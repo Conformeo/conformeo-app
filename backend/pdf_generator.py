@@ -1,8 +1,7 @@
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import cm
-from reportlab.lib.utils import ImageReader # Pour lire l'image modifiée
-from PIL import Image, ImageOps # <--- NOUVEAUX IMPORTS
+from PIL import Image, ImageOps
 import os
 
 def generate_pdf(chantier, rapports, output_path):
@@ -23,7 +22,8 @@ def generate_pdf(chantier, rapports, output_path):
     y_position = height - 7 * cm
     
     for rapport in rapports:
-        if y_position < 8 * cm: # Marge de sécurité pour image + texte
+        # Nouvelle page si besoin
+        if y_position < 10 * cm: 
             c.showPage()
             y_position = height - 3 * cm
             
@@ -41,22 +41,29 @@ def generate_pdf(chantier, rapports, output_path):
             
             if os.path.exists(image_path):
                 try:
-                    # --- CORRECTION ROTATION ---
-                    # 1. On ouvre l'image avec Pillow
-                    pil_image = Image.open(image_path)
+                    # --- CORRECTION ROTATION "HARD" ---
+                    # 1. On ouvre l'image
+                    img = Image.open(image_path)
                     
-                    # 2. On applique la rotation selon les données EXIF (magie !)
-                    pil_image = ImageOps.exif_transpose(pil_image)
+                    # 2. On corrige l'orientation selon les données EXIF
+                    # (Si l'image n'a pas d'EXIF, ça renvoie l'image telle quelle)
+                    transposed_img = ImageOps.exif_transpose(img)
                     
-                    # 3. On convertit pour ReportLab
-                    rl_image = ImageReader(pil_image)
+                    # 3. On écrase le fichier sur le disque avec la version corrigée
+                    # Cela force ReportLab à lire la bonne version
+                    transposed_img.save(image_path)
                     
-                    # 4. On dessine
-                    c.drawImage(rl_image, 2.5 * cm, y_position - 6 * cm, width=8*cm, height=6*cm, preserveAspectRatio=True)
+                    # 4. On ferme l'image pour libérer la mémoire
+                    img.close()
+                    
+                    # 5. On dessine l'image corrigée
+                    # On fixe une largeur de 8cm et on laisse la hauteur s'adapter (preserveAspectRatio)
+                    c.drawImage(image_path, 2.5 * cm, y_position - 6 * cm, width=8*cm, height=6*cm, preserveAspectRatio=True)
+                    
                     y_position -= 7 * cm
                 except Exception as e:
                     print(f"Erreur image: {e}")
-                    c.drawString(2.5 * cm, y_position, "[Erreur image]")
+                    c.drawString(2.5 * cm, y_position, "[Erreur traitement image]")
                     y_position -= 1 * cm
             else:
                 y_position -= 1 * cm
