@@ -32,7 +32,7 @@
   </ion-grid>
 
   <ion-list>
-    <ion-item *ngFor="let mat of materiels" (click)="moveMateriel(mat)" button detail="true">
+    <<ion-item *ngFor="let mat of filteredMateriels" (click)="moveMateriel(mat)" button detail="true">
       <ion-label>
         <h2>{{ mat.nom }}</h2>
         <p>Ref: {{ mat.reference }}</p>

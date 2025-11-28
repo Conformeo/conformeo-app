@@ -59,23 +59,39 @@ export class MaterielPage implements OnInit {
 
   // --- LE NOUVEAU SCANNER (Beaucoup plus court !) ---
   async startScan() {
-    // 1. Demander la permission
-    const { camera } = await BarcodeScanner.requestPermissions();
-    
-    if (camera === 'granted' || camera === 'limited') {
-      // 2. Lancer le scan (ça ouvre une caméra native tout seul)
+    try {
+      // 1. Demander la permission explicitement
+      const { camera } = await BarcodeScanner.requestPermissions();
+      
+      if (camera !== 'granted' && camera !== 'limited') {
+        alert("Permission caméra refusée. Allez dans les paramètres pour l'activer.");
+        return;
+      }
+
+      // 2. (Android Uniquement) Vérifier si le module Google est installé
+      // C'est souvent ça qui bloque "silencieusement"
+      const { available } = await BarcodeScanner.isGoogleBarcodeScannerModuleAvailable();
+      
+      if (!available) {
+        // On demande l'installation (ça se fait en fond)
+        await BarcodeScanner.installGoogleBarcodeScannerModule();
+      }
+
+      // 3. Lancer le scan
       const { barcodes } = await BarcodeScanner.scan({
-        formats: [BarcodeFormat.QrCode] // On cherche des QR Codes
+        formats: [BarcodeFormat.QrCode]
       });
 
-      // 3. Si on a un résultat
+      // 4. Résultat
       if (barcodes.length > 0) {
         const code = barcodes[0].rawValue;
-        console.log('Code trouvé:', code);
         this.handleScanResult(code);
       }
-    } else {
-      alert("Permission caméra refusée");
+
+    } catch (e: any) {
+      // 5. Afficher l'erreur à l'écran pour déboguer
+      console.error(e);
+      alert("Erreur Scanner : " + (e.message || JSON.stringify(e)));
     }
   }
 
