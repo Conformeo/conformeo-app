@@ -93,12 +93,18 @@ export class ChantierDetailsPage implements OnInit {
   // Helper pour afficher l'image complète (Backend URL + Localhost)
   getFullUrl(path: string | undefined) {
     if (!path) return '';
-    return 'http://127.0.0.1:8000' + path;
+    
+    // Si l'URL commence déjà par http (ex: image externe), on la garde
+    if (path.startsWith('http')) return path;
+
+    // Sinon, on colle l'URL de ton serveur Render
+    // ATTENTION : Mets bien TON adresse Render à toi
+    return 'https://conformeo-api.onrender.com' + path;
   }
 
   downloadPdf() {
     // Astuce simple : on ouvre l'URL du backend dans le navigateur du téléphone
-    const url = `http://127.0.0.1:8000/chantiers/${this.chantierId}/pdf`;
+    const url = `https://conformeo-api.onrender.com/chantiers/${this.chantierId}/pdf`;
     window.open(url, '_system');
   }
 }
