@@ -37,12 +37,14 @@ jobs:
   mobile-build:
     runs-on: ubuntu-latest
 
-    defaults:
-      run:
-        working-directory: ./conformeo-mobile
-
+    # J'ai enlevé le "defaults" ici pour qu'on puisse voir la racine du projet d'abord
+    
     steps:
     - uses: actions/checkout@v3
+
+    # NOUVELLE ÉTAPE : On regarde ce qu'il y a dans le dossier
+    - name: Débogage - Lister les fichiers
+      run: ls -R
 
     - name: Installer Node.js
       uses: actions/setup-node@v3
@@ -53,8 +55,10 @@ jobs:
       run: npm install -g @ionic/cli
 
     - name: Installer les dépendances (npm)
+      # On force le chemin ici pour être sûr
+      working-directory: ./conformeo-mobile
       run: npm install
 
     - name: Tenter de construire l'app (Build)
-      # Si cette étape échoue, c'est que tu as cassé le code Angular
+      working-directory: ./conformeo-mobile
       run: ionic build --prod
