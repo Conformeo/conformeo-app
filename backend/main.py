@@ -204,3 +204,15 @@ def transfer_materiel(materiel_id: int, chantier_id: Optional[int] = None, db: S
     db.commit()
     db.refresh(mat)
     return {"status": "success", "nouveau_lieu": chantier_id if chantier_id else "Dépôt"}
+
+
+# Route pour assigner une signature à un chantier
+@app.put("/chantiers/{chantier_id}/signature")
+def sign_chantier(chantier_id: int, signature_url: str, db: Session = Depends(get_db)):
+    chantier = db.query(models.Chantier).filter(models.Chantier.id == chantier_id).first()
+    if not chantier:
+        raise HTTPException(status_code=404, detail="Chantier introuvable")
+    
+    chantier.signature_url = signature_url
+    db.commit()
+    return {"status": "signed", "url": signature_url}

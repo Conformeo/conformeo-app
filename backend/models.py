@@ -12,9 +12,9 @@ class Chantier(Base):
     client = Column(String)
     est_actif = Column(Boolean, default=True)
     date_creation = Column(DateTime, default=datetime.now)
+    signature_url = Column(String, nullable=True)
     
     rapports = relationship("Rapport", back_populates="chantier")
-    # 👇 NOUVELLE LIGNE
     materiels = relationship("Materiel", back_populates="chantier")
 
 class Rapport(Base):
