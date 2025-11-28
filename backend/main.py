@@ -4,6 +4,7 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 import models, schemas, security
 from database import engine, get_db
@@ -216,3 +217,15 @@ def sign_chantier(chantier_id: int, signature_url: str, db: Session = Depends(ge
     chantier.signature_url = signature_url
     db.commit()
     return {"status": "signed", "url": signature_url}
+
+
+# --- ROUTE DE RÉPARATION (A supprimer plus tard) ---
+@app.get("/fix_db_signature")
+def fix_db_signature(db: Session = Depends(get_db)):
+    try:
+        # On exécute la commande SQL pour ajouter la colonne manquant
+        db.execute(text("ALTER TABLE chantiers ADD COLUMN signature_url VARCHAR"))
+        db.commit()
+        return {"message": "Succès ! La colonne signature_url a été ajoutée."}
+    except Exception as e:
+        return {"message": "Erreur ou colonne déjà présente", "details": str(e)}
