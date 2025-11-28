@@ -10,16 +10,18 @@
 <ion-content class="ion-padding">
   
   <form (ngSubmit)="save()">
-    <ion-list lines="none"> <ion-item>
-        <ion-input label="Nom du chantier" labelPlacement="floating" [(ngModel)]="chantier.nom" name="nom" placeholder="Ex: Résidence Les Fleurs"></ion-input>
+    <ion-list lines="none">
+      
+      <ion-item>
+        <ion-input label="Nom" labelPlacement="stacked" [(ngModel)]="chantier.nom" name="nom" placeholder="Nom du chantier"></ion-input>
       </ion-item>
 
       <ion-item>
-        <ion-input label="Client" labelPlacement="floating" [(ngModel)]="chantier.client" name="client" placeholder="Ex: Mairie de Lyon"></ion-input>
+        <ion-input label="Client" labelPlacement="stacked" [(ngModel)]="chantier.client" name="client" placeholder="Nom du client"></ion-input>
       </ion-item>
 
       <ion-item>
-        <ion-input label="Adresse" labelPlacement="floating" [(ngModel)]="chantier.adresse" name="adresse" placeholder="Ex: 12 rue de la République"></ion-input>
+        <ion-input label="Adresse" labelPlacement="stacked" [(ngModel)]="chantier.adresse" name="adresse" placeholder="Adresse complète"></ion-input>
       </ion-item>
 
     </ion-list>

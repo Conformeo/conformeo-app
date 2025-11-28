@@ -1,34 +1,32 @@
-// 1. Fond général de la page (Gris très foncé, presque noir)
+// 1. Fond de la page
 ion-content {
-  --background: #121212;
-  --color: #ffffff; // Texte blanc par défaut
-}
-
-// 2. La liste (transparente pour laisser voir le fond)
-ion-list {
-  background: transparent;
-  padding-top: 20px;
-}
-
-// 3. Les champs de saisie (Cartes gris foncé)
-ion-item {
-  --background: #2a2a2a;       // Gris foncé pour le champ
-  --color: #ffffff;            // Texte blanc
-  --border-radius: 8px;        // Coins arrondis
-  margin-bottom: 16px;         // Espace entre les champs
-  border: 1px solid #333333;   // Bordure subtile
-  
-  // Style spécifique de l'input à l'intérieur
-  ion-input {
-    --placeholder-color: #9e9e9e; // Gris clair pour le texte d'aide "Ex: ..."
-    --color: #ffffff;             // Blanc pour ce qu'on tape
-  }
-}
-
-// 4. Le Bouton "Créer"
-ion-button[type="submit"] {
-  margin-top: 20px;
-  --background: var(--ion-color-primary); // Bleu Ionic (ou ta couleur principale)
+  --background: #000000; // Fond noir total
   --color: #ffffff;
-  --border-radius: 8px;
+}
+
+// 2. Les boites de saisie (On force un gris bien visible)
+ion-item {
+  --background: #333333 !important; // Gris foncé visible
+  --color: #ffffff !important;      // Texte du label en blanc
+  
+  border: 1px solid #555555;        // Bordure grise
+  border-radius: 8px;
+  margin-bottom: 15px;
+  
+  // Espace interne pour que ce soit pas collé
+  --padding-start: 10px;
+}
+
+// 3. Le texte qu'on tape à l'intérieur
+ion-input {
+  --color: #ffffff !important;             // Texte tapé en BLANC
+  --placeholder-color: #aaaaaa !important; // Texte d'aide en gris clair
+  font-size: 16px;
+}
+
+// 4. Le bouton
+ion-button {
+  margin-top: 20px;
+  --background: #3880ff; // Bleu standard
+  --color: white;
 }
