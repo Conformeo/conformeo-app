@@ -217,15 +217,42 @@ def sign_chantier(chantier_id: int, signature_url: str, db: Session = Depends(ge
     chantier.signature_url = signature_url
     db.commit()
     return {"status": "signed", "url": signature_url}
+    
+
+# --- ROUTE DE RESET (NETTOYAGE) ---
+@app.get("/reset_data")
+def reset_data(db: Session = Depends(get_db)):
+    try:
+        # 1. On supprime d'abord les enfants (Rapports et Matériels) pour éviter les conflits de clé étrangère
+        num_rapports = db.query(models.Rapport).delete()
+        num_materiels = db.query(models.Materiel).delete()
+        
+        # 2. On supprime les parents (Chantiers)
+        num_chantiers = db.query(models.Chantier).delete()
+        
+        db.commit()
+        
+        return {
+            "status": "Succès", 
+            "message": "La base de données a été nettoyée.",
+            "details": {
+                "rapports_supprimes": num_rapports,
+                "materiels_supprimes": num_materiels,
+                "chantiers_supprimes": num_chantiers
+            }
+        }
+    except Exception as e:
+        db.rollback() # En cas d'erreur, on annule tout
+        return {"status": "Erreur", "details": str(e)}
 
 
 # --- ROUTE DE RÉPARATION (A supprimer plus tard) ---
-@app.get("/fix_db_signature")
-def fix_db_signature(db: Session = Depends(get_db)):
-    try:
-        # On exécute la commande SQL pour ajouter la colonne manquant
-        db.execute(text("ALTER TABLE chantiers ADD COLUMN signature_url VARCHAR"))
-        db.commit()
-        return {"message": "Succès ! La colonne signature_url a été ajoutée."}
-    except Exception as e:
-        return {"message": "Erreur ou colonne déjà présente", "details": str(e)}
+# @app.get("/fix_db_signature")
+# def fix_db_signature(db: Session = Depends(get_db)):
+#     try:
+#         # On exécute la commande SQL pour ajouter la colonne manquant
+#         db.execute(text("ALTER TABLE chantiers ADD COLUMN signature_url VARCHAR"))
+#         db.commit()
+#         return {"message": "Succès ! La colonne signature_url a été ajoutée."}
+#     except Exception as e:
+#         return {"message": "Erreur ou colonne déjà présente", "details": str(e)}
