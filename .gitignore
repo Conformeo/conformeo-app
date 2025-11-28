@@ -1,0 +1,24 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.env
+.DS_Store
+
+# --- Ionic / Node ---
+node_modules/
+www/
+.angular/
+.ionic/
+coverage/
+
+# --- Données locales ---
+backend/uploads/*
+!backend/uploads/.gitkeep
+backend/conformeo_db_data/
+postgres_data/
+
+# --- IDE ---
+.vscode/
+.idea/
