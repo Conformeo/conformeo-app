@@ -7,6 +7,9 @@ import { ApiService, Rapport } from '../../services/api';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { addIcons } from 'ionicons';
 import { camera, time, warning, documentTextOutline } from 'ionicons/icons';
+import { SignatureModalComponent } from './signature-modal/signature-modal.component';
+import { ModalController } from '@ionic/angular';
+import { createOutline } from 'ionicons/icons';
 
 @Component({
   selector: 'app-chantier-details',
@@ -22,9 +25,10 @@ export class ChantierDetailsPage implements OnInit {
 
   constructor(
     private route: ActivatedRoute,
-    private api: ApiService
+    private api: ApiService,
+    private modalCtrl: ModalController
   ) {
-    addIcons({ camera, time, warning, documentTextOutline });
+    addIcons({ camera, time, warning, documentTextOutline, createOutline });
   }
 
   ngOnInit() {
@@ -65,6 +69,21 @@ export class ChantierDetailsPage implements OnInit {
       }
     } catch (e) {
       console.log('Utilisateur a annulé ou erreur caméra', e);
+    }
+  }
+
+  async openSignature() {
+    const modal = await this.modalCtrl.create({
+      component: SignatureModalComponent,
+      componentProps: { chantierId: this.chantierId }
+    });
+
+    await modal.present();
+
+    const { data, role } = await modal.onWillDismiss();
+    if (role === 'confirm') {
+      alert("Chantier signé avec succès !");
+      // Tu pourrais ici afficher la signature sur la page si tu veux
     }
   }
 

@@ -1,0 +1,30 @@
+<ion-header>
+  <ion-toolbar color="primary">
+    <ion-title>Signature Client</ion-title>
+    <ion-buttons slot="end">
+      <ion-button (click)="cancel()">Annuler</ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding" style="--background: #f0f0f0;">
+  
+  <p class="instruction">Signez dans la case ci-dessous :</p>
+
+  <div class="signature-container">
+    <canvas #canvas></canvas>
+  </div>
+
+  <div class="actions">
+    <ion-button color="medium" fill="outline" (click)="clear()">
+      <ion-icon name="refresh-outline" slot="start"></ion-icon>
+      Effacer
+    </ion-button>
+    
+    <ion-button color="success" (click)="save()">
+      <ion-icon name="checkmark-circle-outline" slot="start"></ion-icon>
+      Valider
+    </ion-button>
+  </div>
+
+</ion-content>

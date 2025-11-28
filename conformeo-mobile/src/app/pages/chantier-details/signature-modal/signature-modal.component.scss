@@ -1,0 +1,26 @@
+.instruction {
+  text-align: center;
+  color: #666;
+  margin-bottom: 10px;
+}
+
+.signature-container {
+  background: white;
+  border-radius: 10px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+  overflow: hidden;
+  height: 300px; /* Hauteur de la zone de signature */
+  position: relative;
+  
+  canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+}
+
+.actions {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 20px;
+}

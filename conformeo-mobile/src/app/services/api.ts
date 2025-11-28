@@ -103,4 +103,9 @@ export class ApiService {
     }
     return this.http.put(url, {});
   }
+
+  signChantier(chantierId: number, signatureUrl: string): Observable<any> {
+    // On envoie l'URL en paramètre query pour faire simple
+    return this.http.put(`${this.apiUrl}/chantiers/${chantierId}/signature?signature_url=${encodeURIComponent(signatureUrl)}`, {});
+  }
 }
