@@ -1,5 +1,5 @@
 <ion-header>
-  <ion-toolbar color="dark">
+  <ion-toolbar>
     <ion-title>Nouveau Chantier</ion-title>
     <ion-buttons slot="end">
       <ion-button (click)="cancel()">Fermer</ion-button>
@@ -18,7 +18,8 @@
           label-placement="stacked" 
           [(ngModel)]="chantier.nom" 
           name="nom" 
-          placeholder="Taper le nom ici...">
+          type="text"
+          placeholder="Ex: Résidence Les Fleurs">
         </ion-input>
       </ion-item>
 
@@ -28,7 +29,8 @@
           label-placement="stacked" 
           [(ngModel)]="chantier.client" 
           name="client" 
-          placeholder="Taper le client ici...">
+          type="text"
+          placeholder="Ex: Mairie de Lyon">
         </ion-input>
       </ion-item>
 
@@ -38,7 +40,8 @@
           label-placement="stacked" 
           [(ngModel)]="chantier.adresse" 
           name="adresse" 
-          placeholder="Taper l'adresse ici...">
+          type="text"
+          placeholder="Ex: 12 rue de la République">
         </ion-input>
       </ion-item>
 

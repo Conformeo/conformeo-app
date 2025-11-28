@@ -37,36 +37,3 @@
 /* @import "@ionic/angular/css/palettes/dark.class.css"; */
 // @import '@ionic/angular/css/palettes/dark.system.css';
 
-/* --- AJOUT A LA FIN DE SRC/GLOBAL.SCSS --- */
-
-/* On cible spécifiquement ta modale */
-// app-add-chantier-modal {
-  
-//   /* On force le fond de la page modale en gris foncé */
-//   ion-content {
-//     --background: #121212 !important;
-//   }
-
-//   /* On force les items en BLANC pur pour être sûr de les voir */
-//   ion-item {
-//     --background: #ffffff !important;
-//     --color: #000000 !important; /* Label en noir */
-//     border: 1px solid #ccc;
-//     margin-bottom: 15px;
-//     border-radius: 4px;
-//     display: block !important; /* Force l'affichage */
-//   }
-
-//   /* On force le champ de saisie en noir sur fond blanc */
-//   ion-input {
-//     --color: #000000 !important;
-//     --placeholder-color: #666666 !important;
-//     background: #ffffff !important; 
-//     color: black !important;
-//   }
-  
-//   /* On s'assure que le label est visible */
-//   ion-input .label-text-wrapper {
-//     color: #000000 !important;
-//   }
-// }

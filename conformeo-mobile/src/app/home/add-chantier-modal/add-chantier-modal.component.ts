@@ -1,7 +1,20 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { IonicModule, ModalController } from '@ionic/angular'; // <--- IMPORTANT : IonicModule
+// 👇 ON IMPORTE CHAQUE COMPOSANT ICI (C'est la méthode moderne Standalone)
+import { 
+  IonHeader, 
+  IonToolbar, 
+  IonTitle, 
+  IonButtons, 
+  IonButton, 
+  IonContent, 
+  IonList, 
+  IonItem, 
+  IonInput,
+  ModalController 
+} from '@ionic/angular/standalone';
+
 import { ApiService, Chantier } from '../../services/api';
 
 @Component({
@@ -9,8 +22,20 @@ import { ApiService, Chantier } from '../../services/api';
   templateUrl: './add-chantier-modal.component.html',
   styleUrls: ['./add-chantier-modal.component.scss'],
   standalone: true,
-  // 👇 C'EST CETTE LIGNE QUI FAIT FONCTIONNER LES INPUTS 👇
-  imports: [CommonModule, FormsModule, IonicModule] 
+  // 👇 ON LES AJOUTE DANS L'ARRAY IMPORTS
+  imports: [
+    CommonModule, 
+    FormsModule, 
+    IonHeader, 
+    IonToolbar, 
+    IonTitle, 
+    IonButtons, 
+    IonButton, 
+    IonContent, 
+    IonList, 
+    IonItem, 
+    IonInput
+  ]
 })
 export class AddChantierModalComponent {
 
@@ -37,7 +62,6 @@ export class AddChantierModalComponent {
       },
       error: (err) => {
         console.error('Erreur création', err);
-        alert("Erreur lors de la création");
       }
     });
   }
