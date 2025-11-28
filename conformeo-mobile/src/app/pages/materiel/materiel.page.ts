@@ -4,28 +4,34 @@ import { FormsModule } from '@angular/forms';
 import { 
   IonHeader, IonToolbar, IonTitle, IonContent, IonList, IonItem, IonLabel, 
   IonButtons, IonButton, IonIcon, IonBadge, IonFab, IonFabButton, 
-  AlertController, IonRefresher, IonRefresherContent, IonBackButton
+  AlertController, IonRefresher, IonRefresherContent, IonBackButton,
+  IonSearchbar, IonGrid, IonRow, IonCol
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
-import { add, hammer, construct, home, swapHorizontal } from 'ionicons/icons';
-import { ApiService, Materiel, Chantier } from 'src/app/services/api';
+import { add, hammer, construct, home, swapHorizontal, qrCodeOutline } from 'ionicons/icons';
+import { ApiService, Materiel, Chantier } from '../../services/api';
+
+// 👇 NOUVEAUX IMPORTS POUR ML KIT
+import { BarcodeScanner, BarcodeFormat } from '@capacitor-mlkit/barcode-scanning';
 
 @Component({
   selector: 'app-materiel',
   templateUrl: './materiel.page.html',
   styleUrls: ['./materiel.page.scss'],
   standalone: true,
-  imports: [CommonModule, FormsModule, IonHeader, IonToolbar, IonTitle, IonContent, IonList, IonItem, IonLabel, IonButtons, IonBackButton, IonIcon, IonBadge, IonFab, IonFabButton, IonRefresher, IonRefresherContent]
+  imports: [CommonModule, FormsModule, IonHeader, IonToolbar, IonTitle, IonContent, IonList, IonItem, IonLabel, IonButtons, IonButton, IonIcon, IonBadge, IonFab, IonFabButton, IonRefresher, IonRefresherContent, IonSearchbar, IonGrid, IonRow, IonCol, IonBackButton]
 })
 export class MaterielPage implements OnInit {
   materiels: Materiel[] = [];
+  filteredMateriels: Materiel[] = [];
   chantiers: Chantier[] = [];
+  searchTerm: string = '';
 
   constructor(
     private api: ApiService,
     private alertCtrl: AlertController
   ) {
-    addIcons({ add, hammer, construct, home, swapHorizontal });
+    addIcons({ add, hammer, construct, home, swapHorizontal, qrCodeOutline });
   }
 
   ngOnInit() {
@@ -33,19 +39,57 @@ export class MaterielPage implements OnInit {
   }
 
   loadData(event?: any) {
-    // 1. Charger le matériel
     this.api.getMateriels().subscribe(mats => {
       this.materiels = mats;
+      this.filteredMateriels = mats;
       if (event) event.target.complete();
     });
 
-    // 2. Charger les chantiers (pour la liste de choix lors du transfert)
     this.api.getChantiers().subscribe(chantiers => {
       this.chantiers = chantiers;
     });
   }
 
-  // --- ACTION 1 : Créer un outil ---
+  filterMateriels() {
+    const term = this.searchTerm.toLowerCase();
+    this.filteredMateriels = this.materiels.filter(m => 
+      m.nom.toLowerCase().includes(term) || m.reference.toLowerCase().includes(term)
+    );
+  }
+
+  // --- LE NOUVEAU SCANNER (Beaucoup plus court !) ---
+  async startScan() {
+    // 1. Demander la permission
+    const { camera } = await BarcodeScanner.requestPermissions();
+    
+    if (camera === 'granted' || camera === 'limited') {
+      // 2. Lancer le scan (ça ouvre une caméra native tout seul)
+      const { barcodes } = await BarcodeScanner.scan({
+        formats: [BarcodeFormat.QrCode] // On cherche des QR Codes
+      });
+
+      // 3. Si on a un résultat
+      if (barcodes.length > 0) {
+        const code = barcodes[0].rawValue;
+        console.log('Code trouvé:', code);
+        this.handleScanResult(code);
+      }
+    } else {
+      alert("Permission caméra refusée");
+    }
+  }
+
+  handleScanResult(code: string) {
+    const mat = this.materiels.find(m => m.reference === code);
+    
+    if (mat) {
+      this.moveMateriel(mat);
+    } else {
+      alert(`Aucun matériel trouvé avec la référence : ${code}`);
+    }
+  }
+
+  // --- Création (inchangé) ---
   async addMateriel() {
     const alert = await this.alertCtrl.create({
       header: 'Nouvel Outil',
@@ -70,25 +114,14 @@ export class MaterielPage implements OnInit {
     await alert.present();
   }
 
-  // --- ACTION 2 : Déplacer un outil ---
+  // --- Déplacement (inchangé) ---
   async moveMateriel(mat: Materiel) {
-    // On prépare les options : "Dépôt" + La liste des chantiers
     const inputs: any[] = [
-      {
-        type: 'radio',
-        label: '🏠 Retour au Dépôt',
-        value: null,
-        checked: mat.chantier_id === null
-      }
+      { type: 'radio', label: '🏠 Retour au Dépôt', value: null, checked: mat.chantier_id === null }
     ];
 
     this.chantiers.forEach(c => {
-      inputs.push({
-        type: 'radio',
-        label: `🏗️ ${c.nom}`,
-        value: c.id,
-        checked: mat.chantier_id === c.id
-      });
+      inputs.push({ type: 'radio', label: `🏗️ ${c.nom}`, value: c.id, checked: mat.chantier_id === c.id });
     });
 
     const alert = await this.alertCtrl.create({
@@ -99,10 +132,7 @@ export class MaterielPage implements OnInit {
         {
           text: 'Valider Transfert',
           handler: (chantierId) => {
-            // Appel API
-            this.api.transferMateriel(mat.id!, chantierId).subscribe(() => {
-              this.loadData(); // Rafraichir la liste
-            });
+            this.api.transferMateriel(mat.id!, chantierId).subscribe(() => this.loadData());
           }
         }
       ]
@@ -110,7 +140,6 @@ export class MaterielPage implements OnInit {
     await alert.present();
   }
 
-  // Helper pour trouver le nom du chantier
   getChantierName(id: number | null | undefined): string {
     if (!id) return 'Au Dépôt';
     const c = this.chantiers.find(x => x.id === id);
