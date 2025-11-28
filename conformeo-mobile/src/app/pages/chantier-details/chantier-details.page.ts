@@ -49,7 +49,8 @@ export class ChantierDetailsPage implements OnInit {
         quality: 90,
         allowEditing: false,
         resultType: CameraResultType.Uri,
-        source: CameraSource.Camera // Ou Prompt pour laisser le choix (Gallerie/Camera)
+        source: CameraSource.Camera,
+        correctOrientation: true
       });
 
       if (image.webPath) {
