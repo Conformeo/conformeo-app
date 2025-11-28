@@ -25,7 +25,11 @@ export interface Rapport {
 export class ApiService {
   // ATTENTION : Pour Android (émulateur), localhost devient 10.0.2.2.
   // Pour le navigateur web, on reste sur 127.0.0.1 ou localhost.
-  private apiUrl = 'http://127.0.0.1:8000'; 
+  // EN LOCAL (Commente cette ligne)
+  // private apiUrl = 'http://127.0.0.1:8000'; 
+
+  // EN PROD (Décommente et mets TON url Render sans le slash à la fin)
+  private apiUrl = 'https://conformeo-api.onrender.com';
 
   constructor(private http: HttpClient) { }
 
