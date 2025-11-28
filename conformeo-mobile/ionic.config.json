@@ -1,0 +1,7 @@
+{
+  "name": "conformeo-mobile",
+  "integrations": {
+    "capacitor": {}
+  },
+  "type": "angular-standalone"
+}

@@ -1,0 +1,57 @@
+<ion-header [translucent]="true">
+  <ion-toolbar color="primary">
+    <ion-title>
+      Conforméo
+    </ion-title>
+
+    <ion-buttons slot="start">
+      <ion-button routerLink="/dashboard">
+        <ion-icon name="stats-chart-outline"></ion-icon> </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content [fullscreen]="true" class="ion-padding-top">
+  
+  <ion-refresher slot="fixed" (ionRefresh)="loadChantiers($event)">
+    <ion-refresher-content></ion-refresher-content>
+  </ion-refresher>
+
+  <h2 style="margin-left: 16px; margin-top: 10px; font-weight: 700;">
+    Mes Chantiers
+  </h2>
+  
+  <div *ngIf="chantiers.length === 0" style="text-align: center; margin-top: 50px; opacity: 0.6;">
+    <p>Aucun chantier trouvé.</p>
+  </div>
+
+  <ion-list style="background: transparent;">
+    <ion-card *ngFor="let c of chantiers" [routerLink]="['/chantier', c.id]" button="true">
+      <img alt="Chantier" src="https://ionicframework.com/docs/img/demos/card-media.png" />
+      <ion-card-header>
+        <ion-card-subtitle>
+          <ion-icon name="business"></ion-icon> {{ c.client }}
+        </ion-card-subtitle>
+        <ion-card-title>{{ c.nom }}</ion-card-title>
+      </ion-card-header>
+
+      <ion-card-content>
+        <div style="display: flex; align-items: center; margin-bottom: 10px;">
+          <ion-icon name="location" style="margin-right: 5px;"></ion-icon>
+          {{ c.adresse }}
+        </div>
+
+        <ion-chip color="success" *ngIf="c.est_actif">
+          <ion-icon name="checkmark-circle"></ion-icon>
+          <ion-label>Actif</ion-label>
+        </ion-chip>
+      </ion-card-content>
+    </ion-card>
+  </ion-list>
+
+  <ion-fab vertical="bottom" horizontal="end" slot="fixed">
+    <ion-fab-button (click)="openAddModal()"> <ion-icon name="add"></ion-icon>
+    </ion-fab-button>
+  </ion-fab>
+
+</ion-content>

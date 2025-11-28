@@ -1,0 +1,75 @@
+import { Injectable } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Observable } from 'rxjs';
+
+export interface Chantier {
+  id?: number;
+  nom: string;
+  adresse: string;
+  client: string;
+  est_actif: boolean;
+}
+
+export interface Rapport {
+  id?: number;
+  titre: string;
+  description: string;
+  photo_url?: string;
+  chantier_id: number;
+  date_creation?: string;
+}
+
+@Injectable({
+  providedIn: 'root'
+})
+export class ApiService {
+  // ATTENTION : Pour Android (émulateur), localhost devient 10.0.2.2.
+  // Pour le navigateur web, on reste sur 127.0.0.1 ou localhost.
+  private apiUrl = 'http://127.0.0.1:8000'; 
+
+  constructor(private http: HttpClient) { }
+
+  // Chantiers
+  getChantiers(): Observable<Chantier[]> {
+    return this.http.get<Chantier[]>(`${this.apiUrl}/chantiers`);
+  }
+
+  // Créer un nouveau chantier
+  createChantier(chantier: Chantier): Observable<Chantier> {
+    return this.http.post<Chantier>(`${this.apiUrl}/chantiers`, chantier);
+  }
+
+  // Récupérer un seul chantier
+  getChantierById(id: number): Observable<Chantier> {
+    return this.http.get<Chantier>(`${this.apiUrl}/chantiers/${id}`); // Note: On n'a pas créé cette route API spécifique, on fera sans pour l'instant ou on filtre en local, mais pour le MVP on va supposer qu'on charge la liste.
+    // Correction pour le MVP rapide : On va tricher un peu si la route backend n'existe pas, mais créons les méthodes pour les rapports d'abord.
+  }
+
+  // 1. Récupérer les rapports d'un chantier
+  getRapports(chantierId: number): Observable<Rapport[]> {
+    return this.http.get<Rapport[]>(`${this.apiUrl}/chantiers/${chantierId}/rapports`);
+  }
+
+  // 2. Envoyer une photo (Upload)
+  uploadPhoto(blob: Blob): Observable<{url: string}> {
+    const formData = new FormData();
+    formData.append('file', blob, 'photo_chantier.jpg');
+    return this.http.post<{url: string}>(`${this.apiUrl}/upload`, formData);
+  }
+
+  // 3. Créer le rapport (Lien texte + photo)
+  createRapport(rapport: Rapport, photoUrl?: string): Observable<Rapport> {
+    // L'API attend le paramètre photo_url dans l'URL (query param) ou le body.
+    // Dans notre code Python précédent : create_rapport(..., photo_url: Optional[str] = None)
+    // On va passer photo_url en query param pour faire simple
+    let url = `${this.apiUrl}/rapports`;
+    if (photoUrl) {
+      url += `?photo_url=${encodeURIComponent(photoUrl)}`;
+    }
+    return this.http.post<Rapport>(url, rapport);
+  }
+
+  getDashboardStats(): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/dashboard/stats`);
+  }
+}
