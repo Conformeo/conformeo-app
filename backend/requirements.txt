@@ -3,7 +3,9 @@ uvicorn[standard]
 sqlalchemy
 psycopg2-binary
 pydantic
-passlib[bcrypt]   # Pour hacher les mots de passe
-python-jose[cryptography] # Pour générer les tokens de sécurité
-python-multipart  # Pour le formulaire de login
+passlib[bcrypt]
+python-jose[cryptography]
+python-multipart
 email-validator
+bcrypt==4.0.1
+reportlab      <-- AJOUTE CETTE LIGNE

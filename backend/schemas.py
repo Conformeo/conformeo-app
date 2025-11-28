@@ -17,7 +17,7 @@ class UserOut(BaseModel):
     is_active: bool
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # Schéma pour le Token (réponse du login)
 class Token(BaseModel):
@@ -39,7 +39,7 @@ class ChantierOut(ChantierBase):
     # date_creation: datetime  <-- Optionnel pour l'instant si tu n'as pas l'import datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 # --- Schémas Rapports ---
@@ -57,4 +57,4 @@ class RapportOut(RapportBase):
     date_creation: datetime # Assure-toi d'avoir importé datetime from datetime en haut
 
     class Config:
-        orm_mode = True
+        from_attributes = True
