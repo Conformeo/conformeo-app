@@ -165,3 +165,42 @@ def get_stats(db: Session = Depends(get_db)):
         "rapports": total_rapports,
         "alertes": alertes
     }
+
+
+# ... (tout le reste au-dessus)
+
+# --- Routes Matériel ---
+
+# 1. Créer un outil
+@app.post("/materiels", response_model=schemas.MaterielOut)
+def create_materiel(mat: schemas.MaterielCreate, db: Session = Depends(get_db)):
+    # Par défaut, un nouveau matériel est au dépôt (chantier_id = None)
+    new_mat = models.Materiel(
+        nom=mat.nom,
+        reference=mat.reference,
+        etat=mat.etat,
+        chantier_id=None 
+    )
+    db.add(new_mat)
+    db.commit()
+    db.refresh(new_mat)
+    return new_mat
+
+# 2. Lister tout le matériel
+@app.get("/materiels", response_model=List[schemas.MaterielOut])
+def read_materiels(db: Session = Depends(get_db)):
+    return db.query(models.Materiel).all()
+
+# 3. Déplacer un outil (Assignation)
+# Si chantier_id est 0 ou absent, on considère que c'est retour au dépôt
+@app.put("/materiels/{materiel_id}/transfert")
+def transfer_materiel(materiel_id: int, chantier_id: Optional[int] = None, db: Session = Depends(get_db)):
+    mat = db.query(models.Materiel).filter(models.Materiel.id == materiel_id).first()
+    if not mat:
+        raise HTTPException(status_code=404, detail="Matériel introuvable")
+    
+    # Mise à jour du lieu
+    mat.chantier_id = chantier_id
+    db.commit()
+    db.refresh(mat)
+    return {"status": "success", "nouveau_lieu": chantier_id if chantier_id else "Dépôt"}

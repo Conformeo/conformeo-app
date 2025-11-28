@@ -58,3 +58,20 @@ class RapportOut(RapportBase):
 
     class Config:
         from_attributes = True
+
+
+# --- Schémas Matériel ---
+class MaterielBase(BaseModel):
+    nom: str
+    reference: str
+    etat: str = "Bon"
+
+class MaterielCreate(MaterielBase):
+    pass
+
+class MaterielOut(MaterielBase):
+    id: int
+    chantier_id: Optional[int] = None # Peut être null (Dépôt)
+
+    class Config:
+        from_attributes = True # (Rappel: on a changé orm_mode en from_attributes)
