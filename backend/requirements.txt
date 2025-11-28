@@ -8,4 +8,5 @@ python-jose[cryptography]
 python-multipart
 email-validator
 bcrypt==4.0.1
+reportlab
 Pillow
