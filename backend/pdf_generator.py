@@ -8,7 +8,11 @@ def generate_pdf(chantier, rapports, output_path):
     c = canvas.Canvas(output_path, pagesize=A4)
     width, height = A4
     
-    # 1. En-tête
+    # --- CONSTANTES DE MISE EN PAGE ---
+    MARGE_BAS = 2 * cm
+    DEPART_HAUT = height - 3 * cm
+    
+    # 1. En-tête (Première page uniquement)
     c.setFont("Helvetica-Bold", 24)
     c.drawString(2 * cm, height - 3 * cm, f"Rapport de Chantier: {chantier.nom}")
     
@@ -18,57 +22,59 @@ def generate_pdf(chantier, rapports, output_path):
     
     c.line(2 * cm, height - 5 * cm, width - 2 * cm, height - 5 * cm)
     
-    # 2. Liste des Rapports
+    # Position de départ pour les rapports
     y_position = height - 7 * cm
     
     for rapport in rapports:
-        # Nouvelle page si besoin
-        if y_position < 10 * cm: 
-            c.showPage()
-            y_position = height - 3 * cm
+        # --- CALCUL DE LA HAUTEUR NÉCESSAIRE ---
+        # Hauteur de base (Titre + Desc + Espaces)
+        hauteur_requise = 2.5 * cm 
+        
+        # Vérification si image existe
+        image_path = None
+        if rapport.photo_url:
+            filename = rapport.photo_url.replace("/static/", "")
+            potential_path = os.path.join("uploads", filename)
+            if os.path.exists(potential_path):
+                image_path = potential_path
+                hauteur_requise += 7 * cm # Image (6cm) + Marge (1cm)
+
+        # --- DÉCISION SAUT DE PAGE ---
+        # Si la position actuelle moins la hauteur requise est trop basse...
+        if (y_position - hauteur_requise) < MARGE_BAS:
+            c.showPage() # Hop, nouvelle page
+            y_position = DEPART_HAUT # On repart d'en haut
             
+        # --- DESSIN DU CONTENU ---
+        # 1. Titre
         c.setFont("Helvetica-Bold", 14)
         c.drawString(2 * cm, y_position, f"• {rapport.titre}")
         y_position -= 1 * cm
         
+        # 2. Description
         c.setFont("Helvetica", 10)
         c.drawString(2.5 * cm, y_position, f"Note: {rapport.description}")
         y_position -= 1 * cm
         
-        if rapport.photo_url:
-            filename = rapport.photo_url.replace("/static/", "")
-            image_path = os.path.join("uploads", filename)
-            
-            if os.path.exists(image_path):
-                try:
-                    # --- CORRECTION ROTATION "HARD" ---
-                    # 1. On ouvre l'image
-                    img = Image.open(image_path)
-                    
-                    # 2. On corrige l'orientation selon les données EXIF
-                    # (Si l'image n'a pas d'EXIF, ça renvoie l'image telle quelle)
-                    transposed_img = ImageOps.exif_transpose(img)
-                    
-                    # 3. On écrase le fichier sur le disque avec la version corrigée
-                    # Cela force ReportLab à lire la bonne version
-                    transposed_img.save(image_path)
-                    
-                    # 4. On ferme l'image pour libérer la mémoire
-                    img.close()
-                    
-                    # 5. On dessine l'image corrigée
-                    # On fixe une largeur de 8cm et on laisse la hauteur s'adapter (preserveAspectRatio)
-                    c.drawImage(image_path, 2.5 * cm, y_position - 6 * cm, width=8*cm, height=6*cm, preserveAspectRatio=True)
-                    
-                    y_position -= 7 * cm
-                except Exception as e:
-                    print(f"Erreur image: {e}")
-                    c.drawString(2.5 * cm, y_position, "[Erreur traitement image]")
-                    y_position -= 1 * cm
-            else:
+        # 3. Image (si elle existe et a été trouvée)
+        if image_path:
+            try:
+                # Correction Rotation (Ton code qui marche)
+                img = Image.open(image_path)
+                transposed_img = ImageOps.exif_transpose(img)
+                transposed_img.save(image_path)
+                img.close()
+                
+                # Dessin
+                c.drawImage(image_path, 2.5 * cm, y_position - 6 * cm, width=8*cm, height=6*cm, preserveAspectRatio=True)
+                y_position -= 7 * cm # On descend de la hauteur de l'image + marge
+            except Exception as e:
+                print(f"Erreur image: {e}")
+                c.drawString(2.5 * cm, y_position, "[Erreur affichage image]")
                 y_position -= 1 * cm
-
-        y_position -= 1 * cm
+        
+        # Petit espace avant le prochain rapport
+        y_position -= 0.5 * cm
 
     c.save()
     return output_path
