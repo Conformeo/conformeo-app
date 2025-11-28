@@ -75,6 +75,30 @@ def generate_pdf(chantier, rapports, output_path):
         
         # Petit espace avant le prochain rapport
         y_position -= 0.5 * cm
+    
+    # 3. Zone de Signature (Pied de page de la dernière page)
+    # On vérifie s'il reste de la place, sinon nouvelle page
+    if y_position < 5 * cm:
+        c.showPage()
+        y_position = height - 3 * cm
+
+    y_position -= 2 * cm
+    c.line(2 * cm, y_position, width - 2 * cm, y_position) # Ligne de séparation
+    y_position -= 1 * cm
+    
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(width - 8 * cm, y_position, "Signature Client / Conducteur :")
+    
+    if chantier.signature_url:
+        sig_filename = chantier.signature_url.replace("/static/", "")
+        sig_path = os.path.join("uploads", sig_filename)
+        
+        if os.path.exists(sig_path):
+            try:
+                # Signature souvent petite, on la met en bas à droite
+                c.drawImage(sig_path, width - 8 * cm, y_position - 4 * cm, width=5*cm, height=3*cm, preserveAspectRatio=True, mask='auto')
+            except:
+                pass
 
     c.save()
     return output_path
