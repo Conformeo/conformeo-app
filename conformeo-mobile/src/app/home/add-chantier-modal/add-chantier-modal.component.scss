@@ -1,32 +1,33 @@
-// 1. Fond de la page
+// Fond de la modale en noir
 ion-content {
-  --background: #000000; // Fond noir total
-  --color: #ffffff;
+  --background: #1e1e1e;
 }
 
-// 2. Les boites de saisie (On force un gris bien visible)
+// Liste transparente
+ion-list {
+  background: transparent;
+  padding-top: 10px;
+}
+
+// FORCE LES CHAMPS EN BLANC (Comme ça impossible de les rater)
 ion-item {
-  --background: #333333 !important; // Gris foncé visible
-  --color: #ffffff !important;      // Texte du label en blanc
+  --background: #ffffff;      // Fond blanc
+  --color: #000000;           // Texte noir
   
-  border: 1px solid #555555;        // Bordure grise
   border-radius: 8px;
   margin-bottom: 15px;
-  
-  // Espace interne pour que ce soit pas collé
-  --padding-start: 10px;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+
+  ion-input {
+    --placeholder-color: #666666;
+    --color: #000000;
+  }
 }
 
-// 3. Le texte qu'on tape à l'intérieur
-ion-input {
-  --color: #ffffff !important;             // Texte tapé en BLANC
-  --placeholder-color: #aaaaaa !important; // Texte d'aide en gris clair
-  font-size: 16px;
-}
-
-// 4. Le bouton
-ion-button {
-  margin-top: 20px;
-  --background: #3880ff; // Bleu standard
+// Bouton bleu
+ion-button[type="submit"] {
+  margin-top: 25px;
+  --background: #3880ff;
   --color: white;
+  font-weight: bold;
 }

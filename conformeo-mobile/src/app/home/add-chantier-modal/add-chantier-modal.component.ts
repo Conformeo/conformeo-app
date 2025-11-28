@@ -1,7 +1,7 @@
 import { Component } from '@angular/core';
-import { ModalController, IonicModule } from '@ionic/angular'; // Import IonicModule pour les composants UI
-import { FormsModule } from '@angular/forms'; // Pour [(ngModel)]
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { IonicModule, ModalController } from '@ionic/angular'; // <--- IMPORTANT : IonicModule
 import { ApiService, Chantier } from '../../services/api';
 
 @Component({
@@ -9,11 +9,11 @@ import { ApiService, Chantier } from '../../services/api';
   templateUrl: './add-chantier-modal.component.html',
   styleUrls: ['./add-chantier-modal.component.scss'],
   standalone: true,
-  imports: [CommonModule, FormsModule, IonicModule] // <-- Important : IonicModule ici
+  // 👇 C'EST CETTE LIGNE QUI FAIT FONCTIONNER LES INPUTS 👇
+  imports: [CommonModule, FormsModule, IonicModule] 
 })
 export class AddChantierModalComponent {
 
-  // Données vides au départ
   chantier: Chantier = {
     nom: '',
     client: '',
@@ -31,15 +31,13 @@ export class AddChantierModalComponent {
   }
 
   save() {
-    // 1. Appel à l'API Python
     this.api.createChantier(this.chantier).subscribe({
       next: (newItem) => {
-        // 2. Si succès, on ferme la modale en renvoyant le nouveau chantier
         this.modalCtrl.dismiss(newItem, 'confirm');
       },
       error: (err) => {
         console.error('Erreur création', err);
-        alert("Erreur lors de la création du chantier");
+        alert("Erreur lors de la création");
       }
     });
   }
