@@ -1,31 +1,34 @@
-// Force le fond de la modale en gris très clair pour le contraste
+// 1. Fond général de la page (Gris très foncé, presque noir)
 ion-content {
-  --background: #f4f5f8;
+  --background: #121212;
+  --color: #ffffff; // Texte blanc par défaut
 }
 
-// Stylise la liste pour qu'elle soit transparente
+// 2. La liste (transparente pour laisser voir le fond)
 ion-list {
   background: transparent;
   padding-top: 20px;
 }
 
-// Stylise chaque champ de saisie (Item)
+// 3. Les champs de saisie (Cartes gris foncé)
 ion-item {
-  --background: #ffffff;      // Fond BLANC forcé
-  --color: #000000;           // Texte NOIR forcé
-  --border-radius: 8px;       // Coins arrondis
-  margin-bottom: 16px;        // Espace entre les champs
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05); // Légère ombre pour le relief
-
-  // Corrige la couleur du label (le titre du champ)
+  --background: #2a2a2a;       // Gris foncé pour le champ
+  --color: #ffffff;            // Texte blanc
+  --border-radius: 8px;        // Coins arrondis
+  margin-bottom: 16px;         // Espace entre les champs
+  border: 1px solid #333333;   // Bordure subtile
+  
+  // Style spécifique de l'input à l'intérieur
   ion-input {
-    --placeholder-color: #666;
-    --color: #000000;
+    --placeholder-color: #9e9e9e; // Gris clair pour le texte d'aide "Ex: ..."
+    --color: #ffffff;             // Blanc pour ce qu'on tape
   }
 }
 
-// Stylise le bouton pour qu'il ressorte bien
+// 4. Le Bouton "Créer"
 ion-button[type="submit"] {
   margin-top: 20px;
-  --box-shadow: 0 4px 12px rgba(var(--ion-color-primary-rgb), 0.4);
+  --background: var(--ion-color-primary); // Bleu Ionic (ou ta couleur principale)
+  --color: #ffffff;
+  --border-radius: 8px;
 }
