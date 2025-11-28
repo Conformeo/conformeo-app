@@ -7,15 +7,20 @@
 .signature-container {
   background: white;
   border-radius: 10px;
+  border: 1px solid #ccc; /* Bordure pour bien voir la zone */
   box-shadow: 0 4px 10px rgba(0,0,0,0.1);
   overflow: hidden;
-  height: 300px; /* Hauteur de la zone de signature */
+  height: 300px; 
+  width: 100%; /* Force la largeur */
   position: relative;
   
   canvas {
     width: 100%;
     height: 100%;
     display: block;
+    /* 👇 TRES IMPORTANT : Empêche le scroll quand on dessine */
+    touch-action: none; 
+    cursor: crosshair;
   }
 }
 

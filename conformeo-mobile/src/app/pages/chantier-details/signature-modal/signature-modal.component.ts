@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { IonicModule, ModalController } from '@ionic/angular';
 import { addIcons } from 'ionicons';
 import { refreshOutline, checkmarkCircleOutline } from 'ionicons/icons';
-import SignaturePad from 'signature_pad'; // La librairie
+import SignaturePad from 'signature_pad';
 import { ApiService } from '../../../services/api';
 
 @Component({
@@ -14,9 +14,9 @@ import { ApiService } from '../../../services/api';
   imports: [CommonModule, IonicModule]
 })
 export class SignatureModalComponent implements AfterViewInit {
-  @ViewChild('canvas', { static: true }) canvasInfo!: ElementRef;
+  @ViewChild('canvas', { static: false }) canvasInfo!: ElementRef;
   signaturePad!: SignaturePad;
-  chantierId!: number; // On recevra l'ID du chantier
+  chantierId!: number;
 
   constructor(
     private modalCtrl: ModalController,
@@ -26,19 +26,34 @@ export class SignatureModalComponent implements AfterViewInit {
   }
 
   ngAfterViewInit() {
-    // Initialisation du Pad
+    // 👇 ON ATTEND 500ms QUE LA MODALE SOIT OUVERTE
+    setTimeout(() => {
+      this.initPad();
+    }, 500);
+  }
+
+  initPad() {
     const canvas = this.canvasInfo.nativeElement;
     
-    // Astuce pour la netteté sur écran rétina/mobile
+    // Fonction pour gérer la résolution (Retina display, etc.)
     const ratio = Math.max(window.devicePixelRatio || 1, 1);
+    
+    // On définit la taille réelle du dessin
     canvas.width = canvas.offsetWidth * ratio;
     canvas.height = canvas.offsetHeight * ratio;
+    
+    // On demande au contexte 2D de s'adapter
     canvas.getContext("2d").scale(ratio, ratio);
 
     this.signaturePad = new SignaturePad(canvas, {
-      backgroundColor: 'rgb(255, 255, 255)', // Fond blanc
-      penColor: 'rgb(0, 0, 0)' // Encre noire
+      backgroundColor: 'rgb(255, 255, 255)',
+      penColor: 'rgb(0, 0, 0)',
+      minWidth: 2, // Trait un peu plus épais pour être visible
+      maxWidth: 4
     });
+    
+    // Petite astuce : on efface tout de suite pour être sûr que c'est propre
+    this.signaturePad.clear(); 
   }
 
   clear() {
@@ -55,17 +70,17 @@ export class SignatureModalComponent implements AfterViewInit {
       return;
     }
 
-    // 1. Convertir le dessin en Fichier (Blob)
+    // On réduit un peu la taille de l'image pour l'upload (optionnel mais mieux pour la perf)
     const dataUrl = this.signaturePad.toDataURL('image/png');
+    
+    // Conversion DataURL -> Blob
     const blob = await (await fetch(dataUrl)).blob();
 
-    // 2. Uploader l'image via ton API existante
+    // Upload
     this.api.uploadPhoto(blob).subscribe({
       next: (res) => {
-        const signatureUrl = res.url; // L'URL sur Render
+        const signatureUrl = res.url;
         
-        // 3. Sauvegarder l'URL dans le Chantier
-        // Note: Il faut ajouter cette méthode dans l'ApiService juste après
         this.api.signChantier(this.chantierId, signatureUrl).subscribe(() => {
           this.modalCtrl.dismiss(signatureUrl, 'confirm');
         });
