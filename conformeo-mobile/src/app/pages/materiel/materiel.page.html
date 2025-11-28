@@ -1,0 +1,41 @@
+<ion-header>
+  <ion-toolbar color="primary">
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/home"></ion-back-button>
+    </ion-buttons>
+    <ion-title>Matériel & Stocks</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  
+  <ion-refresher slot="fixed" (ionRefresh)="loadData($event)">
+    <ion-refresher-content></ion-refresher-content>
+  </ion-refresher>
+
+  <div *ngIf="materiels.length === 0" style="text-align: center; margin-top: 50px; opacity: 0.6;">
+    <ion-icon name="hammer" style="font-size: 3em;"></ion-icon>
+    <p>Aucun matériel enregistré.</p>
+  </div>
+
+  <ion-list>
+    <ion-item *ngFor="let mat of materiels" (click)="moveMateriel(mat)" button detail="true">
+      <ion-label>
+        <h2>{{ mat.nom }}</h2>
+        <p>Ref: {{ mat.reference }}</p>
+      </ion-label>
+      
+      <ion-badge slot="end" [color]="mat.chantier_id ? 'warning' : 'success'">
+        <ion-icon [name]="mat.chantier_id ? 'construct' : 'home'"></ion-icon>
+        {{ getChantierName(mat.chantier_id) }}
+      </ion-badge>
+    </ion-item>
+  </ion-list>
+
+  <ion-fab vertical="bottom" horizontal="end" slot="fixed">
+    <ion-fab-button color="dark" (click)="addMateriel()">
+      <ion-icon name="add"></ion-icon>
+    </ion-fab-button>
+  </ion-fab>
+
+</ion-content>

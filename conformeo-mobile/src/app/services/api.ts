@@ -19,6 +19,14 @@ export interface Rapport {
   date_creation?: string;
 }
 
+export interface Materiel {
+  id?: number;
+  nom: string;
+  reference: string;
+  etat: string;
+  chantier_id?: number | null; // null = Dépôt
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -75,5 +83,24 @@ export class ApiService {
 
   getDashboardStats(): Observable<any> {
     return this.http.get<any>(`${this.apiUrl}/dashboard/stats`);
+  }
+
+  getMateriels(): Observable<Materiel[]> {
+    return this.http.get<Materiel[]>(`${this.apiUrl}/materiels`);
+  }
+
+  createMateriel(mat: Materiel): Observable<Materiel> {
+    return this.http.post<Materiel>(`${this.apiUrl}/materiels`, mat);
+  }
+
+  transferMateriel(materielId: number, chantierId: number | null): Observable<any> {
+    // Si chantierId est null, l'API comprendra "Retour dépôt" si on gère bien, 
+    // ou on envoie 0. Notre API Python attend un entier optionnel.
+    // Astuce : on envoie le paramètre en query string pour faire simple avec FastAPI
+    let url = `${this.apiUrl}/materiels/${materielId}/transfert`;
+    if (chantierId) {
+      url += `?chantier_id=${chantierId}`;
+    }
+    return this.http.put(url, {});
   }
 }
