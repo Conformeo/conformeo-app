@@ -3,7 +3,7 @@ import { IonHeader, IonToolbar, IonTitle, IonContent, IonList, IonCard, IonCardH
 import { ApiService, Chantier } from '../services/api';
 import { CommonModule } from '@angular/common';
 import { addIcons } from 'ionicons';
-import { business, location, checkmarkCircle, alertCircle, add, statsChartOutline } from 'ionicons/icons';
+import { business, location, checkmarkCircle, alertCircle, add, statsChartOutline, hammerOutline } from 'ionicons/icons';
 import { AddChantierModalComponent } from './add-chantier-modal/add-chantier-modal.component'; // <--- Import du composant
 import { RouterLink } from '@angular/router';
 import { IonButton } from '@ionic/angular';
@@ -33,7 +33,7 @@ import { IonButton } from '@ionic/angular';
     IonRefresher, 
     IonRefresherContent,
     IonButtons,
-    RouterLink
+    RouterLink, 
   ],
 })
 export class HomePage implements OnInit {
@@ -43,7 +43,7 @@ export class HomePage implements OnInit {
     private api: ApiService,
     private modalCtrl: ModalController // <--- Injection du contrôleur de modale
   ) {
-    addIcons({ business, location, checkmarkCircle, alertCircle, add, statsChartOutline });
+    addIcons({ business, location, checkmarkCircle, alertCircle, add, statsChartOutline, hammerOutline });
   }
 
   ngOnInit() {
