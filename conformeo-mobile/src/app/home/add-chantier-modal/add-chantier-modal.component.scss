@@ -1,0 +1,31 @@
+// Force le fond de la modale en gris très clair pour le contraste
+ion-content {
+  --background: #f4f5f8;
+}
+
+// Stylise la liste pour qu'elle soit transparente
+ion-list {
+  background: transparent;
+  padding-top: 20px;
+}
+
+// Stylise chaque champ de saisie (Item)
+ion-item {
+  --background: #ffffff;      // Fond BLANC forcé
+  --color: #000000;           // Texte NOIR forcé
+  --border-radius: 8px;       // Coins arrondis
+  margin-bottom: 16px;        // Espace entre les champs
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05); // Légère ombre pour le relief
+
+  // Corrige la couleur du label (le titre du champ)
+  ion-input {
+    --placeholder-color: #666;
+    --color: #000000;
+  }
+}
+
+// Stylise le bouton pour qu'il ressorte bien
+ion-button[type="submit"] {
+  margin-top: 20px;
+  --box-shadow: 0 4px 12px rgba(var(--ion-color-primary-rgb), 0.4);
+}

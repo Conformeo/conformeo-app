@@ -10,9 +10,7 @@
 <ion-content class="ion-padding">
   
   <form (ngSubmit)="save()">
-    <ion-list>
-      
-      <ion-item>
+    <ion-list lines="none"> <ion-item>
         <ion-input label="Nom du chantier" labelPlacement="floating" [(ngModel)]="chantier.nom" name="nom" placeholder="Ex: Résidence Les Fleurs"></ion-input>
       </ion-item>
 
