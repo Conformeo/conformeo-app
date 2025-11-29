@@ -1,65 +1,107 @@
-<ion-header>
-  <ion-toolbar color="dark">
-    <ion-title>Conforméo Pilotage</ion-title>
+<ion-header class="ion-no-border">
+  <ion-toolbar color="light">
+    <ion-title style="font-weight: 800; color: #333;">
+      Conforméo <span style="color: var(--ion-color-primary);">Pilotage</span>
+    </ion-title>
     <ion-buttons slot="end">
-      <ion-button routerLink="/home" color="light">
-        Voir Liste Mobile
+      <ion-button routerLink="/home" fill="solid" color="primary" shape="round">
+        <ion-icon name="phone-portrait-outline" slot="start"></ion-icon>
+        Vue Mobile
       </ion-button>
     </ion-buttons>
   </ion-toolbar>
 </ion-header>
 
-<ion-content class="ion-padding" style="--background: #f4f5f8;">
+<ion-content class="dashboard-content">
 
-  <h1 style="margin-bottom: 20px; color: #333;">Vue d'ensemble</h1>
+  <div class="ion-padding">
+    
+    <ion-grid>
+      <ion-row>
+        
+        <ion-col size="12" size-md="4">
+          <div class="kpi-card blue-card">
+            <div class="icon-box">
+              <ion-icon name="stats-chart"></ion-icon>
+            </div>
+            <div class="text-box">
+              <h3>{{ stats.actifs }}</h3>
+              <p>Chantiers Actifs</p>
+            </div>
+          </div>
+        </ion-col>
 
-  <ion-grid>
-    <ion-row>
-      
-      <ion-col size="12" size-md="3">
-        <ion-card color="primary">
-          <ion-card-header>
-            <ion-card-subtitle style="color: rgba(255,255,255,0.8)">Chantiers Actifs</ion-card-subtitle>
-            <ion-card-title style="font-size: 3em;">{{ stats.actifs }}</ion-card-title>
-          </ion-card-header>
-          <ion-card-content>
-            Sur {{ stats.total_chantiers }} total
-          </ion-card-content>
-        </ion-card>
-      </ion-col>
+        <ion-col size="12" size-md="4">
+          <div class="kpi-card purple-card">
+            <div class="icon-box">
+              <ion-icon name="document-text"></ion-icon>
+            </div>
+            <div class="text-box">
+              <h3>{{ stats.rapports }}</h3>
+              <p>Rapports / Photos</p>
+            </div>
+          </div>
+        </ion-col>
 
-      <ion-col size="12" size-md="3">
-        <ion-card color="secondary">
-          <ion-card-header>
-            <ion-card-subtitle style="color: rgba(255,255,255,0.8)">Rapports / Photos</ion-card-subtitle>
-            <ion-card-title style="font-size: 3em;">{{ stats.rapports }}</ion-card-title>
-          </ion-card-header>
-          <ion-card-content>
-            Preuves collectées
-          </ion-card-content>
-        </ion-card>
-      </ion-col>
+        <ion-col size="12" size-md="4">
+          <div class="kpi-card red-card">
+            <div class="icon-box">
+              <ion-icon name="alert-circle"></ion-icon>
+            </div>
+            <div class="text-box">
+              <h3>{{ stats.alertes }}</h3>
+              <p>Points d'attention</p>
+            </div>
+          </div>
+        </ion-col>
 
-      <ion-col size="12" size-md="3">
-        <ion-card color="danger">
-          <ion-card-header>
-            <ion-card-subtitle style="color: rgba(255,255,255,0.8)">Alertes Critique</ion-card-subtitle>
-            <ion-card-title style="font-size: 3em;">{{ stats.alertes }}</ion-card-title>
-          </ion-card-header>
-          <ion-card-content>
-            Nécessitent action
-          </ion-card-content>
-        </ion-card>
-      </ion-col>
+      </ion-row>
+    </ion-grid>
 
-    </ion-row>
-  </ion-grid>
+    <ion-grid>
+      <ion-row>
+        
+        <ion-col size="12" size-md="6">
+          <ion-card class="chart-card">
+            <ion-card-header>
+              <ion-card-title>Répartition du Matériel</ion-card-title>
+              <ion-card-subtitle>Inventaire en temps réel</ion-card-subtitle>
+            </ion-card-header>
+            <ion-card-content style="height: 300px; display: flex; justify-content: center; align-items: center;">
+              <canvas baseChart
+                [data]="pieChartData"
+                [type]="pieChartType"
+                [options]="pieChartOptions">
+              </canvas>
+            </ion-card-content>
+          </ion-card>
+        </ion-col>
 
-  <ion-card style="margin-top: 20px; height: 300px; display: flex; justify-content: center; align-items: center; background: white;">
-     <div style="text-align: center; color: gray;">
-       <ion-icon name="bar-chart" style="font-size: 4em;"></ion-icon>
-       <p>Graphique d'évolution des conformités (À venir avec Chart.js)</p>
-     </div>
-  </ion-card>
+        <ion-col size="12" size-md="6">
+          <ion-card class="chart-card">
+            <ion-card-header>
+              <ion-card-title>Actions Rapides</ion-card-title>
+            </ion-card-header>
+            <ion-list lines="full">
+              <ion-item button routerLink="/home">
+                <ion-icon name="add-circle" slot="start" color="primary"></ion-icon>
+                <ion-label>Créer un nouveau chantier</ion-label>
+              </ion-item>
+              <ion-item button routerLink="/materiel">
+                <ion-icon name="hammer" slot="start" color="warning"></ion-icon>
+                <ion-label>Gérer l'inventaire matériel</ion-label>
+              </ion-item>
+              <ion-item button>
+                <ion-icon name="people" slot="start" color="medium"></ion-icon>
+                <ion-label>Gérer les équipes (Bientôt)</ion-label>
+              </ion-item>
+            </ion-list>
+          </ion-card>
+        </ion-col>
+
+      </ion-row>
+    </ion-grid>
+
+  </div>
 
 </ion-content>
