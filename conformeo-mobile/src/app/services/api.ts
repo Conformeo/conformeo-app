@@ -1,6 +1,9 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
+
+import { from, Observable, of } from 'rxjs'; // <--- AJOUT DE 'of' et 'from'
+import { tap, switchMap } from 'rxjs/operators'; // <--- AJOUT operateurs
+import { OfflineService } from './offline';
 
 export interface Chantier {
   id?: number;
@@ -39,11 +42,39 @@ export class ApiService {
   // EN PROD (Décommente et mets TON url Render sans le slash à la fin)
   private apiUrl = 'https://conformeo-api.onrender.com';
 
-  constructor(private http: HttpClient) { }
+  constructor(
+    private http: HttpClient,
+    private offline: OfflineService 
+  ) { }
 
   // Chantiers
   getChantiers(): Observable<Chantier[]> {
-    return this.http.get<Chantier[]>(`${this.apiUrl}/chantiers`);
+    // On regarde si on est en ligne (valeur instantanée)
+    if (this.offline.isOnline.value) {
+      
+      // CAS 1 : EN LIGNE
+      // On appelle l'API, MAIS on profite du passage pour sauvegarder (tap) dans le stockage
+      return this.http.get<Chantier[]>(`${this.apiUrl}/chantiers`).pipe(
+        tap(data => {
+          this.offline.set('chantiers_cache', data); // Hop, copie de sauvegarde !
+        })
+      );
+
+    } else {
+      
+      // CAS 2 : HORS LIGNE
+      // On transforme la promesse du stockage en Observable pour que le reste de l'app ne voie pas la différence
+      return from(this.offline.get('chantiers_cache')).pipe(
+        switchMap(data => {
+          if (data) {
+            console.log('Lecture depuis le cache local 💾');
+            return of(data); // On renvoie les données locales
+          } else {
+            return of([]); // Rien en cache
+          }
+        })
+      );
+    }
   }
 
   // Créer un nouveau chantier

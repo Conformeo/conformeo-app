@@ -8,6 +8,8 @@ import { AddChantierModalComponent } from './add-chantier-modal/add-chantier-mod
 import { RouterLink } from '@angular/router';
 import { IonButton } from '@ionic/angular';
 
+import { cloudDone, cloudOffline } from 'ionicons/icons'; // Choisissons des nuages
+import { OfflineService } from '../services/offline'; // Service de gestion offline
 
 @Component({
   selector: 'app-home',
@@ -38,15 +40,22 @@ import { IonButton } from '@ionic/angular';
 })
 export class HomePage implements OnInit {
   chantiers: Chantier[] = [];
+  isOnline = true; 
 
   constructor(
     private api: ApiService,
-    private modalCtrl: ModalController // <--- Injection du contrôleur de modale
+    private modalCtrl: ModalController,
+    private offline: OfflineService
   ) {
     addIcons({ business, location, checkmarkCircle, alertCircle, add, statsChartOutline, hammerOutline });
   }
 
   ngOnInit() {
+    // On écoute le réseau en temps réel
+    this.offline.isOnline.subscribe(state => {
+      this.isOnline = state;
+    });
+
     this.loadChantiers();
   }
 
