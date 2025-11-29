@@ -47,7 +47,7 @@ export class HomePage implements OnInit {
     private modalCtrl: ModalController,
     private offline: OfflineService
   ) {
-    addIcons({ business, location, checkmarkCircle, alertCircle, add, statsChartOutline, hammerOutline });
+    addIcons({ business, location, checkmarkCircle, alertCircle, add, statsChartOutline, hammerOutline, cloudDone, cloudOffline });
   }
 
   ngOnInit() {
