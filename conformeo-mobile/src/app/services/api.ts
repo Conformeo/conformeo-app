@@ -79,6 +79,20 @@ export class ApiService {
 
   // Créer un nouveau chantier
   createChantier(chantier: Chantier): Observable<Chantier> {
+    
+    // CAS 1 : HORS LIGNE -> On met en file d'attente
+    if (!this.offline.isOnline.value) {
+      console.log('📡 Hors ligne : Mise en file d\'attente du chantier');
+      
+      // On sauvegarde l'intention
+      this.offline.addToQueue('POST_CHANTIER', chantier);
+      
+      // On renvoie un "Faux" chantier pour que l'UI se mette à jour tout de suite
+      // (Optimistic UI)
+      return of({ ...chantier, id: 9999, est_actif: true }); 
+    }
+
+    // CAS 2 : EN LIGNE -> Comportement normal
     return this.http.post<Chantier>(`${this.apiUrl}/chantiers`, chantier);
   }
 

@@ -3,6 +3,13 @@ import { Storage } from '@ionic/storage-angular';
 import { Network } from '@capacitor/network';
 import { BehaviorSubject } from 'rxjs';
 
+export interface StoredAction {
+  id: string;
+  type: 'POST_CHANTIER' | 'POST_MATERIEL'; // On pourra en ajouter d'autres
+  data: any;
+  time: number;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -34,6 +41,36 @@ export class OfflineService {
       this.isOnline.next(status.connected);
     });
   }
+
+  // 1. Ajouter une action dans la file d'attente
+  async addToQueue(actionType: 'POST_CHANTIER' | 'POST_MATERIEL', payload: any) {
+    const action: StoredAction = {
+      id: Math.random().toString(36).substring(2), // ID unique temporaire
+      type: actionType,
+      data: payload,
+      time: Date.now()
+    };
+
+    // On récupère la liste actuelle
+    let queue: StoredAction[] = await this.get('action_queue') || [];
+    queue.push(action);
+    
+    // On sauvegarde
+    await this.set('action_queue', queue);
+    console.log('📦 Action ajoutée à la file d\'attente :', action);
+    return action; // On retourne l'action pour simuler une réussite
+  }
+
+  // 2. Récupérer toute la file
+  async getQueue(): Promise<StoredAction[]> {
+    return await this.get('action_queue') || [];
+  }
+
+  // 3. Vider la file (après synchro réussie)
+  async clearQueue() {
+    await this.set('action_queue', []);
+  }
+
 
   // 3. Méthodes pour stocker des données (Le Coffre-fort)
   public async set(key: string, value: any) {
