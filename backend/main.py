@@ -35,11 +35,16 @@ cloudinary_config = {
 }
 
 # On applique la configuration SEULEMENT si les clés sont présentes
-if cloudinary_config["cloud_name"] and cloudinary_config["api_key"]:
-    cloudinary.config(**cloudinary_config)
-    print(f"✅ Cloudinary connecté sur le cloud: {cloudinary_config['cloud_name']}")
-else:
-    print("⚠️ ATTENTION : Clés Cloudinary manquantes ! Vérifiez l'onglet Environment de Render.")
+required_keys = ["cloud_name", "api_key", "api_secret"]
+missing = [k for k in required_keys if not cloudinary_config.get(k)]
+
+if missing:
+    raise RuntimeError(
+        f"⚠️ Cloudinary non configuré correctement. Clés manquantes : {', '.join(missing)}"
+    )
+
+cloudinary.config(**cloudinary_config)
+print(f"✅ Cloudinary configuré pour le cloud: {cloudinary_config['cloud_name']}")
 
 # --- FIN CONFIGURATION ---
 
