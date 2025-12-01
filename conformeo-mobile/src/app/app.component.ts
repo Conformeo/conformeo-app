@@ -30,48 +30,65 @@ export class AppComponent {
 
   async processQueue() {
     const queue = await this.offline.getQueue();
+    
     if (queue.length === 0) return;
 
-    const toast = await this.toastCtrl.create({
-      message: `Synchronisation de ${queue.length} éléments...`,
-      duration: 3000,
+    // 1. On prévient l'utilisateur qu'on travaille
+    const toastStart = await this.toastCtrl.create({
+      message: `🔄 Réseau retrouvé : Envoi de ${queue.length} éléments...`,
+      duration: 2000,
       position: 'top',
-      color: 'primary'
+      color: 'warning'
     });
-    toast.present();
+    toastStart.present();
 
     for (const action of queue) {
       
-      // CAS 1 : Chantier simple (Texte)
+      // CAS 1 : Chantier Texte
       if (action.type === 'POST_CHANTIER') {
         this.api.createChantier(action.data).subscribe();
       }
 
-      // CAS 2 : Rapport avec Photo (Le Tunnel !)
+      // CAS 2 : Photo (Le Tunnel)
       else if (action.type === 'POST_RAPPORT_PHOTO') {
-        const data = action.data; // Contient { rapport, localPhotoPath }
+        const data = action.data; // { rapport, localPhotoPath }
         
         try {
-          // 1. On récupère la photo physique dans le téléphone
-          // On doit extraire le nom du fichier du chemin complet parfois
-          const fileName = data.localPhotoPath.split('/').pop();
+          // IMPORTANT : On extrait juste le nom du fichier (ex: "17625252.jpeg")
+          // car le chemin complet "file://..." change parfois au redémarrage de l'iPhone
+          const rawPath = data.localPhotoPath;
+          const fileName = rawPath.substring(rawPath.lastIndexOf('/') + 1);
+
+          console.log("Tentative lecture fichier :", fileName);
+
+          // Lecture
           const blob = await this.api.readLocalPhoto(fileName);
 
-          // 2. On l'envoie sur Cloudinary
-          this.api.uploadPhoto(blob).subscribe(res => {
-             // 3. On crée le rapport final
-             this.api.createRapport(data.rapport, res.url).subscribe(() => {
-                console.log("📸 Photo synchronisée !");
-                // Optionnel : Supprimer le fichier local pour faire de la place
-             });
+          // Upload Cloudinary
+          this.api.uploadPhoto(blob).subscribe({
+            next: (res) => {
+               // Création Rapport
+               this.api.createRapport(data.rapport, res.url).subscribe(async () => {
+                  const toastSuccess = await this.toastCtrl.create({
+                    message: '✅ Une photo a été synchronisée !',
+                    duration: 3000,
+                    color: 'success',
+                    position: 'top'
+                  });
+                  toastSuccess.present();
+               });
+            },
+            error: (err) => console.error("Erreur upload Cloudinary", err)
           });
 
         } catch (e) {
-          console.error("Erreur lecture fichier local", e);
+          console.error("❌ Erreur lecture fichier local", e);
+          alert("Erreur synchro photo: " + JSON.stringify(e));
         }
       }
     }
 
+    // On vide la file d'attente
     await this.offline.clearQueue();
   }
 }

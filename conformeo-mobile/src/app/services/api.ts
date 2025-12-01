@@ -80,14 +80,21 @@ export class ApiService {
   }
 
   // Lire une image locale pour l'envoyer (quand le réseau revient)
-  async readLocalPhoto(path: string): Promise<Blob> {
+  // Lire une image locale pour l'envoyer
+  async readLocalPhoto(fileName: string): Promise<Blob> {
+    // On force la lecture dans le dossier DATA (là où on a écrit)
     const readFile = await Filesystem.readFile({
-      path: path,
-      // directory: Directory.Data // Pas besoin si le path est complet (file://...)
+      path: fileName,
+      directory: Directory.Data 
     });
 
-    // Conversion Base64 -> Blob pour l'upload
-    const response = await fetch(`data:image/jpeg;base64,${readFile.data}`);
+    // Conversion Base64 -> Blob
+    // Le format retourné par Capacitor est parfois juste la string, parfois un objet.
+    // On sécurise la récupération des données.
+    const data = readFile.data instanceof Blob ? readFile.data : readFile.data;
+    
+    // Si c'est une string base64 pure (cas fréquent sur mobile)
+    const response = await fetch(`data:image/jpeg;base64,${data}`);
     return await response.blob();
   }
 
