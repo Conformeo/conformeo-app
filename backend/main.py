@@ -127,15 +127,18 @@ def read_chantiers(db: Session = Depends(get_db)):
 async def upload_image(file: UploadFile = File(...)):
     """Envoie l'image sur Cloudinary et renvoie l'URL sécurisée."""
     try:
-        # Upload direct vers Cloudinary
-        # On spécifie le dossier dans Cloudinary pour rester organisé
         result = cloudinary.uploader.upload(file.file, folder="conformeo_chantiers")
         url_securisee = result.get("secure_url")
         return {"url": url_securisee}
     except Exception as e:
-        print(f"Erreur Upload Cloudinary: {e}")
-        # On renvoie une erreur 500 propre pour que le frontend comprenne
-        raise HTTPException(status_code=500, detail=f"Erreur Cloudinary: {str(e)}")
+        import traceback
+        traceback.print_exc()  # log complet dans Render
+        # TEMPORAIREMENT on renvoie l'erreur brute
+        raise HTTPException(
+            status_code=500,
+            detail=f"Cloudinary error: {repr(e)}"
+        )
+
 
 @app.post("/rapports", response_model=schemas.RapportOut)
 def create_rapport(rapport: schemas.RapportCreate, photo_url: Optional[str] = None, db: Session = Depends(get_db)):
