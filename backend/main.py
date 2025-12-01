@@ -27,15 +27,16 @@ app = FastAPI(title="Conforméo API")
 # --- CONFIGURATION CLOUDINARY ---
 # Remplace par TON url, ou mieux, utilise os.getenv("CLOUDINARY_URL")
 # Pour l'instant on va utiliser une variable d'environnement
-cloudinary.config(
+cloudinary_config(
   cloud_name = os.getenv("mediaflows_e8ee5dac-d32a-42cd-bc02-c20df96c7aba"),
   api_key = os.getenv("333761364629922"),
   api_secret = os.getenv("Kol6EichzIOtzcDVWz3-xgxtdb4"),
   secure = True
 )
 
-# On ne configure que si les clés sont là pour éviter le crash au démarrage
-if cloudinary_config["mediaflows_e8ee5dac-d32a-42cd-bc02-c20df96c7aba"]:
+# --- 2. UTILISATION DE LA VARIABLE (ENSUITE) ---
+# Attention : mettez bien "cloud_name" entre guillemets, pas le code bizarre
+if cloudinary_config["cloud_name"]:
     cloudinary.config(**cloudinary_config)
 else:
     print("⚠️ ATTENTION : Clés Cloudinary manquantes ! L'upload ne marchera pas.")
