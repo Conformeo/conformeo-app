@@ -1,100 +1,91 @@
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import cm
-import requests
-from io import BytesIO
+from reportlab.lib.utils import ImageReader
 from PIL import Image, ImageOps
 import os
+import requests
+from io import BytesIO
+
+def get_image_from_url_or_path(path_or_url):
+    """Récupère une image (Pillow) depuis un fichier local ou une URL."""
+    try:
+        # CAS 1 : URL Cloudinary (commence par http)
+        if path_or_url.startswith("http"):
+            response = requests.get(path_or_url)
+            if response.status_code == 200:
+                return Image.open(BytesIO(response.content))
+        
+        # CAS 2 : Fichier Local (commence par /static/ ou chemin relatif)
+        else:
+            # Nettoyage du chemin si c'est une URL relative de l'ancienne version
+            clean_path = path_or_url.replace("/static/", "")
+            # On cherche dans uploads ou à la racine
+            possible_paths = [
+                os.path.join("uploads", clean_path),
+                clean_path # Pour logo.png
+            ]
+            
+            for p in possible_paths:
+                if os.path.exists(p):
+                    return Image.open(p)
+                    
+    except Exception as e:
+        print(f"Erreur chargement image ({path_or_url}): {e}")
+    
+    return None
 
 def generate_pdf(chantier, rapports, output_path):
     c = canvas.Canvas(output_path, pagesize=A4)
     width, height = A4
     
-    # --- CONSTANTES DE MISE EN PAGE ---
+    # --- CONSTANTES ---
     MARGE_BAS = 2 * cm
     DEPART_HAUT = height - 3 * cm
     
-    # --- 0. LE LOGO (En haut à droite) ---
-    # On cherche le fichier dans le dossier courant
-    logo_path = "logo.png" 
-    
-    if os.path.exists(logo_path):
+    # --- 0. LE LOGO (Local) ---
+    logo_img = get_image_from_url_or_path("logo.png")
+    if logo_img:
         try:
-            # On dessine le logo (Largeur max 5cm, Hauteur max 2.5cm)
-            # mask='auto' permet de gérer la transparence des PNG
-            c.drawImage(logo_path, width - 7 * cm, height - 3.5 * cm, width=5*cm, height=2.5*cm, preserveAspectRatio=True, mask='auto')
-        except Exception as e:
-            print(f"Erreur logo: {e}")
+            # On utilise ImageReader pour la compatibilité ReportLab
+            rl_logo = ImageReader(logo_img)
+            c.drawImage(rl_logo, width - 7 * cm, height - 3.5 * cm, width=5*cm, height=2.5*cm, preserveAspectRatio=True, mask='auto')
+        except: pass
 
-    # --- 1. En-tête (Texte à gauche) ---
+    # --- 1. EN-TÊTE ---
     c.setFont("Helvetica-Bold", 24)
     c.drawString(2 * cm, height - 3 * cm, f"Rapport de Chantier")
     
     c.setFont("Helvetica-Bold", 16)
-    c.setFillColorRGB(0.2, 0.2, 0.2) # Gris foncé
+    c.setFillColorRGB(0.2, 0.2, 0.2)
     c.drawString(2 * cm, height - 4 * cm, f"{chantier.nom}")
-    c.setFillColorRGB(0, 0, 0) # Retour au noir
+    c.setFillColorRGB(0, 0, 0)
     
     c.setFont("Helvetica", 12)
     c.drawString(2 * cm, height - 5 * cm, f"Client: {chantier.client}")
     c.drawString(2 * cm, height - 5.5 * cm, f"Adresse: {chantier.adresse}")
     
-    # Ligne de séparation
     c.setLineWidth(1)
     c.line(2 * cm, height - 6.5 * cm, width - 2 * cm, height - 6.5 * cm)
     
-    # Position de départ pour les rapports (on descend un peu plus bas qu'avant)
     y_position = height - 8 * cm
     
+    # --- 2. RAPPORTS ---
     for rapport in rapports:
-        # --- CALCUL DE HAUTEUR DU BLOC ---
         hauteur_requise = 2.5 * cm 
+        pil_image = None
         
-        image_path = None
         if rapport.photo_url:
-            try:
-                img_data = None
-                
-                # CAS 1 : Image locale (ex: Signature ancienne ou test)
-                if rapport.photo_url.startswith("/static/"):
-                    filename = rapport.photo_url.replace("/static/", "")
-                    local_path = os.path.join("uploads", filename)
-                    if os.path.exists(local_path):
-                        img = Image.open(local_path)
-                        img_data = img
+            pil_image = get_image_from_url_or_path(rapport.photo_url)
+            if pil_image:
+                hauteur_requise += 7 * cm 
 
-                # CAS 2 : Image Cloudinary (Commence par http)
-                elif rapport.photo_url.startswith("http"):
-                    response = requests.get(rapport.photo_url)
-                    if response.status_code == 200:
-                        img = Image.open(BytesIO(response.content))
-                        img_data = img
-
-                # TRAITEMENT COMMUN (Rotation + Dessin)
-                if img_data:
-                    # Correction Rotation EXIF
-                    transposed_img = ImageOps.exif_transpose(img_data)
-                    
-                    # On convertit en ImageReader pour ReportLab
-                    rl_image = ImageReader(transposed_img)
-                    
-                    # Dessin
-                    c.drawImage(rl_image, 2.5 * cm, y_position - 6 * cm, width=8*cm, height=6*cm, preserveAspectRatio=True)
-                    y_position -= 7 * cm
-                    
-            except Exception as e:
-                print(f"Erreur image: {e}")
-                c.drawString(2.5 * cm, y_position, "[Erreur chargement image]")
-                y_position -= 1 * cm
-        else:
-            y_position -= 1 * cm
-
-        # --- SAUT DE PAGE SI NECESSAIRE ---
+        # Saut de page
         if (y_position - hauteur_requise) < MARGE_BAS:
             c.showPage()
             y_position = DEPART_HAUT
             
-        # --- DESSIN DU CONTENU ---
+        # Textes
         c.setFont("Helvetica-Bold", 14)
         c.drawString(2 * cm, y_position, f"• {rapport.titre}")
         y_position -= 1 * cm
@@ -103,23 +94,22 @@ def generate_pdf(chantier, rapports, output_path):
         c.drawString(2.5 * cm, y_position, f"Note: {rapport.description}")
         y_position -= 1 * cm
         
-        if image_path:
+        # Image (Rotation + Affichage)
+        if pil_image:
             try:
-                # Correction Rotation
-                img = Image.open(image_path)
-                transposed_img = ImageOps.exif_transpose(img)
-                transposed_img.save(image_path)
-                img.close()
+                # Correction rotation
+                pil_image = ImageOps.exif_transpose(pil_image)
+                rl_image = ImageReader(pil_image)
                 
-                c.drawImage(image_path, 2.5 * cm, y_position - 6 * cm, width=8*cm, height=6*cm, preserveAspectRatio=True)
+                c.drawImage(rl_image, 2.5 * cm, y_position - 6 * cm, width=8*cm, height=6*cm, preserveAspectRatio=True)
                 y_position -= 7 * cm 
             except:
-                c.drawString(2.5 * cm, y_position, "[Erreur image]")
+                c.drawString(2.5 * cm, y_position, "[Erreur affichage image]")
                 y_position -= 1 * cm
         
         y_position -= 0.5 * cm
 
-    # --- SIGNATURE (FIN DE DOCUMENT) ---
+    # --- 3. SIGNATURE ---
     if y_position < 5 * cm:
         c.showPage()
         y_position = height - 3 * cm
@@ -132,11 +122,11 @@ def generate_pdf(chantier, rapports, output_path):
     c.drawString(width - 8 * cm, y_position, "Validation :")
     
     if chantier.signature_url:
-        sig_filename = chantier.signature_url.replace("/static/", "")
-        sig_path = os.path.join("uploads", sig_filename)
-        if os.path.exists(sig_path):
+        sig_img = get_image_from_url_or_path(chantier.signature_url)
+        if sig_img:
             try:
-                c.drawImage(sig_path, width - 8 * cm, y_position - 4 * cm, width=5*cm, height=3*cm, preserveAspectRatio=True, mask='auto')
+                rl_sig = ImageReader(sig_img)
+                c.drawImage(rl_sig, width - 8 * cm, y_position - 4 * cm, width=5*cm, height=3*cm, preserveAspectRatio=True, mask='auto')
             except: pass
 
     c.save()
