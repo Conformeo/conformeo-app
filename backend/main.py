@@ -1,4 +1,7 @@
 import os
+from dotenv import load_dotenv
+load_dotenv()  # charge le fichier .env à la racine
+
 import shutil
 from uuid import uuid4
 from typing import List, Optional
