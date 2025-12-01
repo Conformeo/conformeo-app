@@ -1,6 +1,6 @@
 import { Component } from '@angular/core';
-import { IonApp, IonRouterOutlet, ToastController } from '@ionic/angular/standalone'; // Ajoute ToastController
-import { OfflineService, StoredAction } from './services/offline';
+import { IonApp, IonRouterOutlet, ToastController } from '@ionic/angular/standalone';
+import { OfflineService } from './services/offline';
 import { ApiService } from './services/api';
 
 @Component({
@@ -20,10 +20,11 @@ export class AppComponent {
   }
 
   initializeApp() {
-    // On écoute le réseau
+    // On écoute le réseau en permanence
     this.offline.isOnline.subscribe(isOnline => {
       if (isOnline) {
-        this.processQueue(); // 🚀 Le réseau est là, on envoie tout !
+        // Dès que le réseau revient, on lance le traitement
+        this.processQueue();
       }
     });
   }
@@ -31,49 +32,62 @@ export class AppComponent {
   async processQueue() {
     const queue = await this.offline.getQueue();
     
+    // Si rien à faire, on s'arrête
     if (queue.length === 0) return;
 
-    // 1. On prévient l'utilisateur qu'on travaille
+    // 1. Notification de début
     const toastStart = await this.toastCtrl.create({
-      message: `🔄 Réseau retrouvé : Envoi de ${queue.length} éléments...`,
-      duration: 2000,
+      message: `🔄 Connexion retrouvée : Synchronisation de ${queue.length} élément(s)...`,
+      duration: 3000,
       position: 'top',
-      color: 'warning'
+      color: 'primary',
+      icon: 'sync'
     });
     toastStart.present();
 
+    console.log("Traitement de la file d'attente...", queue);
+
+    // 2. Traitement des actions
     for (const action of queue) {
       
-      // CAS 1 : Chantier Texte
+      // CAS 1 : Création Chantier (Texte)
       if (action.type === 'POST_CHANTIER') {
-        this.api.createChantier(action.data).subscribe();
+        this.api.createChantier(action.data).subscribe({
+          next: () => console.log('✅ Chantier synchro'),
+          error: (err) => console.error('❌ Erreur synchro chantier', err)
+        });
       }
 
-      // CAS 2 : Photo (Le Tunnel)
+      // CAS 2 : Matériel
+      else if (action.type === 'POST_MATERIEL') {
+        this.api.createMateriel(action.data).subscribe();
+      }
+
+      // CAS 3 : Photo (Le Tunnel Complexe)
       else if (action.type === 'POST_RAPPORT_PHOTO') {
         const data = action.data; // { rapport, localPhotoPath }
         
         try {
-          // IMPORTANT : On extrait juste le nom du fichier (ex: "17625252.jpeg")
-          // car le chemin complet "file://..." change parfois au redémarrage de l'iPhone
+          // A. Récupérer le nom du fichier
           const rawPath = data.localPhotoPath;
           const fileName = rawPath.substring(rawPath.lastIndexOf('/') + 1);
 
-          console.log("Tentative lecture fichier :", fileName);
-
-          // Lecture
+          // B. Lire le fichier physique
           const blob = await this.api.readLocalPhoto(fileName);
 
-          // Upload Cloudinary
+          // C. Envoyer sur Cloudinary
           this.api.uploadPhoto(blob).subscribe({
             next: (res) => {
-               // Création Rapport
+               // D. Créer le rapport final avec l'URL Cloudinary
                this.api.createRapport(data.rapport, res.url).subscribe(async () => {
+                  
+                  // Notification de succès pour chaque photo
                   const toastSuccess = await this.toastCtrl.create({
-                    message: '✅ Une photo a été synchronisée !',
+                    message: '✅ Une photo a été sauvegardée en ligne !',
                     duration: 3000,
                     color: 'success',
-                    position: 'top'
+                    position: 'top',
+                    icon: 'checkmark-circle'
                   });
                   toastSuccess.present();
                });
@@ -82,13 +96,13 @@ export class AppComponent {
           });
 
         } catch (e) {
-          console.error("❌ Erreur lecture fichier local", e);
-          alert("Erreur synchro photo: " + JSON.stringify(e));
+          console.error("❌ Erreur critique synchro photo", e);
         }
       }
     }
 
-    // On vide la file d'attente
+    // 3. Une fois tout lancé, on vide la file d'attente
+    // (Dans une V2, on pourrait attendre la réussite de chaque item avant de supprimer)
     await this.offline.clearQueue();
   }
 }
