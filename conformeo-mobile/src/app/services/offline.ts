@@ -69,4 +69,51 @@ export class OfflineService {
   public async get(key: string) {
     return await this._storage?.get(key);
   }
+
+  // ... (imports existants)
+  // Ajoute ToastController dans le constructeur de OfflineService si besoin, 
+  // ou utilise juste alert() pour le debug, c'est plus simple.
+
+  async debugSyncProcess(apiService: any) {
+    alert("Démarrage Synchro Manuelle...");
+    
+    const queue = await this.get('action_queue') || [];
+    alert(`File d'attente : ${queue.length} éléments`);
+
+    if (queue.length === 0) return;
+
+    for (const action of queue) {
+      alert(`Traitement action : ${action.type}`);
+
+      if (action.type === 'POST_RAPPORT_PHOTO') {
+        try {
+          const rawPath = action.data.localPhotoPath;
+          // NETTOYAGE DU NOM DE FICHIER (C'est souvent là que ça plante)
+          const fileName = rawPath.substring(rawPath.lastIndexOf('/') + 1);
+          
+          alert(`Lecture fichier : ${fileName}`);
+
+          // Lecture via API Service
+          const blob = await apiService.readLocalPhoto(fileName);
+          alert(`Fichier lu ! Taille : ${blob.size}`);
+
+          // Upload
+          alert("Envoi Cloudinary...");
+          apiService.uploadPhoto(blob).subscribe({
+            next: (res: any) => {
+              alert("Upload OK ! Création rapport...");
+              apiService.createRapport(action.data.rapport, res.url).subscribe(() => {
+                 alert("✅ TOUT EST BON !");
+              });
+            },
+            error: (err: any) => alert("Erreur Upload : " + JSON.stringify(err))
+          });
+
+        } catch (e: any) {
+          alert("❌ CRASH : " + JSON.stringify(e));
+        }
+      }
+    }
+    // On ne vide pas la queue pour pouvoir retester tant que ça marche pas
+  }
 }
