@@ -2,14 +2,6 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>NSCameraUsageDescription</key>
-    <string>Conforméo a besoin de la caméra pour prendre des photos de chantier et scanner le matériel.</string>
-
-    <key>NSPhotoLibraryUsageDescription</key>
-    <string>Conforméo a besoin d'accéder à vos photos pour les ajouter aux rapports.</string>
-
-    <key>NSPhotoLibraryAddUsageDescription</key>
-    <string>Conforméo a besoin d'enregistrer des photos.</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
