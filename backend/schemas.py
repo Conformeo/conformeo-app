@@ -52,12 +52,20 @@ class RapportBase(BaseModel):
     latitude: Optional[float] = None # <--- Ajout
     longitude: Optional[float] = None # <--- Ajout
 
+class RapportImageOut(BaseModel):
+    url: str
+    class Config:
+        from_attributes = True
+
+# Mise à jour du schéma Rapport
 class RapportCreate(RapportBase):
-    pass
+    # On accepte une liste d'URLs à la création
+    image_urls: List[str] = [] 
 
 class RapportOut(RapportBase):
     id: int
-    photo_url: Optional[str] = None
+    photo_url: Optional[str] = None # Pour compatibilité
+    images: List[RapportImageOut] = [] # 👇 La liste des photos
     date_creation: datetime
     class Config:
         from_attributes = True

@@ -142,20 +142,32 @@ async def upload_image(file: UploadFile = File(...)):
 
 
 @app.post("/rapports", response_model=schemas.RapportOut)
-def create_rapport(rapport: schemas.RapportCreate, photo_url: Optional[str] = None, db: Session = Depends(get_db)):
+def create_rapport(rapport: schemas.RapportCreate, db: Session = Depends(get_db)):
+    
+    # 1. Création du rapport
     new_rapport = models.Rapport(
         titre=rapport.titre,
         description=rapport.description,
         chantier_id=rapport.chantier_id,
-        photo_url=photo_url,
-        niveau_urgence=rapport.niveau_urgence, # <--- Ajout
-        latitude=rapport.latitude,             # <--- Ajout
-        longitude=rapport.longitude
+        niveau_urgence=rapport.niveau_urgence,
+        latitude=rapport.latitude,
+        longitude=rapport.longitude,
+        # On garde la première image comme "photo principale" pour la compatibilité PDF simple
+        photo_url=rapport.image_urls[0] if rapport.image_urls else None
     )
     db.add(new_rapport)
     db.commit()
     db.refresh(new_rapport)
+
+    # 2. Création des images liées
+    for url in rapport.image_urls:
+        new_img = models.RapportImage(url=url, rapport_id=new_rapport.id)
+        db.add(new_img)
+    
+    db.commit()
+    db.refresh(new_rapport)
     return new_rapport
+
 
 @app.get("/chantiers/{chantier_id}/rapports", response_model=List[schemas.RapportOut])
 def read_rapports_chantier(chantier_id: int, db: Session = Depends(get_db)):
@@ -291,3 +303,13 @@ def migrate_db(db: Session = Depends(get_db)):
     except Exception as e:
         db.rollback()
         return {"status": "Erreur migration", "details": str(e)}
+
+# --- ROUTE DE MIGRATION V2 (Création table images) ---
+@app.get("/migrate_db_v2")
+def migrate_db_v2(db: Session = Depends(get_db)):
+    try:
+        # On crée la table rapport_images
+        models.Base.metadata.create_all(bind=engine)
+        return {"message": "Migration V2 réussie ! Table images créée."}
+    except Exception as e:
+        return {"status": "Erreur", "details": str(e)}

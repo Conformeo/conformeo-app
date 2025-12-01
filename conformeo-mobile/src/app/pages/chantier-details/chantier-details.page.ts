@@ -90,27 +90,39 @@ export class ChantierDetailsPage implements OnInit {
     // 1. Ouvrir la modale de saisie
     const modal = await this.modalCtrl.create({
       component: NewRapportModalComponent,
-      componentProps: { photoWebPath: webPath }
+      // 👇 Attention : On utilise les nouveaux noms de props définis dans la modale
+      componentProps: { 
+        initialPhotoWebPath: webPath,
+        initialPhotoBlob: blob 
+      }
     });
     
     await modal.present();
-    const { data, role } = await modal.onWillDismiss();
 
-    if (role === 'confirm') {
-      // 2. On a les infos (Titre, Desc, Urgence, GPS) + le Blob photo
+    // 👇 CORRECTION ICI : On stocke le résultat dans une variable 'result'
+    const result = await modal.onWillDismiss();
+
+    if (result.role === 'confirm' && result.data) {
+      // Maintenant 'result' existe, on peut lire dedans
+      const { data, gps, blobs } = result.data; 
+      
       const newRapport: Rapport = {
         titre: data.titre,
         description: data.description,
         chantier_id: this.chantierId,
         niveau_urgence: data.niveau_urgence,
-        latitude: data.latitude,
-        longitude: data.longitude
+        // On vérifie si le GPS est là
+        latitude: gps ? gps.latitude : null,
+        longitude: gps ? gps.longitude : null
       };
 
-      // 3. On lance le tunnel (Service intelligent)
-      await this.api.addRapportWithPhoto(newRapport, blob);
+      // 3. On lance le tunnel Multi-Photos
+      await this.api.addRapportWithMultiplePhotos(newRapport, blobs);
       
-      this.loadRapports();
+      // Petit délai pour laisser le temps au stockage local
+      setTimeout(() => {
+        this.loadRapports();
+      }, 500);
     }
   }
 

@@ -2,17 +2,19 @@ import { Component, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { 
   IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, 
-  IonContent, IonIcon, IonImg, IonLabel, IonItem, IonList, 
-  IonCard, IonCardContent, ModalController 
+  IonContent, IonIcon, ModalController 
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
-import { mapOutline, closeOutline, timeOutline, alertCircleOutline } from 'ionicons/icons';
-import { Rapport } from '../../../services/api'
+import { mapOutline, closeOutline, timeOutline, alertCircleOutline, imagesOutline } from 'ionicons/icons';
+// Attention au chemin d'import, adapte-le si nécessaire selon ta structure
+import { Rapport } from '../../../services/api';
+
 @Component({
   selector: 'app-rapport-details-modal',
   template: `
     <ion-header>
-      <ion-toolbar color="black"> <ion-buttons slot="start">
+      <ion-toolbar color="black">
+        <ion-buttons slot="start">
           <ion-button (click)="close()">
             <ion-icon name="close-outline" slot="icon-only"></ion-icon>
           </ion-button>
@@ -23,8 +25,27 @@ import { Rapport } from '../../../services/api'
 
     <ion-content class="ion-padding" style="--background: #000;">
       
-      <div class="photo-container" *ngIf="rapport.photo_url">
-        <img [src]="getFullUrl(rapport.photo_url)" class="fullscreen-image" />
+      <div class="gallery-container">
+        
+        <div class="photo-counter" *ngIf="rapport.images && rapport.images.length > 1">
+          <ion-icon name="images-outline"></ion-icon> {{ rapport.images.length }} Photos
+        </div>
+
+        <div class="scrolling-wrapper">
+          
+          <div class="photo-card" *ngFor="let img of rapport.images">
+             <img [src]="getFullUrl(img.url)" class="zoomable-image" />
+          </div>
+
+          <div class="photo-card" *ngIf="(!rapport.images || rapport.images.length === 0) && rapport.photo_url">
+             <img [src]="getFullUrl(rapport.photo_url)" class="zoomable-image" />
+          </div>
+
+          <div class="photo-card empty" *ngIf="(!rapport.images || rapport.images.length === 0) && !rapport.photo_url">
+             <p>Aucune photo</p>
+          </div>
+
+        </div>
       </div>
 
       <div class="details-container">
@@ -56,22 +77,64 @@ import { Rapport } from '../../../services/api'
     </ion-content>
   `,
   styles: [`
-    .photo-container {
+    /* Container du Slider */
+    .gallery-container {
+      margin-bottom: 20px;
+      position: relative;
+    }
+
+    .photo-counter {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: rgba(0,0,0,0.6);
+      color: white;
+      padding: 4px 8px;
+      border-radius: 12px;
+      font-size: 12px;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    /* Le Slider Horizontal */
+    .scrolling-wrapper {
+      display: flex;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch; /* Scroll fluide sur iOS */
+      scroll-snap-type: x mandatory; /* Magnétisme */
+      gap: 10px;
+      height: 50vh; /* Hauteur fixe pour la visionneuse */
+    }
+
+    /* Chaque carte photo */
+    .photo-card {
+      flex: 0 0 100%; /* Prend toute la largeur dispo */
+      scroll-snap-align: center; /* S'arrête au centre */
       width: 100%;
-      height: 50vh; /* La moitié de l'écran */
+      height: 100%;
       background: black;
       display: flex;
       justify-content: center;
       align-items: center;
-      overflow: hidden;
       border-radius: 12px;
-      margin-bottom: 20px;
+      overflow: hidden;
     }
-    .fullscreen-image {
+
+    .photo-card.empty {
+      background: #333;
+      color: #666;
+    }
+
+    .zoomable-image {
       width: 100%;
       height: 100%;
-      object-fit: contain; /* L'image entière est visible */
+      object-fit: contain; /* Affiche l'image entière sans couper */
     }
+
+    /* Reste du style inchangé */
     .details-container {
       background: #1e1e1e;
       border-radius: 16px;
@@ -91,7 +154,6 @@ import { Rapport } from '../../../services/api'
       text-transform: uppercase;
       font-size: 12px;
     }
-    /* Couleurs des badges */
     .Faible { background: #2dd36f; color: black; }
     .Moyen { background: #ffc409; color: black; }
     .Critique { background: #eb445a; color: white; }
@@ -108,7 +170,7 @@ export class RapportDetailsModalComponent {
   @Input() rapport!: Rapport;
 
   constructor(private modalCtrl: ModalController) {
-    addIcons({ mapOutline, closeOutline, timeOutline, alertCircleOutline });
+    addIcons({ mapOutline, closeOutline, timeOutline, alertCircleOutline, imagesOutline });
   }
 
   close() {
@@ -116,14 +178,14 @@ export class RapportDetailsModalComponent {
   }
 
   getFullUrl(path: string) {
+    if (!path) return '';
     if (path.startsWith('http')) return path;
-    // Remplace par ton URL render si besoin, mais normalement c'est déjà une URL Cloudinary
-    return path; 
+    return 'https://conformeo-api.onrender.com' + path; // Fallback pour les vieilles images locales
   }
 
   openMap() {
     if (this.rapport.latitude && this.rapport.longitude) {
-      // Ouvre l'application de carte native (Apple Maps ou Google Maps)
+      // Ouvre Maps ou Apple Plans
       const url = `https://www.google.com/maps/search/?api=1&query=${this.rapport.latitude},${this.rapport.longitude}`;
       window.open(url, '_system');
     }

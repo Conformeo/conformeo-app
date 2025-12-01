@@ -5,8 +5,8 @@ import { BehaviorSubject } from 'rxjs';
 
 export interface StoredAction {
   id: string;
-  // 👇 AJOUTE 'POST_RAPPORT_PHOTO' ICI
-  type: 'POST_CHANTIER' | 'POST_MATERIEL' | 'POST_RAPPORT_PHOTO'; 
+  // 👇 AJOUTE LE TYPE ICI
+  type: 'POST_CHANTIER' | 'POST_MATERIEL' | 'POST_RAPPORT_PHOTO' | 'POST_RAPPORT_MULTI';
   data: any;
   time: number;
 }
@@ -38,12 +38,12 @@ export class OfflineService {
   }
 
   // 👇 AJOUTE LE TYPE ICI AUSSI DANS LES ARGUMENTS
-  async addToQueue(actionType: 'POST_CHANTIER' | 'POST_MATERIEL' | 'POST_RAPPORT_PHOTO', payload: any) {
+  async addToQueue(actionType: 'POST_CHANTIER' | 'POST_MATERIEL' | 'POST_RAPPORT_PHOTO' | 'POST_RAPPORT_MULTI', payload: any) {
     const action: StoredAction = {
-      id: Math.random().toString(36).substring(2),
-      type: actionType,
-      data: payload,
-      time: Date.now()
+        id: Math.random().toString(36).substring(2),
+        type: actionType, // TypeScript est content maintenant
+        data: payload,
+        time: Date.now()
     };
 
     let queue: StoredAction[] = await this.get('action_queue') || [];

@@ -18,22 +18,32 @@ class Chantier(Base):
     rapports = relationship("Rapport", back_populates="chantier")
     materiels = relationship("Materiel", back_populates="chantier")
 
+class RapportImage(Base):
+    __tablename__ = "rapport_images"
+    id = Column(Integer, primary_key=True, index=True)
+    url = Column(String)
+    rapport_id = Column(Integer, ForeignKey("rapports.id"))
+    
+    # Lien inverse
+    rapport = relationship("Rapport", back_populates="images")
+
 class Rapport(Base):
     __tablename__ = "rapports"
-
     id = Column(Integer, primary_key=True, index=True)
-    titre = Column(String)                # Ex: "Fissure Mur Nord"
-    description = Column(String)          # Ex: "Fissure de 2mm constatée..."
-    photo_url = Column(String, nullable=True) # Ex: "/static/image123.jpg"
+    titre = Column(String)
+    description = Column(String)
+    # photo_url = Column(String)  <-- ON N'UTILISE PLUS CELLE-LA (mais on la garde pour pas casser les vieux)
+    
     chantier_id = Column(Integer, ForeignKey("chantiers.id"))
     date_creation = Column(DateTime, default=datetime.now)
-
-    niveau_urgence = Column(String, default="Faible") # Faible, Moyen, Critique
+    niveau_urgence = Column(String, default="Faible")
     latitude = Column(Float, nullable=True)
     longitude = Column(Float, nullable=True)
 
-    # Lien inverse
     chantier = relationship("Chantier", back_populates="rapports")
+    
+    # 👇 NOUVEAU LIEN (Une liste d'images)
+    images = relationship("RapportImage", back_populates="rapport")
 
 class Materiel(Base):
     __tablename__ = "materiels"

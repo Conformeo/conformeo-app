@@ -23,11 +23,18 @@ export interface Rapport {
   id?: number;
   titre: string;
   description: string;
-  photo_url?: string;
+  
+  // 👇 C'EST ICI LA CORRECTION
+  // Le backend envoie une liste d'objets { url: "..." }
+  images?: { url: string }[]; 
+  
+  // On garde aussi celui-ci pour l'envoi lors de la création
+  image_urls?: string[]; 
+  
+  photo_url?: string; // Compatibilité ancienne version
   chantier_id: number;
   date_creation?: string;
-
-  niveau_urgence?: string; // 'Faible', 'Moyen', 'Critique'
+  niveau_urgence?: string;
   latitude?: number;
   longitude?: number;
 }
@@ -239,6 +246,56 @@ export class ApiService {
 
     return this.http.post<Rapport>(url, rapport);
   }
+
+  // Sauvegarder un rapport avec PLUSIEURS photos
+async addRapportWithMultiplePhotos(rapport: Rapport, photoBlobs: Blob[]) {
+
+  // CAS 1 : HORS LIGNE ✈️
+  if (!this.offline.isOnline.value) {
+    console.log('📡 Hors ligne : Sauvegarde photos locales...');
+    const localPaths: string[] = [];
+
+    // On sauvegarde chaque photo sur le disque
+    for (const blob of photoBlobs) {
+      try {
+        const path = await this.savePhotoLocally(blob);
+        localPaths.push(path);
+      } catch (e) { console.error(e); }
+    }
+
+    // On met en file d'attente (Type spécial MULTI)
+    await this.offline.addToQueue('POST_RAPPORT_MULTI', {
+      rapport: rapport,
+      localPaths: localPaths
+    });
+    return true;
+  }
+
+  // CAS 2 : EN LIGNE 🌐
+  else {
+    // On upload tout en parallèle (Promise.all)
+    const uploadPromises = photoBlobs.map(blob => 
+      new Promise<string>((resolve, reject) => {
+        this.uploadPhoto(blob).subscribe({
+          next: (res) => resolve(res.url),
+          error: (err) => reject(err)
+        });
+      })
+    );
+
+    try {
+      const urls = await Promise.all(uploadPromises);
+      // On ajoute les URLs au rapport
+      rapport.image_urls = urls;
+      // On envoie
+      this.http.post(`${this.apiUrl}/rapports`, rapport).subscribe();
+      return true;
+    } catch (err) {
+      console.error("Erreur upload multiple", err);
+      return false;
+    }
+  }
+}
 
   // ==========================================
   // ✍️ SIGNATURE
