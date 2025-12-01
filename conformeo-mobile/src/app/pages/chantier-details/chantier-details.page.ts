@@ -10,6 +10,7 @@ import { camera, time, warning, documentTextOutline } from 'ionicons/icons';
 import { SignatureModalComponent } from './signature-modal/signature-modal.component';
 import { ModalController } from '@ionic/angular';
 import { createOutline } from 'ionicons/icons';
+import { NewRapportModalComponent } from './new-rapport-modal/new-rapport-modal.component';
 
 @Component({
   selector: 'app-chantier-details',
@@ -48,7 +49,6 @@ export class ChantierDetailsPage implements OnInit {
 
   async takePhoto() {
     try {
-      // 1. Ouvrir la caméra
       const image = await Camera.getPhoto({
         quality: 90,
         allowEditing: false,
@@ -58,14 +58,12 @@ export class ChantierDetailsPage implements OnInit {
       });
 
       if (image.webPath) {
-        this.photoUrlTemp = image.webPath; // Affichage temporaire
-        
-        // 2. Convertir en Blob pour l'envoi
+        // 1. On récupère le Blob
         const response = await fetch(image.webPath);
         const blob = await response.blob();
 
-        // 3. Envoyer au serveur
-        this.uploadAndCreateRapport(blob);
+        // 2. 👇 CORRECTION ICI : On passe le blob ET le chemin webPath
+        this.uploadAndCreateRapport(blob, image.webPath);
       }
     } catch (e) {
       console.log('Utilisateur a annulé ou erreur caméra', e);
@@ -87,39 +85,34 @@ export class ChantierDetailsPage implements OnInit {
     }
   }
 
-  async uploadAndCreateRapport(blob: Blob) {
-    // 1. On prépare les infos du rapport
-    const newRapport: Rapport = {
-      titre: 'Inspection Photo',
-      description: 'Photo prise sur le terrain',
-      chantier_id: this.chantierId,
-    };
+  async uploadAndCreateRapport(blob: Blob, webPath: string) {
+    // 1. Ouvrir la modale de saisie
+    const modal = await this.modalCtrl.create({
+      component: NewRapportModalComponent,
+      componentProps: { photoWebPath: webPath }
+    });
+    
+    await modal.present();
+    const { data, role } = await modal.onWillDismiss();
 
-    try {
-      // 2. 👇 C'EST ICI LA CLÉ : On utilise la nouvelle fonction du service
-      // Elle gère le mode avion toute seule (sauvegarde locale)
-      const success = await this.api.addRapportWithPhoto(newRapport, blob);
+    if (role === 'confirm') {
+      // 2. On a les infos (Titre, Desc, Urgence, GPS) + le Blob photo
+      const newRapport: Rapport = {
+        titre: data.titre,
+        description: data.description,
+        chantier_id: this.chantierId,
+        niveau_urgence: data.niveau_urgence,
+        latitude: data.latitude,
+        longitude: data.longitude
+      };
 
-      if (success) {
-        // 3. Feedback utilisateur
-        // Si on est hors ligne, on prévient que c'est en attente
-        if (!this.api['offline'].isOnline.value) { // (Accès rapide pour vérifier)
-             alert("Photo sauvegardée dans le téléphone (En attente de réseau 📡)");
-        } else {
-             // Si en ligne, c'est direct
-             // (Optionnel : petit toast de succès)
-        }
-        
-        this.loadRapports();
-        this.photoUrlTemp = undefined; 
-      }
-
-    } catch (e) {
-      console.error("Erreur processus photo", e);
-      alert("Erreur lors de l'enregistrement.");
+      // 3. On lance le tunnel (Service intelligent)
+      await this.api.addRapportWithPhoto(newRapport, blob);
+      
+      this.loadRapports();
     }
   }
-  
+
   // Helper pour afficher l'image complète (Backend URL + Localhost)
   getFullUrl(path: string | undefined) {
     if (!path) return '';

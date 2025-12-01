@@ -10,6 +10,9 @@
 
     <key>NSPhotoLibraryAddUsageDescription</key>
     <string>Besoin de sauvegarder les photos.</string>
+
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Conforméo a besoin de votre position pour géolocaliser les rapports.</string>
     
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>

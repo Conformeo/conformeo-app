@@ -39,13 +39,20 @@
     <p>Aucun chantier trouvé.</p>
   </div>
 
-  <ion-list style="background: transparent;">
+  <ion-list>
     <ion-card *ngFor="let c of chantiers" [routerLink]="['/chantier', c.id]" button="true">
-      <img alt="Chantier" src="https://ionicframework.com/docs/img/demos/card-media.png" />
+      
+      <div style="height: 150px; overflow: hidden; position: relative;">
+        <img *ngIf="c.cover_url" [src]="c.cover_url" style="width: 100%; height: 100%; object-fit: cover;" />
+        <div *ngIf="!c.cover_url" style="width: 100%; height: 100%; background: linear-gradient(45deg, #3880ff, #70a1ff); display: flex; align-items: center; justify-content: center;">
+          <ion-icon name="construct" style="font-size: 64px; color: white; opacity: 0.5;"></ion-icon>
+        </div>
+        
+        <ion-badge color="success" style="position: absolute; top: 10px; right: 10px;" *ngIf="c.est_actif">En cours</ion-badge>
+      </div>
+
       <ion-card-header>
-        <ion-card-subtitle>
-          <ion-icon name="business"></ion-icon> {{ c.client }}
-        </ion-card-subtitle>
+        <ion-card-subtitle>{{ c.client }}</ion-card-subtitle>
         <ion-card-title>{{ c.nom }}</ion-card-title>
       </ion-card-header>
 

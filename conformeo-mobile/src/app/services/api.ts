@@ -16,6 +16,7 @@ export interface Chantier {
   client: string;
   est_actif: boolean;
   signature_url?: string;
+  cover_url?: string;
 }
 
 export interface Rapport {
@@ -25,6 +26,10 @@ export interface Rapport {
   photo_url?: string;
   chantier_id: number;
   date_creation?: string;
+
+  niveau_urgence?: string; // 'Faible', 'Moyen', 'Critique'
+  latitude?: number;
+  longitude?: number;
 }
 
 export interface Materiel {

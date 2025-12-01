@@ -10,6 +10,15 @@
 <ion-content class="ion-padding">
   
   <form (ngSubmit)="save()">
+      
+      <div class="cover-photo-section" (click)="takeCoverPhoto()">
+        <img *ngIf="coverPhotoWebPath" [src]="coverPhotoWebPath" class="cover-preview" />
+        <div *ngIf="!coverPhotoWebPath" class="placeholder">
+          <ion-icon name="camera" size="large"></ion-icon>
+          <p>Ajouter une photo de couverture</p>
+        </div>
+      </div>
+      
     <ion-list>
       
       <ion-item>

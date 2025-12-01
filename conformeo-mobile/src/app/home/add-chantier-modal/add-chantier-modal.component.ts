@@ -1,6 +1,7 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 // 👇 ON IMPORTE CHAQUE COMPOSANT ICI (C'est la méthode moderne Standalone)
 import { 
   IonHeader, 
@@ -12,10 +13,13 @@ import {
   IonList, 
   IonItem, 
   IonInput,
-  ModalController 
+  ModalController,
+  IonIcon
 } from '@ionic/angular/standalone';
 
 import { ApiService, Chantier } from '../../services/api';
+import { addIcons } from 'ionicons';
+import { camera } from 'ionicons/icons';
 
 @Component({
   selector: 'app-add-chantier-modal',
@@ -34,7 +38,8 @@ import { ApiService, Chantier } from '../../services/api';
     IonContent, 
     IonList, 
     IonItem, 
-    IonInput
+    IonInput,
+    IonIcon
   ]
 })
 export class AddChantierModalComponent {
@@ -46,23 +51,50 @@ export class AddChantierModalComponent {
     est_actif: true
   };
 
+  coverPhotoWebPath: string | undefined;
+  coverPhotoBlob: Blob | undefined;
+
   constructor(
     private modalCtrl: ModalController,
     private api: ApiService
-  ) {}
+  ) {
+    addIcons({ camera });
+  }
 
+  
   cancel() {
     return this.modalCtrl.dismiss(null, 'cancel');
   }
 
-  save() {
-    this.api.createChantier(this.chantier).subscribe({
-      next: (newItem) => {
-        this.modalCtrl.dismiss(newItem, 'confirm');
-      },
-      error: (err) => {
-        console.error('Erreur création', err);
-      }
+  async takeCoverPhoto() {
+    const image = await Camera.getPhoto({
+      quality: 80,
+      allowEditing: false,
+      resultType: CameraResultType.Uri,
+      source: CameraSource.Camera // ou Prompt
     });
+    
+    this.coverPhotoWebPath = image.webPath;
+    const response = await fetch(image.webPath!);
+    this.coverPhotoBlob = await response.blob();
+  }
+
+  save() {
+    // Si on a une photo, on l'upload d'abord
+    if (this.coverPhotoBlob) {
+      this.api.uploadPhoto(this.coverPhotoBlob).subscribe(res => {
+        this.chantier.cover_url = res.url; // On lie l'URL Cloudinary
+        this.finalizeCreation();
+      });
+    } else {
+      this.finalizeCreation();
+    }
+  }
+
+  finalizeCreation() {
+    this.api.createChantier(this.chantier).subscribe(newItem => {
+      this.modalCtrl.dismiss(newItem, 'confirm');
+    });
+  
   }
 }

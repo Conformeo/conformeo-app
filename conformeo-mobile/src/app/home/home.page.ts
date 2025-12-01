@@ -1,15 +1,13 @@
 import { Component, OnInit } from '@angular/core';
-import { IonHeader, IonToolbar, IonTitle, IonContent, IonList, IonCard, IonCardHeader, IonCardTitle, IonCardSubtitle, IonCardContent, IonChip, IonIcon, IonLabel, IonFab, IonFabButton, IonRefresher, IonRefresherContent, ModalController, IonButtons, IonButton } from '@ionic/angular/standalone';
+import { IonHeader, IonToolbar, IonTitle, IonContent, IonList, IonCard, IonCardHeader, IonCardTitle, IonCardSubtitle, IonCardContent, IonChip, IonIcon, IonLabel, IonFab, IonFabButton, IonRefresher, IonRefresherContent, ModalController, IonButtons, IonButton, IonBadge } from '@ionic/angular/standalone';
 import { ApiService, Chantier } from '../services/api';
 import { CommonModule } from '@angular/common';
 import { addIcons } from 'ionicons';
-import { business, location, checkmarkCircle, alertCircle, add, statsChartOutline, hammerOutline } from 'ionicons/icons';
+import { business, location, checkmarkCircle, alertCircle, add, statsChartOutline, hammerOutline, cloudDone, cloudOffline, syncOutline, construct } from 'ionicons/icons';
 import { AddChantierModalComponent } from './add-chantier-modal/add-chantier-modal.component'; // <--- Import du composant
 import { RouterLink } from '@angular/router';
 // import { IonButton } from '@ionic/angular';
-import { syncOutline } from 'ionicons/icons'; // Ajoute l'icône
 
-import { cloudDone, cloudOffline } from 'ionicons/icons'; // Choisissons des nuages
 import { OfflineService } from '../services/offline'; // Service de gestion offline
 
 @Component({
@@ -37,7 +35,8 @@ import { OfflineService } from '../services/offline'; // Service de gestion offl
     IonRefresherContent,
     IonButtons,
     RouterLink, 
-    IonButton
+    IonButton,
+    IonBadge
   ],
 })
 export class HomePage implements OnInit {
@@ -49,8 +48,7 @@ export class HomePage implements OnInit {
     private modalCtrl: ModalController,
     private offline: OfflineService
   ) {
-    addIcons({ business, location, checkmarkCircle, alertCircle, add, statsChartOutline, hammerOutline, cloudDone, cloudOffline, syncOutline });
-  }
+addIcons({ business, location, checkmarkCircle, alertCircle, add, statsChartOutline, hammerOutline, cloudDone, cloudOffline, syncOutline, construct });  }
 
   ngOnInit() {
     // On écoute le réseau en temps réel
