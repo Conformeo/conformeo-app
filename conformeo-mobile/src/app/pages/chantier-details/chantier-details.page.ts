@@ -87,27 +87,37 @@ export class ChantierDetailsPage implements OnInit {
     }
   }
 
-  uploadAndCreateRapport(blob: Blob) {
-    // A. Upload de l'image
-    this.api.uploadPhoto(blob).subscribe({
-      next: (res) => {
-        const serverUrl = res.url; // ex: /static/xxx.jpg
-        
-        // B. Création du rapport
-        const newRapport: Rapport = {
-          titre: 'Inspection Photo',
-          description: 'Photo prise sur le terrain',
-          chantier_id: this.chantierId,
-          // photo_url sera passé en paramètre
-        };
+  async uploadAndCreateRapport(blob: Blob) {
+    // 1. On prépare les infos du rapport
+    const newRapport: Rapport = {
+      titre: 'Inspection Photo',
+      description: 'Photo prise sur le terrain',
+      chantier_id: this.chantierId,
+    };
 
-        this.api.createRapport(newRapport, serverUrl).subscribe(() => {
-          this.loadRapports(); // Rafraîchir la liste
-          this.photoUrlTemp = undefined; // Reset
-        });
-      },
-      error: (err) => alert("Erreur upload")
-    });
+    try {
+      // 2. 👇 C'EST ICI LA CLÉ : On utilise la nouvelle fonction du service
+      // Elle gère le mode avion toute seule (sauvegarde locale)
+      const success = await this.api.addRapportWithPhoto(newRapport, blob);
+
+      if (success) {
+        // 3. Feedback utilisateur
+        // Si on est hors ligne, on prévient que c'est en attente
+        if (!this.api['offline'].isOnline.value) { // (Accès rapide pour vérifier)
+             alert("Photo sauvegardée dans le téléphone (En attente de réseau 📡)");
+        } else {
+             // Si en ligne, c'est direct
+             // (Optionnel : petit toast de succès)
+        }
+        
+        this.loadRapports();
+        this.photoUrlTemp = undefined; 
+      }
+
+    } catch (e) {
+      console.error("Erreur processus photo", e);
+      alert("Erreur lors de l'enregistrement.");
+    }
   }
   
   // Helper pour afficher l'image complète (Backend URL + Localhost)

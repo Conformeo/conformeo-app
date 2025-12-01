@@ -30,33 +30,48 @@ export class AppComponent {
 
   async processQueue() {
     const queue = await this.offline.getQueue();
-    
-    if (queue.length === 0) return; // Rien à faire
+    if (queue.length === 0) return;
 
-    console.log(`🔄 Connexion retrouvée ! Synchronisation de ${queue.length} actions...`);
-    
-    // On présente un petit message
     const toast = await this.toastCtrl.create({
-      message: 'Connexion retrouvée : Synchronisation en cours...',
+      message: `Synchronisation de ${queue.length} éléments...`,
       duration: 3000,
       position: 'top',
       color: 'primary'
     });
     toast.present();
 
-    // On traite les éléments un par un
     for (const action of queue) {
+      
+      // CAS 1 : Chantier simple (Texte)
       if (action.type === 'POST_CHANTIER') {
-        // On force l'appel HTTP (on ne repasse pas par createChantier pour éviter la boucle)
-        // Note: Dans une vraie app, on gérerait les erreurs ici
-        this.api.createChantier(action.data).subscribe({
-            next: (res) => console.log('✅ Chantier synchronisé :', res.nom),
-            error: (err) => console.error('❌ Erreur synchro', err)
-        });
+        this.api.createChantier(action.data).subscribe();
+      }
+
+      // CAS 2 : Rapport avec Photo (Le Tunnel !)
+      else if (action.type === 'POST_RAPPORT_PHOTO') {
+        const data = action.data; // Contient { rapport, localPhotoPath }
+        
+        try {
+          // 1. On récupère la photo physique dans le téléphone
+          // On doit extraire le nom du fichier du chemin complet parfois
+          const fileName = data.localPhotoPath.split('/').pop();
+          const blob = await this.api.readLocalPhoto(fileName);
+
+          // 2. On l'envoie sur Cloudinary
+          this.api.uploadPhoto(blob).subscribe(res => {
+             // 3. On crée le rapport final
+             this.api.createRapport(data.rapport, res.url).subscribe(() => {
+                console.log("📸 Photo synchronisée !");
+                // Optionnel : Supprimer le fichier local pour faire de la place
+             });
+          });
+
+        } catch (e) {
+          console.error("Erreur lecture fichier local", e);
+        }
       }
     }
 
-    // Une fois fini, on vide la liste
     await this.offline.clearQueue();
   }
 }

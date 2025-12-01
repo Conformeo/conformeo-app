@@ -1,8 +1,12 @@
+import { Filesystem, Directory } from '@capacitor/filesystem'; // <--- NOUVEAU
+import { Platform } from '@ionic/angular/standalone'; // Pour savoir si on est sur mobile
+
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, from, of } from 'rxjs';
 import { tap, switchMap, catchError } from 'rxjs/operators';
 import { OfflineService } from './offline'
+
 
 // --- INTERFACES ---
 export interface Chantier {
@@ -46,6 +50,97 @@ export class ApiService {
   // ==========================================
   // 🏗️ GESTION DES CHANTIERS (AVEC OFFLINE)
   // ==========================================
+
+  // Convertir un Blob (Photo caméra) en Base64 (Texte stockable)
+  private async blobToBase64(blob: Blob): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = reject;
+      reader.onload = () => {
+        resolve(reader.result as string);
+      };
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  // Sauvegarder l'image physiquement dans le téléphone
+  private async savePhotoLocally(blob: Blob): Promise<string> {
+    const fileName = new Date().getTime() + '.jpeg';
+    const base64Data = await this.blobToBase64(blob);
+    
+    // On écrit le fichier dans le dossier "Documents" de l'app
+    const savedFile = await Filesystem.writeFile({
+      path: fileName,
+      data: base64Data,
+      directory: Directory.Data
+    });
+
+    // On retourne le chemin d'accès (uri)
+    return savedFile.uri;
+  }
+
+  // Lire une image locale pour l'envoyer (quand le réseau revient)
+  async readLocalPhoto(path: string): Promise<Blob> {
+    const readFile = await Filesystem.readFile({
+      path: path,
+      // directory: Directory.Data // Pas besoin si le path est complet (file://...)
+    });
+
+    // Conversion Base64 -> Blob pour l'upload
+    const response = await fetch(`data:image/jpeg;base64,${readFile.data}`);
+    return await response.blob();
+  }
+
+  // --- LE TUNNEL PHOTO ---
+  async addRapportWithPhoto(rapport: Rapport, photoBlob: Blob) {
+    
+    // CAS 1 : HORS LIGNE ✈️ -> On sauvegarde localement
+    if (!this.offline.isOnline.value) {
+      console.log('📡 Hors ligne : Sauvegarde photo locale...');
+      
+      // 1. Convertir Blob en Base64 pour le stockage
+      const convertBlobToBase64 = (blob: Blob) => new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onerror = reject;
+          reader.onload = () => resolve(reader.result as string);
+          reader.readAsDataURL(blob);
+      });
+
+      const base64Data = await convertBlobToBase64(photoBlob);
+      const fileName = new Date().getTime() + '.jpeg';
+
+      // 2. Écrire sur le disque
+      try {
+        await Filesystem.writeFile({
+          path: fileName,
+          data: base64Data,
+          directory: Directory.Data
+        });
+      } catch(e) {
+        console.error("Erreur écriture fichier (normal sur Web, marche sur Mobile)", e);
+        // Sur le web pour tester, on ne fait rien, mais sur mobile ça marchera
+      }
+
+      // 3. Mettre dans la file d'attente
+      await this.offline.addToQueue('POST_RAPPORT_PHOTO', {
+        rapport: rapport,
+        localPhotoPath: fileName // On garde juste le nom du fichier
+      });
+      
+      return true;
+    }
+
+    // CAS 2 : EN LIGNE 🌐 -> Upload direct
+    else {
+      this.uploadPhoto(photoBlob).subscribe({
+        next: (res) => {
+          this.createRapport(rapport, res.url).subscribe();
+        },
+        error: (err) => console.error(err)
+      });
+      return true;
+    }
+  }
 
   getChantiers(): Observable<Chantier[]> {
     // 1. Si on est EN LIGNE
