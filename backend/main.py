@@ -109,7 +109,8 @@ def create_chantier(chantier: schemas.ChantierCreate, db: Session = Depends(get_
     new_chantier = models.Chantier(
         nom=chantier.nom,
         adresse=chantier.adresse,
-        client=chantier.client
+        client=chantier.client,
+        cover_url=chantier.cover_url
     )
     db.add(new_chantier)
     db.commit()
@@ -146,7 +147,10 @@ def create_rapport(rapport: schemas.RapportCreate, photo_url: Optional[str] = No
         titre=rapport.titre,
         description=rapport.description,
         chantier_id=rapport.chantier_id,
-        photo_url=photo_url
+        photo_url=photo_url,
+        niveau_urgence=rapport.niveau_urgence, # <--- Ajout
+        latitude=rapport.latitude,             # <--- Ajout
+        longitude=rapport.longitude
     )
     db.add(new_rapport)
     db.commit()
@@ -269,3 +273,21 @@ def fix_db_signature(db: Session = Depends(get_db)):
         return {"message": "Succès ! La colonne signature_url a été ajoutée."}
     except Exception as e:
         return {"message": "Erreur ou colonne déjà présente", "details": str(e)}
+
+# --- ROUTE DE MIGRATION V1.5 (A lancer une seule fois) ---
+@app.get("/migrate_db_v1_5")
+def migrate_db(db: Session = Depends(get_db)):
+    try:
+        # 1. Ajout colonne photo couverture Chantier
+        db.execute(text("ALTER TABLE chantiers ADD COLUMN IF NOT EXISTS cover_url VARCHAR"))
+        
+        # 2. Ajout colonnes Rapport (GPS + Urgence)
+        db.execute(text("ALTER TABLE rapports ADD COLUMN IF NOT EXISTS niveau_urgence VARCHAR DEFAULT 'Faible'"))
+        db.execute(text("ALTER TABLE rapports ADD COLUMN IF NOT EXISTS latitude FLOAT"))
+        db.execute(text("ALTER TABLE rapports ADD COLUMN IF NOT EXISTS longitude FLOAT"))
+        
+        db.commit()
+        return {"message": "Migration V1.5 réussie ! Colonnes ajoutées."}
+    except Exception as e:
+        db.rollback()
+        return {"status": "Erreur migration", "details": str(e)}

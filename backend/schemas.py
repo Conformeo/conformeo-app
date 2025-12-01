@@ -24,11 +24,14 @@ class Token(BaseModel):
     access_token: str
     token_type: str
 
-# Schéma pour les chantiers
+# ...
+
+# --- CHANTIER ---
 class ChantierBase(BaseModel):
     nom: str
     adresse: str
     client: str
+    cover_url: Optional[str] = None # <--- Ajout
 
 class ChantierCreate(ChantierBase):
     pass
@@ -36,17 +39,18 @@ class ChantierCreate(ChantierBase):
 class ChantierOut(ChantierBase):
     id: int
     est_actif: bool
-    # date_creation: datetime  <-- Optionnel pour l'instant si tu n'as pas l'import datetime
-
+    signature_url: Optional[str] = None
     class Config:
         from_attributes = True
 
-
-# --- Schémas Rapports ---
+# --- RAPPORT ---
 class RapportBase(BaseModel):
     titre: str
     description: str
     chantier_id: int
+    niveau_urgence: str = "Faible" # <--- Ajout
+    latitude: Optional[float] = None # <--- Ajout
+    longitude: Optional[float] = None # <--- Ajout
 
 class RapportCreate(RapportBase):
     pass
@@ -54,8 +58,7 @@ class RapportCreate(RapportBase):
 class RapportOut(RapportBase):
     id: int
     photo_url: Optional[str] = None
-    date_creation: datetime # Assure-toi d'avoir importé datetime from datetime en haut
-
+    date_creation: datetime
     class Config:
         from_attributes = True
 

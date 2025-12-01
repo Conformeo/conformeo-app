@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Float
 from datetime import datetime
 from database import Base
 from sqlalchemy import ForeignKey
@@ -13,7 +13,8 @@ class Chantier(Base):
     est_actif = Column(Boolean, default=True)
     date_creation = Column(DateTime, default=datetime.now)
     signature_url = Column(String, nullable=True)
-    
+    cover_url = Column(String, nullable=True)
+
     rapports = relationship("Rapport", back_populates="chantier")
     materiels = relationship("Materiel", back_populates="chantier")
 
@@ -26,6 +27,10 @@ class Rapport(Base):
     photo_url = Column(String, nullable=True) # Ex: "/static/image123.jpg"
     chantier_id = Column(Integer, ForeignKey("chantiers.id"))
     date_creation = Column(DateTime, default=datetime.now)
+
+    niveau_urgence = Column(String, default="Faible") # Faible, Moyen, Critique
+    latitude = Column(Float, nullable=True)
+    longitude = Column(Float, nullable=True)
 
     # Lien inverse
     chantier = relationship("Chantier", back_populates="rapports")
