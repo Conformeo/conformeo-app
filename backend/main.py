@@ -34,6 +34,12 @@ cloudinary.config(
   secure = True
 )
 
+# On ne configure que si les clés sont là pour éviter le crash au démarrage
+if cloudinary_config["cloud_name"]:
+    cloudinary.config(**cloudinary_config)
+else:
+    print("⚠️ ATTENTION : Clés Cloudinary manquantes ! L'upload ne marchera pas.")
+
 # Créer le dossier s'il n'existe pas (sécurité)
 os.makedirs("uploads", exist_ok=True)
 
@@ -41,11 +47,17 @@ os.makedirs("uploads", exist_ok=True)
 app.mount("/static", StaticFiles(directory="uploads"), name="static")
 
 # --- AJOUT CORS (Début) ---
-origins = ["*"] # En prod, on mettra l'URL spécifique, mais pour le dev "*" autorise tout le monde.
+# --- CORS (Autorisations) ---
+origins = [
+    "http://localhost:8100",           # Ton ordi (Ionic Serve)
+    "http://localhost:4200",           # Angular Dev
+    "https://conformeo-app.vercel.app", # Ton App Vercel
+    "*"                                # (Optionnel) Autoriser tout le monde temporairement
+]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=origins, # Liste explicite
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
