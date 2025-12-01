@@ -11,6 +11,7 @@ import { SignatureModalComponent } from './signature-modal/signature-modal.compo
 import { ModalController } from '@ionic/angular';
 import { createOutline } from 'ionicons/icons';
 import { NewRapportModalComponent } from './new-rapport-modal/new-rapport-modal.component';
+import { RapportDetailsModalComponent } from './rapport-details-modal/rapport-details-modal.component';
 
 @Component({
   selector: 'app-chantier-details',
@@ -111,6 +112,14 @@ export class ChantierDetailsPage implements OnInit {
       
       this.loadRapports();
     }
+  }
+
+  async openRapportDetails(rapport: Rapport) {
+    const modal = await this.modalCtrl.create({
+      component: RapportDetailsModalComponent,
+      componentProps: { rapport: rapport }
+    });
+    modal.present();
   }
 
   // Helper pour afficher l'image complète (Backend URL + Localhost)

@@ -18,9 +18,9 @@
   <h3 style="font-weight: bold;">Journal du chantier</h3>
 
   <ion-list>
-    <ion-card *ngFor="let rap of rapports">
-      <img *ngIf="rap.photo_url" [src]="getFullUrl(rap.photo_url)" style="width: 100%; height: 200px; object-fit: cover;"/>
+    <ion-card *ngFor="let rap of rapports" button="true" (click)="openRapportDetails(rap)">
       
+      <img *ngIf="rap.photo_url" [src]="getFullUrl(rap.photo_url)" style="width: 100%; height: 200px; object-fit: cover;"/>
       <ion-card-header>
         <ion-card-subtitle>{{ rap.date_creation | date:'dd/MM HH:mm' }}</ion-card-subtitle>
         <ion-card-title>{{ rap.titre }}</ion-card-title>
