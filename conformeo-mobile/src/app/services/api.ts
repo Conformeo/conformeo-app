@@ -1,16 +1,17 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { Observable, from, of } from 'rxjs';
+import { tap, switchMap, catchError } from 'rxjs/operators';
+import { OfflineService } from './offline'
 
-import { from, Observable, of } from 'rxjs'; // <--- AJOUT DE 'of' et 'from'
-import { tap, switchMap } from 'rxjs/operators'; // <--- AJOUT operateurs
-import { OfflineService } from './offline';
-
+// --- INTERFACES ---
 export interface Chantier {
   id?: number;
   nom: string;
   adresse: string;
   client: string;
   est_actif: boolean;
+  signature_url?: string;
 }
 
 export interface Rapport {
@@ -27,111 +28,136 @@ export interface Materiel {
   nom: string;
   reference: string;
   etat: string;
-  chantier_id?: number | null; // null = Dépôt
+  chantier_id?: number | null;
 }
 
 @Injectable({
   providedIn: 'root'
 })
 export class ApiService {
-  // ATTENTION : Pour Android (émulateur), localhost devient 10.0.2.2.
-  // Pour le navigateur web, on reste sur 127.0.0.1 ou localhost.
-  // EN LOCAL (Commente cette ligne)
-  // private apiUrl = 'http://127.0.0.1:8000'; 
-
-  // EN PROD (Décommente et mets TON url Render sans le slash à la fin)
-  private apiUrl = 'https://conformeo-api.onrender.com';
+  // ⚠️ Mets bien TON url Render ici
+  private apiUrl = 'https://conformeo-api.onrender.com'; 
 
   constructor(
     private http: HttpClient,
-    private offline: OfflineService 
+    private offline: OfflineService
   ) { }
 
-  // Chantiers
+  // ==========================================
+  // 🏗️ GESTION DES CHANTIERS (AVEC OFFLINE)
+  // ==========================================
+
   getChantiers(): Observable<Chantier[]> {
-    // On regarde si on est en ligne (valeur instantanée)
+    // 1. Si on est EN LIGNE
     if (this.offline.isOnline.value) {
-      
-      // CAS 1 : EN LIGNE
-      // On appelle l'API, MAIS on profite du passage pour sauvegarder (tap) dans le stockage
       return this.http.get<Chantier[]>(`${this.apiUrl}/chantiers`).pipe(
         tap(data => {
-          this.offline.set('chantiers_cache', data); // Hop, copie de sauvegarde !
+          // On sauvegarde la copie fraîche dans le coffre
+          this.offline.set('chantiers_cache', data);
         })
       );
-
-    } else {
-      
-      // CAS 2 : HORS LIGNE
-      // On transforme la promesse du stockage en Observable pour que le reste de l'app ne voie pas la différence
+    } 
+    // 2. Si on est HORS LIGNE
+    else {
       return from(this.offline.get('chantiers_cache')).pipe(
         switchMap(data => {
-          if (data) {
-            console.log('Lecture depuis le cache local 💾');
-            return of(data); // On renvoie les données locales
-          } else {
-            return of([]); // Rien en cache
-          }
+          console.log('📦 Lecture cache chantiers');
+          return of(data || []); // Renvoie le cache ou liste vide
         })
       );
     }
   }
 
-  // Créer un nouveau chantier
   createChantier(chantier: Chantier): Observable<Chantier> {
-    
-    // CAS 1 : HORS LIGNE -> On met en file d'attente
+    // 1. HORS LIGNE -> File d'attente
     if (!this.offline.isOnline.value) {
-      console.log('📡 Hors ligne : Mise en file d\'attente du chantier');
-      
-      // On sauvegarde l'intention
+      console.log('📡 Hors ligne : Mise en file d\'attente');
       this.offline.addToQueue('POST_CHANTIER', chantier);
-      
-      // On renvoie un "Faux" chantier pour que l'UI se mette à jour tout de suite
-      // (Optimistic UI)
-      return of({ ...chantier, id: 9999, est_actif: true }); 
+      // Faux succès pour l'UI
+      return of({ ...chantier, id: 9999, est_actif: true });
     }
-
-    // CAS 2 : EN LIGNE -> Comportement normal
+    // 2. EN LIGNE -> Appel serveur
     return this.http.post<Chantier>(`${this.apiUrl}/chantiers`, chantier);
   }
 
-  // Récupérer un seul chantier
   getChantierById(id: number): Observable<Chantier> {
-    return this.http.get<Chantier>(`${this.apiUrl}/chantiers/${id}`); // Note: On n'a pas créé cette route API spécifique, on fera sans pour l'instant ou on filtre en local, mais pour le MVP on va supposer qu'on charge la liste.
-    // Correction pour le MVP rapide : On va tricher un peu si la route backend n'existe pas, mais créons les méthodes pour les rapports d'abord.
+    // Pour simplifier, on filtre la liste locale (marche online et offline)
+    return this.getChantiers().pipe(
+      switchMap(chantiers => {
+        const found = chantiers.find(c => c.id == id);
+        return of(found as Chantier);
+      })
+    );
   }
 
-  // 1. Récupérer les rapports d'un chantier
+  // ==========================================
+  // 📸 RAPPORTS & PHOTOS
+  // ==========================================
+
   getRapports(chantierId: number): Observable<Rapport[]> {
-    return this.http.get<Rapport[]>(`${this.apiUrl}/chantiers/${chantierId}/rapports`);
+    if (this.offline.isOnline.value) {
+      return this.http.get<Rapport[]>(`${this.apiUrl}/chantiers/${chantierId}/rapports`).pipe(
+        tap(data => this.offline.set(`rapports_${chantierId}`, data))
+      );
+    } else {
+      return from(this.offline.get(`rapports_${chantierId}`)).pipe(
+        switchMap(data => of(data || []))
+      );
+    }
   }
 
-  // 2. Envoyer une photo (Upload)
+  // Upload Photo (Vers Cloudinary via Backend)
   uploadPhoto(blob: Blob): Observable<{url: string}> {
+    if (!this.offline.isOnline.value) {
+      // TODO: Pour la V2, il faudrait stocker le Blob en local
+      alert("L'upload de photo nécessite internet pour l'instant.");
+      throw new Error("Offline");
+    }
     const formData = new FormData();
-    formData.append('file', blob, 'photo_chantier.jpg');
+    formData.append('file', blob, 'photo.jpg');
     return this.http.post<{url: string}>(`${this.apiUrl}/upload`, formData);
   }
 
-  // 3. Créer le rapport (Lien texte + photo)
   createRapport(rapport: Rapport, photoUrl?: string): Observable<Rapport> {
-    // L'API attend le paramètre photo_url dans l'URL (query param) ou le body.
-    // Dans notre code Python précédent : create_rapport(..., photo_url: Optional[str] = None)
-    // On va passer photo_url en query param pour faire simple
     let url = `${this.apiUrl}/rapports`;
     if (photoUrl) {
       url += `?photo_url=${encodeURIComponent(photoUrl)}`;
     }
+    
+    if (!this.offline.isOnline.value) {
+        // En mode offline, on ne gère pas encore la création de rapport complexe
+        // On pourrait l'ajouter à la queue ici
+        return of(rapport); 
+    }
+
     return this.http.post<Rapport>(url, rapport);
   }
 
+  // ==========================================
+  // ✍️ SIGNATURE
+  // ==========================================
+
+  signChantier(chantierId: number, signatureUrl: string): Observable<any> {
+    return this.http.put(`${this.apiUrl}/chantiers/${chantierId}/signature?signature_url=${encodeURIComponent(signatureUrl)}`, {});
+  }
+
+  // ==========================================
+  // 📊 DASHBOARD & MATERIEL
+  // ==========================================
+
   getDashboardStats(): Observable<any> {
+    if(!this.offline.isOnline.value) return of({});
     return this.http.get<any>(`${this.apiUrl}/dashboard/stats`);
   }
 
   getMateriels(): Observable<Materiel[]> {
-    return this.http.get<Materiel[]>(`${this.apiUrl}/materiels`);
+    if (this.offline.isOnline.value) {
+      return this.http.get<Materiel[]>(`${this.apiUrl}/materiels`).pipe(
+        tap(data => this.offline.set('materiels_cache', data))
+      );
+    } else {
+      return from(this.offline.get('materiels_cache')).pipe(switchMap(data => of(data || [])));
+    }
   }
 
   createMateriel(mat: Materiel): Observable<Materiel> {
@@ -139,18 +165,8 @@ export class ApiService {
   }
 
   transferMateriel(materielId: number, chantierId: number | null): Observable<any> {
-    // Si chantierId est null, l'API comprendra "Retour dépôt" si on gère bien, 
-    // ou on envoie 0. Notre API Python attend un entier optionnel.
-    // Astuce : on envoie le paramètre en query string pour faire simple avec FastAPI
     let url = `${this.apiUrl}/materiels/${materielId}/transfert`;
-    if (chantierId) {
-      url += `?chantier_id=${chantierId}`;
-    }
+    if (chantierId) url += `?chantier_id=${chantierId}`;
     return this.http.put(url, {});
-  }
-
-  signChantier(chantierId: number, signatureUrl: string): Observable<any> {
-    // On envoie l'URL en paramètre query pour faire simple
-    return this.http.put(`${this.apiUrl}/chantiers/${chantierId}/signature?signature_url=${encodeURIComponent(signatureUrl)}`, {});
   }
 }
