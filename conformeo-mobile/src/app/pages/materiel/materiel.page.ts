@@ -7,6 +7,7 @@ import {
   AlertController, IonRefresher, IonRefresherContent, IonBackButton,
   IonSearchbar, IonGrid, IonRow, IonCol
 } from '@ionic/angular/standalone';
+import { Capacitor } from '@capacitor/core';
 import { addIcons } from 'ionicons';
 import { add, hammer, construct, home, swapHorizontal, qrCodeOutline } from 'ionicons/icons';
 import { ApiService, Materiel, Chantier } from '../../services/api';
@@ -60,24 +61,24 @@ export class MaterielPage implements OnInit {
   // --- LE NOUVEAU SCANNER (Beaucoup plus court !) ---
   async startScan() {
     try {
-      // 1. Demander la permission explicitement
+      // 1. Demander la permission
       const { camera } = await BarcodeScanner.requestPermissions();
       
       if (camera !== 'granted' && camera !== 'limited') {
-        alert("Permission caméra refusée. Allez dans les paramètres pour l'activer.");
+        alert("Permission caméra refusée.");
         return;
       }
 
-      // 2. (Android Uniquement) Vérifier si le module Google est installé
-      // C'est souvent ça qui bloque "silencieusement"
-      const { available } = await BarcodeScanner.isGoogleBarcodeScannerModuleAvailable();
-      
-      if (!available) {
-        // On demande l'installation (ça se fait en fond)
-        await BarcodeScanner.installGoogleBarcodeScannerModule();
+      // 2. (Android Uniquement) Vérifier le module Google
+      // 👇 C'EST ICI LA CORRECTION 👇
+      if (Capacitor.getPlatform() === 'android') {
+        const { available } = await BarcodeScanner.isGoogleBarcodeScannerModuleAvailable();
+        if (!available) {
+          await BarcodeScanner.installGoogleBarcodeScannerModule();
+        }
       }
 
-      // 3. Lancer le scan
+      // 3. Lancer le scan (Fonctionne sur iOS et Android)
       const { barcodes } = await BarcodeScanner.scan({
         formats: [BarcodeFormat.QrCode]
       });
@@ -89,12 +90,10 @@ export class MaterielPage implements OnInit {
       }
 
     } catch (e: any) {
-      // 5. Afficher l'erreur à l'écran pour déboguer
       console.error(e);
       alert("Erreur Scanner : " + (e.message || JSON.stringify(e)));
     }
   }
-
   handleScanResult(code: string) {
     const mat = this.materiels.find(m => m.reference === code);
     

@@ -2,10 +2,19 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+    <key>NSCameraUsageDescription</key>
+    <string>Besoin de la caméra pour les photos chantier.</string>
+
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>Besoin d'accéder aux photos.</string>
+
+    <key>NSPhotoLibraryAddUsageDescription</key>
+    <string>Besoin de sauvegarder les photos.</string>
+    
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-        <string>conformeo-mobile</string>
+	<string>conformeo-mobile</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -45,5 +54,9 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Besoin de la caméra pour les photos chantier</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Besoin d&apos;accéder à vos images pour les photos chantier</string>
 </dict>
 </plist>
