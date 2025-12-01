@@ -1,6 +1,8 @@
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import cm
+import requests
+from io import BytesIO
 from PIL import Image, ImageOps
 import os
 
@@ -50,11 +52,42 @@ def generate_pdf(chantier, rapports, output_path):
         
         image_path = None
         if rapport.photo_url:
-            filename = rapport.photo_url.replace("/static/", "")
-            potential_path = os.path.join("uploads", filename)
-            if os.path.exists(potential_path):
-                image_path = potential_path
-                hauteur_requise += 7 * cm 
+            try:
+                img_data = None
+                
+                # CAS 1 : Image locale (ex: Signature ancienne ou test)
+                if rapport.photo_url.startswith("/static/"):
+                    filename = rapport.photo_url.replace("/static/", "")
+                    local_path = os.path.join("uploads", filename)
+                    if os.path.exists(local_path):
+                        img = Image.open(local_path)
+                        img_data = img
+
+                # CAS 2 : Image Cloudinary (Commence par http)
+                elif rapport.photo_url.startswith("http"):
+                    response = requests.get(rapport.photo_url)
+                    if response.status_code == 200:
+                        img = Image.open(BytesIO(response.content))
+                        img_data = img
+
+                # TRAITEMENT COMMUN (Rotation + Dessin)
+                if img_data:
+                    # Correction Rotation EXIF
+                    transposed_img = ImageOps.exif_transpose(img_data)
+                    
+                    # On convertit en ImageReader pour ReportLab
+                    rl_image = ImageReader(transposed_img)
+                    
+                    # Dessin
+                    c.drawImage(rl_image, 2.5 * cm, y_position - 6 * cm, width=8*cm, height=6*cm, preserveAspectRatio=True)
+                    y_position -= 7 * cm
+                    
+            except Exception as e:
+                print(f"Erreur image: {e}")
+                c.drawString(2.5 * cm, y_position, "[Erreur chargement image]")
+                y_position -= 1 * cm
+        else:
+            y_position -= 1 * cm
 
         # --- SAUT DE PAGE SI NECESSAIRE ---
         if (y_position - hauteur_requise) < MARGE_BAS:

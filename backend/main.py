@@ -4,6 +4,9 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
+import cloudinary
+import cloudinary.uploader
+
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 import models, schemas, security
@@ -13,12 +16,23 @@ import shutil
 import os
 from uuid import uuid4
 
+
 import pdf_generator # Notre nouveau fichier
 
 # Création des tables
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Conforméo API")
+
+# --- CONFIGURATION CLOUDINARY ---
+# Remplace par TON url, ou mieux, utilise os.getenv("CLOUDINARY_URL")
+# Pour l'instant on va utiliser une variable d'environnement
+cloudinary.config(
+  cloud_name = os.getenv("mediaflows_e8ee5dac-d32a-42cd-bc02-c20df96c7aba"),
+  api_key = os.getenv("333761364629922"),
+  api_secret = os.getenv("Kol6EichzIOtzcDVWz3-xgxtdb4"),
+  secure = True
+)
 
 # Créer le dossier s'il n'existe pas (sécurité)
 os.makedirs("uploads", exist_ok=True)
@@ -97,19 +111,16 @@ def read_chantiers(db: Session = Depends(get_db)):
 
 @app.post("/upload")
 async def upload_image(file: UploadFile = File(...)):
-    """Sauvegarde une image envoyée par le mobile et renvoie son URL."""
-    # 1. Générer un nom unique pour ne pas écraser les fichiers (ex: a1b2-c3d4.jpg)
-    file_extension = file.filename.split(".")[-1]
-    new_filename = f"{uuid4()}.{file_extension}"
-    file_location = f"uploads/{new_filename}"
+    """Envoie l'image sur Cloudinary et renvoie l'URL sécurisée."""
     
-    # 2. Sauvegarder physiquement le fichier
-    with open(file_location, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-        
-    # 3. Renvoyer l'URL accessible
-    # Note: En prod, on renverrait une URL complète (https://api.conformeo.com/static/...)
-    return {"url": f"/static/{new_filename}"}
+    # 1. On envoie directement le fichier à Cloudinary
+    # (Cloudinary est magique, il lit directement le fichier temporaire)
+    result = cloudinary.uploader.upload(file.file, folder="conformeo_chantiers")
+    
+    # 2. On récupère l'URL sécurisée (https)
+    url_securisee = result.get("secure_url")
+    
+    return {"url": url_securisee}
 
 @app.post("/rapports", response_model=schemas.RapportOut)
 def create_rapport(rapport: schemas.RapportCreate, photo_url: Optional[str] = None, db: Session = Depends(get_db)):

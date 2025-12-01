@@ -10,3 +10,5 @@ email-validator
 bcrypt==4.0.1
 reportlab
 Pillow
+cloudinary
+requests
