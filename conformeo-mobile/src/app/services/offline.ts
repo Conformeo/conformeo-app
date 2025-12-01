@@ -74,6 +74,10 @@ export class OfflineService {
   // Ajoute ToastController dans le constructeur de OfflineService si besoin, 
   // ou utilise juste alert() pour le debug, c'est plus simple.
 
+  // ... (imports existants)
+  // Ajoute ToastController dans le constructeur de OfflineService si besoin, 
+  // ou utilise juste alert() pour le debug, c'est plus simple.
+
   async debugSyncProcess(apiService: any) {
     alert("Démarrage Synchro Manuelle...");
     
