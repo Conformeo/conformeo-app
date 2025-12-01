@@ -35,7 +35,7 @@ cloudinary.config(
 )
 
 # On ne configure que si les clés sont là pour éviter le crash au démarrage
-if cloudinary_config["cloud_name"]:
+if cloudinary_config["mediaflows_e8ee5dac-d32a-42cd-bc02-c20df96c7aba"]:
     cloudinary.config(**cloudinary_config)
 else:
     print("⚠️ ATTENTION : Clés Cloudinary manquantes ! L'upload ne marchera pas.")
