@@ -27,19 +27,26 @@ app = FastAPI(title="Conforméo API")
 # --- CONFIGURATION CLOUDINARY ---
 # Remplace par TON url, ou mieux, utilise os.getenv("CLOUDINARY_URL")
 # Pour l'instant on va utiliser une variable d'environnement
-cloudinary_config(
-  cloud_name = os.getenv("mediaflows_e8ee5dac-d32a-42cd-bc02-c20df96c7aba"),
-  api_key = os.getenv("333761364629922"),
-  api_secret = os.getenv("Kol6EichzIOtzcDVWz3-xgxtdb4"),
-  secure = True
-)
 
-# --- 2. UTILISATION DE LA VARIABLE (ENSUITE) ---
-# Attention : mettez bien "cloud_name" entre guillemets, pas le code bizarre
-if cloudinary_config["cloud_name"]:
-    cloudinary.config(**cloudinary_config)
+cloud_name = os.getenv("mediaflows_e8ee5dac-d32a-42cd-bc02-c20df96c7aba"),
+api_key = os.getenv("333761364629922"),
+api_secret = os.getenv("Kol6EichzIOtzcDVWz3-xgxtdb4"),
+secure = True
+
+
+# 2. On vérifie qu'elles existent avant de lancer la config
+if cloud_name and api_key and api_secret:
+    cloudinary.config(
+        cloud_name = cloud_name,
+        api_key = api_key,
+        api_secret = api_secret,
+        secure = True
+    )
+    print("✅ Cloudinary connecté !")
 else:
-    print("⚠️ ATTENTION : Clés Cloudinary manquantes ! L'upload ne marchera pas.")
+    print("⚠️ ERREUR : Clés Cloudinary manquantes sur Render. Vérifiez l'onglet Environment.")
+
+# --- FIN CONFIGURATION ---
 
 # Créer le dossier s'il n'existe pas (sécurité)
 os.makedirs("uploads", exist_ok=True)
@@ -47,7 +54,6 @@ os.makedirs("uploads", exist_ok=True)
 # On dit à l'API : "Quand on demande une URL commençant par /static, va chercher dans le dossier uploads"
 app.mount("/static", StaticFiles(directory="uploads"), name="static")
 
-# --- AJOUT CORS (Début) ---
 # --- CORS (Autorisations) ---
 origins = [
     "http://localhost:8100",           # Ton ordi (Ionic Serve)
@@ -63,7 +69,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-# --- AJOUT CORS (Fin) ---
 
 # Route pour créer un compte (Inscription)
 @app.post("/users", response_model=schemas.UserOut)
