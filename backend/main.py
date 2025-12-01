@@ -59,15 +59,15 @@ app.mount("/static", StaticFiles(directory="uploads"), name="static")
 
 # --- CORS (Autorisations) ---
 origins = [
-    "http://localhost:8100",           # Ionic Serve
-    "http://localhost:4200",           # Angular Dev
-    "https://conformeo-app.vercel.app", # Vercel
-    "*"                                # Autoriser tout (temporaire pour dev)
+    "http://localhost:8100",              # Ionic
+    "http://localhost:4200",              # Angular dev
+    "http://localhost:3000",              # cas général
+    "https://conformeo-app.vercel.app",   # ton front prod
 ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=origins,        # PAS de "*"
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
