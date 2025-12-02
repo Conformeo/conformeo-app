@@ -360,22 +360,22 @@ def migrate_db_v4(db: Session = Depends(get_db)):
         return {"status": "Erreur", "details": str(e)}
 
 # --- ROUTES PPSPS ---
-# @app.post("/ppsps", response_model=schemas.PPSPSOut)
-# def create_ppsps(ppsps: schemas.PPSPSCreate, db: Session = Depends(get_db)):
-#     new_ppsps = models.PPSPS(
-#         maitre_oeuvre=ppsps.maitre_oeuvre,
-#         coordonnateur_sps=ppsps.coordonnateur_sps,
-#         hopital_proche=ppsps.hopital_proche,
-#         responsable_securite=ppsps.responsable_securite,
-#         nb_compagnons=ppsps.nb_compagnons,
-#         horaires=ppsps.horaires,
-#         risques=ppsps.risques,
-#         chantier_id=ppsps.chantier_id
-#     )
-#     db.add(new_ppsps)
-#     db.commit()
-#     db.refresh(new_ppsps)
-#     return new_ppsps
+@app.post("/ppsps", response_model=schemas.PPSPSOut)
+def create_ppsps(ppsps: schemas.PPSPSCreate, db: Session = Depends(get_db)):
+    new_ppsps = models.PPSPS(
+        maitre_oeuvre=ppsps.maitre_oeuvre,
+        coordonnateur_sps=ppsps.coordonnateur_sps,
+        hopital_proche=ppsps.hopital_proche,
+        responsable_securite=ppsps.responsable_securite,
+        nb_compagnons=ppsps.nb_compagnons,
+        horaires=ppsps.horaires,
+        risques=ppsps.risques,
+        chantier_id=ppsps.chantier_id
+    )
+    db.add(new_ppsps)
+    db.commit()
+    db.refresh(new_ppsps)
+    return new_ppsps
 
 @app.get("/chantiers/{chantier_id}/ppsps", response_model=List[schemas.PPSPSOut])
 def read_ppsps_chantier(chantier_id: int, db: Session = Depends(get_db)):
