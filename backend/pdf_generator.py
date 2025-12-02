@@ -199,6 +199,71 @@ def generate_pdf(chantier, rapports, inspections, output_path):
 def generate_ppsps_pdf(chantier, ppsps, output_path):
     c = canvas.Canvas(output_path, pagesize=A4)
     width, height = A4
+    
+    # --- PAGE DE GARDE IMMERSIVE ---
+    
+    # 1. Image de fond (Cover du chantier)
+    cover_img = None
+    if chantier.cover_url:
+        cover_img = get_optimized_image(chantier.cover_url)
+    
+    if cover_img:
+        try:
+            # On redimensionne pour couvrir toute la page (Cover)
+            img_w, img_h = cover_img.size
+            aspect = img_h / float(img_w)
+            
+            # On dessine l'image en plein écran
+            c.drawImage(ImageReader(cover_img), 0, 0, width=width, height=width*aspect, preserveAspectRatio=True)
+            
+            # Ajout d'un voile noir semi-transparent pour la lisibilité
+            c.setFillColorRGB(0, 0, 0, 0.6) # Noir à 60% d'opacité
+            c.rect(0, 0, width, height, fill=1, stroke=0)
+        except: pass
+    else:
+        # Si pas d'image, fond bleu pro
+        c.setFillColorRGB(0.1, 0.2, 0.4) 
+        c.rect(0, 0, width, height, fill=1, stroke=0)
+
+    # 2. Logo Conforméo (En haut au centre, en blanc ou cadre blanc)
+    logo_img = get_optimized_image("logo.png")
+    if logo_img:
+        try:
+            rl_logo = ImageReader(logo_img)
+            # Petit fond blanc sous le logo
+            c.setFillColorRGB(1, 1, 1)
+            c.roundRect(width/2 - 3*cm, height - 4*cm, 6*cm, 3*cm, 10, fill=1, stroke=0)
+            c.drawImage(rl_logo, width/2 - 2.5*cm, height - 3.8*cm, width=5*cm, height=2.5*cm, preserveAspectRatio=True, mask='auto')
+        except: pass
+
+    # 3. Titre Principal (Au centre)
+    c.setFillColorRGB(1, 1, 1) # Blanc
+    c.setFont("Helvetica-Bold", 40)
+    c.drawCentredString(width / 2, height / 2 + 2*cm, "P.P.S.P.S")
+    
+    c.setFont("Helvetica", 16)
+    c.drawCentredString(width / 2, height / 2 + 0.5*cm, "Plan Particulier de Sécurité")
+    c.drawCentredString(width / 2, height / 2 - 0.5*cm, "et de Protection de la Santé")
+    
+    # Ligne de séparation
+    c.setLineWidth(2)
+    c.setStrokeColorRGB(1, 1, 1)
+    c.line(width/2 - 4*cm, height/2 - 1.5*cm, width/2 + 4*cm, height/2 - 1.5*cm)
+
+    # 4. Nom du Chantier (En gros en dessous)
+    c.setFont("Helvetica-Bold", 24)
+    c.drawCentredString(width / 2, height / 2 - 3*cm, chantier.nom)
+    
+    c.setFont("Helvetica", 14)
+    c.drawCentredString(width / 2, height / 2 - 4*cm, chantier.adresse)
+
+    # 5. Pied de page (Date et Entreprise)
+    c.setFont("Helvetica-Oblique", 10)
+    c.drawCentredString(width / 2, 2*cm, f"Document généré le {datetime.now().strftime('%d/%m/%Y')}")
+    
+    c.showPage() # FIN PAGE DE GARDE
+
+    # --- PAGES SUIVANTES (Contenu classique avec en-tête sobre) ---
     margin = 2 * cm
     y = height - 3 * cm
 
@@ -208,33 +273,34 @@ def generate_ppsps_pdf(chantier, ppsps, output_path):
             c.showPage()
             y = height - 3 * cm
 
-    # TITRE
-    c.setFont("Helvetica-Bold", 24)
-    c.drawCentredString(width/2, y, "PPSPS SIMPLIFIÉ")
-    y -= 1*cm
-    c.setFont("Helvetica", 12)
-    c.drawCentredString(width/2, y, "Conforme aux recommandations OPPBTP")
-    y -= 2*cm
+    # Titre rappel
+    c.setFillColorRGB(0, 0, 0)
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(margin, height - 1.5*cm, f"PPSPS - {chantier.nom}")
+    c.line(margin, height - 1.8*cm, width - margin, height - 1.8*cm)
 
-    # 1. ADMIN
-    c.setFont("Helvetica-Bold", 14)
-    c.setFillColorRGB(0, 0.2, 0.5)
+    # 1. INTERVENANTS
+    c.setFont("Helvetica-Bold", 16)
+    c.setFillColorRGB(0, 0.2, 0.5) # Bleu pro
     c.drawString(margin, y, "1. RENSEIGNEMENTS GÉNÉRAUX")
     c.setFillColorRGB(0, 0, 0)
     y -= 1*cm
     
+    # ... (Le reste du contenu reste identique à la version précédente) ...
+    # Je remets le bloc standard pour que vous ayez tout d'un bloc
+
     c.setFont("Helvetica", 11)
-    c.drawString(margin, y, f"Chantier : {chantier.nom} ({chantier.adresse})")
-    y -= 0.6*cm
     c.drawString(margin, y, f"Responsable Chantier : {ppsps.responsable_chantier}")
     y -= 0.6*cm
     c.drawString(margin, y, f"Effectif : {ppsps.nb_compagnons} compagnons - Horaires : {ppsps.horaires}")
+    y -= 0.6*cm
+    c.drawString(margin, y, f"Durée : {ppsps.duree_travaux}")
     y -= 0.6*cm
     c.drawString(margin, y, f"CSPS : {ppsps.coordonnateur_sps} | MOA : {ppsps.maitre_ouvrage}")
     y -= 1.5*cm
 
     # 2. SECOURS
-    c.setFont("Helvetica-Bold", 14)
+    c.setFont("Helvetica-Bold", 16)
     c.setFillColorRGB(0, 0.2, 0.5)
     c.drawString(margin, y, "2. ORGANISATION DES SECOURS")
     c.setFillColorRGB(0, 0, 0)
@@ -252,7 +318,7 @@ def generate_ppsps_pdf(chantier, ppsps, output_path):
     y -= 1.5*cm
 
     # 3. HYGIENE
-    c.setFont("Helvetica-Bold", 14)
+    c.setFont("Helvetica-Bold", 16)
     c.setFillColorRGB(0, 0.2, 0.5)
     c.drawString(margin, y, "3. HYGIÈNE & VIE DE CHANTIER")
     c.setFillColorRGB(0, 0, 0)
@@ -267,9 +333,9 @@ def generate_ppsps_pdf(chantier, ppsps, output_path):
     c.drawString(margin, y, f"Repas : {inst.get('repas', '-')}")
     y -= 1.5*cm
 
-    # 4. ANALYSE DES RISQUES (Tableau)
+    # 4. ANALYSE DES RISQUES
     check_page()
-    c.setFont("Helvetica-Bold", 14)
+    c.setFont("Helvetica-Bold", 16)
     c.setFillColorRGB(0, 0.2, 0.5)
     c.drawString(margin, y, "4. ANALYSE DES TÂCHES & PRÉVENTION")
     c.setFillColorRGB(0, 0, 0)
@@ -282,20 +348,24 @@ def generate_ppsps_pdf(chantier, ppsps, output_path):
     
     for t in taches:
         check_page()
-        # Bloc Tâche
+        # Bloc Tâche avec fond gris léger
+        c.setFillColorRGB(0.95, 0.95, 0.95)
+        c.rect(margin - 0.2*cm, y - 1.8*cm, width - 2*margin + 0.4*cm, 2.2*cm, fill=1, stroke=0)
+        c.setFillColorRGB(0, 0, 0)
+
         c.setFont("Helvetica-Bold", 11)
         c.drawString(margin, y, f"📌 Tâche : {t.get('tache')}")
         y -= 0.6*cm
         
         c.setFont("Helvetica", 10)
-        c.setFillColorRGB(0.8, 0, 0) # Rouge pour le risque
-        c.drawString(margin + 1*cm, y, f"⚠️ Risque : {t.get('risque')}")
+        c.setFillColorRGB(0.8, 0, 0) # Rouge
+        c.drawString(margin + 0.5*cm, y, f"⚠️ Risque : {t.get('risque')}")
         y -= 0.6*cm
         
-        c.setFillColorRGB(0, 0.5, 0) # Vert pour la prévention
-        c.drawString(margin + 1*cm, y, f"🛡️ Mesures : {t.get('prevention')}")
+        c.setFillColorRGB(0, 0.5, 0) # Vert
+        c.drawString(margin + 0.5*cm, y, f"🛡️ Mesures : {t.get('prevention')}")
         c.setFillColorRGB(0, 0, 0)
         
-        y -= 1*cm # Espace entre tâches
+        y -= 1.2*cm 
 
     c.save()
