@@ -6,32 +6,42 @@ from PIL import Image, ImageOps
 import os
 import requests
 from io import BytesIO
-import json # Pour lire les données JSON des inspections
+from datetime import datetime  # <--- L'IMPORT QUI MANQUAIT !
 
 def get_optimized_image(path_or_url):
-    """Télécharge une image optimisée (redimensionnée) pour économiser la RAM."""
+    """
+    Télécharge une image optimisée (redimensionnée) pour économiser la RAM.
+    """
     try:
+        # CAS 1 : URL Cloudinary (Optimisation Serveur)
         if path_or_url.startswith("http"):
+            # Si c'est du Cloudinary, on injecte des paramètres de redimensionnement
             optimized_url = path_or_url
             if "cloudinary.com" in path_or_url and "/upload/" in path_or_url:
                 optimized_url = path_or_url.replace("/upload/", "/upload/w_800,q_auto,f_jpg/")
             
+            # On télécharge l'image légère
             response = requests.get(optimized_url, stream=True)
             if response.status_code == 200:
                 img = Image.open(BytesIO(response.content))
                 return img
+        
+        # CAS 2 : Fichier Local (Logo, etc.)
         else:
             clean_path = path_or_url.replace("/static/", "")
             possible_paths = [os.path.join("uploads", clean_path), clean_path]
+            
             for p in possible_paths:
                 if os.path.exists(p):
                     return Image.open(p)
+                    
     except Exception as e:
         print(f"Erreur chargement image optimisée ({path_or_url}): {e}")
+    
     return None
 
-# 👇 ON AJOUTE L'ARGUMENT 'inspections'
-def generate_pdf(chantier, rapports, inspections, output_path):
+def generate_pdf(chantier, rapports, output_path):
+    """Génère le rapport de chantier classique (Journal de bord)"""
     c = canvas.Canvas(output_path, pagesize=A4)
     width, height = A4
     
@@ -39,9 +49,9 @@ def generate_pdf(chantier, rapports, inspections, output_path):
     MARGE_X = 2 * cm
     MARGE_BAS = 3 * cm
     DEPART_HAUT = height - 3 * cm
-    HAUTEUR_IMAGE = 6 * cm 
+    HAUTEUR_IMAGE = 6 * cm
     
-    # === 1. EN-TÊTE ===
+    # --- EN-TÊTE ---
     logo_img = get_optimized_image("logo.png")
     if logo_img:
         try:
@@ -66,117 +76,56 @@ def generate_pdf(chantier, rapports, inspections, output_path):
     
     y_position = height - 8 * cm
     
-    # === 2. JOURNAL PHOTO ===
-    if rapports:
-        c.setFont("Helvetica-Bold", 16)
-        c.drawString(MARGE_X, y_position, "Journal de Bord")
-        y_position -= 1 * cm
+    # --- RAPPORTS ---
+    for rapport in rapports:
+        hauteur_texte = 2 * cm
+        liste_images = []
+        
+        # Gestion V2 (Liste) et V1 (Unique)
+        if hasattr(rapport, 'images') and rapport.images:
+            for img_obj in rapport.images:
+                liste_images.append(img_obj.url)
+        elif hasattr(rapport, 'photo_url') and rapport.photo_url:
+            liste_images.append(rapport.photo_url)
 
-        for rapport in rapports:
-            hauteur_texte = 2 * cm
-            liste_images = []
-            
-            if hasattr(rapport, 'images') and rapport.images:
-                for img_obj in rapport.images:
-                    liste_images.append(img_obj.url)
-            elif rapport.photo_url:
-                liste_images.append(rapport.photo_url)
-
-            if y_position - hauteur_texte < MARGE_BAS:
-                c.showPage()
-                y_position = DEPART_HAUT
-
-            c.setFont("Helvetica-Bold", 12)
-            c.drawString(MARGE_X, y_position, f"• {rapport.titre}")
-            y_position -= 0.6 * cm
-            
-            c.setFont("Helvetica", 10)
-            desc = (rapport.description[:90] + '...') if len(rapport.description) > 90 else rapport.description
-            c.drawString(MARGE_X + 0.5*cm, y_position, f"Note: {desc}")
-            y_position -= 1 * cm 
-
-            for img_url in liste_images:
-                if y_position - HAUTEUR_IMAGE < MARGE_BAS:
-                    c.showPage()
-                    y_position = DEPART_HAUT
-                
-                pil_image = get_optimized_image(img_url)
-                if pil_image:
-                    try:
-                        pil_image = ImageOps.exif_transpose(pil_image)
-                        rl_image = ImageReader(pil_image)
-                        c.drawImage(rl_image, MARGE_X + 0.5*cm, y_position - HAUTEUR_IMAGE, width=8*cm, height=HAUTEUR_IMAGE, preserveAspectRatio=True)
-                        pil_image.close()
-                    except: pass
-                
-                y_position -= (HAUTEUR_IMAGE + 0.5*cm)
-
-            y_position -= 0.5 * cm
-
-    # === 3. AUDITS QHSE (NOUVEAU) ===
-    if inspections:
-        # Saut de page si nécessaire avant de commencer la section
-        if y_position < 6 * cm:
+        if y_position - hauteur_texte < MARGE_BAS:
             c.showPage()
             y_position = DEPART_HAUT
-        
-        y_position -= 1 * cm
-        c.setFont("Helvetica-Bold", 16)
-        c.setFillColorRGB(0, 0.4, 0) # Vert foncé pour QHSE
-        c.drawString(MARGE_X, y_position, "Contrôles QHSE")
-        c.setFillColorRGB(0, 0, 0)
-        y_position -= 1 * cm
 
-        for insp in inspections:
-            if y_position < 4 * cm:
+        c.setFont("Helvetica-Bold", 12)
+        c.drawString(MARGE_X, y_position, f"• {rapport.titre}")
+        y_position -= 0.6 * cm
+        
+        c.setFont("Helvetica", 10)
+        desc = (rapport.description[:90] + '...') if len(rapport.description) > 90 else rapport.description
+        c.drawString(MARGE_X + 0.5*cm, y_position, f"Note: {desc}")
+        y_position -= 1 * cm 
+
+        for img_url in liste_images:
+            if y_position - HAUTEUR_IMAGE < MARGE_BAS:
                 c.showPage()
                 y_position = DEPART_HAUT
-
-            # Titre de l'audit
-            c.setFont("Helvetica-Bold", 12)
-            c.drawString(MARGE_X, y_position, f"📋 {insp.titre} ({insp.type})")
-            y_position -= 0.8 * cm
-
-            # On parse les données JSON
-            questions = insp.data if isinstance(insp.data, list) else []
             
-            for item in questions:
-                if y_position < MARGE_BAS:
-                    c.showPage()
-                    y_position = DEPART_HAUT
-                
-                q_text = item.get('q', 'Question')
-                status = item.get('status', 'NA')
-                
-                # Question
-                c.setFont("Helvetica", 10)
-                c.drawString(MARGE_X + 1*cm, y_position, f"- {q_text}")
-                
-                # Statut (Coloré)
-                if status == 'OK':
-                    c.setFillColorRGB(0, 0.6, 0) # Vert
-                    c.drawString(width - 4*cm, y_position, "CONFORME")
-                elif status == 'NOK':
-                    c.setFillColorRGB(0.8, 0, 0) # Rouge
-                    c.setFont("Helvetica-Bold", 10)
-                    c.drawString(width - 4*cm, y_position, "NON CONFORME")
-                else:
-                    c.setFillColorRGB(0.5, 0.5, 0.5) # Gris
-                    c.drawString(width - 4*cm, y_position, "N/A")
-                
-                c.setFillColorRGB(0, 0, 0) # Retour noir
-                c.setFont("Helvetica", 10)
-                y_position -= 0.6 * cm
+            pil_image = get_optimized_image(img_url)
+            if pil_image:
+                try:
+                    pil_image = ImageOps.exif_transpose(pil_image)
+                    rl_image = ImageReader(pil_image)
+                    c.drawImage(rl_image, MARGE_X + 0.5*cm, y_position - HAUTEUR_IMAGE, width=8*cm, height=HAUTEUR_IMAGE, preserveAspectRatio=True)
+                    pil_image.close()
+                except:
+                    c.drawString(MARGE_X, y_position - 2*cm, "[Erreur Image]")
             
-            y_position -= 0.5 * cm # Espace entre audits
+            y_position -= (HAUTEUR_IMAGE + 0.5*cm)
 
-    # === 4. SIGNATURE ===
-    if y_position < 5 * cm:
+        y_position -= 0.5 * cm
+
+    # --- SIGNATURE ---
+    if y_position < 4 * cm:
         c.showPage()
-        y_position = height - 3 * cm
+        y_position = DEPART_HAUT
 
     y_position -= 1 * cm
-    c.setLineWidth(1)
     c.line(MARGE_X, y_position, width - MARGE_X, y_position)
     y_position -= 1 * cm
     
@@ -194,9 +143,8 @@ def generate_pdf(chantier, rapports, inspections, output_path):
     c.save()
     return output_path
 
-# ... (laisse la fonction generate_pdf existante)
-
 def generate_ppsps_pdf(chantier, ppsps, output_path):
+    """Génère le PPSPS avec la nouvelle page de garde Design"""
     c = canvas.Canvas(output_path, pagesize=A4)
     width, height = A4
     
@@ -209,34 +157,30 @@ def generate_ppsps_pdf(chantier, ppsps, output_path):
     
     if cover_img:
         try:
-            # On redimensionne pour couvrir toute la page (Cover)
             img_w, img_h = cover_img.size
             aspect = img_h / float(img_w)
-            
-            # On dessine l'image en plein écran
             c.drawImage(ImageReader(cover_img), 0, 0, width=width, height=width*aspect, preserveAspectRatio=True)
             
-            # Ajout d'un voile noir semi-transparent pour la lisibilité
-            c.setFillColorRGB(0, 0, 0, 0.6) # Noir à 60% d'opacité
+            # Voile noir semi-transparent
+            c.setFillColorRGB(0, 0, 0, 0.6)
             c.rect(0, 0, width, height, fill=1, stroke=0)
         except: pass
     else:
-        # Si pas d'image, fond bleu pro
+        # Fond bleu par défaut
         c.setFillColorRGB(0.1, 0.2, 0.4) 
         c.rect(0, 0, width, height, fill=1, stroke=0)
 
-    # 2. Logo Conforméo (En haut au centre, en blanc ou cadre blanc)
+    # 2. Logo Conforméo
     logo_img = get_optimized_image("logo.png")
     if logo_img:
         try:
             rl_logo = ImageReader(logo_img)
-            # Petit fond blanc sous le logo
             c.setFillColorRGB(1, 1, 1)
             c.roundRect(width/2 - 3*cm, height - 4*cm, 6*cm, 3*cm, 10, fill=1, stroke=0)
             c.drawImage(rl_logo, width/2 - 2.5*cm, height - 3.8*cm, width=5*cm, height=2.5*cm, preserveAspectRatio=True, mask='auto')
         except: pass
 
-    # 3. Titre Principal (Au centre)
+    # 3. Titre Principal
     c.setFillColorRGB(1, 1, 1) # Blanc
     c.setFont("Helvetica-Bold", 40)
     c.drawCentredString(width / 2, height / 2 + 2*cm, "P.P.S.P.S")
@@ -245,25 +189,25 @@ def generate_ppsps_pdf(chantier, ppsps, output_path):
     c.drawCentredString(width / 2, height / 2 + 0.5*cm, "Plan Particulier de Sécurité")
     c.drawCentredString(width / 2, height / 2 - 0.5*cm, "et de Protection de la Santé")
     
-    # Ligne de séparation
     c.setLineWidth(2)
     c.setStrokeColorRGB(1, 1, 1)
     c.line(width/2 - 4*cm, height/2 - 1.5*cm, width/2 + 4*cm, height/2 - 1.5*cm)
 
-    # 4. Nom du Chantier (En gros en dessous)
+    # 4. Infos Chantier
     c.setFont("Helvetica-Bold", 24)
     c.drawCentredString(width / 2, height / 2 - 3*cm, chantier.nom)
     
     c.setFont("Helvetica", 14)
     c.drawCentredString(width / 2, height / 2 - 4*cm, chantier.adresse)
 
-    # 5. Pied de page (Date et Entreprise)
+    # 5. Pied de page avec DATE (C'est ici que ça plantait)
     c.setFont("Helvetica-Oblique", 10)
-    c.drawCentredString(width / 2, 2*cm, f"Document généré le {datetime.now().strftime('%d/%m/%Y')}")
+    date_str = datetime.now().strftime('%d/%m/%Y')
+    c.drawCentredString(width / 2, 2*cm, f"Document généré le {date_str}")
     
     c.showPage() # FIN PAGE DE GARDE
 
-    # --- PAGES SUIVANTES (Contenu classique avec en-tête sobre) ---
+    # --- PAGES SUIVANTES ---
     margin = 2 * cm
     y = height - 3 * cm
 
@@ -273,7 +217,6 @@ def generate_ppsps_pdf(chantier, ppsps, output_path):
             c.showPage()
             y = height - 3 * cm
 
-    # Titre rappel
     c.setFillColorRGB(0, 0, 0)
     c.setFont("Helvetica-Bold", 12)
     c.drawString(margin, height - 1.5*cm, f"PPSPS - {chantier.nom}")
@@ -281,14 +224,11 @@ def generate_ppsps_pdf(chantier, ppsps, output_path):
 
     # 1. INTERVENANTS
     c.setFont("Helvetica-Bold", 16)
-    c.setFillColorRGB(0, 0.2, 0.5) # Bleu pro
+    c.setFillColorRGB(0, 0.2, 0.5)
     c.drawString(margin, y, "1. RENSEIGNEMENTS GÉNÉRAUX")
     c.setFillColorRGB(0, 0, 0)
     y -= 1*cm
     
-    # ... (Le reste du contenu reste identique à la version précédente) ...
-    # Je remets le bloc standard pour que vous ayez tout d'un bloc
-
     c.setFont("Helvetica", 11)
     c.drawString(margin, y, f"Responsable Chantier : {ppsps.responsable_chantier}")
     y -= 0.6*cm
@@ -333,7 +273,7 @@ def generate_ppsps_pdf(chantier, ppsps, output_path):
     c.drawString(margin, y, f"Repas : {inst.get('repas', '-')}")
     y -= 1.5*cm
 
-    # 4. ANALYSE DES RISQUES
+    # 4. RISQUES
     check_page()
     c.setFont("Helvetica-Bold", 16)
     c.setFillColorRGB(0, 0.2, 0.5)
@@ -348,7 +288,6 @@ def generate_ppsps_pdf(chantier, ppsps, output_path):
     
     for t in taches:
         check_page()
-        # Bloc Tâche avec fond gris léger
         c.setFillColorRGB(0.95, 0.95, 0.95)
         c.rect(margin - 0.2*cm, y - 1.8*cm, width - 2*margin + 0.4*cm, 2.2*cm, fill=1, stroke=0)
         c.setFillColorRGB(0, 0, 0)
@@ -356,16 +295,13 @@ def generate_ppsps_pdf(chantier, ppsps, output_path):
         c.setFont("Helvetica-Bold", 11)
         c.drawString(margin, y, f"📌 Tâche : {t.get('tache')}")
         y -= 0.6*cm
-        
         c.setFont("Helvetica", 10)
-        c.setFillColorRGB(0.8, 0, 0) # Rouge
+        c.setFillColorRGB(0.8, 0, 0)
         c.drawString(margin + 0.5*cm, y, f"⚠️ Risque : {t.get('risque')}")
         y -= 0.6*cm
-        
-        c.setFillColorRGB(0, 0.5, 0) # Vert
+        c.setFillColorRGB(0, 0.5, 0)
         c.drawString(margin + 0.5*cm, y, f"🛡️ Mesures : {t.get('prevention')}")
         c.setFillColorRGB(0, 0, 0)
-        
         y -= 1.2*cm 
 
     c.save()
