@@ -138,6 +138,13 @@ async def upload_image(file: UploadFile = File(...)):
         )
 
 
+@app.get("/rapports", response_model=List[schemas.RapportOut])
+def read_all_rapports(db: Session = Depends(get_db)):
+    """Affiche tous les rapports et leurs images (Utile pour le debug)"""
+    rapports = db.query(models.Rapport).all()
+    return rapports
+
+
 @app.post("/rapports", response_model=schemas.RapportOut)
 def create_rapport(rapport: schemas.RapportCreate, db: Session = Depends(get_db)):
     new_rapport = models.Rapport(
