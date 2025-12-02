@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-load_dotenv()  # charge le fichier .env à la racine
+load_dotenv()
 
 import shutil
 from uuid import uuid4
@@ -18,7 +18,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 import models, schemas, security
-import pdf_generator  # Notre module PDF
+import pdf_generator
 from database import engine, get_db
 
 # Création des tables
@@ -26,29 +26,26 @@ models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Conforméo API")
 
-# CORS large pour debug (on pourra resserrer ensuite)
+# === CORS ULTRA SIMPLE (pour être sûr que ça passe) ===
 app.add_middleware(
     CORSMiddleware,
-    # autorise toutes les origines (regex) → compatible avec allow_credentials=True
-    allow_origin_regex=".*",
-    allow_credentials=True,
+    allow_origins=["*"],      # <- autorise tout le monde
+    allow_credentials=False,  # <- IMPORTANT pour que "*" soit accepté par le navigateur
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Petit endpoint de test pour vérifier que tu es bien sur la bonne version
+# Petit endpoint de test
 @app.get("/")
 def root():
     return {"message": "Conformeo API ok", "cors": "enabled"}
-# Quand tout sera bien calé, on pourra resserrer ici en remettant une liste d’origines.
 
 # --- CONFIGURATION CLOUDINARY ---
-
 cloudinary_config = {
-  "cloud_name": os.getenv("CLOUDINARY_CLOUD_NAME"),
-  "api_key": os.getenv("CLOUDINARY_API_KEY"),
-  "api_secret": os.getenv("CLOUDINARY_API_SECRET"),
-  "secure": True
+    "cloud_name": os.getenv("CLOUDINARY_CLOUD_NAME"),
+    "api_key": os.getenv("CLOUDINARY_API_KEY"),
+    "api_secret": os.getenv("CLOUDINARY_API_SECRET"),
+    "secure": True,
 }
 
 required_keys = ["cloud_name", "api_key", "api_secret"]
@@ -61,6 +58,8 @@ if missing:
 
 cloudinary.config(**cloudinary_config)
 print(f"✅ Cloudinary configuré pour le cloud: {cloudinary_config['cloud_name']}")
+
+# (et ensuite le reste de TON fichier, inchangé : uploads, routes, etc.)
 
 # --- FIN CONFIGURATION ---
 
