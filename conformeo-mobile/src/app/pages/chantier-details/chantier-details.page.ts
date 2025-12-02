@@ -4,13 +4,16 @@ import { filter } from 'rxjs/operators'; // <--- AJOUTER filter
 import { FormsModule } from '@angular/forms';
 import { IonicModule, ModalController } from '@ionic/angular';
 import { ActivatedRoute, RouterLink } from '@angular/router'; // Ajout RouterLink
-import { ApiService, Rapport, Chantier } from 'src/app/services/api'; // Import Chantier
+import { ApiService, Rapport, Chantier, PPSPS } from 'src/app/services/api'; // Import Chantier
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { addIcons } from 'ionicons';
 import { 
   camera, time, warning, documentText, create, navigate, 
-  location, arrowBack, documentTextOutline, createOutline ,
-  scanOutline, checkmarkCircle
+  location, arrowBack, createOutline ,
+  scanOutline, checkmarkCircle, shieldCheckmark, downloadOutline,
+  shieldCheckmarkOutline, // <--- AJOUTE ÇA (PPSPS)
+  checkmarkDoneCircleOutline, // <--- AJOUTE ÇA (Audit)
+  documentTextOutline // (Vérifie que tu as celui-là pour le PDF aussi)
 } from 'ionicons/icons';
 
 // Imports Standalone
@@ -33,7 +36,7 @@ export class ChantierDetailsPage implements OnInit {
   
   // 👇 C'EST LA VARIABLE QUI MANQUAIT
   chantier: Chantier | undefined; 
-  
+  ppspsList: PPSPS[] = [];
   rapports: Rapport[] = [];
   photoUrlTemp: string | undefined;
 
@@ -42,7 +45,10 @@ export class ChantierDetailsPage implements OnInit {
     public api: ApiService, // Public pour accès HTML si besoin
     private modalCtrl: ModalController
   ) {
-    addIcons({ camera, time, warning, documentText, create, navigate, location, arrowBack, documentTextOutline, createOutline, scanOutline, checkmarkCircle });
+    addIcons({ camera, time, warning, documentText, create, navigate, location, arrowBack, documentTextOutline, createOutline, scanOutline, checkmarkCircle, shieldCheckmark, downloadOutline,
+      shieldCheckmarkOutline, 
+    checkmarkDoneCircleOutline
+     });
   }
 
   ngOnInit() {
@@ -63,11 +69,18 @@ export class ChantierDetailsPage implements OnInit {
   }
 
   loadData() {
-    console.log("🔄 Rechargement des données chantier..."); // Pour vérifier dans la console
+    // 1. Chantier
     this.api.getChantierById(this.chantierId).subscribe(data => {
       this.chantier = data;
     });
+
+    // 2. Rapports
     this.loadRapports();
+
+    // 3. Documents PPSPS (NOUVEAU)
+    this.api.getPPSPSList(this.chantierId).subscribe(docs => {
+      this.ppspsList = docs;
+    });
   }
 
   loadRapports() {
@@ -144,6 +157,11 @@ export class ChantierDetailsPage implements OnInit {
   
   downloadPdf() {
     const url = `${this.api['apiUrl']}/chantiers/${this.chantierId}/pdf`;
+    window.open(url, '_system');
+  }
+
+  downloadPPSPS(docId: number) {
+    const url = `${this.api['apiUrl']}/ppsps/${docId}/pdf`;
     window.open(url, '_system');
   }
 

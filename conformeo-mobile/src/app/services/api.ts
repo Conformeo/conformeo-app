@@ -67,7 +67,8 @@ export interface PPSPS {
   responsable_securite: string;
   nb_compagnons: number;
   horaires: string;
-  risques: any; // { chute: boolean, ... }
+  risques: any; 
+  date_creation?: string;
 }
 
 @Injectable({
@@ -375,5 +376,9 @@ export class ApiService {
 
   createPPSPS(doc: PPSPS): Observable<PPSPS> {
     return this.http.post<PPSPS>(`${this.apiUrl}/ppsps`, doc);
+  }
+
+  getPPSPSList(chantierId: number): Observable<PPSPS[]> {
+    return this.http.get<PPSPS[]>(`${this.apiUrl}/chantiers/${chantierId}/ppsps`);
   }
 }

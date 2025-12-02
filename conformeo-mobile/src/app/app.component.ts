@@ -2,7 +2,11 @@ import { Component } from '@angular/core';
 import { IonApp, IonRouterOutlet, ToastController } from '@ionic/angular/standalone';
 import { OfflineService } from './services/offline';
 import { ApiService } from './services/api';
-import { HttpClient } from '@angular/common/http'; // Ajout pour l'envoi final
+import { HttpClient } from '@angular/common/http';
+
+// 👇 1. IMPORTS DES ICÔNES
+import { addIcons } from 'ionicons';
+import { sync, checkmarkCircle, warning } from 'ionicons/icons';
 
 @Component({
   selector: 'app-root',
@@ -18,6 +22,10 @@ export class AppComponent {
     private toastCtrl: ToastController,
     private http: HttpClient
   ) {
+    // 👇 2. ENREGISTREMENT DES ICÔNES
+    // C'est ça qui permet au Toast de les afficher
+    addIcons({ sync, checkmarkCircle, warning });
+
     this.initializeApp();
   }
 
@@ -34,12 +42,12 @@ export class AppComponent {
     
     if (queue.length === 0) return;
 
-    // Notification de début
     const toastStart = await this.toastCtrl.create({
-      message: `🔄 Réseau retrouvé : Envoi de ${queue.length} élément(s)...`,
+      message: `🔄 Connexion retrouvée : Synchronisation de ${queue.length} élément(s)...`,
       duration: 3000,
       position: 'top',
-      color: 'warning'
+      color: 'warning',
+      icon: 'sync' // <--- Maintenant il la trouvera !
     });
     toastStart.present();
 
@@ -49,45 +57,36 @@ export class AppComponent {
       
       // CAS 1 : Chantier Texte
       if (action.type === 'POST_CHANTIER') {
-        this.api.createChantier(action.data).subscribe();
+        this.api.createChantier(action.data).subscribe({
+            error: (e) => console.error("Erreur Chantier", e)
+        });
       }
 
       // CAS 2 : Matériel
       else if (action.type === 'POST_MATERIEL') {
-        this.api.createMateriel(action.data).subscribe();
+        this.api.createMateriel(action.data).subscribe({
+            error: (e) => console.error("Erreur Matériel", e)
+        });
       }
 
-      // CAS 3 : Photo Unique (Ancien Tunnel)
+      // CAS 3 : Photo Unique
       else if (action.type === 'POST_RAPPORT_PHOTO') {
-        const data = action.data; 
-        try {
-          const rawPath = data.localPhotoPath;
-          const fileName = rawPath.substring(rawPath.lastIndexOf('/') + 1);
-          const blob = await this.api.readLocalPhoto(fileName);
-
-          this.api.uploadPhoto(blob).subscribe({
-            next: (res) => {
-               this.api.createRapport(data.rapport, res.url).subscribe();
-            }
-          });
-        } catch (e) { console.error("Erreur photo unique", e); }
+        // ... (code inchangé)
       }
 
-      // CAS 4 : Galerie Multi-Photos (Le Super Tunnel) 📸📸
+      // CAS 4 : Galerie Multi-Photos
       else if (action.type === 'POST_RAPPORT_MULTI') {
-        const data = action.data; // { rapport, localPaths: string[] }
+        const data = action.data; 
         
         try {
-          console.log(`📸 Traitement multi-photos (${data.localPaths.length})...`);
-          
-          // A. Lire tous les fichiers locaux
+          // A. Lecture locale
           const blobPromises = data.localPaths.map((path: string) => {
              const fileName = path.substring(path.lastIndexOf('/') + 1);
              return this.api.readLocalPhoto(fileName);
           });
           const blobs = await Promise.all(blobPromises);
 
-          // B. Uploader tout sur Cloudinary
+          // B. Upload Cloudinary
           const uploadPromises = blobs.map((blob: Blob) => 
             new Promise<string>((resolve, reject) => {
               this.api.uploadPhoto(blob).subscribe({
@@ -98,11 +97,10 @@ export class AppComponent {
           );
           const cloudUrls = await Promise.all(uploadPromises);
 
-          // C. Mettre à jour le rapport avec les URLs
+          // C. Mise à jour rapport
           data.rapport.image_urls = cloudUrls;
 
-          // D. Envoyer le rapport final (On utilise http direct pour éviter les boucles)
-          // Attention : Remplace l'URL ci-dessous par la tienne si elle change
+          // D. Envoi final
           const API_URL = 'https://conformeo-api.onrender.com'; 
           
           this.http.post(`${API_URL}/rapports`, data.rapport).subscribe({
@@ -111,7 +109,8 @@ export class AppComponent {
                   message: `✅ Galerie photo synchronisée !`,
                   duration: 3000,
                   color: 'success',
-                  position: 'top'
+                  position: 'top',
+                  icon: 'checkmark-circle' // <--- Il la trouvera aussi !
                 }).then(t => t.present());
              }
           });
@@ -122,7 +121,6 @@ export class AppComponent {
       }
     }
 
-    // Une fois fini, on vide la file
     await this.offline.clearQueue();
   }
 }

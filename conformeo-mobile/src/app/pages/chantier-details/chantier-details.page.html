@@ -29,7 +29,7 @@
           <span>PDF</span>
         </div>
         <div class="action-btn" [routerLink]="['/qhse-form', chantierId]">
-          <div class="icon-circle" style="color: #2dd36f;"><ion-icon name="checkmark-done-circle"></ion-icon></div>
+          <div class="icon-circle" style="color: #2dd36f;"><ion-icon name="checkmark-done-circle-outline"></ion-icon></div>
           <span>Audit</span>
         </div>
         <div class="action-btn" [routerLink]="['/ppsps-form', chantierId]">
@@ -38,7 +38,7 @@
           <span>PPSPS</span>
         </div>
         <div class="action-btn" (click)="openSignature()">
-          <div class="icon-circle"><ion-icon name="create"></ion-icon></div>
+          <div class="icon-circle"><ion-icon name="download-outline"></ion-icon></div>
           <span>Signer</span>
         </div>
         <div class="action-btn" (click)="openItinerary()">
@@ -46,6 +46,27 @@
           <span>Y aller</span>
         </div>
       </div>
+    </div>
+    
+    <div *ngIf="ppspsList.length > 0" style="margin-bottom: 20px;">
+      <h3 class="section-title">Documents</h3>
+      
+      <ion-card style="border-radius: 12px; margin: 0; box-shadow: 0 4px 10px rgba(0,0,0,0.05);">
+        <ion-list lines="none">
+          
+          <ion-item button *ngFor="let doc of ppspsList" (click)="downloadPPSPS(doc.id!)">
+            <div slot="start" style="background: #ffc409; width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white;">
+              <ion-icon name="shield-checkmark"></ion-icon>
+            </div>
+            <ion-label>
+              <h2>PPSPS</h2>
+              <p>Créé le {{ doc['date_creation'] | date:'dd/MM/yyyy' }}</p>
+            </ion-label>
+            <ion-icon name="download-outline" slot="end" color="medium"></ion-icon>
+          </ion-item>
+
+        </ion-list>
+      </ion-card>
     </div>
 
     <h3 class="section-title">Journal de bord</h3>
