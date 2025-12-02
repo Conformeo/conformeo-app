@@ -346,3 +346,53 @@ def create_inspection(inspection: schemas.InspectionCreate, db: Session = Depend
 @app.get("/chantiers/{chantier_id}/inspections", response_model=List[schemas.InspectionOut])
 def read_inspections(chantier_id: int, db: Session = Depends(get_db)):
     return db.query(models.Inspection).filter(models.Inspection.chantier_id == chantier_id).all()
+
+
+# ...
+
+# --- MIGRATION V4 (PPSPS) ---
+@app.get("/migrate_db_v4")
+def migrate_db_v4(db: Session = Depends(get_db)):
+    try:
+        models.Base.metadata.create_all(bind=engine)
+        return {"message": "Migration V4 (PPSPS) réussie !"}
+    except Exception as e:
+        return {"status": "Erreur", "details": str(e)}
+
+# --- ROUTES PPSPS ---
+@app.post("/ppsps", response_model=schemas.PPSPSOut)
+def create_ppsps(ppsps: schemas.PPSPSCreate, db: Session = Depends(get_db)):
+    new_ppsps = models.PPSPS(
+        maitre_oeuvre=ppsps.maitre_oeuvre,
+        coordonnateur_sps=ppsps.coordonnateur_sps,
+        hopital_proche=ppsps.hopital_proche,
+        responsable_securite=ppsps.responsable_securite,
+        nb_compagnons=ppsps.nb_compagnons,
+        horaires=ppsps.horaires,
+        risques=ppsps.risques,
+        chantier_id=ppsps.chantier_id
+    )
+    db.add(new_ppsps)
+    db.commit()
+    db.refresh(new_ppsps)
+    return new_ppsps
+
+@app.get("/chantiers/{chantier_id}/ppsps", response_model=List[schemas.PPSPSOut])
+def read_ppsps_chantier(chantier_id: int, db: Session = Depends(get_db)):
+    return db.query(models.PPSPS).filter(models.PPSPS.chantier_id == chantier_id).all()
+
+# --- PDF PPSPS SPECIFIQUE ---
+@app.get("/ppsps/{ppsps_id}/pdf")
+def download_ppsps_pdf(ppsps_id: int, db: Session = Depends(get_db)):
+    ppsps = db.query(models.PPSPS).filter(models.PPSPS.id == ppsps_id).first()
+    if not ppsps: raise HTTPException(status_code=404, detail="PPSPS introuvable")
+    
+    chantier = db.query(models.Chantier).filter(models.Chantier.id == ppsps.chantier_id).first()
+    
+    filename = f"PPSPS_{chantier.nom}.pdf"
+    file_path = f"uploads/{filename}"
+    
+    # On appelle une nouvelle fonction dédiée dans pdf_generator
+    pdf_generator.generate_ppsps_pdf(chantier, ppsps, file_path)
+    
+    return FileResponse(path=file_path, filename=filename, media_type='application/pdf')

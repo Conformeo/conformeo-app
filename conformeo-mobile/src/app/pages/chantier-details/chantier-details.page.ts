@@ -10,7 +10,7 @@ import { addIcons } from 'ionicons';
 import { 
   camera, time, warning, documentText, create, navigate, 
   location, arrowBack, documentTextOutline, createOutline ,
-  scanOutline
+  scanOutline, checkmarkCircle
 } from 'ionicons/icons';
 
 // Imports Standalone
@@ -42,7 +42,7 @@ export class ChantierDetailsPage implements OnInit {
     public api: ApiService, // Public pour accès HTML si besoin
     private modalCtrl: ModalController
   ) {
-    addIcons({ camera, time, warning, documentText, create, navigate, location, arrowBack, documentTextOutline, createOutline, scanOutline });
+    addIcons({ camera, time, warning, documentText, create, navigate, location, arrowBack, documentTextOutline, createOutline, scanOutline, checkmarkCircle });
   }
 
   ngOnInit() {

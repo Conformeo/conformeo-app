@@ -18,6 +18,7 @@ class Chantier(Base):
     rapports = relationship("Rapport", back_populates="chantier")
     materiels = relationship("Materiel", back_populates="chantier")
     inspections = relationship("Inspection", back_populates="chantier")
+    ppsps_docs = relationship("PPSPS", back_populates="chantier")
 
 class RapportImage(Base):
     __tablename__ = "rapport_images"
@@ -84,4 +85,29 @@ class Inspection(Base):
     createur = Column(String) # Nom du contrôleur
 
     chantier = relationship("Chantier", back_populates="inspections")
+
+
+class PPSPS(Base):
+    __tablename__ = "ppsps"
+
+    id = Column(Integer, primary_key=True, index=True)
+    chantier_id = Column(Integer, ForeignKey("chantiers.id"))
+    
+    # Infos Générales
+    maitre_ouvrage = Column(String) # Le Client (déjà dans chantier, mais on peut préciser)
+    maitre_oeuvre = Column(String)  # L'architecte / Maitre d'oeuvre
+    coordonnateur_sps = Column(String) # Le CSPS
+    hopital_proche = Column(String)    # Urgences
+    responsable_securite = Column(String) # Chef de chantier
+    
+    # Effectifs
+    nb_compagnons = Column(Integer, default=1)
+    horaires = Column(String, default="8h-12h / 13h-17h")
+    
+    # Risques (Stocké en JSON : {"chute": true, "elec": false...})
+    risques = Column(JSON) 
+    
+    date_creation = Column(DateTime, default=datetime.now)
+
+    chantier = relationship("Chantier", back_populates="ppsps_docs")
 

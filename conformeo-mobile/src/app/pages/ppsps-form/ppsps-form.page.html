@@ -1,0 +1,82 @@
+<ion-header>
+  <ion-toolbar color="primary">
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/home"></ion-back-button>
+    </ion-buttons>
+    <ion-title>Nouveau PPSPS</ion-title>
+    <ion-buttons slot="end">
+      <ion-button (click)="save()">
+        <ion-icon name="save-outline" slot="start"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+
+  <form>
+    <ion-list-header>
+      <ion-label>📢 Intervenants & Secours</ion-label>
+    </ion-list-header>
+    
+    <ion-list lines="full" class="form-card">
+      <ion-item>
+        <ion-label position="stacked">Responsable Sécurité (Chantier)</ion-label>
+        <ion-input [(ngModel)]="formData.responsable_securite" name="resp" placeholder="Nom du chef"></ion-input>
+      </ion-item>
+
+      <ion-item>
+        <ion-icon name="medical-outline" slot="start" color="danger"></ion-icon>
+        <ion-label position="stacked">Urgences / Hôpital le plus proche</ion-label>
+        <ion-input [(ngModel)]="formData.hopital_proche" name="hopital" placeholder="Ex: CHU Purpan"></ion-input>
+      </ion-item>
+
+      <ion-item>
+        <ion-label position="stacked">Maître d'Œuvre (Archi)</ion-label>
+        <ion-input [(ngModel)]="formData.maitre_oeuvre" name="moe"></ion-input>
+      </ion-item>
+
+      <ion-item>
+        <ion-label position="stacked">Coordonnateur SPS</ion-label>
+        <ion-input [(ngModel)]="formData.coordonnateur_sps" name="csps"></ion-input>
+      </ion-item>
+    </ion-list>
+
+    <ion-list-header>
+      <ion-label>🏗️ Organisation</ion-label>
+    </ion-list-header>
+
+    <ion-list lines="full" class="form-card">
+      <ion-item>
+        <ion-icon name="people-outline" slot="start"></ion-icon>
+        <ion-label position="stacked">Nombre de compagnons</ion-label>
+        <ion-input type="number" [(ngModel)]="formData.nb_compagnons" name="nb"></ion-input>
+      </ion-item>
+
+      <ion-item>
+        <ion-icon name="time-outline" slot="start"></ion-icon>
+        <ion-label position="stacked">Horaires de travail</ion-label>
+        <ion-input [(ngModel)]="formData.horaires" name="horaires"></ion-input>
+      </ion-item>
+    </ion-list>
+
+    <ion-list-header>
+      <ion-label>⚠️ Analyse des Risques</ion-label>
+    </ion-list-header>
+
+    <ion-list class="form-card">
+      <ion-item *ngFor="let risque of risques">
+        <ion-label class="ion-text-wrap">{{ risque.label }}</ion-label>
+        <ion-checkbox slot="start" [(ngModel)]="risque.checked" [name]="risque.key"></ion-checkbox>
+      </ion-item>
+    </ion-list>
+
+    <div class="ion-padding">
+      <ion-button expand="block" (click)="save()" size="large">
+        Générer le document
+      </ion-button>
+    </div>
+
+  </form>
+
+</ion-content>

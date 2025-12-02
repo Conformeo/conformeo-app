@@ -193,3 +193,96 @@ def generate_pdf(chantier, rapports, inspections, output_path):
 
     c.save()
     return output_path
+
+# ... (laisse la fonction generate_pdf existante)
+
+def generate_ppsps_pdf(chantier, ppsps, output_path):
+    c = canvas.Canvas(output_path, pagesize=A4)
+    width, height = A4
+    margin = 2 * cm
+    
+    # --- PAGE DE GARDE ---
+    logo_img = get_optimized_image("logo.png")
+    if logo_img:
+        try:
+            rl_logo = ImageReader(logo_img)
+            c.drawImage(rl_logo, width/2 - 2.5*cm, height - 5*cm, width=5*cm, height=2.5*cm, preserveAspectRatio=True, mask='auto')
+        except: pass
+
+    c.setFont("Helvetica-Bold", 30)
+    c.drawCentredString(width / 2, height - 8 * cm, "P.P.S.P.S")
+    c.setFont("Helvetica", 14)
+    c.drawCentredString(width / 2, height - 9 * cm, "Plan Particulier de Sécurité et de Protection de la Santé")
+    
+    c.setFont("Helvetica-Bold", 18)
+    c.drawCentredString(width / 2, height / 2, f"Chantier : {chantier.nom}")
+    c.setFont("Helvetica", 12)
+    c.drawCentredString(width / 2, height / 2 - 1*cm, chantier.adresse)
+    
+    c.showPage() # Page suivante
+
+    # --- INFO GENERALES ---
+    y = height - 3 * cm
+    c.setFont("Helvetica-Bold", 16)
+    c.drawString(margin, y, "1. Intervenants & Secours")
+    y -= 1 * cm
+    
+    c.setFont("Helvetica", 12)
+    c.drawString(margin, y, f"Maître d'Ouvrage (Client) : {chantier.client}")
+    y -= 0.8 * cm
+    c.drawString(margin, y, f"Maître d'Œuvre : {ppsps.maitre_oeuvre}")
+    y -= 0.8 * cm
+    c.drawString(margin, y, f"Coordonnateur SPS : {ppsps.coordonnateur_sps}")
+    y -= 0.8 * cm
+    c.drawString(margin, y, f"Responsable Sécurité : {ppsps.responsable_securite}")
+    y -= 1.5 * cm
+    
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(margin, y, f"🏥 Urgences / Hôpital : {ppsps.hopital_proche}")
+    y -= 2 * cm
+
+    # --- ANALYSE DES RISQUES ---
+    c.setFont("Helvetica-Bold", 16)
+    c.drawString(margin, y, "2. Analyse des Risques Spécifiques")
+    y -= 1 * cm
+    
+    # On récupère le dictionnaire des risques
+    risques = ppsps.risques if isinstance(ppsps.risques, dict) else {}
+    
+    # Liste des définitions de risques pour l'affichage
+    definitions = {
+        "chute": "Travail en hauteur / Chutes",
+        "elec": "Risques Électriques",
+        "levage": "Appareils de Levage / Grue",
+        "produits": "Produits Chimiques / Poussières",
+        "coactivite": "Co-activité / Circulation"
+    }
+
+    c.setFont("Helvetica", 12)
+    has_risk = False
+    
+    for key, label in definitions.items():
+        if risques.get(key) == True: # Si le risque est coché
+            has_risk = True
+            c.setFillColorRGB(0.8, 0, 0) # Rouge
+            c.drawString(margin, y, f"⚠️ {label}")
+            c.setFillColorRGB(0, 0, 0)
+            
+            # Mesures de prévention standards (simulées)
+            c.setFont("Helvetica-Oblique", 10)
+            y -= 0.5 * cm
+            c.drawString(margin + 1*cm, y, "Mesures : Port des EPI adaptés, Balisage, Vérification matériel.")
+            
+            c.setFont("Helvetica", 12)
+            y -= 1.5 * cm
+    
+    if not has_risk:
+        c.drawString(margin, y, "Aucun risque spécifique majeur signalé.")
+
+    # --- SIGNATURE ---
+    y = 4 * cm
+    c.line(margin, y, width - margin, y)
+    y -= 1 * cm
+    c.drawString(width - 8*cm, y, "Date et Signature :")
+
+    c.save()

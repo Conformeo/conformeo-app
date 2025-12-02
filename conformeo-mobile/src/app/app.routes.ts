@@ -40,4 +40,12 @@ export const routes: Routes = [
     path: 'qhse-form/:id',
     loadComponent: () => import('./pages/qhse-form/qhse-form.page').then( m => m.QhseFormPage)
   },
+  {
+    path: 'ppsps-form',
+    loadComponent: () => import('./pages/ppsps-form/ppsps-form.page').then( m => m.PpspsFormPage)
+  },
+  {
+  path: 'ppsps-form/:id', // <--- Vérifie bien le /:id
+    loadComponent: () => import('./pages/ppsps-form/ppsps-form.page').then( m => m.PpspsFormPage)
+  },
 ];

@@ -100,3 +100,24 @@ class InspectionOut(InspectionBase):
     date_creation: datetime
     class Config:
         from_attributes = True
+
+# --- PPSPS DOCUMENTS ---
+
+class PPSPSBase(BaseModel):
+    maitre_oeuvre: str
+    coordonnateur_sps: str
+    hopital_proche: str
+    responsable_securite: str
+    nb_compagnons: int
+    horaires: str
+    risques: dict # Le JSON des risques
+    chantier_id: int
+
+class PPSPSCreate(PPSPSBase):
+    pass
+
+class PPSPSOut(PPSPSBase):
+    id: int
+    date_creation: datetime
+    class Config:
+        from_attributes = True

@@ -32,6 +32,11 @@
           <div class="icon-circle" style="color: #2dd36f;"><ion-icon name="checkmark-done-circle"></ion-icon></div>
           <span>Audit</span>
         </div>
+        <div class="action-btn" [routerLink]="['/ppsps-form', chantierId]">
+          <div class="icon-circle" style="color: #ffc409;"> <ion-icon name="shield-checkmark-outline"></ion-icon>
+          </div>
+          <span>PPSPS</span>
+        </div>
         <div class="action-btn" (click)="openSignature()">
           <div class="icon-circle"><ion-icon name="create"></ion-icon></div>
           <span>Signer</span>

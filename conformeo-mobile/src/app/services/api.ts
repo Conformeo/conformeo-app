@@ -58,6 +58,18 @@ export interface Inspection {
   date_creation?: string;
 }
 
+export interface PPSPS {
+  id?: number;
+  chantier_id: number;
+  maitre_oeuvre: string;
+  coordonnateur_sps: string;
+  hopital_proche: string;
+  responsable_securite: string;
+  nb_compagnons: number;
+  horaires: string;
+  risques: any; // { chute: boolean, ... }
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -359,5 +371,9 @@ export class ApiService {
 
   createInspection(insp: Inspection): Observable<Inspection> {
     return this.http.post<Inspection>(`${this.apiUrl}/inspections`, insp);
+  }
+
+  createPPSPS(doc: PPSPS): Observable<PPSPS> {
+    return this.http.post<PPSPS>(`${this.apiUrl}/ppsps`, doc);
   }
 }
