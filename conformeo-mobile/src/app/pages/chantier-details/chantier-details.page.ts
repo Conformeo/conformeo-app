@@ -1,6 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { filter } from 'rxjs/operators'; // <--- AJOUTER filter
+import { Platform } from '@ionic/angular/standalone';
 import { FormsModule } from '@angular/forms';
 import { IonicModule, ModalController } from '@ionic/angular';
 import { ActivatedRoute, RouterLink } from '@angular/router'; // Ajout RouterLink
@@ -48,7 +49,8 @@ export class ChantierDetailsPage implements OnInit {
   constructor(
     private route: ActivatedRoute,
     public api: ApiService, // Public pour accès HTML si besoin
-    private modalCtrl: ModalController
+    private modalCtrl: ModalController,
+    private platform: Platform // <--- 2. INJECTEZ LA PLATEFORME ICI
   ) {
     addIcons({ camera, time, warning, documentText, create, navigate, location, arrowBack, documentTextOutline, createOutline, scanOutline, checkmarkCircle, shieldCheckmark, downloadOutline,
       shieldCheckmarkOutline, 
@@ -149,14 +151,21 @@ export class ChantierDetailsPage implements OnInit {
       return;
     }
 
-    // On encode l'adresse pour qu'elle soit propre dans l'URL (ex: les espaces deviennent %20)
     const destination = encodeURIComponent(this.chantier.adresse);
+    let url = '';
 
-    // Astuce : Sur iOS, on ouvre Apple Maps, sur Android Google Maps
-    // Mais le lien Google Maps Universel marche partout et redirige souvent vers l'app installée
-    const url = `https://www.google.com/maps/dir/?api=1&destination=${destination}`;
+    // Logique adaptée à chaque téléphone
+    if (this.platform.is('ios')) {
+      // Ouvre Apple Maps directement
+      url = `maps:?q=${destination}`;
+    } else if (this.platform.is('android')) {
+      // Ouvre le choix GPS Android (Waze/Maps)
+      url = `geo:0,0?q=${destination}`;
+    } else {
+      // Fallback Web (Ouvre Google Maps dans le navigateur)
+      url = `https://www.google.com/maps/search/?api=1&query=${destination}`;
+    }
 
-    // On ouvre dans le navigateur système (qui va sûrement proposer d'ouvrir l'app Maps)
     window.open(url, '_system');
   }
   
