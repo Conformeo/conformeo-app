@@ -81,3 +81,22 @@ class RapportOut(RapportBase):
     date_creation: datetime
     class Config:
         from_attributes = True
+
+# ...
+
+# --- INSPECTIONS QHSE ---
+class InspectionBase(BaseModel):
+    titre: str
+    type: str
+    data: List[dict] # Liste de questions/réponses
+    chantier_id: int
+    createur: str
+
+class InspectionCreate(InspectionBase):
+    pass
+
+class InspectionOut(InspectionBase):
+    id: int
+    date_creation: datetime
+    class Config:
+        from_attributes = True

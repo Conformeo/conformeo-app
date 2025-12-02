@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Float
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Float, JSON
 from sqlalchemy.orm import relationship
 from database import Base
 from datetime import datetime
@@ -17,6 +17,7 @@ class Chantier(Base):
 
     rapports = relationship("Rapport", back_populates="chantier")
     materiels = relationship("Materiel", back_populates="chantier")
+    inspections = relationship("Inspection", back_populates="chantier")
 
 class RapportImage(Base):
     __tablename__ = "rapport_images"
@@ -66,3 +67,21 @@ class User(Base):
     hashed_password = Column(String)
     role = Column(String, default="conducteur")
     is_active = Column(Boolean, default=True)
+
+class Inspection(Base):
+    __tablename__ = "inspections"
+
+    id = Column(Integer, primary_key=True, index=True)
+    titre = Column(String) # Ex: "Vérification Échafaudage"
+    type = Column(String) # "Sécurité", "Environnement", "Qualité"
+    
+    # Les données de l'audit : 
+    # Ex: [{"question": "Harnais attaché ?", "statut": "OK", "commentaire": ""}, ...]
+    data = Column(JSON) 
+    
+    chantier_id = Column(Integer, ForeignKey("chantiers.id"))
+    date_creation = Column(DateTime, default=datetime.now)
+    createur = Column(String) # Nom du contrôleur
+
+    chantier = relationship("Chantier", back_populates="inspections")
+

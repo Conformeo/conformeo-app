@@ -1,5 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { filter } from 'rxjs/operators'; // <--- AJOUTER filter
 import { FormsModule } from '@angular/forms';
 import { IonicModule, ModalController } from '@ionic/angular';
 import { ActivatedRoute, RouterLink } from '@angular/router'; // Ajout RouterLink
@@ -8,7 +9,8 @@ import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { addIcons } from 'ionicons';
 import { 
   camera, time, warning, documentText, create, navigate, 
-  location, arrowBack, documentTextOutline, createOutline 
+  location, arrowBack, documentTextOutline, createOutline ,
+  scanOutline
 } from 'ionicons/icons';
 
 // Imports Standalone
@@ -40,24 +42,31 @@ export class ChantierDetailsPage implements OnInit {
     public api: ApiService, // Public pour accès HTML si besoin
     private modalCtrl: ModalController
   ) {
-    addIcons({ camera, time, warning, documentText, create, navigate, location, arrowBack, documentTextOutline, createOutline });
+    addIcons({ camera, time, warning, documentText, create, navigate, location, arrowBack, documentTextOutline, createOutline, scanOutline });
   }
 
   ngOnInit() {
     const id = this.route.snapshot.paramMap.get('id');
     if (id) {
       this.chantierId = +id;
-      this.loadData();
+      this.loadData(); // Premier chargement
+    }
+  }
+
+  ionViewWillEnter() {
+    // On vérifie si quelqu'un a demandé un refresh
+    if (this.api.needsRefresh) {
+      console.log("🚩 Drapeau détecté : Rechargement des données...");
+      this.loadRapports();
+      this.api.needsRefresh = false; // On baisse le drapeau
     }
   }
 
   loadData() {
-    // 1. Charger les infos du chantier (Titre, Cover...)
+    console.log("🔄 Rechargement des données chantier..."); // Pour vérifier dans la console
     this.api.getChantierById(this.chantierId).subscribe(data => {
       this.chantier = data;
     });
-
-    // 2. Charger les rapports
     this.loadRapports();
   }
 
@@ -116,6 +125,23 @@ export class ChantierDetailsPage implements OnInit {
     }
   }
 
+  openItinerary() {
+    if (!this.chantier || !this.chantier.adresse) {
+      alert("Adresse du chantier introuvable.");
+      return;
+    }
+
+    // On encode l'adresse pour qu'elle soit propre dans l'URL (ex: les espaces deviennent %20)
+    const destination = encodeURIComponent(this.chantier.adresse);
+
+    // Astuce : Sur iOS, on ouvre Apple Maps, sur Android Google Maps
+    // Mais le lien Google Maps Universel marche partout et redirige souvent vers l'app installée
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${destination}`;
+
+    // On ouvre dans le navigateur système (qui va sûrement proposer d'ouvrir l'app Maps)
+    window.open(url, '_system');
+  }
+  
   downloadPdf() {
     const url = `${this.api['apiUrl']}/chantiers/${this.chantierId}/pdf`;
     window.open(url, '_system');

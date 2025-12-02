@@ -4,7 +4,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { 
   IonContent, IonFab, IonFabButton, IonIcon, IonButton, 
-  AlertController, NavController 
+  AlertController, NavController, IonSpinner
 } from '@ionic/angular/standalone';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { addIcons } from 'ionicons';
@@ -16,7 +16,7 @@ import { ApiService, Rapport } from 'src/app/services/api';
   templateUrl: './smart-scan.page.html',
   styleUrls: ['./smart-scan.page.scss'],
   standalone: true,
-  imports: [CommonModule, FormsModule, IonContent, IonFab, IonFabButton, IonIcon, IonButton]
+  imports: [CommonModule, FormsModule, IonContent, IonFab, IonFabButton, IonIcon, IonButton, IonSpinner]
 })
 export class SmartScanPage {
   
@@ -29,6 +29,8 @@ export class SmartScanPage {
     type: '',
     volume: ''
   };
+
+  isSaving: boolean = false;
 
   constructor(
     private route: ActivatedRoute,
@@ -89,21 +91,30 @@ export class SmartScanPage {
   }
 
   saveScan() {
+    // 1. Sécurités
     if (!this.photoBlob) return;
+    if (this.isSaving) return; // Si déjà en train de sauvegarder, on bloque !
+
+    // 2. On verrouille
+    this.isSaving = true;
 
     const newRapport: Rapport = {
-      // On ajoute un TAG spécial pour le DOE
-      titre: `♻️ DÉCHETS : ${this.scanResult.type}`, 
+      titre: `♻️ DÉCHETS : ${this.scanResult.type}`,
       description: `Volume estimé : ${this.scanResult.volume} m³. (Scan Auto)`,
-      
-      // 👇 C'EST ICI QU'ON CORRIGE : On utilise le vrai ID
-      chantier_id: this.chantierId, 
-      
-      niveau_urgence: 'Faible' // C'est un constat, pas une alerte sécurité
+      chantier_id: this.chantierId,
+      niveau_urgence: 'Faible'
     };
 
+    // 3. On envoie
     this.api.addRapportWithMultiplePhotos(newRapport, [this.photoBlob]).then(() => {
+      
+      // 👇 ON LEVE LE DRAPEAU ICI
+      this.api.needsRefresh = true;
+      
       this.navCtrl.back();
+    }).catch(() => {
+      this.isSaving = false;
+      alert("Erreur lors de la sauvegarde");
     });
   }
 

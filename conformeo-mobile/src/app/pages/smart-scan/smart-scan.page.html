@@ -33,8 +33,10 @@
       <ion-button fill="solid" color="light" (click)="photoPath = undefined">
         <ion-icon name="close" slot="start"></ion-icon> Refaire
       </ion-button>
-      <ion-button fill="solid" color="success" (click)="saveScan()">
-        <ion-icon name="checkmark" slot="start"></ion-icon> Enregistrer
+      <ion-button fill="solid" color="success" (click)="saveScan()" [disabled]="isSaving">
+        <ion-icon name="checkmark" slot="start" *ngIf="!isSaving"></ion-icon>
+        <ion-spinner name="crescent" *ngIf="isSaving"></ion-spinner> <span *ngIf="!isSaving">Enregistrer</span>
+        <span *ngIf="isSaving">Envoi...</span>
       </ion-button>
     </div>
 

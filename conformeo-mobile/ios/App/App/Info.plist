@@ -13,6 +13,12 @@
 
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Conforméo a besoin de votre position pour géolocaliser les rapports.</string>
+
+	<key>NSMicrophoneUsageDescription</key>
+    <string>Conforméo a besoin du micro pour la dictée vocale.</string>
+
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>Conforméo utilise la reconnaissance vocale pour remplir les rapports.</string>
     
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>

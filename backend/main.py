@@ -313,3 +313,31 @@ def migrate_db_v2(db: Session = Depends(get_db)):
         return {"message": "Migration V2 réussie ! Table images créée."}
     except Exception as e:
         return {"status": "Erreur", "details": str(e)}
+
+# --- MIGRATION V3 (QHSE) ---
+@app.get("/migrate_db_v3")
+def migrate_db_v3(db: Session = Depends(get_db)):
+    try:
+        models.Base.metadata.create_all(bind=engine) # Crée la table inspections
+        return {"message": "Migration V3 (QHSE) réussie !"}
+    except Exception as e:
+        return {"status": "Erreur", "details": str(e)}
+
+# --- ROUTES INSPECTIONS ---
+@app.post("/inspections", response_model=schemas.InspectionOut)
+def create_inspection(inspection: schemas.InspectionCreate, db: Session = Depends(get_db)):
+    new_insp = models.Inspection(
+        titre=inspection.titre,
+        type=inspection.type,
+        data=inspection.data,
+        chantier_id=inspection.chantier_id,
+        createur=inspection.createur
+    )
+    db.add(new_insp)
+    db.commit()
+    db.refresh(new_insp)
+    return new_insp
+
+@app.get("/chantiers/{chantier_id}/inspections", response_model=List[schemas.InspectionOut])
+def read_inspections(chantier_id: int, db: Session = Depends(get_db)):
+    return db.query(models.Inspection).filter(models.Inspection.chantier_id == chantier_id).all()

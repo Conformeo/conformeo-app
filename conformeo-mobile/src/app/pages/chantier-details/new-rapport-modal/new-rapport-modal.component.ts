@@ -1,19 +1,24 @@
-import { Component, Input, OnInit } from '@angular/core';
+import { Component, Input, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Geolocation } from '@capacitor/geolocation';
-import { Camera, CameraResultType, CameraSource } from '@capacitor/camera'; // <--- Ajout Camera ici
+import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
+import { SpeechRecognition } from '@capacitor-community/speech-recognition';
+
+// 👇 IMPORT DU COMPOSANT D'ANNOTATION
+import { AnnotationModalComponent } from '../annotation-modal/annotation-modal.component';
 
 import { 
   IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, 
   IonContent, IonList, IonItem, IonInput, IonLabel, 
   IonIcon, IonTextarea, IonSelect, IonSelectOption,
-  IonGrid, IonRow, IonCol, // <--- Ajout Grid
+  IonGrid, IonRow, IonCol,
   ModalController 
 } from '@ionic/angular/standalone';
 
 import { addIcons } from 'ionicons';
-import { locationOutline, cameraOutline, trashOutline } from 'ionicons/icons'; // + trash
+// 👇 AJOUT DE L'ICONE 'createOutline' (Crayon)
+import { locationOutline, cameraOutline, trashOutline, micOutline, mic, createOutline } from 'ionicons/icons';
 
 @Component({
   selector: 'app-new-rapport-modal',
@@ -33,12 +38,18 @@ import { locationOutline, cameraOutline, trashOutline } from 'ionicons/icons'; /
         <ion-row>
           <ion-col size="4" *ngFor="let photo of photosWebPath; let i = index">
             <div class="photo-thumb" [style.background-image]="'url(' + photo + ')'">
+              
               <div class="delete-btn" (click)="removePhoto(i)">
                 <ion-icon name="trash-outline"></ion-icon>
               </div>
+
+              <div class="edit-btn" (click)="annotatePhoto(i)">
+                <ion-icon name="create-outline"></ion-icon>
+              </div>
+
             </div>
           </ion-col>
-
+          
           <ion-col size="4">
             <div class="add-photo-btn" (click)="addPhoto()">
               <ion-icon name="camera-outline" size="large"></ion-icon>
@@ -54,7 +65,22 @@ import { locationOutline, cameraOutline, trashOutline } from 'ionicons/icons'; /
         </ion-item>
 
         <ion-item>
-          <ion-textarea label="Commentaire" label-placement="stacked" [(ngModel)]="data.description" rows="3" auto-grow="true"></ion-textarea>
+          <ion-textarea 
+            label="Commentaire" 
+            label-placement="stacked" 
+            [(ngModel)]="data.description" 
+            rows="3" 
+            auto-grow="true"
+            placeholder="Décrivez l'anomalie...">
+          </ion-textarea>
+          
+          <ion-button slot="end" fill="clear" (click)="toggleRecording()">
+            <ion-icon 
+                [name]="isRecording ? 'mic' : 'mic-outline'" 
+                [color]="isRecording ? 'danger' : 'medium'" 
+                size="large">
+            </ion-icon>
+          </ion-button>
         </ion-item>
 
         <ion-item>
@@ -81,23 +107,14 @@ import { locationOutline, cameraOutline, trashOutline } from 'ionicons/icons'; /
     </ion-content>
   `,
   styles: [`
-    .photo-thumb {
-      width: 100%; padding-top: 100%; /* Carré */
-      background-size: cover; background-position: center;
-      border-radius: 8px; border: 1px solid #ddd;
-      position: relative;
-    }
-    .delete-btn {
-      position: absolute; top: -5px; right: -5px;
-      background: red; color: white; border-radius: 50%;
-      width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;
-    }
-    .add-photo-btn {
-      width: 100%; padding-top: 100%;
-      background: #f4f5f8; border-radius: 8px; border: 2px dashed #ccc;
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
-      color: #666; position: relative;
-    }
+    .photo-thumb { width: 100%; padding-top: 100%; background-size: cover; background-position: center; border-radius: 8px; border: 1px solid #ddd; position: relative; }
+    
+    .delete-btn { position: absolute; top: -5px; right: -5px; background: red; color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; z-index: 10; }
+    
+    /* 👇 STYLE DU BOUTON CRAYON */
+    .edit-btn { position: absolute; bottom: -5px; right: -5px; background: #3880ff; color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; z-index: 10; }
+
+    .add-photo-btn { width: 100%; padding-top: 100%; background: #f4f5f8; border-radius: 8px; border: 2px dashed #ccc; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #666; position: relative; }
     .add-photo-btn ion-icon { position: absolute; top: 30%; }
     .add-photo-btn span { position: absolute; bottom: 20%; font-size: 12px; }
   `],
@@ -109,29 +126,29 @@ export class NewRapportModalComponent implements OnInit {
   @Input() initialPhotoBlob!: Blob;
 
   photosWebPath: string[] = [];
-  photosBlobs: Blob[] = []; // Liste des fichiers à envoyer
-
+  photosBlobs: Blob[] = [];
   data = { titre: '', description: '', niveau_urgence: 'Faible' };
   gpsCoords: any = null;
+  isRecording = false;
 
-  constructor(private modalCtrl: ModalController) {
-    addIcons({ locationOutline, cameraOutline, trashOutline });
+  constructor(
+    private modalCtrl: ModalController,
+    private changeRef: ChangeDetectorRef
+  ) {
+    addIcons({ locationOutline, cameraOutline, trashOutline, micOutline, mic, createOutline });
   }
 
   async ngOnInit() {
-    // On ajoute la première photo prise avant d'ouvrir la modale
     if (this.initialPhotoWebPath) {
       this.photosWebPath.push(this.initialPhotoWebPath);
       this.photosBlobs.push(this.initialPhotoBlob);
     }
-    // GPS
     try {
       const position = await Geolocation.getCurrentPosition();
       this.gpsCoords = { latitude: position.coords.latitude, longitude: position.coords.longitude };
     } catch (e) {}
   }
 
-  // Ajouter une autre photo depuis la modale
   async addPhoto() {
     const image = await Camera.getPhoto({
       quality: 80, allowEditing: false, resultType: CameraResultType.Uri, source: CameraSource.Camera, correctOrientation: true
@@ -148,13 +165,67 @@ export class NewRapportModalComponent implements OnInit {
     this.photosBlobs.splice(index, 1);
   }
 
+  // 👇 FONCTION POUR ANNOTER (DESSINER SUR) LA PHOTO
+  async annotatePhoto(index: number) {
+    const modal = await this.modalCtrl.create({
+      component: AnnotationModalComponent,
+      componentProps: { photoWebPath: this.photosWebPath[index] }
+    });
+
+    await modal.present();
+    const { data, role } = await modal.onWillDismiss();
+
+    if (role === 'confirm' && data) {
+      const newBlob = data as Blob;
+      
+      // On remplace le Blob original par l'image dessinée
+      this.photosBlobs[index] = newBlob;
+      
+      // On met à jour l'aperçu visuel
+      const newUrl = URL.createObjectURL(newBlob);
+      this.photosWebPath[index] = newUrl;
+    }
+  }
+
+  async toggleRecording() {
+    if (this.isRecording) {
+      await SpeechRecognition.stop();
+      this.isRecording = false;
+      return;
+    }
+
+    try {
+        const perm = await SpeechRecognition.requestPermissions() as any;
+        if (perm.speechRecognition !== 'granted' && perm.status !== 'granted') {
+            alert("Permission micro refusée");
+            return;
+        }
+    } catch (e) { console.error(e); }
+
+    this.isRecording = true;
+    
+    try {
+        const result = await SpeechRecognition.start({
+            language: "fr-FR", maxResults: 1, prompt: "Dictez...", partialResults: false, popup: false
+        });
+
+        if (result.matches && result.matches.length > 0) {
+            const text = result.matches[0];
+            this.data.description = (this.data.description ? this.data.description + " " : "") + text;
+        }
+    } catch (e) { console.error(e); } finally {
+        this.isRecording = false;
+        this.changeRef.detectChanges();
+    }
+  }
+
   cancel() { this.modalCtrl.dismiss(null, 'cancel'); }
 
   confirm() {
     this.modalCtrl.dismiss({
       data: this.data,
       gps: this.gpsCoords,
-      blobs: this.photosBlobs // On renvoie toute la liste !
+      blobs: this.photosBlobs
     }, 'confirm');
   }
 }

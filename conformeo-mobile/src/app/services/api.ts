@@ -3,7 +3,7 @@ import { Platform } from '@ionic/angular/standalone'; // Pour savoir si on est s
 
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, from, of } from 'rxjs';
+import { Observable, from, of, Subject } from 'rxjs'; // <--- AJOUTE Subject
 import { tap, switchMap, catchError } from 'rxjs/operators';
 import { OfflineService } from './offline'
 
@@ -54,6 +54,10 @@ export interface Materiel {
 export class ApiService {
   // ⚠️ Mets bien TON url Render ici
   private apiUrl = 'https://conformeo-api.onrender.com'; 
+
+  // SIGNAL DE REFRESH GLOBAL
+  public needsRefresh = false;
+  
 
   constructor(
     private http: HttpClient,

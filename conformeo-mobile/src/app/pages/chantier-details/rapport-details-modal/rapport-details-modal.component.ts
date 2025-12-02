@@ -1,19 +1,22 @@
-import { Component, Input } from '@angular/core';
+import { Component, Input, CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { 
   IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, 
   IonContent, IonIcon, ModalController 
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
-import { mapOutline, closeOutline, timeOutline, alertCircleOutline, imagesOutline } from 'ionicons/icons';
-// Attention au chemin d'import, adapte-le si nécessaire selon ta structure
-import { Rapport } from '../../../services/api';
+import { mapOutline, closeOutline, timeOutline, alertCircleOutline } from 'ionicons/icons';
+import { Rapport } from 'src/app/services/api';
 import { ImageViewerModalComponent } from '../image-viewer-modal/image-viewer-modal.component';
+
+// 👇 ON ACTIVE LE MOTEUR SWIPER
+import { register } from 'swiper/element/bundle';
+register();
 
 @Component({
   selector: 'app-rapport-details-modal',
   template: `
-    <ion-header>
+    <ion-header class="ion-no-border">
       <ion-toolbar color="black">
         <ion-buttons slot="start">
           <ion-button (click)="close()">
@@ -24,21 +27,30 @@ import { ImageViewerModalComponent } from '../image-viewer-modal/image-viewer-mo
       </ion-toolbar>
     </ion-header>
 
-    <ion-content class="ion-padding" style="--background: #000;">
+    <ion-content style="--background: #000;">
       
-      <div class="gallery-scroller">
+      <div class="gallery-section">
         
-        <ng-container *ngFor="let img of rapport.images">
-           <img [src]="getFullUrl(img.url)" class="gallery-img" (click)="zoomImage(img.url)" />
-        </ng-container>
+        <swiper-container 
+          slides-per-view="1.1" 
+          space-between="10" 
+          centered-slides="true"
+          pagination="true"
+        >
+          
+          <swiper-slide *ngFor="let img of rapport.images">
+             <img [src]="getFullUrl(img.url)" class="slide-img" (click)="zoomImage(img.url)" />
+          </swiper-slide>
 
-        <ng-container *ngIf="(!rapport.images || rapport.images.length === 0) && rapport.photo_url">
-           <img [src]="getFullUrl(rapport.photo_url)" class="gallery-img" />
-        </ng-container>
+          <swiper-slide *ngIf="(!rapport.images || rapport.images.length === 0) && rapport.photo_url">
+             <img [src]="getFullUrl(rapport.photo_url)" class="slide-img" (click)="zoomImage(rapport.photo_url)" />
+          </swiper-slide>
+
+        </swiper-container>
 
       </div>
 
-      <div class="details-container">
+      <div class="details-section">
         
         <div class="badge-row">
           <span class="badge" [class]="rapport.niveau_urgence || 'Faible'">
@@ -46,7 +58,7 @@ import { ImageViewerModalComponent } from '../image-viewer-modal/image-viewer-mo
           </span>
           <span class="date">
             <ion-icon name="time-outline"></ion-icon>
-            {{ rapport.date_creation | date:'dd/MM/yyyy HH:mm' }}
+            {{ rapport.date_creation | date:'dd/MM HH:mm' }}
           </span>
         </div>
 
@@ -56,152 +68,89 @@ import { ImageViewerModalComponent } from '../image-viewer-modal/image-viewer-mo
         <div *ngIf="rapport.latitude" class="map-section">
           <ion-button expand="block" color="secondary" (click)="openMap()">
             <ion-icon name="map-outline" slot="start"></ion-icon>
-            Voir la position exacte
+            Voir la position
           </ion-button>
-          <p class="gps-text">
-            GPS: {{ rapport.latitude | number:'1.5-5' }}, {{ rapport.longitude | number:'1.5-5' }}
-          </p>
         </div>
 
       </div>
     </ion-content>
   `,
   styles: [`
-    /* Container du Slider */
-    .gallery-container {
-      margin-bottom: 20px;
+    .gallery-section {
+      background: #000;
+      padding-top: 20px;
+      padding-bottom: 20px;
+    }
+
+    swiper-container {
+      width: 100%;
+      height: 350px; /* Hauteur fixe pour la zone de slide */
+      --swiper-pagination-color: #fff;
+      --swiper-pagination-bullet-inactive-color: #666;
+    }
+
+    .slide-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border-radius: 12px;
+      border: 1px solid #333;
+      background: #111;
+    }
+
+    /* DETAILS */
+    .details-section {
+      background: #1e1e1e;
+      border-top-left-radius: 24px;
+      border-top-right-radius: 24px;
+      padding: 25px;
+      color: white;
+      min-height: 300px;
       position: relative;
     }
 
-    .gallery-scroller {
-      display: flex;
-      overflow-x: auto;
-      gap: 10px;
-      padding-bottom: 10px;
-      margin-bottom: 20px;
-    }
-    .gallery-img {
-      width: 85%; /* On voit un bout de la suivante */
-      height: 300px;
-      object-fit: cover;
-      border-radius: 12px;
-      flex-shrink: 0; /* Empêche l'écrasement */
-    }
-
-    .photo-counter {
-      position: absolute;
-      top: 10px;
-      right: 10px;
-      background: rgba(0,0,0,0.6);
-      color: white;
-      padding: 4px 8px;
-      border-radius: 12px;
-      font-size: 12px;
-      z-index: 10;
-      display: flex;
-      align-items: center;
-      gap: 5px;
-    }
-
-    /* Le Slider Horizontal */
-    .scrolling-wrapper {
-      display: flex;
-      flex-wrap: nowrap;
-      overflow-x: auto;
-      -webkit-overflow-scrolling: touch; /* Scroll fluide sur iOS */
-      scroll-snap-type: x mandatory; /* Magnétisme */
-      gap: 10px;
-      height: 50vh; /* Hauteur fixe pour la visionneuse */
-    }
-
-    /* Chaque carte photo */
-    .photo-card {
-      flex: 0 0 100%; /* Prend toute la largeur dispo */
-      scroll-snap-align: center; /* S'arrête au centre */
-      width: 100%;
-      height: 100%;
-      background: black;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      border-radius: 12px;
-      overflow: hidden;
-    }
-
-    .photo-card.empty {
-      background: #333;
-      color: #666;
-    }
-
-    .zoomable-image {
-      width: 100%;
-      height: 100%;
-      object-fit: contain; /* Affiche l'image entière sans couper */
-    }
-
-    /* Reste du style inchangé */
-    .details-container {
-      background: #1e1e1e;
-      border-radius: 16px;
-      padding: 20px;
-      color: white;
-    }
-    .badge-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 15px;
-    }
-    .badge {
-      padding: 5px 12px;
-      border-radius: 20px;
-      font-weight: bold;
-      text-transform: uppercase;
-      font-size: 12px;
-    }
+    .badge-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .badge { padding: 6px 14px; border-radius: 20px; font-weight: 800; text-transform: uppercase; font-size: 12px; letter-spacing: 0.5px; }
     .Faible { background: #2dd36f; color: black; }
     .Moyen { background: #ffc409; color: black; }
     .Critique { background: #eb445a; color: white; }
-
-    .date { color: #aaa; font-size: 14px; display: flex; align-items: center; gap: 5px; }
-    .description-title { margin: 0 0 10px 0; font-size: 18px; font-weight: bold; }
-    .description-text { color: #ddd; line-height: 1.5; font-size: 16px; margin-bottom: 20px;}
-    .gps-text { text-align: center; color: #666; font-size: 12px; margin-top: 10px; }
+    
+    .date { color: #aaa; font-size: 13px; display: flex; align-items: center; gap: 5px; }
+    .description-title { margin: 0 0 10px 0; font-size: 20px; font-weight: 700; color: #fff; }
+    .description-text { color: #ccc; line-height: 1.6; font-size: 16px; margin-bottom: 30px; white-space: pre-wrap; }
   `],
   standalone: true,
-  imports: [CommonModule, IonHeader, IonToolbar, IonButtons, IonButton, IonContent, IonIcon, IonTitle]
+  imports: [CommonModule, IonHeader, IonToolbar, IonButtons, IonButton, IonContent, IonIcon],
+  // 👇 INDISPENSABLE POUR QUE ANGULAR ACCEPTE <swiper-container>
+  schemas: [CUSTOM_ELEMENTS_SCHEMA]
 })
 export class RapportDetailsModalComponent {
   @Input() rapport!: Rapport;
 
   constructor(private modalCtrl: ModalController) {
-    addIcons({ mapOutline, closeOutline, timeOutline, alertCircleOutline, imagesOutline });
+    addIcons({ mapOutline, closeOutline, timeOutline, alertCircleOutline });
   }
 
-  close() {
-    this.modalCtrl.dismiss();
-  }
+  close() { this.modalCtrl.dismiss(); }
 
   getFullUrl(path: string) {
     if (!path) return '';
     if (path.startsWith('http')) return path;
-    return 'https://conformeo-api.onrender.com' + path; // Fallback pour les vieilles images locales
-  }
-
-  openMap() {
-    if (this.rapport.latitude && this.rapport.longitude) {
-      // Ouvre Maps ou Apple Plans
-      const url = `https://www.google.com/maps/search/?api=1&query=${this.rapport.latitude},${this.rapport.longitude}`;
-      window.open(url, '_system');
-    }
+    return 'https://conformeo-api.onrender.com' + path;
   }
 
   async zoomImage(url: string) {
     const modal = await this.modalCtrl.create({
       component: ImageViewerModalComponent,
-      componentProps: { imageUrl: this.getFullUrl(url) },
-      cssClass: 'transparent-modal' // Pour une animation fluide
+      componentProps: { imageUrl: this.getFullUrl(url) }
     });
     modal.present();
+  }
+
+  openMap() {
+    if (this.rapport.latitude) {
+      const url = `http://googleusercontent.com/maps.google.com/?q=${this.rapport.latitude},${this.rapport.longitude}`;
+      window.open(url, '_system');
+    }
   }
 }

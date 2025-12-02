@@ -65,8 +65,14 @@
     width: 100%;
     height: 100%;
     font-size: 14px;
-    color: #333;
-    &::placeholder { color: #aaa; }
+    
+    // 👇 LA CORRECTION EST ICI
+    color: #000000 !important; // Force le texte en noir
+    background: transparent;
+    
+    &::placeholder { 
+      color: #999 !important; // Gris pour le placeholder
+    }
   }
 }
 
