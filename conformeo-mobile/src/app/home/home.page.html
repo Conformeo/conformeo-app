@@ -39,42 +39,52 @@
     <p>Aucun chantier trouvé.</p>
   </div>
 
-  <div class="feed-container">
+  <ion-content class="ion-padding-top">
+  
+  <h2 style="margin-left: 20px; font-weight: 800; font-size: 24px; margin-bottom: 20px;">
+    Mes Chantiers
+  </h2>
+
+  <div class="pro-list">
     
-    <div *ngFor="let c of chantiers" class="chantier-card" [routerLink]="['/chantier', c.id]">
+    <div *ngFor="let c of chantiers" class="pro-card" [routerLink]="['/chantier', c.id]">
       
-      <div class="card-image" [style.background-image]="'url(' + (c.cover_url || 'assets/splash.png') + ')'">
+      <div class="card-thumb" [style.background-image]="'url(' + (c.cover_url || 'assets/splash.png') + ')'">
+        <div class="status-dot" [class.active]="c.est_actif"></div>
+      </div>
+
+      <div class="card-content">
+        <h3 class="title">{{ c.nom }}</h3>
+        <p class="subtitle">{{ c.client }}</p>
         
-        <div class="status-badge" [class.active]="c.est_actif">
-          {{ c.est_actif ? 'En cours' : 'Terminé' }}
+        <div class="location-row">
+          <ion-icon name="location-outline"></ion-icon>
+          <span>{{ c.adresse }}</span>
         </div>
 
-        <div class="card-overlay">
-          <h3 class="chantier-title">{{ c.nom }}</h3>
-          <p class="chantier-location">
-            <ion-icon name="location-outline"></ion-icon> {{ c.adresse }}
-          </p>
-          <p class="chantier-client">Client: {{ c.client }}</p>
+        <div class="meta-row">
+          <span class="tag date">J-{{ getDaysOpen(c.date_creation) }}</span>
+          <span class="tag reports">
+            <ion-icon name="document-text-outline"></ion-icon> 3
+          </span>
         </div>
       </div>
 
-      <div class="card-actions">
-        <div class="action-btn">
-          <ion-icon name="camera-outline"></ion-icon>
-          <span>Photo</span>
-        </div>
-        <div class="action-btn">
-          <ion-icon name="document-text-outline"></ion-icon>
-          <span>Rapport</span>
-        </div>
-        <div class="action-btn">
-          <ion-icon name="call-outline"></ion-icon>
-          <span>Appeler</span>
-        </div>
+      <div class="card-arrow">
+        <ion-icon name="chevron-forward-outline"></ion-icon>
       </div>
 
     </div>
+
   </div>
+
+  <ion-fab vertical="bottom" horizontal="end" slot="fixed">
+    <ion-fab-button (click)="openAddModal()">
+      <ion-icon name="add"></ion-icon>
+    </ion-fab-button>
+  </ion-fab>
+
+</ion-content>
 
   <ion-fab vertical="bottom" horizontal="end" slot="fixed">
     <ion-fab-button (click)="openAddModal()"> <ion-icon name="add"></ion-icon>

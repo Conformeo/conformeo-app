@@ -17,6 +17,7 @@ export interface Chantier {
   est_actif: boolean;
   signature_url?: string;
   cover_url?: string;
+  date_creation?: string;
 }
 
 export interface Rapport {

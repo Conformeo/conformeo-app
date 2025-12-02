@@ -34,6 +34,7 @@ class ChantierOut(ChantierBase):
     id: int
     est_actif: bool
     signature_url: Optional[str] = None
+    date_creation: datetime
     class Config:
         from_attributes = True
 

@@ -20,15 +20,15 @@ import { OfflineService } from '../services/offline'; // Service de gestion offl
     IonToolbar, 
     IonTitle, 
     IonContent, 
-    IonList, 
-    IonCard, 
-    IonCardHeader, 
-    IonCardTitle, 
-    IonCardSubtitle, 
-    IonCardContent, 
-    IonChip, 
+    // IonList, 
+    // IonCard, 
+    // IonCardHeader, 
+    // IonCardTitle, 
+    // IonCardSubtitle, 
+    // IonCardContent, 
+    // IonChip, 
     IonIcon, 
-    IonLabel, 
+    // IonLabel, 
     IonFab, 
     IonFabButton, 
     IonRefresher, 
@@ -36,7 +36,7 @@ import { OfflineService } from '../services/offline'; // Service de gestion offl
     IonButtons,
     RouterLink, 
     IonButton,
-    IonBadge
+    // IonBadge
   ],
 })
 export class HomePage implements OnInit {
@@ -57,6 +57,14 @@ addIcons({ business, location, checkmarkCircle, alertCircle, add, statsChartOutl
     });
 
     this.loadChantiers();
+  }
+
+  getDaysOpen(dateString?: string): number {
+    if (!dateString) return 0;
+    const date = new Date(dateString);
+    const now = new Date();
+    const diff = Math.abs(now.getTime() - date.getTime());
+    return Math.ceil(diff / (1000 * 3600 * 24));
   }
 
   loadChantiers(event?: any) {
