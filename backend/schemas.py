@@ -104,13 +104,18 @@ class InspectionOut(InspectionBase):
 # --- PPSPS DOCUMENTS ---
 
 class PPSPSBase(BaseModel):
-    maitre_oeuvre: str
-    coordonnateur_sps: str
-    hopital_proche: str
-    responsable_securite: str
-    nb_compagnons: int
-    horaires: str
-    risques: dict # Le JSON des risques
+    maitre_ouvrage: Optional[str] = ""
+    maitre_oeuvre: Optional[str] = ""
+    coordonnateur_sps: Optional[str] = ""
+    responsable_chantier: str
+    nb_compagnons: int = 1
+    horaires: str = "8h-17h"
+    duree_travaux: str = "Non définie"
+    
+    secours_data: dict = {}
+    installations_data: dict = {}
+    taches_data: List[dict] = []
+    
     chantier_id: int
 
 class PPSPSCreate(PPSPSBase):

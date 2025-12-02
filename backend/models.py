@@ -87,27 +87,34 @@ class Inspection(Base):
     chantier = relationship("Chantier", back_populates="inspections")
 
 
+# ... (Assure-toi d'avoir importé JSON de sqlalchemy)
+from sqlalchemy import JSON
+
 class PPSPS(Base):
     __tablename__ = "ppsps"
 
     id = Column(Integer, primary_key=True, index=True)
     chantier_id = Column(Integer, ForeignKey("chantiers.id"))
     
-    # Infos Générales
-    maitre_ouvrage = Column(String) # Le Client (déjà dans chantier, mais on peut préciser)
-    maitre_oeuvre = Column(String)  # L'architecte / Maitre d'oeuvre
-    coordonnateur_sps = Column(String) # Le CSPS
-    hopital_proche = Column(String)    # Urgences
-    responsable_securite = Column(String) # Chef de chantier
-    
-    # Effectifs
-    nb_compagnons = Column(Integer, default=1)
-    horaires = Column(String, default="8h-12h / 13h-17h")
-    
-    # Risques (Stocké en JSON : {"chute": true, "elec": false...})
-    risques = Column(JSON) 
+    # 1. Renseignements Généraux
+    maitre_ouvrage = Column(String)
+    maitre_oeuvre = Column(String)
+    coordonnateur_sps = Column(String)
+    responsable_chantier = Column(String) # Conducteur travaux ou Chef chantier
+    nb_compagnons = Column(Integer)
+    horaires = Column(String)
+    duree_travaux = Column(String) # Ex: "3 mois"
+
+    # 2. Secours (JSON: { sst_noms: [], hopital: "", num_urgence: "", trousse_loc: "" })
+    secours_data = Column(JSON)
+
+    # 3. Hygiène & Installations (JSON: { vestiaires: "", refectoire: "", toilettes: "", eau: "" })
+    installations_data = Column(JSON)
+
+    # 4. Tâches & Risques (JSON: [ { tache: "", risque: "", prevention: "" }, ... ])
+    # Remplace l'ancienne colonne 'risques' simple
+    taches_data = Column(JSON)
     
     date_creation = Column(DateTime, default=datetime.now)
 
     chantier = relationship("Chantier", back_populates="ppsps_docs")
-

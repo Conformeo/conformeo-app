@@ -20,7 +20,28 @@ import { BarcodeScanner, BarcodeFormat } from '@capacitor-mlkit/barcode-scanning
   templateUrl: './materiel.page.html',
   styleUrls: ['./materiel.page.scss'],
   standalone: true,
-  imports: [CommonModule, FormsModule, IonHeader, IonToolbar, IonTitle, IonContent, IonList, IonItem, IonLabel, IonButtons, IonButton, IonIcon, IonBadge, IonFab, IonFabButton, IonRefresher, IonRefresherContent, IonSearchbar, IonGrid, IonRow, IonCol, IonBackButton]
+  imports: [CommonModule, 
+    FormsModule, 
+    IonHeader, 
+    IonToolbar, 
+    // IonTitle, 
+    IonContent, 
+    // IonList, 
+    // IonItem, 
+    // IonLabel, 
+    IonButtons, 
+    // IonButton, 
+    IonIcon, 
+    // IonBadge, 
+    IonFab, 
+    IonFabButton, 
+    // IonRefresher, 
+    // IonRefresherContent, 
+    // IonSearchbar, 
+    // IonGrid, 
+    // IonRow, 
+    // IonCol, 
+    IonBackButton]
 })
 export class MaterielPage implements OnInit {
   materiels: Materiel[] = [];

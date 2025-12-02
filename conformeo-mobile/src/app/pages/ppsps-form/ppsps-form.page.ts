@@ -5,7 +5,9 @@ import { ActivatedRoute } from '@angular/router';
 import { 
   IonContent, IonHeader, IonToolbar, IonTitle, IonButtons, IonBackButton, 
   IonList, IonItem, IonInput, IonLabel, IonListHeader, IonCheckbox, 
-  IonButton, IonIcon, NavController, AlertController 
+  IonButton, IonIcon, NavController, AlertController, IonCard, IonCardContent,
+  IonCardHeader, IonCardTitle, IonCardSubtitle, IonSegmentButton, IonSegment,
+  IonSelectOption, IonSelect
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
 import { saveOutline, medicalOutline, timeOutline, peopleOutline } from 'ionicons/icons';
@@ -16,20 +18,60 @@ import { ApiService, PPSPS } from 'src/app/services/api';
   templateUrl: './ppsps-form.page.html',
   styleUrls: ['./ppsps-form.page.scss'],
   standalone: true,
-  imports: [CommonModule, FormsModule, IonContent, IonHeader, IonToolbar, IonTitle, IonButtons, IonBackButton, IonList, IonItem, IonInput, IonLabel, IonListHeader, IonCheckbox, IonButton, IonIcon]
+  imports: [CommonModule, 
+    FormsModule, 
+    IonContent, 
+    IonHeader, 
+    IonToolbar, 
+    IonTitle, 
+    IonButtons, 
+    IonBackButton, 
+    // IonList, 
+    IonItem, 
+    IonInput, 
+    IonLabel, 
+    IonListHeader, 
+    // IonCheckbox, 
+    IonButton, 
+    IonIcon, 
+    IonCard, 
+    IonCardContent, 
+    IonCardHeader, 
+    IonCardTitle, 
+    IonCardSubtitle, 
+    IonSegmentButton, 
+    IonSegment, 
+    IonSelectOption, IonSelect]
 })
 export class PpspsFormPage implements OnInit {
   chantierId!: number;
+  step = 'general'; // Onglet actif
 
-  // Données du formulaire
   formData = {
-    maitre_oeuvre: '',
+    responsable_chantier: '',
     coordonnateur_sps: '',
-    hopital_proche: '',
-    responsable_securite: '',
+    maitre_ouvrage: '',
+    maitre_oeuvre: '',
     nb_compagnons: 2,
-    horaires: '08h00 - 17h00'
+    horaires: '08h00 - 17h00',
+    duree_travaux: ''
   };
+
+  secoursData = {
+    hopital: '',
+    num_urgence: '15 / 18',
+    trousse_loc: '',
+    sst_noms: ''
+  };
+
+  installationsData = {
+    type_base: '',
+    eau: '',
+    repas: ''
+  };
+
+  tachesData: any[] = []; // Liste des tâches ajoutées
+  currentTache = { tache: '', risque: '', prevention: '' }; // Tâche en cours de saisie
 
   // Liste des risques (Doit correspondre aux clés du backend python)
   risques = [
@@ -54,37 +96,33 @@ export class PpspsFormPage implements OnInit {
     if (id) this.chantierId = +id;
   }
 
-  async save() {
-    if (!this.formData.hopital_proche || !this.formData.responsable_securite) {
-      const alert = await this.alertCtrl.create({
-        header: 'Incomplet',
-        message: 'Veuillez au moins indiquer les Urgences et le Responsable Sécurité.',
-        buttons: ['OK']
-      });
-      await alert.present();
-      return;
+  addTache() {
+    if (this.currentTache.tache && this.currentTache.risque) {
+      this.tachesData.push({ ...this.currentTache });
+      this.currentTache = { tache: '', risque: '', prevention: '' }; // Reset
     }
+  }
 
-    // On transforme le tableau de risques en objet JSON simple pour l'API
-    // Ex: { chute: true, elec: false }
-    const risquesJson: any = {};
-    this.risques.forEach(r => risquesJson[r.key] = r.checked);
+  removeTache(index: number) {
+    this.tachesData.splice(index, 1);
+  }
 
-    const ppsps: PPSPS = {
+  async save() {
+    const ppsps: any = { // Utilise 'any' ou met à jour l'interface PPSPS dans api.service.ts
       chantier_id: this.chantierId,
       ...this.formData,
-      risques: risquesJson
+      secours_data: this.secoursData,
+      installations_data: this.installationsData,
+      taches_data: this.tachesData,
+      risques: {} // On garde vide pour compatibilité ancien champ
     };
 
     this.api.createPPSPS(ppsps).subscribe({
       next: () => {
-        alert("PPSPS créé avec succès !");
+        alert("PPSPS enregistré !");
         this.navCtrl.back();
       },
-      error: (err) => {
-        console.error(err);
-        alert("Erreur lors de la création.");
-      }
+      error: () => alert("Erreur sauvegarde")
     });
   }
 }

@@ -29,7 +29,12 @@ import { SignatureModalComponent } from './signature-modal/signature-modal.compo
   templateUrl: './chantier-details.page.html',
   styleUrls: ['./chantier-details.page.scss'],
   standalone: true,
-  imports: [IonicModule, CommonModule, FormsModule, IonButtons, IonBackButton, RouterLink]
+  imports: [IonicModule, 
+    CommonModule, 
+    FormsModule, 
+    // IonButtons, 
+    // IonBackButton, 
+    RouterLink]
 })
 export class ChantierDetailsPage implements OnInit {
   chantierId: number = 0;

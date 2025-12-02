@@ -1,8 +1,6 @@
 <ion-header>
   <ion-toolbar color="primary">
-    <ion-buttons slot="start">
-      <ion-back-button defaultHref="/home"></ion-back-button>
-    </ion-buttons>
+    <ion-buttons slot="start"><ion-back-button defaultHref="/home"></ion-back-button></ion-buttons>
     <ion-title>Nouveau PPSPS</ion-title>
     <ion-buttons slot="end">
       <ion-button (click)="save()">
@@ -10,73 +8,134 @@
       </ion-button>
     </ion-buttons>
   </ion-toolbar>
+  
+  <ion-segment [(ngModel)]="step" scrollable mode="md">
+    <ion-segment-button value="general"><ion-label>Général</ion-label></ion-segment-button>
+    <ion-segment-button value="secours"><ion-label>Secours</ion-label></ion-segment-button>
+    <ion-segment-button value="hygiene"><ion-label>Hygiène</ion-label></ion-segment-button>
+    <ion-segment-button value="taches"><ion-label>Risques</ion-label></ion-segment-button>
+  </ion-segment>
 </ion-header>
 
 <ion-content class="ion-padding">
 
-  <form>
-    <ion-list-header>
-      <ion-label>📢 Intervenants & Secours</ion-label>
-    </ion-list-header>
+  <div *ngIf="step === 'general'">
+    <ion-list-header>👷‍♂️ Acteurs du chantier</ion-list-header>
+    <ion-item>
+      <ion-label position="stacked">Responsable Chantier</ion-label>
+      <ion-input [(ngModel)]="formData.responsable_chantier" placeholder="Nom du chef"></ion-input>
+    </ion-item>
+    <ion-item>
+      <ion-label position="stacked">CSPS (Coordonnateur)</ion-label>
+      <ion-input [(ngModel)]="formData.coordonnateur_sps" placeholder="Nom du CSPS"></ion-input>
+    </ion-item>
+    <ion-item>
+      <ion-label position="stacked">Maître d'Ouvrage (Client)</ion-label>
+      <ion-input [(ngModel)]="formData.maitre_ouvrage"></ion-input>
+    </ion-item>
     
-    <ion-list lines="full" class="form-card">
-      <ion-item>
-        <ion-label position="stacked">Responsable Sécurité (Chantier)</ion-label>
-        <ion-input [(ngModel)]="formData.responsable_securite" name="resp" placeholder="Nom du chef"></ion-input>
-      </ion-item>
+    <ion-list-header>📅 Organisation</ion-list-header>
+    <ion-item>
+      <ion-label position="stacked">Effectif max</ion-label>
+      <ion-input type="number" [(ngModel)]="formData.nb_compagnons"></ion-input>
+    </ion-item>
+    <ion-item>
+      <ion-label position="stacked">Horaires</ion-label>
+      <ion-input [(ngModel)]="formData.horaires"></ion-input>
+    </ion-item>
+    <ion-item>
+      <ion-label position="stacked">Durée prévue</ion-label>
+      <ion-input [(ngModel)]="formData.duree_travaux" placeholder="Ex: 3 semaines"></ion-input>
+    </ion-item>
+    
+    <ion-button expand="block" class="ion-margin-top" (click)="step = 'secours'">Suivant</ion-button>
+  </div>
 
-      <ion-item>
-        <ion-icon name="medical-outline" slot="start" color="danger"></ion-icon>
-        <ion-label position="stacked">Urgences / Hôpital le plus proche</ion-label>
-        <ion-input [(ngModel)]="formData.hopital_proche" name="hopital" placeholder="Ex: CHU Purpan"></ion-input>
-      </ion-item>
+  <div *ngIf="step === 'secours'">
+    <ion-list-header>🚑 Organisation des Secours</ion-list-header>
+    <ion-item>
+      <ion-label position="stacked">Hôpital le plus proche</ion-label>
+      <ion-input [(ngModel)]="secoursData.hopital" placeholder="Nom et Ville"></ion-input>
+    </ion-item>
+    <ion-item>
+      <ion-label position="stacked">Numéros d'urgence</ion-label>
+      <ion-input [(ngModel)]="secoursData.num_urgence" value="15 (SAMU) / 18 (Pompiers)"></ion-input>
+    </ion-item>
+    <ion-item>
+      <ion-label position="stacked">Emplacement Trousse Secours</ion-label>
+      <ion-input [(ngModel)]="secoursData.trousse_loc" placeholder="Ex: Camionnette Chef"></ion-input>
+    </ion-item>
+    
+    <ion-item>
+      <ion-label position="stacked">Sauveteurs Secouristes (SST)</ion-label>
+      <ion-textarea [(ngModel)]="secoursData.sst_noms" placeholder="Noms des secouristes présents"></ion-textarea>
+    </ion-item>
 
-      <ion-item>
-        <ion-label position="stacked">Maître d'Œuvre (Archi)</ion-label>
-        <ion-input [(ngModel)]="formData.maitre_oeuvre" name="moe"></ion-input>
-      </ion-item>
+    <ion-button expand="block" class="ion-margin-top" (click)="step = 'hygiene'">Suivant</ion-button>
+  </div>
 
-      <ion-item>
-        <ion-label position="stacked">Coordonnateur SPS</ion-label>
-        <ion-input [(ngModel)]="formData.coordonnateur_sps" name="csps"></ion-input>
-      </ion-item>
-    </ion-list>
+  <div *ngIf="step === 'hygiene'">
+    <ion-list-header>🚿 Installations de Chantier</ion-list-header>
+    <ion-item>
+      <ion-label position="stacked">Vestiaires / Sanitaires</ion-label>
+      <ion-select [(ngModel)]="installationsData.type_base">
+        <ion-select-option value="Roulotte de chantier">Roulotte de chantier</ion-select-option>
+        <ion-select-option value="Local existant">Local existant mis à dispo</ion-select-option>
+        <ion-select-option value="Retour dépôt quotidien">Retour dépôt quotidien</ion-select-option>
+      </ion-select>
+    </ion-item>
+    
+    <ion-item>
+      <ion-label position="stacked">Accès Eau Potable</ion-label>
+      <ion-input [(ngModel)]="installationsData.eau" placeholder="Ex: Bouteilles ou Raccord réseau"></ion-input>
+    </ion-item>
+    
+    <ion-item>
+      <ion-label position="stacked">Prise de repas</ion-label>
+      <ion-input [(ngModel)]="installationsData.repas" placeholder="Ex: Réfectoire base vie"></ion-input>
+    </ion-item>
 
-    <ion-list-header>
-      <ion-label>🏗️ Organisation</ion-label>
-    </ion-list-header>
+    <ion-button expand="block" class="ion-margin-top" (click)="step = 'taches'">Suivant</ion-button>
+  </div>
 
-    <ion-list lines="full" class="form-card">
-      <ion-item>
-        <ion-icon name="people-outline" slot="start"></ion-icon>
-        <ion-label position="stacked">Nombre de compagnons</ion-label>
-        <ion-input type="number" [(ngModel)]="formData.nb_compagnons" name="nb"></ion-input>
-      </ion-item>
-
-      <ion-item>
-        <ion-icon name="time-outline" slot="start"></ion-icon>
-        <ion-label position="stacked">Horaires de travail</ion-label>
-        <ion-input [(ngModel)]="formData.horaires" name="horaires"></ion-input>
-      </ion-item>
-    </ion-list>
-
-    <ion-list-header>
-      <ion-label>⚠️ Analyse des Risques</ion-label>
-    </ion-list-header>
-
-    <ion-list class="form-card">
-      <ion-item *ngFor="let risque of risques">
-        <ion-label class="ion-text-wrap">{{ risque.label }}</ion-label>
-        <ion-checkbox slot="start" [(ngModel)]="risque.checked" [name]="risque.key"></ion-checkbox>
-      </ion-item>
-    </ion-list>
-
-    <div class="ion-padding">
-      <ion-button expand="block" (click)="save()" size="large">
-        Générer le document
-      </ion-button>
+  <div *ngIf="step === 'taches'">
+    <div class="info-box">
+      <p>Ajoutez les tâches à risque de ce chantier spécifique.</p>
     </div>
 
-  </form>
+    <ion-card *ngFor="let t of tachesData; let i = index">
+      <ion-card-header>
+        <ion-card-subtitle>Tâche #{{ i+1 }}</ion-card-subtitle>
+        <ion-card-title>{{ t.tache }}</ion-card-title>
+      </ion-card-header>
+      <ion-card-content>
+        <p><strong>Risque :</strong> {{ t.risque }}</p>
+        <p><strong>Prévention :</strong> {{ t.prevention }}</p>
+        <ion-button fill="clear" color="danger" (click)="removeTache(i)">Supprimer</ion-button>
+      </ion-card-content>
+    </ion-card>
+
+    <ion-card style="background: #f9f9f9;">
+      <ion-card-content>
+        <ion-item>
+          <ion-label position="stacked">Tâche à réaliser</ion-label>
+          <ion-input [(ngModel)]="currentTache.tache" placeholder="Ex: Pose charpente"></ion-input>
+        </ion-item>
+        <ion-item>
+          <ion-label position="stacked">Risque principal</ion-label>
+          <ion-input [(ngModel)]="currentTache.risque" placeholder="Ex: Chute de hauteur"></ion-input>
+        </ion-item>
+        <ion-item>
+          <ion-label position="stacked">Mesures Prévention (EPC/EPI)</ion-label>
+          <ion-textarea [(ngModel)]="currentTache.prevention" placeholder="Ex: Échafaudage, Harnais..."></ion-textarea>
+        </ion-item>
+        <ion-button expand="block" fill="outline" (click)="addTache()">Ajouter cette tâche</ion-button>
+      </ion-card-content>
+    </ion-card>
+
+    <ion-button expand="block" color="success" size="large" class="ion-margin-top" (click)="save()">
+      Générer le PPSPS
+    </ion-button>
+  </div>
 
 </ion-content>

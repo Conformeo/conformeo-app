@@ -360,22 +360,22 @@ def migrate_db_v4(db: Session = Depends(get_db)):
         return {"status": "Erreur", "details": str(e)}
 
 # --- ROUTES PPSPS ---
-@app.post("/ppsps", response_model=schemas.PPSPSOut)
-def create_ppsps(ppsps: schemas.PPSPSCreate, db: Session = Depends(get_db)):
-    new_ppsps = models.PPSPS(
-        maitre_oeuvre=ppsps.maitre_oeuvre,
-        coordonnateur_sps=ppsps.coordonnateur_sps,
-        hopital_proche=ppsps.hopital_proche,
-        responsable_securite=ppsps.responsable_securite,
-        nb_compagnons=ppsps.nb_compagnons,
-        horaires=ppsps.horaires,
-        risques=ppsps.risques,
-        chantier_id=ppsps.chantier_id
-    )
-    db.add(new_ppsps)
-    db.commit()
-    db.refresh(new_ppsps)
-    return new_ppsps
+# @app.post("/ppsps", response_model=schemas.PPSPSOut)
+# def create_ppsps(ppsps: schemas.PPSPSCreate, db: Session = Depends(get_db)):
+#     new_ppsps = models.PPSPS(
+#         maitre_oeuvre=ppsps.maitre_oeuvre,
+#         coordonnateur_sps=ppsps.coordonnateur_sps,
+#         hopital_proche=ppsps.hopital_proche,
+#         responsable_securite=ppsps.responsable_securite,
+#         nb_compagnons=ppsps.nb_compagnons,
+#         horaires=ppsps.horaires,
+#         risques=ppsps.risques,
+#         chantier_id=ppsps.chantier_id
+#     )
+#     db.add(new_ppsps)
+#     db.commit()
+#     db.refresh(new_ppsps)
+#     return new_ppsps
 
 @app.get("/chantiers/{chantier_id}/ppsps", response_model=List[schemas.PPSPSOut])
 def read_ppsps_chantier(chantier_id: int, db: Session = Depends(get_db)):
@@ -396,3 +396,38 @@ def download_ppsps_pdf(ppsps_id: int, db: Session = Depends(get_db)):
     pdf_generator.generate_ppsps_pdf(chantier, ppsps, file_path)
     
     return FileResponse(path=file_path, filename=filename, media_type='application/pdf')
+
+# --- MIGRATION V5 (PPSPS COMPLET) ---
+@app.get("/migrate_db_v5")
+def migrate_db_v5(db: Session = Depends(get_db)):
+    try:
+        # On ajoute les colonnes manquantes
+        db.execute(text("ALTER TABLE ppsps ADD COLUMN IF NOT EXISTS secours_data JSON"))
+        db.execute(text("ALTER TABLE ppsps ADD COLUMN IF NOT EXISTS installations_data JSON"))
+        db.execute(text("ALTER TABLE ppsps ADD COLUMN IF NOT EXISTS taches_data JSON"))
+        db.execute(text("ALTER TABLE ppsps ADD COLUMN IF NOT EXISTS duree_travaux VARCHAR"))
+        db.commit()
+        return {"message": "Migration V5 (PPSPS OPPBTP) réussie !"}
+    except Exception as e:
+        return {"status": "Erreur", "details": str(e)}
+
+@app.post("/ppsps", response_model=schemas.PPSPSOut)
+def create_ppsps(ppsps: schemas.PPSPSCreate, db: Session = Depends(get_db)):
+    new_ppsps = models.PPSPS(
+        # On mappe tous les champs
+        chantier_id=ppsps.chantier_id,
+        maitre_ouvrage=ppsps.maitre_ouvrage,
+        maitre_oeuvre=ppsps.maitre_oeuvre,
+        coordonnateur_sps=ppsps.coordonnateur_sps,
+        responsable_chantier=ppsps.responsable_chantier,
+        nb_compagnons=ppsps.nb_compagnons,
+        horaires=ppsps.horaires,
+        duree_travaux=ppsps.duree_travaux,
+        secours_data=ppsps.secours_data,
+        installations_data=ppsps.installations_data,
+        taches_data=ppsps.taches_data
+    )
+    db.add(new_ppsps)
+    db.commit()
+    db.refresh(new_ppsps)
+    return new_ppsps
