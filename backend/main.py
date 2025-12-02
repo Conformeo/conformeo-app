@@ -26,16 +26,20 @@ models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Conforméo API")
 
-# -------------------------------------------------------------------
-# CORS – VERSION SIMPLE ET LARGE (pour que Vercel puisse appeler l’API)
-# -------------------------------------------------------------------
+# CORS large pour debug (on pourra resserrer ensuite)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],      # on autorise tout le monde (pour debug / dev)
-    allow_credentials=False,  # IMPORTANT si on utilise "*"
+    # autorise toutes les origines (regex) → compatible avec allow_credentials=True
+    allow_origin_regex=".*",
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Petit endpoint de test pour vérifier que tu es bien sur la bonne version
+@app.get("/")
+def root():
+    return {"message": "Conformeo API ok", "cors": "enabled"}
 # Quand tout sera bien calé, on pourra resserrer ici en remettant une liste d’origines.
 
 # --- CONFIGURATION CLOUDINARY ---
