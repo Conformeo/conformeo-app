@@ -86,10 +86,6 @@ class Inspection(Base):
 
     chantier = relationship("Chantier", back_populates="inspections")
 
-
-# ... (Assure-toi d'avoir importé JSON de sqlalchemy)
-from sqlalchemy import JSON
-
 class PPSPS(Base):
     __tablename__ = "ppsps"
 

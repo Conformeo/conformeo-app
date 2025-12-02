@@ -53,7 +53,7 @@ class MaterielOut(MaterielBase):
     class Config:
         from_attributes = True
 
-# --- RAPPORTS & IMAGES (LE CŒUR DU PROBLEME) ---
+# --- RAPPORTS & IMAGES ---
 
 # 1. Structure d'une image seule dans la liste
 class RapportImageOut(BaseModel):
@@ -81,8 +81,6 @@ class RapportOut(RapportBase):
     date_creation: datetime
     class Config:
         from_attributes = True
-
-# ...
 
 # --- INSPECTIONS QHSE ---
 class InspectionBase(BaseModel):
