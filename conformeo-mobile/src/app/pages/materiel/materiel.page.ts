@@ -9,7 +9,7 @@ import {
 } from '@ionic/angular/standalone';
 import { Capacitor } from '@capacitor/core';
 import { addIcons } from 'ionicons';
-import { add, hammer, construct, home, swapHorizontal, qrCodeOutline } from 'ionicons/icons';
+import { add, hammer, construct, home, swapHorizontal, qrCodeOutline, searchOutline, cube, homeOutline, locationOutline } from 'ionicons/icons';
 import { ApiService, Materiel, Chantier } from '../../services/api';
 
 // 👇 NOUVEAUX IMPORTS POUR ML KIT
@@ -32,7 +32,7 @@ export class MaterielPage implements OnInit {
     private api: ApiService,
     private alertCtrl: AlertController
   ) {
-    addIcons({ add, hammer, construct, home, swapHorizontal, qrCodeOutline });
+    addIcons({ add, hammer, construct, home, swapHorizontal, qrCodeOutline, searchOutline, cube, homeOutline, locationOutline });
   }
 
   ngOnInit() {
@@ -159,5 +159,14 @@ export class MaterielPage implements OnInit {
     if (!id) return 'Au Dépôt';
     const c = this.chantiers.find(x => x.id === id);
     return c ? c.nom : 'Inconnu';
+  }
+
+  // --- Helpers pour les stats ---
+  getMaterielsSortis(): number {
+    return this.materiels.filter(m => m.chantier_id !== null).length;
+  }
+
+  getMaterielsDepot(): number {
+    return this.materiels.filter(m => m.chantier_id === null).length;
   }
 }

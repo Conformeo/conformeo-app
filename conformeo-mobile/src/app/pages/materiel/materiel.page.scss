@@ -1,0 +1,167 @@
+.inventory-content {
+  --background: #f4f6f9; // Gris très clair pro
+}
+
+// 1. EN-TÊTE BLEU
+.header-section {
+  background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); // Bleu Profond
+  padding: 60px 20px 80px 20px; // De la place en bas pour la barre flottante
+  border-bottom-left-radius: 30px;
+  border-bottom-right-radius: 30px;
+  color: white;
+}
+
+.header-top {
+  margin-bottom: 20px;
+  .page-title { margin: 0; font-size: 28px; font-weight: 800; }
+  .page-subtitle { margin: 5px 0 0; opacity: 0.8; font-size: 14px; }
+}
+
+.stats-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+
+  .stat-item {
+    background: rgba(255,255,255,0.1);
+    border-radius: 12px;
+    padding: 10px;
+    flex: 1;
+    text-align: center;
+    backdrop-filter: blur(5px);
+
+    &.warning { background: rgba(255, 196, 9, 0.2); color: #ffc409; }
+    &.success { background: rgba(45, 211, 111, 0.2); color: #2dd36f; }
+
+    .stat-num { display: block; font-size: 20px; font-weight: 800; margin-bottom: 2px; color: white;}
+    .stat-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.9; color: inherit;}
+  }
+}
+
+// 2. BARRE DE RECHERCHE FLOTTANTE
+.search-container {
+  margin: -35px 20px 20px 20px; // Remonte sur le header
+  display: flex;
+  gap: 10px;
+  position: relative;
+  z-index: 10;
+}
+
+.search-wrapper {
+  flex: 1;
+  background: white;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  padding: 0 15px;
+  height: 50px;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+
+  .search-icon { font-size: 20px; color: #999; margin-right: 10px; }
+  
+  input {
+    border: none;
+    outline: none;
+    width: 100%;
+    height: 100%;
+    font-size: 14px;
+    color: #333;
+    &::placeholder { color: #aaa; }
+  }
+}
+
+.scan-btn {
+  width: 50px;
+  height: 50px;
+  background: #333;
+  border-radius: 12px;
+  border: none;
+  color: white;
+  font-size: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+  
+  &:active { transform: scale(0.95); }
+}
+
+// 3. LISTE
+.list-container {
+  padding: 0 20px 80px 20px;
+}
+
+.tool-card {
+  background: white;
+  border-radius: 16px;
+  padding: 15px;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.03);
+  transition: transform 0.1s;
+
+  &:active { transform: scale(0.98); background: #fcfcfc; }
+}
+
+.tool-icon {
+  width: 50px;
+  height: 50px;
+  background: #eefbf3; // Vert très clair
+  color: #2dd36f;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  margin-right: 15px;
+  flex-shrink: 0;
+
+  &.out { // Si sorti
+    background: #fff8e6; // Jaune très clair
+    color: #ffc409;
+  }
+}
+
+.tool-info {
+  flex-grow: 1;
+  overflow: hidden;
+
+  .tool-name { margin: 0 0 4px; font-size: 16px; font-weight: 700; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tool-ref { margin: 0; font-size: 12px; color: #999; font-family: monospace; letter-spacing: 0.5px; }
+}
+
+.tool-status {
+  text-align: right;
+  min-width: 80px;
+
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    background: #eefbf3; color: #2dd36f; // Vert par défaut
+
+    &.out { background: #fff8e6; color: #ffc409; } // Orange si sorti
+  }
+
+  .chantier-name {
+    margin: 4px 0 0;
+    font-size: 10px;
+    color: #999;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100px;
+  }
+}
+
+.empty-state {
+  text-align: center; color: #ccc; margin-top: 50px;
+  ion-icon { font-size: 60px; margin-bottom: 10px; }
+  p { font-size: 16px; }
+}
