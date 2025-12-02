@@ -26,9 +26,19 @@ models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Conforméo API")
 
+# -------------------------------------------------------------------
+# CORS – VERSION SIMPLE ET LARGE (pour que Vercel puisse appeler l’API)
+# -------------------------------------------------------------------
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],      # on autorise tout le monde (pour debug / dev)
+    allow_credentials=False,  # IMPORTANT si on utilise "*"
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+# Quand tout sera bien calé, on pourra resserrer ici en remettant une liste d’origines.
+
 # --- CONFIGURATION CLOUDINARY ---
-# Documentation: https://cloudinary.com/documentation/django_integration#configuration
-# On utilise la méthode du dictionnaire unpacking (**config) qui est standard et propre.
 
 cloudinary_config = {
   "cloud_name": os.getenv("CLOUDINARY_CLOUD_NAME"),
@@ -37,7 +47,6 @@ cloudinary_config = {
   "secure": True
 }
 
-# On applique la configuration SEULEMENT si les clés sont présentes
 required_keys = ["cloud_name", "api_key", "api_secret"]
 missing = [k for k in required_keys if not cloudinary_config.get(k)]
 
@@ -57,21 +66,6 @@ os.makedirs("uploads", exist_ok=True)
 # Montage des fichiers statiques
 app.mount("/static", StaticFiles(directory="uploads"), name="static")
 
-# --- CORS (Autorisations) ---
-origins = [
-    "http://localhost:8100",              # Ionic
-    "http://localhost:4200",              # Angular dev
-    "http://localhost:3000",              # cas général
-    "https://conformeo-app.vercel.app",   # ton front prod
-]
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,        # PAS de "*"
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 # --- ROUTES AUTHENTIFICATION ---
 
@@ -122,6 +116,7 @@ def read_chantiers(db: Session = Depends(get_db)):
     chantiers = db.query(models.Chantier).all()
     return chantiers
 
+
 # --- ROUTES RAPPORTS & PHOTOS ---
 
 @app.post("/upload")
@@ -134,7 +129,6 @@ async def upload_image(file: UploadFile = File(...)):
     except Exception as e:
         import traceback
         traceback.print_exc()  # log complet dans Render
-        # TEMPORAIREMENT on renvoie l'erreur brute
         raise HTTPException(
             status_code=500,
             detail=f"Cloudinary error: {repr(e)}"
@@ -143,8 +137,6 @@ async def upload_image(file: UploadFile = File(...)):
 
 @app.post("/rapports", response_model=schemas.RapportOut)
 def create_rapport(rapport: schemas.RapportCreate, db: Session = Depends(get_db)):
-    
-    # 1. Création du rapport
     new_rapport = models.Rapport(
         titre=rapport.titre,
         description=rapport.description,
@@ -152,14 +144,12 @@ def create_rapport(rapport: schemas.RapportCreate, db: Session = Depends(get_db)
         niveau_urgence=rapport.niveau_urgence,
         latitude=rapport.latitude,
         longitude=rapport.longitude,
-        # On garde la première image comme "photo principale" pour la compatibilité PDF simple
         photo_url=rapport.image_urls[0] if rapport.image_urls else None
     )
     db.add(new_rapport)
     db.commit()
     db.refresh(new_rapport)
 
-    # 2. Création des images liées
     for url in rapport.image_urls:
         new_img = models.RapportImage(url=url, rapport_id=new_rapport.id)
         db.add(new_img)
@@ -185,7 +175,6 @@ def download_pdf(chantier_id: int, db: Session = Depends(get_db)):
     filename = f"Rapport_{chantier.id}.pdf"
     file_path = f"uploads/{filename}"
 
-    # Génération du PDF via notre module
     pdf_generator.generate_pdf(chantier, rapports, file_path)
 
     return FileResponse(path=file_path, filename=filename, media_type='application/pdf')
@@ -276,7 +265,7 @@ def reset_data(db: Session = Depends(get_db)):
         db.rollback()
         return {"status": "Erreur", "details": str(e)}
 
-# Route de réparation DB (Décommentée si besoin pour ajouter colonne manquante)
+
 @app.get("/fix_db_signature")
 def fix_db_signature(db: Session = Depends(get_db)):
     try:
@@ -286,14 +275,11 @@ def fix_db_signature(db: Session = Depends(get_db)):
     except Exception as e:
         return {"message": "Erreur ou colonne déjà présente", "details": str(e)}
 
-# --- ROUTE DE MIGRATION V1.5 (A lancer une seule fois) ---
+
 @app.get("/migrate_db_v1_5")
 def migrate_db(db: Session = Depends(get_db)):
     try:
-        # 1. Ajout colonne photo couverture Chantier
         db.execute(text("ALTER TABLE chantiers ADD COLUMN IF NOT EXISTS cover_url VARCHAR"))
-        
-        # 2. Ajout colonnes Rapport (GPS + Urgence)
         db.execute(text("ALTER TABLE rapports ADD COLUMN IF NOT EXISTS niveau_urgence VARCHAR DEFAULT 'Faible'"))
         db.execute(text("ALTER TABLE rapports ADD COLUMN IF NOT EXISTS latitude FLOAT"))
         db.execute(text("ALTER TABLE rapports ADD COLUMN IF NOT EXISTS longitude FLOAT"))
@@ -304,11 +290,10 @@ def migrate_db(db: Session = Depends(get_db)):
         db.rollback()
         return {"status": "Erreur migration", "details": str(e)}
 
-# --- ROUTE DE MIGRATION V2 (Création table images) ---
+
 @app.get("/migrate_db_v2")
 def migrate_db_v2(db: Session = Depends(get_db)):
     try:
-        # On crée la table rapport_images
         models.Base.metadata.create_all(bind=engine)
         return {"message": "Migration V2 réussie ! Table images créée."}
     except Exception as e:
