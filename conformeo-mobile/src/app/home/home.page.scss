@@ -1,27 +1,93 @@
-#container {
-  text-align: center;
+ion-content {
+  --background: #f0f2f5; // Fond gris clair moderne
+}
 
+.feed-container {
+  padding: 10px;
+}
+
+.chantier-card {
+  background: white;
+  border-radius: 20px;
+  overflow: hidden;
+  margin-bottom: 20px;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+  position: relative;
+}
+
+.card-image {
+  height: 250px;
+  background-size: cover;
+  background-position: center;
+  position: relative;
+}
+
+.status-badge {
   position: absolute;
+  top: 15px;
+  right: 15px;
+  background: rgba(0, 0, 0, 0.6);
+  color: white;
+  padding: 5px 12px;
+  border-radius: 15px;
+  font-size: 12px;
+  font-weight: bold;
+  backdrop-filter: blur(5px);
+  
+  &.active {
+    background: #2dd36f; // Vert
+    color: black;
+  }
+}
+
+.card-overlay {
+  position: absolute;
+  bottom: 0;
   left: 0;
-  right: 0;
-  top: 50%;
-  transform: translateY(-50%);
+  width: 100%;
+  padding: 20px;
+  background: linear-gradient(to top, rgba(0,0,0,0.8), transparent);
+  color: white;
+  
+  .chantier-title {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 800;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+  }
+  
+  .chantier-location {
+    margin: 5px 0 0;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    opacity: 0.9;
+  }
+  
+  .chantier-client {
+    font-size: 12px;
+    opacity: 0.7;
+    margin: 2px 0 0;
+  }
 }
 
-#container strong {
-  font-size: 20px;
-  line-height: 26px;
-}
-
-#container p {
-  font-size: 16px;
-  line-height: 22px;
-
-  color: #8c8c8c;
-
-  margin: 0;
-}
-
-#container a {
-  text-decoration: none;
+.card-actions {
+  display: flex;
+  padding: 15px;
+  justify-content: space-around;
+  
+  .action-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    color: #666;
+    font-size: 12px;
+    gap: 5px;
+    
+    ion-icon {
+      font-size: 24px;
+      color: var(--ion-color-primary);
+    }
+  }
 }
