@@ -23,4 +23,13 @@ export const routes: Routes = [
     path: 'materiel',
     loadComponent: () => import('./pages/materiel/materiel.page').then( m => m.MaterielPage)
   },
+  {
+    path: 'smart-scan',
+    loadComponent: () => import('./pages/smart-scan/smart-scan.page').then( m => m.SmartScanPage)
+  },
+  {
+    // On ajoute /:id pour dire "cette page attend un numéro"
+    path: 'smart-scan/:id', 
+    loadComponent: () => import('./pages/smart-scan/smart-scan.page').then( m => m.SmartScanPage)
+  },
 ];

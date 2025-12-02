@@ -69,9 +69,15 @@
   </div>
 
   <ion-fab vertical="bottom" horizontal="end" slot="fixed">
-    <ion-fab-button (click)="takePhoto()" color="primary">
+    
+    <ion-fab-button (click)="takePhoto()" color="primary" style="margin-bottom: 10px;">
       <ion-icon name="camera"></ion-icon>
     </ion-fab-button>
+
+    <ion-fab-button color="success" [routerLink]="['/smart-scan', chantierId]">
+      <ion-icon name="scan-outline"></ion-icon>
+    </ion-fab-button>
+
   </ion-fab>
 
 </ion-content>
