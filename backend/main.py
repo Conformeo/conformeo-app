@@ -302,3 +302,35 @@ def migrate_db_v5(db: Session = Depends(get_db)):
         return {"message": "Migration V5 (PPSPS OPPBTP) réussie !"}
     except Exception as e:
         return {"status": "Erreur", "details": str(e)}
+
+# --- ROUTE DE RÉPARATION FORCEE ---
+@app.get("/force_fix_ppsps")
+def force_fix_ppsps(db: Session = Depends(get_db)):
+    try:
+        # On tente d'ajouter les colonnes manquantes une par une
+        # Si une colonne existe déjà, PostgreSQL renverra une erreur qu'on attrape,
+        # mais on continue pour les autres.
+        
+        commands = [
+            "ALTER TABLE ppsps ADD COLUMN responsable_chantier VARCHAR",
+            "ALTER TABLE ppsps ADD COLUMN duree_travaux VARCHAR",
+            "ALTER TABLE ppsps ADD COLUMN secours_data JSON",
+            "ALTER TABLE ppsps ADD COLUMN installations_data JSON",
+            "ALTER TABLE ppsps ADD COLUMN taches_data JSON"
+        ]
+        
+        results = []
+        
+        for cmd in commands:
+            try:
+                db.execute(text(cmd))
+                db.commit()
+                results.append(f"Succès: {cmd}")
+            except Exception as e:
+                db.rollback()
+                results.append(f"Ignoré (existe déjà ?): {cmd} -> {str(e)}")
+                
+        return {"status": "Terminé", "details": results}
+
+    except Exception as e:
+        return {"status": "Erreur critique", "details": str(e)}
