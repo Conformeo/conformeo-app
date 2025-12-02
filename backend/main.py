@@ -30,7 +30,7 @@ app = FastAPI(title="Conforméo API")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],      # <- autorise tout le monde
-    allow_credentials=False,  # <- IMPORTANT pour que "*" soit accepté par le navigateur
+    allow_credentials=True,  # <- IMPORTANT pour que "*" soit accepté par le navigateur
     allow_methods=["*"],
     allow_headers=["*"],
 )
