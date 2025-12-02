@@ -1,0 +1,183 @@
+.detail-content {
+  --background: #f7f8fa;
+}
+
+// Bouton retour flottant
+.back-btn-container {
+  position: absolute;
+  top: 50px;
+  left: 10px;
+  z-index: 100;
+  background: rgba(0,0,0,0.3);
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+// 1. En-tête Image
+.header-image {
+  height: 300px;
+  width: 100%;
+  background-size: cover;
+  background-position: center;
+  position: relative;
+}
+
+.header-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(to bottom, transparent 50%, rgba(0,0,0,0.8));
+  display: flex;
+  align-items: flex-end;
+  padding: 20px;
+  padding-bottom: 40px; // Espace pour l'arrondi du body
+}
+
+.header-text {
+  color: white;
+  width: 100%;
+  
+  .chantier-title {
+    margin: 0;
+    font-size: 28px;
+    font-weight: 800;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+  }
+  .chantier-subtitle {
+    margin: 5px 0 0;
+    font-size: 16px;
+    opacity: 0.9;
+  }
+}
+
+// 2. Corps de page (Arrondi)
+.body-container {
+  margin-top: -30px; // Remonte sur l'image
+  border-top-left-radius: 30px;
+  border-top-right-radius: 30px;
+  background: #f7f8fa;
+  min-height: 500px;
+  position: relative;
+  z-index: 10;
+  padding: 20px;
+}
+
+// Carte d'infos
+.info-card {
+  background: white;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+  margin-bottom: 25px;
+
+  .location-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 20px;
+    font-size: 14px;
+    color: #555;
+  }
+
+  .actions-row {
+    display: flex;
+    justify-content: space-around;
+    
+    .action-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      
+      .icon-circle {
+        width: 45px;
+        height: 45px;
+        background: #f0f2f5;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--ion-color-primary);
+        font-size: 20px;
+      }
+      span { font-size: 12px; color: #666; font-weight: 500; }
+    }
+  }
+}
+
+.section-title {
+  font-weight: 800;
+  font-size: 18px;
+  margin-bottom: 15px;
+  color: #333;
+}
+
+// Cartes Feed (Rapports)
+.feed-card {
+  background: white;
+  border-radius: 16px;
+  overflow: hidden;
+  margin-bottom: 15px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.03);
+  display: flex; // Image gauche / Texte droite (comme la liste chantiers)
+  padding: 10px;
+  align-items: flex-start;
+  gap: 15px;
+}
+
+.feed-image {
+  width: 90px;
+  height: 90px;
+  border-radius: 12px;
+  background-size: cover;
+  background-position: center;
+  background-color: #eee;
+  flex-shrink: 0;
+}
+
+.feed-content {
+  flex-grow: 1;
+}
+
+.feed-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 5px;
+  font-size: 12px;
+  
+  .feed-date { color: #999; }
+  .feed-badge { 
+    font-weight: bold; 
+    text-transform: uppercase; 
+    font-size: 10px;
+    
+    &.Faible { color: #2dd36f; }
+    &.Moyen { color: #ffc409; }
+    &.Critique { color: #eb445a; }
+  }
+}
+
+.feed-title {
+  margin: 0 0 5px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #333;
+}
+
+.feed-desc {
+  margin: 0;
+  font-size: 13px;
+  color: #666;
+  display: -webkit-box;
+  -webkit-line-clamp: 2; // Coupe après 2 lignes
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.empty-state { text-align: center; color: #999; margin-top: 30px; font-style: italic; }

@@ -1,52 +1,73 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { IonicModule } from '@ionic/angular'; // Import global pour simplifier
-import { ActivatedRoute } from '@angular/router';
-import { ApiService, Rapport } from '../../services/api';
+import { IonicModule, ModalController } from '@ionic/angular';
+import { ActivatedRoute, RouterLink } from '@angular/router'; // Ajout RouterLink
+import { ApiService, Rapport, Chantier } from 'src/app/services/api'; // Import Chantier
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { addIcons } from 'ionicons';
-import { camera, time, warning, documentTextOutline } from 'ionicons/icons';
-import { SignatureModalComponent } from './signature-modal/signature-modal.component';
-import { ModalController } from '@ionic/angular';
-import { createOutline } from 'ionicons/icons';
+import { 
+  camera, time, warning, documentText, create, navigate, 
+  location, arrowBack, documentTextOutline, createOutline 
+} from 'ionicons/icons';
+
+// Imports Standalone
+import { IonBackButton, IonButtons } from '@ionic/angular/standalone';
+
+// Import des modales
 import { NewRapportModalComponent } from './new-rapport-modal/new-rapport-modal.component';
 import { RapportDetailsModalComponent } from './rapport-details-modal/rapport-details-modal.component';
+import { SignatureModalComponent } from './signature-modal/signature-modal.component';
 
 @Component({
   selector: 'app-chantier-details',
   templateUrl: './chantier-details.page.html',
   styleUrls: ['./chantier-details.page.scss'],
   standalone: true,
-  imports: [IonicModule, CommonModule, FormsModule]
+  imports: [IonicModule, CommonModule, FormsModule, IonButtons, IonBackButton, RouterLink]
 })
 export class ChantierDetailsPage implements OnInit {
   chantierId: number = 0;
+  
+  // 👇 C'EST LA VARIABLE QUI MANQUAIT
+  chantier: Chantier | undefined; 
+  
   rapports: Rapport[] = [];
-  photoUrlTemp: string | undefined; // Pour afficher la photo juste prise avant envoi
+  photoUrlTemp: string | undefined;
 
   constructor(
     private route: ActivatedRoute,
-    private api: ApiService,
+    public api: ApiService, // Public pour accès HTML si besoin
     private modalCtrl: ModalController
   ) {
-    addIcons({ camera, time, warning, documentTextOutline, createOutline });
+    addIcons({ camera, time, warning, documentText, create, navigate, location, arrowBack, documentTextOutline, createOutline });
   }
 
   ngOnInit() {
-    // On récupère l'ID depuis l'URL (ex: /chantier/1)
     const id = this.route.snapshot.paramMap.get('id');
     if (id) {
       this.chantierId = +id;
-      this.loadRapports();
+      this.loadData();
     }
+  }
+
+  loadData() {
+    // 1. Charger les infos du chantier (Titre, Cover...)
+    this.api.getChantierById(this.chantierId).subscribe(data => {
+      this.chantier = data;
+    });
+
+    // 2. Charger les rapports
+    this.loadRapports();
   }
 
   loadRapports() {
     this.api.getRapports(this.chantierId).subscribe(data => {
-      this.rapports = data.reverse(); // Les plus récents en haut
+      this.rapports = data.reverse();
     });
   }
+
+  // --- ACTIONS ---
 
   async takePhoto() {
     try {
@@ -59,30 +80,12 @@ export class ChantierDetailsPage implements OnInit {
       });
 
       if (image.webPath) {
-        // 1. On récupère le Blob
         const response = await fetch(image.webPath);
         const blob = await response.blob();
-
-        // 2. 👇 CORRECTION ICI : On passe le blob ET le chemin webPath
         this.uploadAndCreateRapport(blob, image.webPath);
       }
     } catch (e) {
-      console.log('Utilisateur a annulé ou erreur caméra', e);
-    }
-  }
-
-  async openSignature() {
-    const modal = await this.modalCtrl.create({
-      component: SignatureModalComponent,
-      componentProps: { chantierId: this.chantierId }
-    });
-
-    await modal.present();
-
-    const { data, role } = await modal.onWillDismiss();
-    if (role === 'confirm') {
-      alert("Chantier signé avec succès !");
-      // Tu pourrais ici afficher la signature sur la page si tu veux
+      console.log('Annulé/Erreur', e);
     }
   }
 
@@ -107,12 +110,23 @@ export class ChantierDetailsPage implements OnInit {
         longitude: gps ? gps.longitude : null
       };
 
-      // 👇 APPEL DE LA NOUVELLE METHODE
-      // "blobs" est maintenant un tableau [Blob, Blob, ...]
       await this.api.addRapportWithMultiplePhotos(newRapport, blobs);
       
       setTimeout(() => { this.loadRapports(); }, 500);
     }
+  }
+
+  downloadPdf() {
+    const url = `${this.api['apiUrl']}/chantiers/${this.chantierId}/pdf`;
+    window.open(url, '_system');
+  }
+
+  async openSignature() {
+    const modal = await this.modalCtrl.create({
+      component: SignatureModalComponent,
+      componentProps: { chantierId: this.chantierId }
+    });
+    await modal.present();
   }
 
   async openRapportDetails(rapport: Rapport) {
@@ -123,21 +137,24 @@ export class ChantierDetailsPage implements OnInit {
     modal.present();
   }
 
-  // Helper pour afficher l'image complète (Backend URL + Localhost)
+  // --- HELPERS VISUELS ---
+
   getFullUrl(path: string | undefined) {
     if (!path) return '';
-    
-    // Si l'URL commence déjà par http (ex: image externe), on la garde
-    if (path.startsWith('http')) return path;
-
-    // Sinon, on colle l'URL de ton serveur Render
-    // ATTENTION : Mets bien TON adresse Render à toi
+    if (path.startsWith('http') && path.includes('cloudinary.com')) {
+      return path.replace('/upload/', '/upload/w_500,f_auto,q_auto/');
+    }
     return 'https://conformeo-api.onrender.com' + path;
   }
 
-  downloadPdf() {
-    // Astuce simple : on ouvre l'URL du backend dans le navigateur du téléphone
-    const url = `https://conformeo-api.onrender.com/chantiers/${this.chantierId}/pdf`;
-    window.open(url, '_system');
+  hasImage(rap: Rapport): boolean {
+    return (rap.images && rap.images.length > 0) || !!rap.photo_url;
+  }
+
+  getFirstImage(rap: Rapport): string {
+    if (rap.images && rap.images.length > 0) {
+      return this.getFullUrl(rap.images[0].url);
+    }
+    return this.getFullUrl(rap.photo_url);
   }
 }
