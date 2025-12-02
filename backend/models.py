@@ -23,10 +23,8 @@ class RapportImage(Base):
     id = Column(Integer, primary_key=True, index=True)
     url = Column(String)
     rapport_id = Column(Integer, ForeignKey("rapports.id"))
-    
-    # Lien inverse
     rapport = relationship("Rapport", back_populates="images")
-
+    
 class Rapport(Base):
     __tablename__ = "rapports"
     id = Column(Integer, primary_key=True, index=True)

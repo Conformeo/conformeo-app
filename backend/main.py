@@ -138,15 +138,10 @@ async def upload_image(file: UploadFile = File(...)):
         )
 
 
-@app.get("/rapports", response_model=List[schemas.RapportOut])
-def read_all_rapports(db: Session = Depends(get_db)):
-    """Affiche tous les rapports et leurs images (Utile pour le debug)"""
-    rapports = db.query(models.Rapport).all()
-    return rapports
-
-
 @app.post("/rapports", response_model=schemas.RapportOut)
 def create_rapport(rapport: schemas.RapportCreate, db: Session = Depends(get_db)):
+    
+    # 1. On crée le rapport "Parent"
     new_rapport = models.Rapport(
         titre=rapport.titre,
         description=rapport.description,
@@ -154,20 +149,30 @@ def create_rapport(rapport: schemas.RapportCreate, db: Session = Depends(get_db)
         niveau_urgence=rapport.niveau_urgence,
         latitude=rapport.latitude,
         longitude=rapport.longitude,
+        # Astuce : On met la 1ère image en "photo principale" pour que les vieux écrans marchent encore
         photo_url=rapport.image_urls[0] if rapport.image_urls else None
     )
     db.add(new_rapport)
     db.commit()
     db.refresh(new_rapport)
 
-    for url in rapport.image_urls:
-        new_img = models.RapportImage(url=url, rapport_id=new_rapport.id)
-        db.add(new_img)
-    
-    db.commit()
-    db.refresh(new_rapport)
+    # 2. On crée les images "Enfants" dans la table dédiée
+    if rapport.image_urls:
+        for url in rapport.image_urls:
+            new_img = models.RapportImage(url=url, rapport_id=new_rapport.id)
+            db.add(new_img)
+        
+        db.commit()
+        db.refresh(new_rapport) # On rafraîchit pour récupérer la liste des images
+        
     return new_rapport
 
+# Nouvelle route GET pour vérifier que ça marche dans le navigateur
+@app.get("/rapports", response_model=List[schemas.RapportOut])
+def read_all_rapports(db: Session = Depends(get_db)):
+    """Permet de voir tous les rapports et leurs galeries via le navigateur"""
+    return db.query(models.Rapport).all()
+    
 
 @app.get("/chantiers/{chantier_id}/rapports", response_model=List[schemas.RapportOut])
 def read_rapports_chantier(chantier_id: int, db: Session = Depends(get_db)):

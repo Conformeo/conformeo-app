@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr
-from typing import Optional, List  # <--- C'EST ICI QU'IL MANQUAIT 'List'
+from typing import Optional, List
 from datetime import datetime
 
 # --- UTILISATEURS ---
@@ -13,7 +13,6 @@ class UserOut(BaseModel):
     email: EmailStr
     role: str
     is_active: bool
-
     class Config:
         from_attributes = True
 
@@ -35,7 +34,6 @@ class ChantierOut(ChantierBase):
     id: int
     est_actif: bool
     signature_url: Optional[str] = None
-    
     class Config:
         from_attributes = True
 
@@ -51,13 +49,12 @@ class MaterielCreate(MaterielBase):
 class MaterielOut(MaterielBase):
     id: int
     chantier_id: Optional[int] = None
-
     class Config:
         from_attributes = True
 
-# --- RAPPORTS & IMAGES ---
+# --- RAPPORTS & IMAGES (LE CŒUR DU PROBLEME) ---
 
-# Schéma pour une image seule
+# 1. Structure d'une image seule dans la liste
 class RapportImageOut(BaseModel):
     url: str
     class Config:
@@ -71,15 +68,15 @@ class RapportBase(BaseModel):
     latitude: Optional[float] = None
     longitude: Optional[float] = None
 
+# 2. Ce qu'on envoie pour CREER (Une liste de liens textes)
 class RapportCreate(RapportBase):
-    # Liste d'URLs (Maintenant 'List' est reconnu)
     image_urls: List[str] = [] 
 
+# 3. Ce que l'API RENVOIE (Une liste d'objets images)
 class RapportOut(RapportBase):
     id: int
-    photo_url: Optional[str] = None
-    images: List[RapportImageOut] = [] # Liste des images
+    photo_url: Optional[str] = None # On garde pour compatibilité
+    images: List[RapportImageOut] = [] # La galerie
     date_creation: datetime
-
     class Config:
         from_attributes = True
