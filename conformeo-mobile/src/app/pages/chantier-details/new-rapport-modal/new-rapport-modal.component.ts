@@ -2,18 +2,18 @@ import { Component, Input, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Geolocation } from '@capacitor/geolocation';
-import { Camera, CameraResultType, CameraSource } from '@capacitor/camera'; // <--- AJOUT CAMERA
+import { Camera, CameraResultType, CameraSource } from '@capacitor/camera'; // <--- Ajout Camera ici
 
-// Imports des composants Ionic
 import { 
   IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, 
   IonContent, IonList, IonItem, IonInput, IonLabel, 
   IonIcon, IonTextarea, IonSelect, IonSelectOption,
-  ModalController, IonGrid, IonRow, IonCol, IonThumbnail
+  IonGrid, IonRow, IonCol, // <--- Ajout Grid
+  ModalController 
 } from '@ionic/angular/standalone';
 
 import { addIcons } from 'ionicons';
-import { locationOutline, camera } from 'ionicons/icons'; // <--- AJOUT ICONE CAMERA
+import { locationOutline, cameraOutline, trashOutline } from 'ionicons/icons'; // + trash
 
 @Component({
   selector: 'app-new-rapport-modal',
@@ -21,60 +21,44 @@ import { locationOutline, camera } from 'ionicons/icons'; // <--- AJOUT ICONE CA
     <ion-header>
       <ion-toolbar color="primary">
         <ion-title>Nouveau Rapport</ion-title>
-        <ion-buttons slot="end">
-          <ion-button (click)="cancel()">Annuler</ion-button>
-        </ion-buttons>
+        <ion-buttons slot="end"><ion-button (click)="cancel()">Annuler</ion-button></ion-buttons>
       </ion-toolbar>
     </ion-header>
 
     <ion-content class="ion-padding">
       
-      <ion-grid class="ion-no-padding">
+      <p style="font-weight:bold; margin-bottom:10px;">Photos ({{ photosWebPath.length }})</p>
+      
+      <ion-grid style="padding:0; margin-bottom: 20px;">
         <ion-row>
-          
-          <ion-col size="4" *ngFor="let photo of photosWebPath">
-            <div class="photo-item" [style.background-image]="'url(' + photo + ')'"></div>
-          </ion-col>
-
-          <ion-col size="4">
-            <div class="add-photo-btn" (click)="takePhoto()">
-              <ion-icon name="camera" size="large"></ion-icon>
-              <span>+ Photo</span>
+          <ion-col size="4" *ngFor="let photo of photosWebPath; let i = index">
+            <div class="photo-thumb" [style.background-image]="'url(' + photo + ')'">
+              <div class="delete-btn" (click)="removePhoto(i)">
+                <ion-icon name="trash-outline"></ion-icon>
+              </div>
             </div>
           </ion-col>
 
+          <ion-col size="4">
+            <div class="add-photo-btn" (click)="addPhoto()">
+              <ion-icon name="camera-outline" size="large"></ion-icon>
+              <span>Ajouter</span>
+            </div>
+          </ion-col>
         </ion-row>
       </ion-grid>
       
-      <ion-list lines="full" class="ion-margin-top">
-        
+      <ion-list lines="full">
         <ion-item>
-          <ion-input 
-            label="Titre" 
-            label-placement="stacked" 
-            [(ngModel)]="data.titre" 
-            placeholder="Ex: Fissure mur Est">
-          </ion-input>
+          <ion-input label="Titre" label-placement="stacked" [(ngModel)]="data.titre" placeholder="Ex: Fissure mur Est"></ion-input>
         </ion-item>
 
         <ion-item>
-          <ion-textarea 
-            label="Commentaire" 
-            label-placement="stacked" 
-            [(ngModel)]="data.description" 
-            rows="4"
-            auto-grow="true"
-            placeholder="Décrivez l'anomalie en détail...">
-          </ion-textarea>
+          <ion-textarea label="Commentaire" label-placement="stacked" [(ngModel)]="data.description" rows="3" auto-grow="true"></ion-textarea>
         </ion-item>
 
         <ion-item>
-          <ion-select 
-            label="Gravité / Urgence" 
-            label-placement="stacked" 
-            [(ngModel)]="data.niveau_urgence" 
-            interface="popover" 
-            placeholder="Choisir le niveau">
+          <ion-select label="Gravité" label-placement="stacked" [(ngModel)]="data.niveau_urgence" interface="popover">
             <ion-select-option value="Faible">🟢 Faible</ion-select-option>
             <ion-select-option value="Moyen">🟠 Moyen</ion-select-option>
             <ion-select-option value="Critique">🔴 Critique</ion-select-option>
@@ -84,141 +68,93 @@ import { locationOutline, camera } from 'ionicons/icons'; // <--- AJOUT ICONE CA
         <ion-item lines="none">
           <ion-icon name="location-outline" slot="start" [color]="gpsCoords ? 'primary' : 'medium'"></ion-icon>
           <ion-label>
-            <h3 *ngIf="gpsCoords" style="color: var(--ion-color-primary); font-weight: bold;">
-              Position acquise ✅
-            </h3>
-            <p *ngIf="gpsCoords" style="font-size: 0.8em; color: #666;">
-              Lat: {{ gpsCoords.latitude | number:'1.4-4' }}, Lon: {{ gpsCoords.longitude | number:'1.4-4' }}
-            </p>
-            <h3 *ngIf="!gpsCoords">Recherche GPS en cours... ⏳</h3>
+            <h3 *ngIf="gpsCoords">Position acquise ✅</h3>
+            <h3 *ngIf="!gpsCoords">Recherche GPS... ⏳</h3>
           </ion-label>
         </ion-item>
-
       </ion-list>
 
       <ion-button expand="block" (click)="confirm()" [disabled]="!data.titre" class="ion-margin-top" size="large">
-        Valider et Sauvegarder
+        Valider ({{ photosWebPath.length }} photos)
       </ion-button>
 
     </ion-content>
   `,
   styles: [`
-    .photo-item {
-      width: 100%;
-      padding-top: 100%; /* Ratio Carré 1:1 */
-      background-size: cover;
-      background-position: center;
-      border-radius: 8px;
-      border: 1px solid #ddd;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    .photo-thumb {
+      width: 100%; padding-top: 100%; /* Carré */
+      background-size: cover; background-position: center;
+      border-radius: 8px; border: 1px solid #ddd;
+      position: relative;
+    }
+    .delete-btn {
+      position: absolute; top: -5px; right: -5px;
+      background: red; color: white; border-radius: 50%;
+      width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;
     }
     .add-photo-btn {
-      width: 100%;
-      padding-top: 100%; /* Ratio Carré 1:1 */
-      background: #f4f5f8;
-      border-radius: 8px;
-      border: 2px dashed #ccc;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      color: #666;
-      position: relative; /* Pour centrer le contenu absolu si besoin */
+      width: 100%; padding-top: 100%;
+      background: #f4f5f8; border-radius: 8px; border: 2px dashed #ccc;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      color: #666; position: relative;
     }
-    /* Astuce pour centrer le contenu dans le carré padding-top */
-    .add-photo-btn ion-icon, .add-photo-btn span {
-      position: absolute;
-      left: 50%;
-      transform: translateX(-50%);
-    }
-    .add-photo-btn ion-icon { top: 25%; }
-    .add-photo-btn span { bottom: 25%; font-weight: bold; font-size: 0.9em; }
+    .add-photo-btn ion-icon { position: absolute; top: 30%; }
+    .add-photo-btn span { position: absolute; bottom: 20%; font-size: 12px; }
   `],
   standalone: true,
-  imports: [
-    CommonModule, 
-    FormsModule, 
-    IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, 
-    IonContent, IonList, IonItem, IonInput, IonLabel, 
-    IonIcon, IonTextarea, IonSelect, IonSelectOption,
-    IonGrid, IonRow, IonCol, IonThumbnail
-  ]
+  imports: [CommonModule, FormsModule, IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, IonContent, IonList, IonItem, IonInput, IonLabel, IonIcon, IonTextarea, IonSelect, IonSelectOption, IonGrid, IonRow, IonCol]
 })
 export class NewRapportModalComponent implements OnInit {
-  
-  // On reçoit la toute première photo prise avant d'ouvrir la modale
   @Input() initialPhotoWebPath!: string;
   @Input() initialPhotoBlob!: Blob;
-  
-  // Listes pour gérer le multi-upload
-  photosWebPath: string[] = [];
-  photosBlobs: Blob[] = [];
 
-  data = {
-    titre: '',
-    description: '',
-    niveau_urgence: 'Faible'
-  };
-  
+  photosWebPath: string[] = [];
+  photosBlobs: Blob[] = []; // Liste des fichiers à envoyer
+
+  data = { titre: '', description: '', niveau_urgence: 'Faible' };
   gpsCoords: any = null;
 
   constructor(private modalCtrl: ModalController) {
-    addIcons({ locationOutline, camera });
+    addIcons({ locationOutline, cameraOutline, trashOutline });
   }
 
   async ngOnInit() {
-    // 1. On initialise la liste avec la première photo reçue
-    if (this.initialPhotoWebPath && this.initialPhotoBlob) {
+    // On ajoute la première photo prise avant d'ouvrir la modale
+    if (this.initialPhotoWebPath) {
       this.photosWebPath.push(this.initialPhotoWebPath);
       this.photosBlobs.push(this.initialPhotoBlob);
     }
-
-    // 2. GPS
+    // GPS
     try {
       const position = await Geolocation.getCurrentPosition();
-      this.gpsCoords = {
-        latitude: position.coords.latitude,
-        longitude: position.coords.longitude
-      };
-    } catch (e) {
-      console.error("Erreur GPS", e);
+      this.gpsCoords = { latitude: position.coords.latitude, longitude: position.coords.longitude };
+    } catch (e) {}
+  }
+
+  // Ajouter une autre photo depuis la modale
+  async addPhoto() {
+    const image = await Camera.getPhoto({
+      quality: 80, allowEditing: false, resultType: CameraResultType.Uri, source: CameraSource.Camera, correctOrientation: true
+    });
+    if (image.webPath) {
+      this.photosWebPath.push(image.webPath);
+      const response = await fetch(image.webPath);
+      this.photosBlobs.push(await response.blob());
     }
   }
 
-  // Fonction pour ajouter une photo supplémentaire
-  async takePhoto() {
-    try {
-      const image = await Camera.getPhoto({
-        quality: 80,
-        allowEditing: false,
-        resultType: CameraResultType.Uri,
-        source: CameraSource.Camera,
-        correctOrientation: true
-      });
-
-      if (image.webPath) {
-        // Ajout visuel
-        this.photosWebPath.push(image.webPath);
-        
-        // Ajout données (Blob)
-        const response = await fetch(image.webPath);
-        const blob = await response.blob();
-        this.photosBlobs.push(blob);
-      }
-    } catch (e) {
-      console.log('Ajout photo annulé');
-    }
+  removePhoto(index: number) {
+    this.photosWebPath.splice(index, 1);
+    this.photosBlobs.splice(index, 1);
   }
 
-  cancel() {
-    this.modalCtrl.dismiss(null, 'cancel');
-  }
+  cancel() { this.modalCtrl.dismiss(null, 'cancel'); }
 
   confirm() {
     this.modalCtrl.dismiss({
       data: this.data,
       gps: this.gpsCoords,
-      blobs: this.photosBlobs // On renvoie TOUTES les photos
+      blobs: this.photosBlobs // On renvoie toute la liste !
     }, 'confirm');
   }
 }

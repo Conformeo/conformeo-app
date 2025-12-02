@@ -248,54 +248,56 @@ export class ApiService {
   }
 
   // Sauvegarder un rapport avec PLUSIEURS photos
-async addRapportWithMultiplePhotos(rapport: Rapport, photoBlobs: Blob[]) {
+// --- NOUVELLE METHODE MULTI-PHOTOS ---
+  async addRapportWithMultiplePhotos(rapport: Rapport, photoBlobs: Blob[]) {
+    
+    // CAS 1 : HORS LIGNE ✈️
+    if (!this.offline.isOnline.value) {
+      console.log('📡 Hors ligne : Sauvegarde galerie locale...');
+      const localPaths: string[] = [];
 
-  // CAS 1 : HORS LIGNE ✈️
-  if (!this.offline.isOnline.value) {
-    console.log('📡 Hors ligne : Sauvegarde photos locales...');
-    const localPaths: string[] = [];
+      // On sauvegarde chaque photo sur le disque
+      for (const blob of photoBlobs) {
+        try {
+          const path = await this.savePhotoLocally(blob);
+          localPaths.push(path);
+        } catch (e) { console.error("Erreur sauvegarde locale", e); }
+      }
 
-    // On sauvegarde chaque photo sur le disque
-    for (const blob of photoBlobs) {
-      try {
-        const path = await this.savePhotoLocally(blob);
-        localPaths.push(path);
-      } catch (e) { console.error(e); }
-    }
-
-    // On met en file d'attente (Type spécial MULTI)
-    await this.offline.addToQueue('POST_RAPPORT_MULTI', {
-      rapport: rapport,
-      localPaths: localPaths
-    });
-    return true;
-  }
-
-  // CAS 2 : EN LIGNE 🌐
-  else {
-    // On upload tout en parallèle (Promise.all)
-    const uploadPromises = photoBlobs.map(blob => 
-      new Promise<string>((resolve, reject) => {
-        this.uploadPhoto(blob).subscribe({
-          next: (res) => resolve(res.url),
-          error: (err) => reject(err)
-        });
-      })
-    );
-
-    try {
-      const urls = await Promise.all(uploadPromises);
-      // On ajoute les URLs au rapport
-      rapport.image_urls = urls;
-      // On envoie
-      this.http.post(`${this.apiUrl}/rapports`, rapport).subscribe();
+      // On met en file d'attente (Action spéciale MULTI)
+      await this.offline.addToQueue('POST_RAPPORT_MULTI', {
+        rapport: rapport,
+        localPaths: localPaths
+      });
       return true;
-    } catch (err) {
-      console.error("Erreur upload multiple", err);
-      return false;
+    }
+
+    // CAS 2 : EN LIGNE 🌐
+    else {
+      // On upload tout en parallèle (Promise.all) pour aller vite
+      const uploadPromises = photoBlobs.map(blob => 
+        new Promise<string>((resolve, reject) => {
+          this.uploadPhoto(blob).subscribe({
+            next: (res) => resolve(res.url),
+            error: (err) => reject(err)
+          });
+        })
+      );
+
+      try {
+        const urls = await Promise.all(uploadPromises);
+        // On attache les URLs au rapport
+        rapport.image_urls = urls;
+        
+        // On envoie le rapport final
+        this.http.post(`${this.apiUrl}/rapports`, rapport).subscribe();
+        return true;
+      } catch (err) {
+        console.error("Erreur upload multiple", err);
+        return false;
+      }
     }
   }
-}
 
   // ==========================================
   // ✍️ SIGNATURE

@@ -25,27 +25,16 @@ import { Rapport } from '../../../services/api';
 
     <ion-content class="ion-padding" style="--background: #000;">
       
-      <div class="gallery-container">
+      <div class="gallery-scroller">
         
-        <div class="photo-counter" *ngIf="rapport.images && rapport.images.length > 1">
-          <ion-icon name="images-outline"></ion-icon> {{ rapport.images.length }} Photos
-        </div>
+        <ng-container *ngFor="let img of rapport.images">
+           <img [src]="getFullUrl(img.url)" class="gallery-img" />
+        </ng-container>
 
-        <div class="scrolling-wrapper">
-          
-          <div class="photo-card" *ngFor="let img of rapport.images">
-             <img [src]="getFullUrl(img.url)" class="zoomable-image" />
-          </div>
+        <ng-container *ngIf="(!rapport.images || rapport.images.length === 0) && rapport.photo_url">
+           <img [src]="getFullUrl(rapport.photo_url)" class="gallery-img" />
+        </ng-container>
 
-          <div class="photo-card" *ngIf="(!rapport.images || rapport.images.length === 0) && rapport.photo_url">
-             <img [src]="getFullUrl(rapport.photo_url)" class="zoomable-image" />
-          </div>
-
-          <div class="photo-card empty" *ngIf="(!rapport.images || rapport.images.length === 0) && !rapport.photo_url">
-             <p>Aucune photo</p>
-          </div>
-
-        </div>
       </div>
 
       <div class="details-container">
@@ -81,6 +70,21 @@ import { Rapport } from '../../../services/api';
     .gallery-container {
       margin-bottom: 20px;
       position: relative;
+    }
+
+    .gallery-scroller {
+      display: flex;
+      overflow-x: auto;
+      gap: 10px;
+      padding-bottom: 10px;
+      margin-bottom: 20px;
+    }
+    .gallery-img {
+      width: 85%; /* On voit un bout de la suivante */
+      height: 300px;
+      object-fit: cover;
+      border-radius: 12px;
+      flex-shrink: 0; /* Empêche l'écrasement */
     }
 
     .photo-counter {

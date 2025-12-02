@@ -87,23 +87,15 @@ export class ChantierDetailsPage implements OnInit {
   }
 
   async uploadAndCreateRapport(blob: Blob, webPath: string) {
-    // 1. Ouvrir la modale de saisie
     const modal = await this.modalCtrl.create({
       component: NewRapportModalComponent,
-      // 👇 Attention : On utilise les nouveaux noms de props définis dans la modale
-      componentProps: { 
-        initialPhotoWebPath: webPath,
-        initialPhotoBlob: blob 
-      }
+      componentProps: { initialPhotoWebPath: webPath, initialPhotoBlob: blob }
     });
     
     await modal.present();
-
-    // 👇 CORRECTION ICI : On stocke le résultat dans une variable 'result'
     const result = await modal.onWillDismiss();
 
     if (result.role === 'confirm' && result.data) {
-      // Maintenant 'result' existe, on peut lire dedans
       const { data, gps, blobs } = result.data; 
       
       const newRapport: Rapport = {
@@ -111,18 +103,15 @@ export class ChantierDetailsPage implements OnInit {
         description: data.description,
         chantier_id: this.chantierId,
         niveau_urgence: data.niveau_urgence,
-        // On vérifie si le GPS est là
         latitude: gps ? gps.latitude : null,
         longitude: gps ? gps.longitude : null
       };
 
-      // 3. On lance le tunnel Multi-Photos
+      // 👇 APPEL DE LA NOUVELLE METHODE
+      // "blobs" est maintenant un tableau [Blob, Blob, ...]
       await this.api.addRapportWithMultiplePhotos(newRapport, blobs);
       
-      // Petit délai pour laisser le temps au stockage local
-      setTimeout(() => {
-        this.loadRapports();
-      }, 500);
+      setTimeout(() => { this.loadRapports(); }, 500);
     }
   }
 
