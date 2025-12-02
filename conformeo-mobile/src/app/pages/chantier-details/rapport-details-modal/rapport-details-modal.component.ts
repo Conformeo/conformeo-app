@@ -8,6 +8,7 @@ import { addIcons } from 'ionicons';
 import { mapOutline, closeOutline, timeOutline, alertCircleOutline, imagesOutline } from 'ionicons/icons';
 // Attention au chemin d'import, adapte-le si nécessaire selon ta structure
 import { Rapport } from '../../../services/api';
+import { ImageViewerModalComponent } from '../image-viewer-modal/image-viewer-modal.component';
 
 @Component({
   selector: 'app-rapport-details-modal',
@@ -28,7 +29,7 @@ import { Rapport } from '../../../services/api';
       <div class="gallery-scroller">
         
         <ng-container *ngFor="let img of rapport.images">
-           <img [src]="getFullUrl(img.url)" class="gallery-img" />
+           <img [src]="getFullUrl(img.url)" class="gallery-img" (click)="zoomImage(img.url)" />
         </ng-container>
 
         <ng-container *ngIf="(!rapport.images || rapport.images.length === 0) && rapport.photo_url">
@@ -193,5 +194,14 @@ export class RapportDetailsModalComponent {
       const url = `https://www.google.com/maps/search/?api=1&query=${this.rapport.latitude},${this.rapport.longitude}`;
       window.open(url, '_system');
     }
+  }
+
+  async zoomImage(url: string) {
+    const modal = await this.modalCtrl.create({
+      component: ImageViewerModalComponent,
+      componentProps: { imageUrl: this.getFullUrl(url) },
+      cssClass: 'transparent-modal' // Pour une animation fluide
+    });
+    modal.present();
   }
 }
