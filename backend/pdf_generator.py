@@ -6,43 +6,32 @@ from PIL import Image, ImageOps
 import os
 import requests
 from io import BytesIO
+import json # Pour lire les données JSON des inspections
 
 def get_optimized_image(path_or_url):
-    """
-    Télécharge une image optimisée (redimensionnée) pour économiser la RAM.
-    """
+    """Télécharge une image optimisée (redimensionnée) pour économiser la RAM."""
     try:
-        # CAS 1 : URL Cloudinary (Optimisation Serveur)
         if path_or_url.startswith("http"):
-            # Si c'est du Cloudinary, on injecte des paramètres de redimensionnement
-            # w_800 : Largeur 800px (suffisant pour PDF)
-            # q_auto : Qualité auto
-            # f_jpg : Force le format JPG (plus léger que PNG)
             optimized_url = path_or_url
             if "cloudinary.com" in path_or_url and "/upload/" in path_or_url:
                 optimized_url = path_or_url.replace("/upload/", "/upload/w_800,q_auto,f_jpg/")
             
-            # On télécharge l'image légère (flux streaming pour ne pas saturer la RAM)
             response = requests.get(optimized_url, stream=True)
             if response.status_code == 200:
                 img = Image.open(BytesIO(response.content))
                 return img
-        
-        # CAS 2 : Fichier Local (Logo, etc.)
         else:
             clean_path = path_or_url.replace("/static/", "")
             possible_paths = [os.path.join("uploads", clean_path), clean_path]
-            
             for p in possible_paths:
                 if os.path.exists(p):
                     return Image.open(p)
-                    
     except Exception as e:
         print(f"Erreur chargement image optimisée ({path_or_url}): {e}")
-    
     return None
 
-def generate_pdf(chantier, rapports, output_path):
+# 👇 ON AJOUTE L'ARGUMENT 'inspections'
+def generate_pdf(chantier, rapports, inspections, output_path):
     c = canvas.Canvas(output_path, pagesize=A4)
     width, height = A4
     
@@ -50,10 +39,9 @@ def generate_pdf(chantier, rapports, output_path):
     MARGE_X = 2 * cm
     MARGE_BAS = 3 * cm
     DEPART_HAUT = height - 3 * cm
-    ESPACE_LIGNE = 0.5 * cm
-    HAUTEUR_IMAGE = 6 * cm # Hauteur fixe pour les photos
+    HAUTEUR_IMAGE = 6 * cm 
     
-    # --- EN-TÊTE (LOGO + INFOS) ---
+    # === 1. EN-TÊTE ===
     logo_img = get_optimized_image("logo.png")
     if logo_img:
         try:
@@ -78,75 +66,117 @@ def generate_pdf(chantier, rapports, output_path):
     
     y_position = height - 8 * cm
     
-    # --- BOUCLE SUR LES RAPPORTS ---
-    for rapport in rapports:
-        
-        # 1. Calcul hauteur nécessaire pour le TEXTE
-        hauteur_texte = 2 * cm
-        
-        # 2. Récupération de la liste des images (V2 ou V1)
-        liste_images = []
-        
-        # Si c'est la V2 (liste d'objets images)
-        if hasattr(rapport, 'images') and rapport.images:
-            for img_obj in rapport.images:
-                liste_images.append(img_obj.url)
-        # Fallback V1 (si pas de liste, on regarde photo_url)
-        elif rapport.photo_url:
-            liste_images.append(rapport.photo_url)
+    # === 2. JOURNAL PHOTO ===
+    if rapports:
+        c.setFont("Helvetica-Bold", 16)
+        c.drawString(MARGE_X, y_position, "Journal de Bord")
+        y_position -= 1 * cm
 
-        # 3. Saut de page préventif pour le TITRE
-        if y_position - hauteur_texte < MARGE_BAS:
-            c.showPage()
-            y_position = DEPART_HAUT
+        for rapport in rapports:
+            hauteur_texte = 2 * cm
+            liste_images = []
+            
+            if hasattr(rapport, 'images') and rapport.images:
+                for img_obj in rapport.images:
+                    liste_images.append(img_obj.url)
+            elif rapport.photo_url:
+                liste_images.append(rapport.photo_url)
 
-        # 4. Dessin du TITRE et DESCRIPTION
-        c.setFont("Helvetica-Bold", 12)
-        c.drawString(MARGE_X, y_position, f"• {rapport.titre}")
-        y_position -= 0.6 * cm
-        
-        c.setFont("Helvetica", 10)
-        # Petit hack pour éviter que la description sorte de la page (tronquer si trop long pour ce MVP)
-        desc = (rapport.description[:90] + '...') if len(rapport.description) > 90 else rapport.description
-        c.drawString(MARGE_X + 0.5*cm, y_position, f"Note: {desc}")
-        y_position -= 1 * cm # Espace après le texte
-
-        # 5. BOUCLE SUR LES IMAGES DU RAPPORT
-        for img_url in liste_images:
-            # Saut de page si pas assez de place pour UNE image
-            if y_position - HAUTEUR_IMAGE < MARGE_BAS:
+            if y_position - hauteur_texte < MARGE_BAS:
                 c.showPage()
                 y_position = DEPART_HAUT
-            
-            # Téléchargement et traitement image
-            pil_image = get_optimized_image(img_url)
-            
-            if pil_image:
-                try:
-                    pil_image = ImageOps.exif_transpose(pil_image)
-                    rl_image = ImageReader(pil_image)
-                    
-                    # On dessine
-                    c.drawImage(rl_image, MARGE_X + 0.5*cm, y_position - HAUTEUR_IMAGE, width=8*cm, height=HAUTEUR_IMAGE, preserveAspectRatio=True)
-                    
-                    # On libère la mémoire immédiatement (Important pour Render !)
-                    pil_image.close()
-                    del pil_image
-                    
-                except:
-                    c.drawString(MARGE_X, y_position - 2*cm, "[Erreur Image]")
-            
-            y_position -= (HAUTEUR_IMAGE + 0.5*cm) # On descend pour la prochaine image ou rapport
 
-        # Espace entre deux rapports
-        y_position -= 0.5 * cm
+            c.setFont("Helvetica-Bold", 12)
+            c.drawString(MARGE_X, y_position, f"• {rapport.titre}")
+            y_position -= 0.6 * cm
+            
+            c.setFont("Helvetica", 10)
+            desc = (rapport.description[:90] + '...') if len(rapport.description) > 90 else rapport.description
+            c.drawString(MARGE_X + 0.5*cm, y_position, f"Note: {desc}")
+            y_position -= 1 * cm 
 
-    # --- SIGNATURE ---
-    if y_position < 4 * cm:
+            for img_url in liste_images:
+                if y_position - HAUTEUR_IMAGE < MARGE_BAS:
+                    c.showPage()
+                    y_position = DEPART_HAUT
+                
+                pil_image = get_optimized_image(img_url)
+                if pil_image:
+                    try:
+                        pil_image = ImageOps.exif_transpose(pil_image)
+                        rl_image = ImageReader(pil_image)
+                        c.drawImage(rl_image, MARGE_X + 0.5*cm, y_position - HAUTEUR_IMAGE, width=8*cm, height=HAUTEUR_IMAGE, preserveAspectRatio=True)
+                        pil_image.close()
+                    except: pass
+                
+                y_position -= (HAUTEUR_IMAGE + 0.5*cm)
+
+            y_position -= 0.5 * cm
+
+    # === 3. AUDITS QHSE (NOUVEAU) ===
+    if inspections:
+        # Saut de page si nécessaire avant de commencer la section
+        if y_position < 6 * cm:
+            c.showPage()
+            y_position = DEPART_HAUT
+        
+        y_position -= 1 * cm
+        c.setFont("Helvetica-Bold", 16)
+        c.setFillColorRGB(0, 0.4, 0) # Vert foncé pour QHSE
+        c.drawString(MARGE_X, y_position, "Contrôles QHSE")
+        c.setFillColorRGB(0, 0, 0)
+        y_position -= 1 * cm
+
+        for insp in inspections:
+            if y_position < 4 * cm:
+                c.showPage()
+                y_position = DEPART_HAUT
+
+            # Titre de l'audit
+            c.setFont("Helvetica-Bold", 12)
+            c.drawString(MARGE_X, y_position, f"📋 {insp.titre} ({insp.type})")
+            y_position -= 0.8 * cm
+
+            # On parse les données JSON
+            questions = insp.data if isinstance(insp.data, list) else []
+            
+            for item in questions:
+                if y_position < MARGE_BAS:
+                    c.showPage()
+                    y_position = DEPART_HAUT
+                
+                q_text = item.get('q', 'Question')
+                status = item.get('status', 'NA')
+                
+                # Question
+                c.setFont("Helvetica", 10)
+                c.drawString(MARGE_X + 1*cm, y_position, f"- {q_text}")
+                
+                # Statut (Coloré)
+                if status == 'OK':
+                    c.setFillColorRGB(0, 0.6, 0) # Vert
+                    c.drawString(width - 4*cm, y_position, "CONFORME")
+                elif status == 'NOK':
+                    c.setFillColorRGB(0.8, 0, 0) # Rouge
+                    c.setFont("Helvetica-Bold", 10)
+                    c.drawString(width - 4*cm, y_position, "NON CONFORME")
+                else:
+                    c.setFillColorRGB(0.5, 0.5, 0.5) # Gris
+                    c.drawString(width - 4*cm, y_position, "N/A")
+                
+                c.setFillColorRGB(0, 0, 0) # Retour noir
+                c.setFont("Helvetica", 10)
+                y_position -= 0.6 * cm
+            
+            y_position -= 0.5 * cm # Espace entre audits
+
+    # === 4. SIGNATURE ===
+    if y_position < 5 * cm:
         c.showPage()
-        y_position = DEPART_HAUT
+        y_position = height - 3 * cm
 
     y_position -= 1 * cm
+    c.setLineWidth(1)
     c.line(MARGE_X, y_position, width - MARGE_X, y_position)
     y_position -= 1 * cm
     

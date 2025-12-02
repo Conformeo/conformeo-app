@@ -1,0 +1,46 @@
+<ion-header>
+  <ion-toolbar color="primary">
+    <ion-buttons slot="start"><ion-back-button defaultHref="/home"></ion-back-button></ion-buttons>
+    <ion-title>Contrôle QHSE</ion-title>
+    <ion-buttons slot="end">
+      <ion-button (click)="save()">
+        <ion-icon name="save" slot="start"></ion-icon>
+        Sauver
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+
+  <ion-segment [(ngModel)]="templateType" (ionChange)="loadTemplate($event.detail.value!.toString())" mode="ios" style="margin-bottom: 20px;">
+    <ion-segment-button value="Securite"><ion-label>Sécurité</ion-label></ion-segment-button>
+    <ion-segment-button value="Environnement"><ion-label>Environnement</ion-label></ion-segment-button>
+  </ion-segment>
+
+  <ion-list lines="full">
+    <div *ngFor="let item of currentQuestions; let i = index" class="question-block">
+      
+      <p class="question-text">{{ item.q }}</p>
+      
+      <div class="buttons-row">
+        <div class="choice-btn" [class.selected]="item.status === 'OK'" (click)="setStatus(i, 'OK')">
+          <ion-icon name="checkmark-circle" color="success"></ion-icon>
+          <span>Conforme</span>
+        </div>
+
+        <div class="choice-btn" [class.selected]="item.status === 'NOK'" (click)="setStatus(i, 'NOK')">
+          <ion-icon name="close-circle" color="danger"></ion-icon>
+          <span>Non Conforme</span>
+        </div>
+
+        <div class="choice-btn" [class.selected]="item.status === 'NA'" (click)="setStatus(i, 'NA')">
+          <ion-icon name="ban" color="medium"></ion-icon>
+          <span>N/A</span>
+        </div>
+      </div>
+
+    </div>
+  </ion-list>
+
+</ion-content>

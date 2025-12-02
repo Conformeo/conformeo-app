@@ -32,4 +32,12 @@ export const routes: Routes = [
     path: 'smart-scan/:id', 
     loadComponent: () => import('./pages/smart-scan/smart-scan.page').then( m => m.SmartScanPage)
   },
+  {
+    path: 'qhse-form',
+    loadComponent: () => import('./pages/qhse-form/qhse-form.page').then( m => m.QhseFormPage)
+  },
+  {
+    path: 'qhse-form/:id',
+    loadComponent: () => import('./pages/qhse-form/qhse-form.page').then( m => m.QhseFormPage)
+  },
 ];

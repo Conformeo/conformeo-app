@@ -179,10 +179,15 @@ def read_rapports_chantier(chantier_id: int, db: Session = Depends(get_db)):
     rapports = db.query(models.Rapport).filter(models.Rapport.chantier_id == chantier_id).all()
     return rapports
 
+# ... (imports)
+
 @app.get("/chantiers/{chantier_id}/pdf")
 def download_pdf(chantier_id: int, db: Session = Depends(get_db)):
     chantier = db.query(models.Chantier).filter(models.Chantier.id == chantier_id).first()
     rapports = db.query(models.Rapport).filter(models.Rapport.chantier_id == chantier_id).all()
+    
+    # 👇 NOUVEAU : On récupère aussi les inspections
+    inspections = db.query(models.Inspection).filter(models.Inspection.chantier_id == chantier_id).all()
 
     if not chantier:
         raise HTTPException(status_code=404, detail="Chantier introuvable")
@@ -190,10 +195,10 @@ def download_pdf(chantier_id: int, db: Session = Depends(get_db)):
     filename = f"Rapport_{chantier.id}.pdf"
     file_path = f"uploads/{filename}"
 
-    pdf_generator.generate_pdf(chantier, rapports, file_path)
+    # 👇 ON PASSE 'inspections' A LA FONCTION
+    pdf_generator.generate_pdf(chantier, rapports, inspections, file_path)
 
     return FileResponse(path=file_path, filename=filename, media_type='application/pdf')
-
 
 # --- DASHBOARD ---
 

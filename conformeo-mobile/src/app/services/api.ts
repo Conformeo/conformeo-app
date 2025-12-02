@@ -48,6 +48,16 @@ export interface Materiel {
   chantier_id?: number | null;
 }
 
+export interface Inspection {
+  id?: number;
+  titre: string;
+  type: string; // 'Securite', 'Qualite', 'Environnement'
+  data: any[]; // [{ question: string, status: 'OK'|'NOK'|'NA', comment: string }]
+  chantier_id: number;
+  createur: string;
+  date_creation?: string;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -339,5 +349,15 @@ export class ApiService {
     let url = `${this.apiUrl}/materiels/${materielId}/transfert`;
     if (chantierId) url += `?chantier_id=${chantierId}`;
     return this.http.put(url, {});
+  }
+
+
+  getInspections(chantierId: number): Observable<Inspection[]> {
+    // Tu peux ajouter le cache offline ici si tu veux (comme pour les rapports)
+    return this.http.get<Inspection[]>(`${this.apiUrl}/chantiers/${chantierId}/inspections`);
+  }
+
+  createInspection(insp: Inspection): Observable<Inspection> {
+    return this.http.post<Inspection>(`${this.apiUrl}/inspections`, insp);
   }
 }
