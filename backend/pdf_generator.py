@@ -166,7 +166,19 @@ def generate_pdf(chantier, rapports, inspections, output_path):
         for insp in inspections:
             check_space(3*cm)
             c.setFont("Helvetica-Bold", 12)
-            c.drawString(margin, y, f"📋 {insp.titre or 'Audit'}")
+            
+            # 👇 NOUVEAU : Formatage de la date
+            date_audit = ""
+            if insp.date_creation:
+                if isinstance(insp.date_creation, str): 
+                    date_audit = insp.date_creation[:10] # Prend YYYY-MM-DD
+                elif isinstance(insp.date_creation, datetime): 
+                    date_audit = insp.date_creation.strftime('%d/%m/%Y')
+            
+            # 👇 TITRE AVEC DATE
+            titre_complet = f"📋 {insp.titre} (du {date_audit})"
+            c.drawString(margin, y, titre_complet)
+            
             y -= 0.8*cm
             
             questions = insp.data if isinstance(insp.data, list) else []

@@ -120,6 +120,7 @@ export class PpspsFormPage implements OnInit {
     this.api.createPPSPS(ppsps).subscribe({
       next: () => {
         alert("PPSPS enregistré !");
+        this.api.needsRefresh = true; // Envoie le signal de refresh
         this.navCtrl.back();
       },
       error: () => alert("Erreur sauvegarde")
