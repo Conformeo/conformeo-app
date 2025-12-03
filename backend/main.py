@@ -160,19 +160,27 @@ def read_rapports_chantier(chantier_id: int, db: Session = Depends(get_db)):
 
 @app.get("/chantiers/{chantier_id}/pdf")
 def download_pdf(chantier_id: int, db: Session = Depends(get_db)):
+    # 1. Récupérer le chantier
     chantier = db.query(models.Chantier).filter(models.Chantier.id == chantier_id).first()
-    rapports = db.query(models.Rapport).filter(models.Rapport.chantier_id == chantier_id).all()
-    inspections = db.query(models.Inspection).filter(models.Inspection.chantier_id == chantier_id).all()
-
     if not chantier:
         raise HTTPException(status_code=404, detail="Chantier introuvable")
 
+    # 2. Récupérer les données liées
+    rapports = db.query(models.Rapport).filter(models.Rapport.chantier_id == chantier_id).all()
+    
+    # 👇 C'EST ICI QUE CA MANQUAIT : On récupère les inspections
+    inspections = db.query(models.Inspection).filter(models.Inspection.chantier_id == chantier_id).all()
+
+    # 3. Préparer le fichier
     filename = f"Rapport_{chantier.id}.pdf"
     file_path = f"uploads/{filename}"
 
+    # 4. Générer le PDF (Avec les 4 arguments !)
+    # 👇 AJOUT DE 'inspections'
     pdf_generator.generate_pdf(chantier, rapports, inspections, file_path)
-    return FileResponse(path=file_path, filename=filename, media_type='application/pdf')
 
+    return FileResponse(path=file_path, filename=filename, media_type='application/pdf')
+    
 # ==========================================
 # 4. MATÉRIEL
 # ==========================================
