@@ -18,7 +18,7 @@ import {
 } from 'ionicons/icons';
 // Imports Standalone
 import { IonBackButton, IonButtons } from '@ionic/angular/standalone';
-
+import { PicModalComponent } from './pic-modal/pic-modal.component';
 // Import des modales
 import { NewRapportModalComponent } from './new-rapport-modal/new-rapport-modal.component';
 import { RapportDetailsModalComponent } from './rapport-details-modal/rapport-details-modal.component';
@@ -180,6 +180,14 @@ export class ChantierDetailsPage implements OnInit {
 
   downloadDOE() {
     this.api.downloadDOE(this.chantierId);
+  }
+
+  async openPIC() {
+    const modal = await this.modalCtrl.create({
+      component: PicModalComponent,
+      componentProps: { chantierId: this.chantierId }
+    });
+    modal.present();
   }
 
   async openSignature() {

@@ -71,6 +71,14 @@ export interface PPSPS {
   date_creation?: string;
 }
 
+export interface PIC {
+  id?: number;
+  chantier_id: number;
+  background_url: string;
+  final_url?: string;
+  elements_data: any[]; // { type: string, x: number, y: number, label: string }
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -380,6 +388,14 @@ export class ApiService {
 
   getPPSPSList(chantierId: number): Observable<PPSPS[]> {
     return this.http.get<PPSPS[]>(`${this.apiUrl}/chantiers/${chantierId}/ppsps`);
+  }
+
+  savePIC(pic: PIC): Observable<PIC> {
+    return this.http.post<PIC>(`${this.apiUrl}/pics`, pic);
+  }
+
+  getPIC(chantierId: number): Observable<PIC> {
+    return this.http.get<PIC>(`${this.apiUrl}/chantiers/${chantierId}/pic`);
   }
 
   // Export DOE (Dossier des Ouvrages Exécutés) en ZIP
