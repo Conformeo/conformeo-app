@@ -2,6 +2,10 @@ import os
 import shutil
 from uuid import uuid4
 from typing import List, Optional
+from dotenv import load_dotenv
+
+# Chargement des variables d'environnement locales (.env) si présentes
+load_dotenv()
 
 import cloudinary
 import cloudinary.uploader
@@ -25,37 +29,40 @@ app = FastAPI(title="Conforméo API")
 
 # --- CONFIGURATION CLOUDINARY ---
 cloudinary_config = {
-  "cloud_name": os.getenv("CLOUDINARY_CLOUD_NAME"),
-  "api_key": os.getenv("CLOUDINARY_API_KEY"),
-  "api_secret": os.getenv("CLOUDINARY_API_SECRET"),
-  "secure": True
+    "cloud_name": os.getenv("CLOUDINARY_CLOUD_NAME"),
+    "api_key": os.getenv("CLOUDINARY_API_KEY"),
+    "api_secret": os.getenv("CLOUDINARY_API_SECRET"),
+    "secure": True,
 }
 
-if cloudinary_config["cloud_name"] and cloudinary_config["api_key"]:
-    cloudinary.config(**cloudinary_config)
-    print(f"✅ Cloudinary connecté sur le cloud: {cloudinary_config['cloud_name']}")
-else:
-    print("⚠️ ATTENTION : Clés Cloudinary manquantes !")
+# Vérification et application de la configuration
+required_keys = ["cloud_name", "api_key", "api_secret"]
+missing = [k for k in required_keys if not cloudinary_config.get(k)]
 
-# Dossier uploads local
+if missing:
+    print(f"⚠️ Cloudinary non configuré correctement. Clés manquantes : {', '.join(missing)}")
+else:
+    cloudinary.config(**cloudinary_config)
+    print(f"✅ Cloudinary configuré pour le cloud: {cloudinary_config['cloud_name']}")
+
+# --- CONFIGURATION FICHIERS LOCAUX ---
 os.makedirs("uploads", exist_ok=True)
 app.mount("/static", StaticFiles(directory="uploads"), name="static")
 
-# --- CORS ---
-origins = [
-    "http://localhost:8100",
-    "http://localhost:4200",
-    "https://conformeo-app.vercel.app",
-    "*"
-]
-
+# --- CORS (Autorisations larges pour le dev) ---
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=["*"],      # Autorise tout le monde
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Petit endpoint de test
+@app.get("/")
+def root():
+    return {"message": "Conformeo API is running 🚀", "cors": "enabled"}
+
 
 # ==========================================
 # 1. UTILISATEURS & AUTH
@@ -65,7 +72,7 @@ app.add_middleware(
 def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     db_user = db.query(models.User).filter(models.User.email == user.email).first()
     if db_user:
-        raise HTTPException(status_code=400, detail="Email déjà utilisé")
+        raise HTTPException(status_code=400, detail="Cet email est déjà utilisé")
     
     hashed_pwd = security.get_password_hash(user.password)
     new_user = models.User(email=user.email, hashed_password=hashed_pwd, role=user.role)
@@ -78,10 +85,15 @@ def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
 def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     user = db.query(models.User).filter(models.User.email == form_data.username).first()
     if not user or not security.verify_password(form_data.password, user.hashed_password):
-        raise HTTPException(status_code=401, detail="Identifiants incorrects")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Email ou mot de passe incorrect",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     
     access_token = security.create_access_token(data={"sub": user.email, "role": user.role})
     return {"access_token": access_token, "token_type": "bearer"}
+
 
 # ==========================================
 # 2. CHANTIERS
@@ -104,15 +116,6 @@ def create_chantier(chantier: schemas.ChantierCreate, db: Session = Depends(get_
 def read_chantiers(db: Session = Depends(get_db)):
     return db.query(models.Chantier).all()
 
-@app.put("/chantiers/{chantier_id}/signature")
-def sign_chantier(chantier_id: int, signature_url: str, db: Session = Depends(get_db)):
-    chantier = db.query(models.Chantier).filter(models.Chantier.id == chantier_id).first()
-    if not chantier:
-        raise HTTPException(status_code=404, detail="Chantier introuvable")
-    
-    chantier.signature_url = signature_url
-    db.commit()
-    return {"status": "signed", "url": signature_url}
 
 # ==========================================
 # 3. RAPPORTS & PHOTOS
@@ -120,16 +123,17 @@ def sign_chantier(chantier_id: int, signature_url: str, db: Session = Depends(ge
 
 @app.post("/upload")
 async def upload_image(file: UploadFile = File(...)):
+    """Envoie l'image sur Cloudinary et renvoie l'URL sécurisée."""
     try:
         result = cloudinary.uploader.upload(file.file, folder="conformeo_chantiers")
         return {"url": result.get("secure_url")}
     except Exception as e:
-        print(f"Erreur Upload: {e}")
-        raise HTTPException(status_code=500, detail=f"Erreur Cloudinary: {str(e)}")
+        print(f"Erreur Upload Cloudinary: {e}")
+        raise HTTPException(status_code=500, detail=f"Cloudinary error: {str(e)}")
 
 @app.post("/rapports", response_model=schemas.RapportOut)
 def create_rapport(rapport: schemas.RapportCreate, db: Session = Depends(get_db)):
-    # Création du rapport parent
+    # 1. Création du rapport parent
     new_rapport = models.Rapport(
         titre=rapport.titre,
         description=rapport.description,
@@ -143,7 +147,7 @@ def create_rapport(rapport: schemas.RapportCreate, db: Session = Depends(get_db)
     db.commit()
     db.refresh(new_rapport)
 
-    # Création des images liées (Table rapport_images)
+    # 2. Création des images enfants
     if rapport.image_urls:
         for url in rapport.image_urls:
             new_img = models.RapportImage(url=url, rapport_id=new_rapport.id)
@@ -154,36 +158,47 @@ def create_rapport(rapport: schemas.RapportCreate, db: Session = Depends(get_db)
         
     return new_rapport
 
+@app.get("/rapports", response_model=List[schemas.RapportOut])
+def read_all_rapports(db: Session = Depends(get_db)):
+    """Permet de voir tous les rapports via le navigateur"""
+    return db.query(models.Rapport).all()
+
 @app.get("/chantiers/{chantier_id}/rapports", response_model=List[schemas.RapportOut])
 def read_rapports_chantier(chantier_id: int, db: Session = Depends(get_db)):
     return db.query(models.Rapport).filter(models.Rapport.chantier_id == chantier_id).all()
 
 @app.get("/chantiers/{chantier_id}/pdf")
 def download_pdf(chantier_id: int, db: Session = Depends(get_db)):
-    # 1. Récupérer le chantier
     chantier = db.query(models.Chantier).filter(models.Chantier.id == chantier_id).first()
     if not chantier:
         raise HTTPException(status_code=404, detail="Chantier introuvable")
 
-    # 2. Récupérer les données liées
     rapports = db.query(models.Rapport).filter(models.Rapport.chantier_id == chantier_id).all()
     
-    # 👇 C'EST ICI QUE CA MANQUAIT : On récupère les inspections
+    # 👇 On récupère les inspections pour les inclure dans le rapport
     inspections = db.query(models.Inspection).filter(models.Inspection.chantier_id == chantier_id).all()
 
-    # 3. Préparer le fichier
     filename = f"Rapport_{chantier.id}.pdf"
     file_path = f"uploads/{filename}"
 
-    # 4. Générer le PDF (Avec les 4 arguments !)
-    # 👇 AJOUT DE 'inspections'
+    # 👇 On passe 'inspections' à la fonction
     pdf_generator.generate_pdf(chantier, rapports, inspections, file_path)
 
     return FileResponse(path=file_path, filename=filename, media_type='application/pdf')
-    
+
+
 # ==========================================
-# 4. MATÉRIEL
+# 4. DASHBOARD & MATERIEL
 # ==========================================
+
+@app.get("/dashboard/stats")
+def get_stats(db: Session = Depends(get_db)):
+    return {
+        "total_chantiers": db.query(models.Chantier).count(),
+        "actifs": db.query(models.Chantier).filter(models.Chantier.est_actif == True).count(),
+        "rapports": db.query(models.Rapport).count(),
+        "alertes": db.query(models.Rapport).count()
+    }
 
 @app.post("/materiels", response_model=schemas.MaterielOut)
 def create_materiel(mat: schemas.MaterielCreate, db: Session = Depends(get_db)):
@@ -211,8 +226,24 @@ def transfer_materiel(materiel_id: int, chantier_id: Optional[int] = None, db: S
     db.commit()
     return {"status": "success"}
 
+
 # ==========================================
-# 5. QHSE (INSPECTIONS)
+# 5. SIGNATURE
+# ==========================================
+
+@app.put("/chantiers/{chantier_id}/signature")
+def sign_chantier(chantier_id: int, signature_url: str, db: Session = Depends(get_db)):
+    chantier = db.query(models.Chantier).filter(models.Chantier.id == chantier_id).first()
+    if not chantier:
+        raise HTTPException(status_code=404, detail="Chantier introuvable")
+    
+    chantier.signature_url = signature_url
+    db.commit()
+    return {"status": "signed", "url": signature_url}
+
+
+# ==========================================
+# 6. QHSE (INSPECTIONS)
 # ==========================================
 
 @app.post("/inspections", response_model=schemas.InspectionOut)
@@ -233,8 +264,9 @@ def create_inspection(inspection: schemas.InspectionCreate, db: Session = Depend
 def read_inspections(chantier_id: int, db: Session = Depends(get_db)):
     return db.query(models.Inspection).filter(models.Inspection.chantier_id == chantier_id).all()
 
+
 # ==========================================
-# 6. PPSPS (NOUVEAU MODULE COMPLET)
+# 7. PPSPS
 # ==========================================
 
 @app.post("/ppsps", response_model=schemas.PPSPSOut)
@@ -273,27 +305,24 @@ def download_ppsps_pdf(ppsps_id: int, db: Session = Depends(get_db)):
     pdf_generator.generate_ppsps_pdf(chantier, ppsps, file_path)
     return FileResponse(path=file_path, filename=filename, media_type='application/pdf')
 
-# ==========================================
-# 7. ROUTES DE MIGRATION & MAINTENANCE
-# ==========================================
 
-@app.get("/dashboard/stats")
-def get_stats(db: Session = Depends(get_db)):
-    return {
-        "total_chantiers": db.query(models.Chantier).count(),
-        "actifs": db.query(models.Chantier).filter(models.Chantier.est_actif == True).count(),
-        "rapports": db.query(models.Rapport).count(),
-        "alertes": db.query(models.Rapport).count()
-    }
+# ==========================================
+# 8. MIGRATIONS & MAINTENANCE
+# ==========================================
 
 @app.get("/reset_data")
 def reset_data(db: Session = Depends(get_db)):
     try:
+        # On supprime dans l'ordre pour respecter les clés étrangères
+        db.query(models.RapportImage).delete() # D'abord les images
         db.query(models.Rapport).delete()
         db.query(models.Materiel).delete()
+        db.query(models.Inspection).delete()
+        db.query(models.PPSPS).delete()
         db.query(models.Chantier).delete()
+        
         db.commit()
-        return {"message": "Base nettoyée"}
+        return {"message": "Base de données entièrement nettoyée"}
     except Exception as e:
         db.rollback()
         return {"error": str(e)}
@@ -311,14 +340,9 @@ def migrate_db_v5(db: Session = Depends(get_db)):
     except Exception as e:
         return {"status": "Erreur", "details": str(e)}
 
-# --- ROUTE DE RÉPARATION FORCEE ---
 @app.get("/force_fix_ppsps")
 def force_fix_ppsps(db: Session = Depends(get_db)):
     try:
-        # On tente d'ajouter les colonnes manquantes une par une
-        # Si une colonne existe déjà, PostgreSQL renverra une erreur qu'on attrape,
-        # mais on continue pour les autres.
-        
         commands = [
             "ALTER TABLE ppsps ADD COLUMN responsable_chantier VARCHAR",
             "ALTER TABLE ppsps ADD COLUMN duree_travaux VARCHAR",
@@ -326,9 +350,7 @@ def force_fix_ppsps(db: Session = Depends(get_db)):
             "ALTER TABLE ppsps ADD COLUMN installations_data JSON",
             "ALTER TABLE ppsps ADD COLUMN taches_data JSON"
         ]
-        
         results = []
-        
         for cmd in commands:
             try:
                 db.execute(text(cmd))
@@ -336,9 +358,8 @@ def force_fix_ppsps(db: Session = Depends(get_db)):
                 results.append(f"Succès: {cmd}")
             except Exception as e:
                 db.rollback()
-                results.append(f"Ignoré (existe déjà ?): {cmd} -> {str(e)}")
+                results.append(f"Ignoré: {str(e)}")
                 
         return {"status": "Terminé", "details": results}
-
     except Exception as e:
         return {"status": "Erreur critique", "details": str(e)}
