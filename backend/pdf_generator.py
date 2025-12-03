@@ -6,142 +6,244 @@ from PIL import Image, ImageOps
 import os
 import requests
 from io import BytesIO
-from datetime import datetime  # <--- L'IMPORT QUI MANQUAIT !
+from datetime import datetime
 
 def get_optimized_image(path_or_url):
-    """
-    Télécharge une image optimisée (redimensionnée) pour économiser la RAM.
-    """
+    """Télécharge une image optimisée (redimensionnée) pour économiser la RAM."""
     try:
-        # CAS 1 : URL Cloudinary (Optimisation Serveur)
+        # CAS 1 : URL Cloudinary
         if path_or_url.startswith("http"):
-            # Si c'est du Cloudinary, on injecte des paramètres de redimensionnement
             optimized_url = path_or_url
+            # On ajoute les paramètres de redimensionnement Cloudinary
             if "cloudinary.com" in path_or_url and "/upload/" in path_or_url:
-                optimized_url = path_or_url.replace("/upload/", "/upload/w_800,q_auto,f_jpg/")
+                # w_1000 pour une bonne qualité sur A4
+                optimized_url = path_or_url.replace("/upload/", "/upload/w_1000,q_auto,f_jpg/")
             
-            # On télécharge l'image légère
             response = requests.get(optimized_url, stream=True)
             if response.status_code == 200:
                 img = Image.open(BytesIO(response.content))
                 return img
         
-        # CAS 2 : Fichier Local (Logo, etc.)
+        # CAS 2 : Fichier Local
         else:
             clean_path = path_or_url.replace("/static/", "")
             possible_paths = [os.path.join("uploads", clean_path), clean_path]
-            
             for p in possible_paths:
                 if os.path.exists(p):
                     return Image.open(p)
-                    
     except Exception as e:
-        print(f"Erreur chargement image optimisée ({path_or_url}): {e}")
-    
+        print(f"Erreur image ({path_or_url}): {e}")
     return None
 
-def generate_pdf(chantier, rapports, output_path):
-    """Génère le rapport de chantier classique (Journal de bord)"""
-    c = canvas.Canvas(output_path, pagesize=A4)
+def draw_cover_page(c, chantier, titre_principal, sous_titre):
+    """Dessine une page de garde commune et stylée"""
     width, height = A4
     
-    # --- CONSTANTES ---
-    MARGE_X = 2 * cm
-    MARGE_BAS = 3 * cm
-    DEPART_HAUT = height - 3 * cm
-    HAUTEUR_IMAGE = 6 * cm
+    # 1. Image de fond
+    cover_img = None
+    if chantier.cover_url:
+        cover_img = get_optimized_image(chantier.cover_url)
     
-    # --- EN-TÊTE ---
+    if cover_img:
+        try:
+            img_w, img_h = cover_img.size
+            aspect = img_h / float(img_w)
+            # On remplit toute la largeur
+            c.drawImage(ImageReader(cover_img), 0, 0, width=width, height=width*aspect, preserveAspectRatio=True)
+            # Voile noir
+            c.setFillColorRGB(0, 0, 0, 0.6)
+            c.rect(0, 0, width, height, fill=1, stroke=0)
+        except: pass
+    else:
+        c.setFillColorRGB(0.1, 0.2, 0.4) # Bleu pro par défaut
+        c.rect(0, 0, width, height, fill=1, stroke=0)
+
+    # 2. Logo (Fond blanc arrondi)
     logo_img = get_optimized_image("logo.png")
     if logo_img:
         try:
             rl_logo = ImageReader(logo_img)
-            c.drawImage(rl_logo, width - 7 * cm, height - 3.5 * cm, width=5*cm, height=2.5*cm, preserveAspectRatio=True, mask='auto')
+            c.setFillColorRGB(1, 1, 1)
+            c.roundRect(width/2 - 3*cm, height - 4*cm, 6*cm, 3*cm, 10, fill=1, stroke=0)
+            c.drawImage(rl_logo, width/2 - 2.5*cm, height - 3.8*cm, width=5*cm, height=2.5*cm, preserveAspectRatio=True, mask='auto')
         except: pass
 
+    # 3. Titres
+    c.setFillColorRGB(1, 1, 1) # Blanc
+    c.setFont("Helvetica-Bold", 32)
+    c.drawCentredString(width / 2, height / 2 + 1*cm, titre_principal)
+    
+    c.setFont("Helvetica", 16)
+    c.drawCentredString(width / 2, height / 2 - 0.5*cm, sous_titre)
+    
+    c.setLineWidth(2)
+    c.setStrokeColorRGB(1, 1, 1)
+    c.line(width/2 - 4*cm, height/2 - 1.5*cm, width/2 + 4*cm, height/2 - 1.5*cm)
+
+    # 4. Infos Chantier
     c.setFont("Helvetica-Bold", 22)
-    c.drawString(MARGE_X, height - 3 * cm, f"Rapport de Chantier")
+    c.drawCentredString(width / 2, height / 2 - 3*cm, chantier.nom)
     
-    c.setFont("Helvetica-Bold", 14)
-    c.setFillColorRGB(0.2, 0.2, 0.2)
-    c.drawString(MARGE_X, height - 4 * cm, f"{chantier.nom}")
-    c.setFillColorRGB(0, 0, 0)
+    c.setFont("Helvetica", 14)
+    c.drawCentredString(width / 2, height / 2 - 4*cm, chantier.adresse)
     
-    c.setFont("Helvetica", 11)
-    c.drawString(MARGE_X, height - 5 * cm, f"Client: {chantier.client}")
-    c.drawString(MARGE_X, height - 5.5 * cm, f"Adresse: {chantier.adresse}")
+    # 5. Date
+    c.setFont("Helvetica-Oblique", 10)
+    date_str = datetime.now().strftime('%d/%m/%Y')
+    c.drawCentredString(width / 2, 2*cm, f"Édité le {date_str}")
     
-    c.setLineWidth(1)
-    c.line(MARGE_X, height - 6.5 * cm, width - MARGE_X, height - 6.5 * cm)
-    
-    y_position = height - 8 * cm
-    
-    # --- RAPPORTS ---
-    for rapport in rapports:
-        hauteur_texte = 2 * cm
-        liste_images = []
-        
-        # Gestion V2 (Liste) et V1 (Unique)
-        if hasattr(rapport, 'images') and rapport.images:
-            for img_obj in rapport.images:
-                liste_images.append(img_obj.url)
-        elif hasattr(rapport, 'photo_url') and rapport.photo_url:
-            liste_images.append(rapport.photo_url)
+    c.showPage()
 
-        if y_position - hauteur_texte < MARGE_BAS:
+# ==========================================
+# 1. GENERATEUR JOURNAL DE BORD (PHOTOS)
+# ==========================================
+def generate_pdf(chantier, rapports, inspections, output_path):
+    c = canvas.Canvas(output_path, pagesize=A4)
+    width, height = A4
+    margin = 2 * cm
+    
+    # PAGE DE GARDE
+    draw_cover_page(c, chantier, "JOURNAL DE BORD", "Suivi & Avancement")
+
+    # SETUP PAGES SUIVANTES
+    y = height - 3 * cm
+
+    def check_page(espace_necessaire):
+        nonlocal y
+        if y < espace_necessaire:
             c.showPage()
-            y_position = DEPART_HAUT
+            y = height - 3 * cm
+            # Rappel titre
+            c.setFillColorRGB(0, 0, 0)
+            c.setFont("Helvetica-Oblique", 8)
+            c.drawString(margin, height - 1.5*cm, f"Journal - {chantier.nom}")
 
-        c.setFont("Helvetica-Bold", 12)
-        c.drawString(MARGE_X, y_position, f"• {rapport.titre}")
-        y_position -= 0.6 * cm
-        
-        c.setFont("Helvetica", 10)
-        desc = (rapport.description[:90] + '...') if len(rapport.description) > 90 else rapport.description
-        c.drawString(MARGE_X + 0.5*cm, y_position, f"Note: {desc}")
-        y_position -= 1 * cm 
+    # --- SECTION PHOTOS (Journal) ---
+    if rapports:
+        c.setFont("Helvetica-Bold", 16)
+        c.setFillColorRGB(0, 0.2, 0.5)
+        c.drawString(margin, y, "1. RELEVÉS PHOTOS")
+        c.setFillColorRGB(0, 0, 0)
+        y -= 1.5*cm
 
-        for img_url in liste_images:
-            if y_position - HAUTEUR_IMAGE < MARGE_BAS:
-                c.showPage()
-                y_position = DEPART_HAUT
+        for rapport in rapports:
+            # Récupération images (V1 + V2)
+            liste_images = []
+            if hasattr(rapport, 'images') and rapport.images:
+                for img_obj in rapport.images:
+                    liste_images.append(img_obj.url)
+            elif rapport.photo_url:
+                liste_images.append(rapport.photo_url)
+
+            # Titre du rapport
+            check_page(3*cm)
+            c.setFont("Helvetica-Bold", 12)
+            date_rap = rapport.date_creation.strftime('%d/%m %H:%M') if isinstance(rapport.date_creation, datetime) else ""
+            c.drawString(margin, y, f"📅 {date_rap} - {rapport.titre}")
+            y -= 0.6*cm
             
-            pil_image = get_optimized_image(img_url)
-            if pil_image:
-                try:
-                    pil_image = ImageOps.exif_transpose(pil_image)
-                    rl_image = ImageReader(pil_image)
-                    c.drawImage(rl_image, MARGE_X + 0.5*cm, y_position - HAUTEUR_IMAGE, width=8*cm, height=HAUTEUR_IMAGE, preserveAspectRatio=True)
-                    pil_image.close()
-                except:
-                    c.drawString(MARGE_X, y_position - 2*cm, "[Erreur Image]")
-            
-            y_position -= (HAUTEUR_IMAGE + 0.5*cm)
+            c.setFont("Helvetica", 10)
+            c.setFillColorRGB(0.3, 0.3, 0.3)
+            desc = rapport.description if rapport.description else "Aucune description"
+            c.drawString(margin, y, desc)
+            c.setFillColorRGB(0, 0, 0)
+            y -= 0.8*cm
 
-        y_position -= 0.5 * cm
+            # Images
+            for img_url in liste_images:
+                check_page(8*cm) # Besoin de 8cm pour une photo
+                
+                pil_image = get_optimized_image(img_url)
+                if pil_image:
+                    try:
+                        pil_image = ImageOps.exif_transpose(pil_image)
+                        rl_image = ImageReader(pil_image)
+                        
+                        # Image centrée large (12cm de large)
+                        img_w_pdf = 12*cm
+                        img_h_pdf = 7*cm # Max height
+                        
+                        # Centrage
+                        x_img = (width - img_w_pdf) / 2
+                        
+                        c.drawImage(rl_image, x_img, y - img_h_pdf, width=img_w_pdf, height=img_h_pdf, preserveAspectRatio=True)
+                        pil_image.close()
+                        y -= (img_h_pdf + 0.5*cm)
+                    except:
+                        c.drawString(margin, y, "[Image introuvable]")
+                        y -= 1*cm
+            
+            y -= 0.5*cm
+            c.setLineWidth(0.5)
+            c.setStrokeColorRGB(0.8, 0.8, 0.8)
+            c.line(margin, y, width-margin, y) # Séparateur gris
+            c.setStrokeColorRGB(0, 0, 0)
+            y -= 1*cm
+
+    # --- SECTION QHSE (Si présente) ---
+    if inspections:
+        check_page(4*cm)
+        c.setFont("Helvetica-Bold", 16)
+        c.setFillColorRGB(0, 0.2, 0.5)
+        c.drawString(margin, y, "2. CONTRÔLES QHSE")
+        c.setFillColorRGB(0, 0, 0)
+        y -= 1.5*cm
+
+        for insp in inspections:
+            check_page(3*cm)
+            c.setFont("Helvetica-Bold", 12)
+            c.drawString(margin, y, f"📋 Audit : {insp.titre}")
+            y -= 0.8*cm
+            
+            questions = insp.data if isinstance(insp.data, list) else []
+            for item in questions:
+                check_page(1.5*cm)
+                q = item.get('q', '')
+                s = item.get('status', 'NA')
+                
+                c.setFont("Helvetica", 10)
+                c.drawString(margin + 0.5*cm, y, f"- {q}")
+                
+                if s == 'OK':
+                    c.setFillColorRGB(0, 0.6, 0)
+                    c.drawString(width - 4*cm, y, "CONFORME")
+                elif s == 'NOK':
+                    c.setFillColorRGB(0.8, 0, 0)
+                    c.setFont("Helvetica-Bold", 10)
+                    c.drawString(width - 4*cm, y, "NON CONFORME")
+                else:
+                    c.setFillColorRGB(0.5, 0.5, 0.5)
+                    c.drawString(width - 4*cm, y, "N/A")
+                
+                c.setFillColorRGB(0, 0, 0)
+                c.setFont("Helvetica", 10)
+                y -= 0.6*cm
+            y -= 0.5*cm
 
     # --- SIGNATURE ---
-    if y_position < 4 * cm:
-        c.showPage()
-        y_position = DEPART_HAUT
-
-    y_position -= 1 * cm
-    c.line(MARGE_X, y_position, width - MARGE_X, y_position)
-    y_position -= 1 * cm
+    check_page(5*cm)
+    y -= 1*cm
+    c.setLineWidth(1)
+    c.line(margin, y, width - margin, y)
+    y -= 1*cm
     
     c.setFont("Helvetica-Bold", 12)
-    c.drawString(width - 8 * cm, y_position, "Validation :")
+    c.drawString(width - 8 * cm, y, "Validation :")
     
     if chantier.signature_url:
         sig_img = get_optimized_image(chantier.signature_url)
         if sig_img:
             try:
                 rl_sig = ImageReader(sig_img)
-                c.drawImage(rl_sig, width - 8 * cm, y_position - 4 * cm, width=5*cm, height=3*cm, preserveAspectRatio=True, mask='auto')
+                c.drawImage(rl_sig, width - 8 * cm, y - 4 * cm, width=5*cm, height=3*cm, preserveAspectRatio=True, mask='auto')
             except: pass
 
     c.save()
     return output_path
+
+# ==========================================
+# 2. GENERATEUR PPSPS (Déjà fait, on le garde propre)
+# ==========================================
 
 def generate_ppsps_pdf(chantier, ppsps, output_path):
     """Génère le PPSPS avec la nouvelle page de garde Design"""
