@@ -11,20 +11,15 @@ from datetime import datetime
 def get_optimized_image(path_or_url):
     """Télécharge une image optimisée (redimensionnée) pour économiser la RAM."""
     try:
-        # CAS 1 : URL Cloudinary
         if path_or_url.startswith("http"):
             optimized_url = path_or_url
-            # On ajoute les paramètres de redimensionnement Cloudinary
             if "cloudinary.com" in path_or_url and "/upload/" in path_or_url:
-                # w_1000 pour une bonne qualité sur A4
                 optimized_url = path_or_url.replace("/upload/", "/upload/w_1000,q_auto,f_jpg/")
             
             response = requests.get(optimized_url, stream=True)
             if response.status_code == 200:
                 img = Image.open(BytesIO(response.content))
                 return img
-        
-        # CAS 2 : Fichier Local
         else:
             clean_path = path_or_url.replace("/static/", "")
             possible_paths = [os.path.join("uploads", clean_path), clean_path]
@@ -48,17 +43,15 @@ def draw_cover_page(c, chantier, titre_principal, sous_titre):
         try:
             img_w, img_h = cover_img.size
             aspect = img_h / float(img_w)
-            # On remplit toute la largeur
             c.drawImage(ImageReader(cover_img), 0, 0, width=width, height=width*aspect, preserveAspectRatio=True)
-            # Voile noir
             c.setFillColorRGB(0, 0, 0, 0.6)
             c.rect(0, 0, width, height, fill=1, stroke=0)
         except: pass
     else:
-        c.setFillColorRGB(0.1, 0.2, 0.4) # Bleu pro par défaut
+        c.setFillColorRGB(0.1, 0.2, 0.4)
         c.rect(0, 0, width, height, fill=1, stroke=0)
 
-    # 2. Logo (Fond blanc arrondi)
+    # 2. Logo
     logo_img = get_optimized_image("logo.png")
     if logo_img:
         try:
@@ -69,10 +62,9 @@ def draw_cover_page(c, chantier, titre_principal, sous_titre):
         except: pass
 
     # 3. Titres
-    c.setFillColorRGB(1, 1, 1) # Blanc
+    c.setFillColorRGB(1, 1, 1)
     c.setFont("Helvetica-Bold", 32)
     c.drawCentredString(width / 2, height / 2 + 1*cm, titre_principal)
-    
     c.setFont("Helvetica", 16)
     c.drawCentredString(width / 2, height / 2 - 0.5*cm, sous_titre)
     
@@ -80,10 +72,9 @@ def draw_cover_page(c, chantier, titre_principal, sous_titre):
     c.setStrokeColorRGB(1, 1, 1)
     c.line(width/2 - 4*cm, height/2 - 1.5*cm, width/2 + 4*cm, height/2 - 1.5*cm)
 
-    # 4. Infos Chantier
+    # 4. Infos
     c.setFont("Helvetica-Bold", 22)
     c.drawCentredString(width / 2, height / 2 - 3*cm, chantier.nom)
-    
     c.setFont("Helvetica", 14)
     c.drawCentredString(width / 2, height / 2 - 4*cm, chantier.adresse)
     
@@ -95,17 +86,15 @@ def draw_cover_page(c, chantier, titre_principal, sous_titre):
     c.showPage()
 
 # ==========================================
-# 1. GENERATEUR JOURNAL DE BORD (PHOTOS)
+# 1. GENERATEUR JOURNAL DE BORD
 # ==========================================
 def generate_pdf(chantier, rapports, inspections, output_path):
     c = canvas.Canvas(output_path, pagesize=A4)
     width, height = A4
     margin = 2 * cm
     
-    # PAGE DE GARDE
     draw_cover_page(c, chantier, "JOURNAL DE BORD", "Suivi & Avancement")
 
-    # SETUP PAGES SUIVANTES
     y = height - 3 * cm
 
     def check_page(espace_necessaire):
@@ -113,12 +102,11 @@ def generate_pdf(chantier, rapports, inspections, output_path):
         if y < espace_necessaire:
             c.showPage()
             y = height - 3 * cm
-            # Rappel titre
             c.setFillColorRGB(0, 0, 0)
             c.setFont("Helvetica-Oblique", 8)
             c.drawString(margin, height - 1.5*cm, f"Journal - {chantier.nom}")
 
-    # --- SECTION PHOTOS (Journal) ---
+    # --- SECTION PHOTOS ---
     if rapports:
         c.setFont("Helvetica-Bold", 16)
         c.setFillColorRGB(0, 0.2, 0.5)
@@ -127,60 +115,53 @@ def generate_pdf(chantier, rapports, inspections, output_path):
         y -= 1.5*cm
 
         for rapport in rapports:
-            # Récupération images (V1 + V2)
+            hauteur_texte = 2 * cm
             liste_images = []
+            
             if hasattr(rapport, 'images') and rapport.images:
                 for img_obj in rapport.images:
                     liste_images.append(img_obj.url)
             elif rapport.photo_url:
                 liste_images.append(rapport.photo_url)
 
-            # Titre du rapport
-            check_page(3*cm)
+            if y_position - hauteur_texte < MARGE_BAS:
+                c.showPage()
+                y_position = DEPART_HAUT
+
             c.setFont("Helvetica-Bold", 12)
-            date_rap = rapport.date_creation.strftime('%d/%m %H:%M') if isinstance(rapport.date_creation, datetime) else ""
-            c.drawString(margin, y, f"📅 {date_rap} - {rapport.titre}")
-            y -= 0.6*cm
+            c.drawString(margin, y, f"• {rapport.titre}")
+            y -= 0.6 * cm
             
             c.setFont("Helvetica", 10)
             c.setFillColorRGB(0.3, 0.3, 0.3)
-            desc = rapport.description if rapport.description else "Aucune description"
+            desc = rapport.description if rapport.description else ""
             c.drawString(margin, y, desc)
             c.setFillColorRGB(0, 0, 0)
-            y -= 0.8*cm
+            y -= 0.8 * cm
 
-            # Images
             for img_url in liste_images:
-                check_page(8*cm) # Besoin de 8cm pour une photo
-                
+                check_page(8*cm)
                 pil_image = get_optimized_image(img_url)
                 if pil_image:
                     try:
                         pil_image = ImageOps.exif_transpose(pil_image)
                         rl_image = ImageReader(pil_image)
-                        
-                        # Image centrée large (12cm de large)
                         img_w_pdf = 12*cm
-                        img_h_pdf = 7*cm # Max height
-                        
-                        # Centrage
+                        img_h_pdf = 7*cm
                         x_img = (width - img_w_pdf) / 2
-                        
                         c.drawImage(rl_image, x_img, y - img_h_pdf, width=img_w_pdf, height=img_h_pdf, preserveAspectRatio=True)
                         pil_image.close()
                         y -= (img_h_pdf + 0.5*cm)
-                    except:
-                        c.drawString(margin, y, "[Image introuvable]")
-                        y -= 1*cm
+                    except: pass
             
             y -= 0.5*cm
             c.setLineWidth(0.5)
             c.setStrokeColorRGB(0.8, 0.8, 0.8)
-            c.line(margin, y, width-margin, y) # Séparateur gris
+            c.line(margin, y, width-margin, y)
             c.setStrokeColorRGB(0, 0, 0)
             y -= 1*cm
 
-    # --- SECTION QHSE (Si présente) ---
+    # --- SECTION QHSE ---
     if inspections:
         check_page(4*cm)
         c.setFont("Helvetica-Bold", 16)
@@ -192,7 +173,10 @@ def generate_pdf(chantier, rapports, inspections, output_path):
         for insp in inspections:
             check_page(3*cm)
             c.setFont("Helvetica-Bold", 12)
-            c.drawString(margin, y, f"📋 Audit : {insp.titre}")
+            
+            # 👇 CORRECTION ICI : On affiche juste le titre enregistré
+            c.drawString(margin, y, f"📋 {insp.titre}") 
+            
             y -= 0.8*cm
             
             questions = insp.data if isinstance(insp.data, list) else []
