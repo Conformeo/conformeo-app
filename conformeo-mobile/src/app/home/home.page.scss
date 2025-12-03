@@ -7,6 +7,8 @@ ion-content {
   display: flex;
   flex-direction: column;
   gap: 16px; // Espace entre les cartes
+
+  padding-bottom: 100px; /* Espace suffisant pour le bouton (+) et la barre iPhone */
 }
 
 .pro-card {
