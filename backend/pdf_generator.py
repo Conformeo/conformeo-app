@@ -8,23 +8,20 @@ import requests
 from io import BytesIO
 from datetime import datetime
 
-# --- CONFIGURATION DESIGN ---
-COLOR_PRIMARY = (0, 0.2, 0.5) # Bleu Pro
-COLOR_SECONDARY = (0.1, 0.1, 0.1) # Gris fonce
-COLOR_BG_HEADER = (0.92, 0.94, 0.97) # Gris/Bleu très clair pour les fonds
+# --- CONFIGURATION DESIGN SOBRE ---
+COLOR_PRIMARY = (0.1, 0.1, 0.3) # Bleu nuit très sombre (Corporate)
+COLOR_SECONDARY = (0.4, 0.4, 0.4) # Gris moyen
 FONT_TITLE = "Helvetica-Bold"
 FONT_TEXT = "Helvetica"
 
 def get_optimized_image(path_or_url):
-    """Télécharge et optimise une image (800px max)."""
+    """Télécharge une image optimisée."""
     if not path_or_url: return None
     try:
         if path_or_url.startswith("http"):
             optimized_url = path_or_url
             if "cloudinary.com" in path_or_url and "/upload/" in path_or_url:
-                # Optimisation WebP ou JPG, largeur 800
-                optimized_url = path_or_url.replace("/upload/", "/upload/w_800,q_auto,f_jpg/")
-            
+                optimized_url = path_or_url.replace("/upload/", "/upload/w_1000,q_auto,f_jpg/")
             response = requests.get(optimized_url, stream=True, timeout=10)
             if response.status_code == 200:
                 return Image.open(BytesIO(response.content))
@@ -38,140 +35,126 @@ def get_optimized_image(path_or_url):
         print(f"Warning image: {e}")
     return None
 
-def draw_footer(c, width, height, chantier):
-    """Dessine le pied de page sur toutes les pages (sauf couverture)"""
+def draw_header_footer(c, width, height, chantier, titre_doc):
+    """En-tête et pied de page discret sur toutes les pages"""
     c.saveState()
-    c.setStrokeColorRGB(0.8, 0.8, 0.8)
-    c.setLineWidth(0.5)
+    
+    # PIED DE PAGE
+    c.setStrokeColorRGB(0.8, 0.8, 0.8); c.setLineWidth(0.5)
     c.line(1*cm, 1.5*cm, width-1*cm, 1.5*cm)
     
-    c.setFont(FONT_TEXT, 8)
-    c.setFillColorRGB(0.5, 0.5, 0.5)
-    
-    # Gauche : Nom du chantier
-    c.drawString(1*cm, 1*cm, f"Conforméo - {chantier.nom}")
-    
-    # Droite : Numéro de page
-    page_num = c.getPageNumber()
-    c.drawRightString(width-1*cm, 1*cm, f"Page {page_num}")
+    c.setFont(FONT_TEXT, 8); c.setFillColorRGB(0.5, 0.5, 0.5)
+    c.drawString(1*cm, 1*cm, f"Conforméo - {titre_doc} - {chantier.nom}")
+    c.drawRightString(width-1*cm, 1*cm, f"Page {c.getPageNumber()}")
+
     c.restoreState()
 
-def draw_cover_page(c, chantier, titre, sous_titre):
-    """Page de garde immersive"""
+def draw_simple_cover(c, chantier, titre_principal, sous_titre):
+    """Page de garde sobre (Fond blanc, Logo, Titres)"""
     width, height = A4
     
-    # Fond
-    if chantier.cover_url:
-        cover = get_optimized_image(chantier.cover_url)
-        if cover:
-            try:
-                w, h = cover.size
-                aspect = h / float(w)
-                c.drawImage(ImageReader(cover), 0, 0, width=width, height=width*aspect, preserveAspectRatio=True)
-                c.setFillColorRGB(0, 0, 0, 0.6) # Voile noir
-                c.rect(0, 0, width, height, fill=1, stroke=0)
-            except: pass
-    else:
-        c.setFillColorRGB(*COLOR_PRIMARY)
-        c.rect(0, 0, width, height, fill=1, stroke=0)
-
-    # Logo
+    # 1. Logo (Haut Gauche)
     logo = get_optimized_image("logo.png")
     if logo:
         try:
             rl_logo = ImageReader(logo)
-            c.setFillColorRGB(1, 1, 1)
-            c.roundRect(width/2-3*cm, height-4*cm, 6*cm, 3*cm, 10, fill=1, stroke=0)
-            c.drawImage(rl_logo, width/2-2.5*cm, height-3.8*cm, 5*cm, 2.5*cm, mask='auto', preserveAspectRatio=True)
+            # Logo plus discret (4cm de large)
+            c.drawImage(rl_logo, 2*cm, height-5*cm, width=4*cm, height=2*cm, mask='auto', preserveAspectRatio=True)
         except: pass
 
-    # Titres
-    c.setFillColorRGB(1, 1, 1)
-    c.setFont(FONT_TITLE, 36)
-    c.drawCentredString(width/2, height/2+2*cm, titre)
+    # 2. Bloc Titre (Centre)
+    y_center = height / 2 + 2*cm
     
-    c.setFont(FONT_TEXT, 18)
-    c.drawCentredString(width/2, height/2, sous_titre)
+    c.setFillColorRGB(*COLOR_PRIMARY)
+    c.setFont(FONT_TITLE, 24) # Taille réduite (24 vs 40)
+    c.drawString(2*cm, y_center, titre_principal)
     
-    c.setStrokeColorRGB(1, 1, 1); c.setLineWidth(2)
-    c.line(width/2-4*cm, height/2-1.5*cm, width/2+4*cm, height/2-1.5*cm)
+    y_center -= 1*cm
+    c.setFillColorRGB(*COLOR_SECONDARY)
+    c.setFont(FONT_TEXT, 14) # Taille réduite
+    c.drawString(2*cm, y_center, sous_titre)
+    
+    # Ligne fine de séparation
+    y_center -= 1.5*cm
+    c.setStrokeColorRGB(0.8, 0.8, 0.8); c.setLineWidth(0.5)
+    c.line(2*cm, y_center, width-2*cm, y_center)
 
-    c.setFont(FONT_TITLE, 24)
-    c.drawCentredString(width/2, height/2-3*cm, chantier.nom or "")
-    c.setFont(FONT_TEXT, 14)
-    c.drawCentredString(width/2, height/2-4*cm, chantier.adresse or "")
+    # 3. Infos Chantier (En dessous)
+    y_center -= 2*cm
     
-    c.setFont("Helvetica-Oblique", 10)
-    c.drawCentredString(width/2, 2*cm, f"Document généré le {datetime.now().strftime('%d/%m/%Y')}")
+    c.setFillColorRGB(0, 0, 0)
+    c.setFont(FONT_TITLE, 14)
+    c.drawString(2*cm, y_center, "PROJET :")
+    
+    c.setFont(FONT_TEXT, 14)
+    c.drawString(5*cm, y_center, chantier.nom or "Non défini")
+    
+    y_center -= 1*cm
+    c.setFont(FONT_TITLE, 14)
+    c.drawString(2*cm, y_center, "ADRESSE :")
+    
+    c.setFont(FONT_TEXT, 14)
+    c.drawString(5*cm, y_center, chantier.adresse or "Non définie")
+
+    # 4. Date (Bas de page)
+    date_str = datetime.now().strftime('%d/%m/%Y')
+    c.setFont(FONT_TEXT, 10); c.setFillColorRGB(0.5, 0.5, 0.5)
+    c.drawRightString(width-2*cm, 3*cm, f"Édité le {date_str}")
     
     c.showPage()
 
 # ==========================================
-# 1. GENERATEUR JOURNAL DE BORD
+# 1. JOURNAL DE BORD (PHOTOS)
 # ==========================================
 def generate_pdf(chantier, rapports, inspections, output_path):
     c = canvas.Canvas(output_path, pagesize=A4)
     width, height = A4
     margin = 2 * cm
     
-    draw_cover_page(c, chantier, "JOURNAL DE BORD", "Suivi & Avancement")
+    draw_simple_cover(c, chantier, "JOURNAL DE BORD", "Suivi d'exécution & Rapports")
 
     y = height - 3 * cm
 
     def check_space(needed):
         nonlocal y
         if y < needed:
-            draw_footer(c, width, height, chantier)
+            draw_header_footer(c, width, height, chantier, "Journal de Bord")
             c.showPage()
             y = height - 3 * cm
 
-    # --- SECTION 1 : PHOTOS (GRILLE 2 COLONNES) ---
+    # --- PHOTOS ---
     if rapports:
-        c.setFillColorRGB(*COLOR_PRIMARY); c.setFont(FONT_TITLE, 18)
+        c.setFillColorRGB(*COLOR_PRIMARY); c.setFont(FONT_TITLE, 14)
         c.drawString(margin, y, "1. RELEVÉS PHOTOS")
-        y -= 0.2*cm; c.setLineWidth(2); c.setStrokeColorRGB(*COLOR_PRIMARY)
+        y -= 0.2*cm; c.setLineWidth(1); c.setStrokeColorRGB(*COLOR_PRIMARY)
         c.line(margin, y, width-margin, y)
-        y -= 1.5 * cm
+        y -= 1 * cm
 
         for rap in rapports:
             check_space(4*cm)
             
-            # Header Rapport
-            c.setFillColorRGB(0.95, 0.95, 0.95)
-            c.rect(margin-0.2*cm, y-0.2*cm, width-2*margin+0.4*cm, 1.2*cm, fill=1, stroke=0)
-            
-            c.setFillColorRGB(0,0,0); c.setFont(FONT_TITLE, 12)
-            titre = rap.titre or "Observation"
-            date_rap = ""
-            if rap.date_creation:
-                if isinstance(rap.date_creation, str): date_rap = rap.date_creation[:10]
-                elif isinstance(rap.date_creation, datetime): date_rap = rap.date_creation.strftime('%d/%m')
-            
-            c.drawString(margin, y+0.3*cm, f"📅 {date_rap} - {titre}")
-            y -= 0.5*cm
+            # Titre discret
+            c.setFillColorRGB(0,0,0); c.setFont(FONT_TITLE, 11)
+            date_rap = rap.date_creation.strftime('%d/%m') if isinstance(rap.date_creation, datetime) else ""
+            c.drawString(margin, y, f"{date_rap} | {rap.titre or 'Observation'}")
+            y -= 0.6*cm
             
             if rap.description:
-                c.setFont(FONT_TEXT, 10); c.setFillColorRGB(0.3, 0.3, 0.3)
+                c.setFont(FONT_TEXT, 10); c.setFillColorRGB(0.2, 0.2, 0.2)
                 c.drawString(margin, y, rap.description)
                 y -= 0.8*cm
 
-            # Récupération Images
+            # Images
             imgs = []
-            if hasattr(rap, 'images') and rap.images:
-                imgs = [img.url for img in rap.images]
-            elif hasattr(rap, 'photo_url') and rap.photo_url:
-                imgs = [rap.photo_url]
+            if hasattr(rap, 'images') and rap.images: imgs = [i.url for i in rap.images]
+            elif hasattr(rap, 'photo_url') and rap.photo_url: imgs = [rap.photo_url]
 
-            # GRILLE 2 COLONNES
-            # On traite les images par paire
-            img_w = 8*cm
-            img_h = 6*cm
-            gap = 1*cm
+            # Grille 2 colonnes
+            img_w, img_h, gap = 8*cm, 6*cm, 1*cm
             
             for i in range(0, len(imgs), 2):
-                check_space(img_h + 1*cm)
+                check_space(img_h + 0.5*cm)
                 
-                # Image Gauche
                 url1 = imgs[i]
                 pil1 = get_optimized_image(url1)
                 if pil1:
@@ -180,7 +163,6 @@ def generate_pdf(chantier, rapports, inspections, output_path):
                         c.drawImage(ImageReader(pil1), margin, y-img_h, width=img_w, height=img_h, preserveAspectRatio=True)
                     except: pass
                 
-                # Image Droite (si existe)
                 if i+1 < len(imgs):
                     url2 = imgs[i+1]
                     pil2 = get_optimized_image(url2)
@@ -189,173 +171,118 @@ def generate_pdf(chantier, rapports, inspections, output_path):
                             pil2 = ImageOps.exif_transpose(pil2)
                             c.drawImage(ImageReader(pil2), margin+img_w+gap, y-img_h, width=img_w, height=img_h, preserveAspectRatio=True)
                         except: pass
-                
                 y -= (img_h + 0.5*cm)
             
-            y -= 1*cm
+            y -= 0.5*cm
 
-    # --- SECTION 2 : QHSE (TABLEAU) ---
+    # --- QHSE ---
     if inspections:
-        check_space(5*cm)
-        c.setFillColorRGB(*COLOR_PRIMARY); c.setFont(FONT_TITLE, 18)
+        check_space(4*cm)
+        c.setFillColorRGB(*COLOR_PRIMARY); c.setFont(FONT_TITLE, 14)
         c.drawString(margin, y, "2. CONTRÔLES QHSE")
-        y -= 0.2*cm; c.setLineWidth(2); c.setStrokeColorRGB(*COLOR_PRIMARY)
+        y -= 0.2*cm; c.setLineWidth(1); c.setStrokeColorRGB(*COLOR_PRIMARY)
         c.line(margin, y, width-margin, y)
-        y -= 1.5 * cm
+        y -= 1 * cm
 
         for insp in inspections:
-            check_space(3*cm)
-            
-            # Titre Audit (Fond coloré)
-            c.setFillColorRGB(*COLOR_BG_HEADER)
-            c.rect(margin, y-0.8*cm, width-2*margin, 1.2*cm, fill=1, stroke=0)
-            
-            c.setFillColorRGB(0,0,0); c.setFont(FONT_TITLE, 12)
+            check_space(2*cm)
+            c.setFillColorRGB(0,0,0); c.setFont(FONT_TITLE, 11)
             date_audit = insp.date_creation.strftime('%d/%m') if isinstance(insp.date_creation, datetime) else ""
-            c.drawString(margin+0.5*cm, y, f"📋 {insp.titre or 'Audit'} ({date_audit})")
-            y -= 1.2*cm
+            c.drawString(margin, y, f"{insp.titre or 'Audit'} ({date_audit})")
+            y -= 0.8*cm
             
             questions = insp.data if isinstance(insp.data, list) else []
             for q in questions:
-                check_space(1*cm)
+                check_space(0.6*cm)
+                c.setFont(FONT_TEXT, 9); c.setFillColorRGB(0.2, 0.2, 0.2)
+                c.drawString(margin+0.5*cm, y, f"- {q.get('q','')}")
                 
-                # Ligne de séparation fine
-                c.setStrokeColorRGB(0.9, 0.9, 0.9); c.setLineWidth(0.5)
-                c.line(margin, y-0.2*cm, width-margin, y-0.2*cm)
-                
-                # Question
-                c.setFont(FONT_TEXT, 10); c.setFillColorRGB(0,0,0)
-                q_text = q.get('q') or "Question"
-                c.drawString(margin, y, f"- {q_text}")
-                
-                # Statut aligné à droite
                 stat = q.get('status', 'NA')
-                txt, color = "N/A", (0.5,0.5,0.5)
-                if stat == 'OK': txt, color = "CONFORME", (0, 0.6, 0)
-                elif stat == 'NOK': txt, color = "NON CONFORME", (0.8, 0, 0)
+                txt, col = "N/A", (0.5,0.5,0.5)
+                if stat=='OK': txt, col = "CONFORME", (0, 0.5, 0)
+                elif stat=='NOK': txt, col = "NON CONFORME", (0.8, 0, 0)
                 
-                c.setFont(FONT_TITLE, 10); c.setFillColorRGB(*color)
+                c.setFont(FONT_TITLE, 9); c.setFillColorRGB(*col)
                 c.drawRightString(width-margin, y, txt)
-                
-                y -= 0.8*cm
-            y -= 1*cm
+                y -= 0.5*cm
+            y -= 0.5*cm
 
-    # --- SECTION 3 : SIGNATURE ---
-    check_space(5*cm)
-    y -= 1*cm
-    c.setStrokeColorRGB(0,0,0); c.setLineWidth(1)
-    c.line(margin, y, width-margin, y)
-    y -= 1*cm
-    
-    c.setFillColorRGB(0,0,0); c.setFont(FONT_TITLE, 12)
-    c.drawString(width-8*cm, y, "Visa / Validation :")
-    
-    if chantier.signature_url:
-        sig = get_optimized_image(chantier.signature_url)
-        if sig:
-            try: c.drawImage(ImageReader(sig), width-8*cm, y-4*cm, 5*cm, 3*cm, mask='auto', preserveAspectRatio=True)
-            except: pass
-    
-    # Dernier pied de page
-    draw_footer(c, width, height, chantier)
+    draw_footer(c, width, height, chantier, "Journal de Bord")
     c.save()
+    return output_path
 
 # ==========================================
-# 2. GENERATEUR PPSPS (Même logique pro)
+# 2. GENERATEUR PPSPS
 # ==========================================
 def generate_ppsps_pdf(chantier, ppsps, output_path):
     c = canvas.Canvas(output_path, pagesize=A4)
     width, height = A4
     margin = 2 * cm
     
-    draw_cover_page(c, chantier, "P.P.S.P.S", "Plan Particulier de Sécurité et de protection de la santé")
+    draw_simple_cover(c, chantier, "P.P.S.P.S", "Plan Particulier de Sécurité")
 
     y = height - 3 * cm
-
     def check_space(needed):
         nonlocal y
         if y < needed:
-            draw_footer(c, width, height, chantier)
+            draw_header_footer(c, width, height, chantier, "PPSPS")
             c.showPage()
             y = height - 3 * cm
 
-    # Styles Titres
-    def draw_section_title(title):
+    def draw_section(title):
         nonlocal y
         check_space(2*cm)
-        c.setFillColorRGB(*COLOR_PRIMARY); c.setFont(FONT_TITLE, 16)
+        c.setFillColorRGB(*COLOR_PRIMARY); c.setFont(FONT_TITLE, 14)
         c.drawString(margin, y, title)
-        y -= 0.2*cm; c.setLineWidth(1.5); c.setStrokeColorRGB(*COLOR_PRIMARY)
+        y -= 0.2*cm; c.setLineWidth(1); c.setStrokeColorRGB(*COLOR_PRIMARY)
         c.line(margin, y, width-margin, y)
-        c.setFillColorRGB(0,0,0)
-        y -= 1*cm
+        c.setFillColorRGB(0,0,0); y -= 0.8*cm
 
-    # 1. INTERVENANTS
-    draw_section_title("1. RENSEIGNEMENTS GÉNÉRAUX")
-    c.setFont(FONT_TEXT, 11)
-    
-    data_list = [
-        f"Responsable Chantier : {ppsps.responsable_chantier or ''}",
-        f"CSPS : {ppsps.coordonnateur_sps or ''}",
-        f"Maître d'Ouvrage : {ppsps.maitre_ouvrage or ''}",
-        f"Maître d'Œuvre : {ppsps.maitre_oeuvre or ''}",
+    # 1. INFO
+    draw_section("1. RENSEIGNEMENTS GÉNÉRAUX")
+    c.setFont(FONT_TEXT, 10)
+    lines = [
+        f"Responsable : {ppsps.responsable_chantier or ''}",
         f"Effectif : {ppsps.nb_compagnons} pers. | Horaires : {ppsps.horaires}",
-        f"Durée : {ppsps.duree_travaux or ''}"
+        f"CSPS : {ppsps.coordonnateur_sps or ''} | MOA : {ppsps.maitre_ouvrage or ''}"
     ]
-    
-    for line in data_list:
-        c.drawString(margin, y, line)
-        y -= 0.7*cm
-    y -= 1*cm
+    for l in lines: c.drawString(margin, y, l); y -= 0.6*cm
+    y -= 0.5*cm
 
     # 2. SECOURS
-    draw_section_title("2. ORGANISATION DES SECOURS")
-    secours = ppsps.secours_data if ppsps.secours_data else {}
-    
-    # Cadre rouge pour l'urgence
-    c.setStrokeColorRGB(0.8, 0, 0); c.setLineWidth(2)
-    c.roundRect(margin, y-2.5*cm, width-2*margin, 2.5*cm, 8, stroke=1, fill=0)
-    
-    c.setFont(FONT_TITLE, 12); c.setFillColorRGB(0.8, 0, 0)
-    c.drawString(margin+0.5*cm, y-0.8*cm, f"📞 URGENCES : {secours.get('num_urgence', '15 / 18')}")
-    c.setFillColorRGB(0,0,0); c.setFont(FONT_TEXT, 11)
-    c.drawString(margin+0.5*cm, y-1.5*cm, f"🏥 Hôpital : {secours.get('hopital', '-')}")
-    c.drawString(margin+0.5*cm, y-2.1*cm, f"⛑️ Sauveteurs : {secours.get('sst_noms', '-')}")
-    y -= 3.5*cm
-
-    # 3. HYGIENE
-    draw_section_title("3. HYGIÈNE & VIE DE CHANTIER")
-    inst = ppsps.installations_data if ppsps.installations_data else {}
-    c.drawString(margin, y, f"• Base vie : {inst.get('type_base', '-')}")
+    draw_section("2. SECOURS & URGENCES")
+    sec = ppsps.secours_data or {}
+    c.setFont(FONT_TITLE, 10); c.setFillColorRGB(0.8, 0, 0)
+    c.drawString(margin, y, f"URGENCES : {sec.get('num_urgence','15')}")
+    c.setFillColorRGB(0,0,0); c.setFont(FONT_TEXT, 10); y -= 0.6*cm
+    c.drawString(margin, y, f"Hôpital : {sec.get('hopital','-')}")
     y -= 0.6*cm
-    c.drawString(margin, y, f"• Eau potable : {inst.get('eau', '-')}")
-    y -= 0.6*cm
-    c.drawString(margin, y, f"• Repas : {inst.get('repas', '-')}")
-    y -= 1.5*cm
+    c.drawString(margin, y, f"SST : {sec.get('sst_noms','-')}")
+    y -= 1*cm
 
-    # 4. RISQUES
-    draw_section_title("4. ANALYSE DES RISQUES")
-    taches = ppsps.taches_data if ppsps.taches_data else []
+    # 3. RISQUES (Tableau sobre)
+    draw_section("3. ANALYSE DES RISQUES")
+    taches = ppsps.taches_data or []
     
-    if not taches:
-        c.drawString(margin, y, "Aucun risque spécifique.")
-    
+    if not taches: c.drawString(margin, y, "Aucun risque spécifique."); y -= 1*cm
+
     for t in taches:
-        check_space(3*cm)
-        # Fond gris pour la tache
-        c.setFillColorRGB(0.95, 0.95, 0.95)
-        c.rect(margin, y-2*cm, width-2*margin, 2*cm, fill=1, stroke=0)
+        check_space(2.5*cm)
+        # Ligne grise fine
+        c.setStrokeColorRGB(0.9,0.9,0.9); c.setLineWidth(0.5)
+        c.line(margin, y, width-margin, y); y -= 0.5*cm
         
-        c.setFillColorRGB(0,0,0); c.setFont(FONT_TITLE, 11)
-        c.drawString(margin+0.5*cm, y-0.5*cm, f"📌 {t.get('tache')}")
+        c.setFont(FONT_TITLE, 10); c.drawString(margin, y, t.get('tache',''))
+        y -= 0.5*cm
         
-        c.setFillColorRGB(0.8, 0, 0); c.setFont(FONT_TEXT, 10)
-        c.drawString(margin+1*cm, y-1*cm, f"⚠️ {t.get('risque')}")
+        c.setFont(FONT_TEXT, 9); c.setFillColorRGB(0.8, 0, 0)
+        c.drawString(margin+0.5*cm, y, f"Risque : {t.get('risque','')}")
+        y -= 0.5*cm
         
-        c.setFillColorRGB(0, 0.5, 0)
-        c.drawString(margin+1*cm, y-1.5*cm, f"🛡️ {t.get('prevention')}")
-        
-        y -= 2.5*cm
+        c.setFillColorRGB(0, 0.4, 0)
+        c.drawString(margin+0.5*cm, y, f"Prévention : {t.get('prevention','')}")
+        c.setFillColorRGB(0,0,0); y -= 0.8*cm
 
-    draw_footer(c, width, height, chantier)
+    draw_header_footer(c, width, height, chantier, "PPSPS")
     c.save()
+    return output_path
