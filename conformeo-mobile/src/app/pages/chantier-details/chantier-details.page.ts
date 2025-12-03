@@ -14,7 +14,7 @@ import {
   scanOutline, checkmarkCircle, shieldCheckmark, downloadOutline,
   shieldCheckmarkOutline, 
   checkmarkDoneCircleOutline, 
-  documentTextOutline, archiveOutline
+  documentTextOutline, archiveOutline, mapOutline
 } from 'ionicons/icons';
 // Imports Standalone
 import { IonBackButton, IonButtons } from '@ionic/angular/standalone';
@@ -39,12 +39,13 @@ import { SignatureModalComponent } from './signature-modal/signature-modal.compo
 export class ChantierDetailsPage implements OnInit {
   chantierId: number = 0;
   
-  // 👇 C'EST LA VARIABLE QUI MANQUAIT
   chantier: Chantier | undefined; 
-  ppspsList: PPSPS[] = [];
   rapports: Rapport[] = [];
   photoUrlTemp: string | undefined;
 
+  ppspsList: PPSPS[] = [];
+  documentsList: any[] = [];
+  
   constructor(
     private route: ActivatedRoute,
     public api: ApiService, // Public pour accès HTML si besoin
@@ -53,7 +54,7 @@ export class ChantierDetailsPage implements OnInit {
   ) {
     addIcons({ camera, time, warning, documentText, create, navigate, location, arrowBack, documentTextOutline, createOutline, scanOutline, checkmarkCircle, shieldCheckmark, downloadOutline, archiveOutline,
       shieldCheckmarkOutline, 
-    checkmarkDoneCircleOutline
+    checkmarkDoneCircleOutline, mapOutline
      });
   }
 
@@ -75,17 +76,43 @@ export class ChantierDetailsPage implements OnInit {
   }
 
   loadData() {
-    // 1. Chantier
+    // 1. Charger les infos du chantier
     this.api.getChantierById(this.chantierId).subscribe(data => {
       this.chantier = data;
     });
 
-    // 2. Rapports
+    // 2. Charger les rapports (Photos)
     this.loadRapports();
 
-    // 3. Documents PPSPS (NOUVEAU)
+    // 3. CONSTRUIRE LA LISTE DES DOCUMENTS
+    // On réinitialise la liste à chaque chargement pour éviter les doublons
+    this.documentsList = [];
+
+    // A. Ajouter le "Journal de Bord" (C'est un document virtuel qui existe toujours)
+    this.documentsList.push({
+        type: 'RAPPORT',
+        titre: 'Journal de Bord (Photos & QHSE)',
+        // On utilise la date du jour ou celle du chantier comme date de référence
+        date: new Date().toISOString(), 
+        icon: 'document-text-outline',
+        color: 'primary', // Bleu
+        action: () => this.downloadPdf() // L'action qui lance le téléchargement
+    });
+
+    // B. Ajouter les PPSPS qui viennent de l'API
     this.api.getPPSPSList(this.chantierId).subscribe(docs => {
-      this.ppspsList = docs;
+        this.ppspsList = docs; // On garde la liste brute au cas où
+        
+        docs.forEach(doc => {
+            this.documentsList.push({
+                type: 'PPSPS',
+                titre: 'PPSPS Officiel',
+                date: doc.date_creation,
+                icon: 'shield-checkmark-outline',
+                color: 'warning', // Jaune
+                action: () => this.downloadPPSPS(doc.id!)
+            });
+        });
     });
   }
 

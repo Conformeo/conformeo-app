@@ -52,20 +52,23 @@
       </div>
     </div>
     
-    <div *ngIf="ppspsList.length > 0" style="margin-bottom: 20px;">
+    <div style="margin-bottom: 20px;">
       <h3 class="section-title">Documents</h3>
       
       <ion-card style="border-radius: 12px; margin: 0; box-shadow: 0 4px 10px rgba(0,0,0,0.05);">
         <ion-list lines="none">
           
-          <ion-item button *ngFor="let doc of ppspsList" (click)="downloadPPSPS(doc.id!)">
-            <div slot="start" style="background: #ffc409; width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white;">
-              <ion-icon name="shield-checkmark"></ion-icon>
+          <ion-item button *ngFor="let doc of documentsList" (click)="doc.action()">
+            
+            <div slot="start" [style.background]="'var(--ion-color-' + doc.color + ')'" style="width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white;">
+              <ion-icon [name]="doc.icon"></ion-icon>
             </div>
+            
             <ion-label>
-              <h2>PPSPS</h2>
-              <p>Créé le {{ doc['date_creation'] | date:'dd/MM/yyyy' }}</p>
+              <h2>{{ doc.titre }}</h2>
+              <p>Édité le {{ doc.date | date:'dd/MM/yyyy' }}</p>
             </ion-label>
+            
             <ion-icon name="download-outline" slot="end" color="medium"></ion-icon>
           </ion-item>
 

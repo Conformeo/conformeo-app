@@ -63,3 +63,17 @@
   display: flex; justify-content: space-around;
   padding: 0 20px;
 }
+
+.back-button-container {
+  position: absolute;
+  top: 50px; /* Ajusté pour éviter l'encoche de l'iPhone */
+  left: 10px;
+  z-index: 1000; /* Toujours au-dessus */
+  
+  ion-button {
+    --background: rgba(0,0,0,0.3); /* Fond semi-transparent */
+    --border-radius: 50%;
+    width: 50px;
+    height: 50px;
+  }
+}

@@ -1,5 +1,13 @@
 <ion-content [fullscreen]="true">
 
+  <ion-content [fullscreen]="true">
+
+  <div class="back-button-container">
+    <ion-button fill="clear" color="light" (click)="cancel()">
+      <ion-icon name="arrow-back" slot="icon-only" size="large"></ion-icon>
+    </ion-button>
+  </div>
+
   <div class="start-screen" *ngIf="!photoPath">
     <div class="scanner-frame"></div> <div class="scan-instructions">
       <h2>Smart Scan</h2>

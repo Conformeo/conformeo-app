@@ -7,8 +7,8 @@ import {
   AlertController, NavController, IonSpinner
 } from '@ionic/angular/standalone';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
-import { addIcons } from 'ionicons';
-import { camera, checkmark, close } from 'ionicons/icons';
+import { addIcons,  } from 'ionicons';
+import { camera, checkmark, close, arrowBack } from 'ionicons/icons';
 import { ApiService, Rapport } from 'src/app/services/api';
 
 @Component({
@@ -38,7 +38,7 @@ export class SmartScanPage {
     private api: ApiService,
     private navCtrl: NavController
   ) {
-    addIcons({ camera, checkmark, close });
+    addIcons({ camera, checkmark, close, arrowBack });
   }
 
   ngOnInit() {
