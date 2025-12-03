@@ -124,3 +124,20 @@ class PPSPSOut(PPSPSBase):
     date_creation: datetime
     class Config:
         from_attributes = True
+
+
+# --- PIC (Plan Installation Chantier) ---
+class PICBase(BaseModel):
+    background_url: str
+    final_url: Optional[str] = None
+    elements_data: List[dict] = []
+    chantier_id: int
+
+class PICCreate(PICBase):
+    pass
+
+class PICOut(PICBase):
+    id: int
+    date_update: datetime
+    class Config:
+        from_attributes = True

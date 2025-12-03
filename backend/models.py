@@ -19,6 +19,7 @@ class Chantier(Base):
     materiels = relationship("Materiel", back_populates="chantier")
     inspections = relationship("Inspection", back_populates="chantier")
     ppsps_docs = relationship("PPSPS", back_populates="chantier")
+    pic = relationship("PIC", uselist=False, back_populates="chantier")
 
 class RapportImage(Base):
     __tablename__ = "rapport_images"
@@ -114,3 +115,24 @@ class PPSPS(Base):
     date_creation = Column(DateTime, default=datetime.now)
 
     chantier = relationship("Chantier", back_populates="ppsps_docs")
+
+# ... imports existants ...
+
+class PIC(Base):
+    __tablename__ = "pics"
+
+    id = Column(Integer, primary_key=True, index=True)
+    chantier_id = Column(Integer, ForeignKey("chantiers.id"))
+    
+    # L'image de fond (Plan vierge)
+    background_url = Column(String)
+    
+    # L'image finale générée (pour le PDF)
+    final_url = Column(String)
+    
+    # Les données modifiables (Position des icônes : [{"type": "grue", "x": 100, "y": 200}, ...])
+    elements_data = Column(JSON)
+    
+    date_update = Column(DateTime, default=datetime.now)
+
+    chantier = relationship("Chantier", back_populates="pic")

@@ -404,3 +404,46 @@ def force_fix_ppsps(db: Session = Depends(get_db)):
         return {"status": "Terminé", "details": results}
     except Exception as e:
         return {"status": "Erreur critique", "details": str(e)}
+
+# ...
+
+# --- MIGRATION V6 (TABLE PIC) ---
+@app.get("/migrate_db_v6")
+def migrate_db_v6(db: Session = Depends(get_db)):
+    try:
+        models.Base.metadata.create_all(bind=engine)
+        return {"message": "Migration V6 (PIC) réussie !"}
+    except Exception as e:
+        return {"status": "Erreur", "details": str(e)}
+
+# --- ROUTES PIC ---
+@app.post("/pics", response_model=schemas.PICOut)
+def create_or_update_pic(pic: schemas.PICCreate, db: Session = Depends(get_db)):
+    # On vérifie si un PIC existe déjà pour ce chantier
+    existing_pic = db.query(models.PIC).filter(models.PIC.chantier_id == pic.chantier_id).first()
+    
+    if existing_pic:
+        # Mise à jour
+        existing_pic.background_url = pic.background_url
+        existing_pic.final_url = pic.final_url
+        existing_pic.elements_data = pic.elements_data
+        existing_pic.date_update = datetime.now()
+        db.commit()
+        db.refresh(existing_pic)
+        return existing_pic
+    else:
+        # Création
+        new_pic = models.PIC(
+            chantier_id=pic.chantier_id,
+            background_url=pic.background_url,
+            final_url=pic.final_url,
+            elements_data=pic.elements_data
+        )
+        db.add(new_pic)
+        db.commit()
+        db.refresh(new_pic)
+        return new_pic
+
+@app.get("/chantiers/{chantier_id}/pic", response_model=Optional[schemas.PICOut])
+def read_pic_chantier(chantier_id: int, db: Session = Depends(get_db)):
+    return db.query(models.PIC).filter(models.PIC.chantier_id == chantier_id).first()
