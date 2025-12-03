@@ -9,228 +9,159 @@ from io import BytesIO
 from datetime import datetime
 
 def get_optimized_image(path_or_url):
-    """
-    Télécharge une image optimisée (redimensionnée) pour économiser la RAM.
-    """
     try:
-        # CAS 1 : URL Cloudinary (Optimisation Serveur)
         if path_or_url.startswith("http"):
-            # Si c'est du Cloudinary, on injecte des paramètres de redimensionnement
             optimized_url = path_or_url
             if "cloudinary.com" in path_or_url and "/upload/" in path_or_url:
                 optimized_url = path_or_url.replace("/upload/", "/upload/w_1000,q_auto,f_jpg/")
-            
-            # On télécharge l'image légère
             response = requests.get(optimized_url, stream=True)
             if response.status_code == 200:
-                img = Image.open(BytesIO(response.content))
-                return img
-        
-        # CAS 2 : Fichier Local (Logo, etc.)
+                return Image.open(BytesIO(response.content))
         else:
             clean_path = path_or_url.replace("/static/", "")
             possible_paths = [os.path.join("uploads", clean_path), clean_path]
-            
             for p in possible_paths:
                 if os.path.exists(p):
                     return Image.open(p)
-                    
     except Exception as e:
-        print(f"Erreur chargement image optimisée ({path_or_url}): {e}")
-    
+        print(f"Erreur image: {e}")
     return None
 
-def draw_cover_page(c, chantier, titre_principal, sous_titre):
-    """Dessine une page de garde commune et stylée"""
+def draw_cover_page(c, chantier, titre, soustitre):
     width, height = A4
-    
-    # 1. Image de fond
-    cover_img = None
+    # Image de fond
     if chantier.cover_url:
-        cover_img = get_optimized_image(chantier.cover_url)
-    
-    if cover_img:
-        try:
-            img_w, img_h = cover_img.size
-            aspect = img_h / float(img_w)
-            c.drawImage(ImageReader(cover_img), 0, 0, width=width, height=width*aspect, preserveAspectRatio=True)
-            c.setFillColorRGB(0, 0, 0, 0.6)
-            c.rect(0, 0, width, height, fill=1, stroke=0)
-        except: pass
+        cover = get_optimized_image(chantier.cover_url)
+        if cover:
+            try:
+                w, h = cover.size
+                aspect = h / float(w)
+                c.drawImage(ImageReader(cover), 0, 0, width=width, height=width*aspect, preserveAspectRatio=True)
+                c.setFillColorRGB(0, 0, 0, 0.6)
+                c.rect(0, 0, width, height, fill=1, stroke=0)
+            except: pass
     else:
         c.setFillColorRGB(0.1, 0.2, 0.4)
         c.rect(0, 0, width, height, fill=1, stroke=0)
 
-    # 2. Logo
-    logo_img = get_optimized_image("logo.png")
-    if logo_img:
+    # Logo
+    logo = get_optimized_image("logo.png")
+    if logo:
         try:
-            rl_logo = ImageReader(logo_img)
             c.setFillColorRGB(1, 1, 1)
-            c.roundRect(width/2 - 3*cm, height - 4*cm, 6*cm, 3*cm, 10, fill=1, stroke=0)
-            c.drawImage(rl_logo, width/2 - 2.5*cm, height - 3.8*cm, width=5*cm, height=2.5*cm, preserveAspectRatio=True, mask='auto')
+            c.roundRect(width/2-3*cm, height-4*cm, 6*cm, 3*cm, 10, fill=1, stroke=0)
+            c.drawImage(ImageReader(logo), width/2-2.5*cm, height-3.8*cm, 5*cm, 2.5*cm, mask='auto', preserveAspectRatio=True)
         except: pass
 
-    # 3. Titres
+    # Textes
     c.setFillColorRGB(1, 1, 1)
     c.setFont("Helvetica-Bold", 32)
-    c.drawCentredString(width / 2, height / 2 + 1*cm, titre_principal)
+    c.drawCentredString(width/2, height/2+1*cm, titre)
     c.setFont("Helvetica", 16)
-    c.drawCentredString(width / 2, height / 2 - 0.5*cm, sous_titre)
+    c.drawCentredString(width/2, height/2-0.5*cm, soustitre)
     
-    c.setLineWidth(2)
-    c.setStrokeColorRGB(1, 1, 1)
-    c.line(width/2 - 4*cm, height/2 - 1.5*cm, width/2 + 4*cm, height/2 - 1.5*cm)
+    c.setStrokeColorRGB(1, 1, 1); c.setLineWidth(2)
+    c.line(width/2-4*cm, height/2-1.5*cm, width/2+4*cm, height/2-1.5*cm)
 
-    # 4. Infos
     c.setFont("Helvetica-Bold", 22)
-    c.drawCentredString(width / 2, height / 2 - 3*cm, chantier.nom)
+    c.drawCentredString(width/2, height/2-3*cm, chantier.nom)
     c.setFont("Helvetica", 14)
-    c.drawCentredString(width / 2, height / 2 - 4*cm, chantier.adresse)
+    c.drawCentredString(width/2, height/2-4*cm, chantier.adresse)
     
-    # 5. Date
     c.setFont("Helvetica-Oblique", 10)
-    date_str = datetime.now().strftime('%d/%m/%Y')
-    c.drawCentredString(width / 2, 2*cm, f"Édité le {date_str}")
-    
+    c.drawCentredString(width/2, 2*cm, f"Édité le {datetime.now().strftime('%d/%m/%Y')}")
     c.showPage()
 
-# ==========================================
-# 1. GENERATEUR JOURNAL DE BORD
-# ==========================================
+# 👇 C'EST ICI LA CORRECTION : AJOUT DE L'ARGUMENT 'inspections'
 def generate_pdf(chantier, rapports, inspections, output_path):
     c = canvas.Canvas(output_path, pagesize=A4)
     width, height = A4
     margin = 2 * cm
     
     draw_cover_page(c, chantier, "JOURNAL DE BORD", "Suivi & Avancement")
-
+    
     y = height - 3 * cm
-
-    def check_page(espace_necessaire):
+    def check_space(needed):
         nonlocal y
-        if y < espace_necessaire:
-            c.showPage()
-            y = height - 3 * cm
-            c.setFillColorRGB(0, 0, 0)
-            c.setFont("Helvetica-Oblique", 8)
-            c.drawString(margin, height - 1.5*cm, f"Journal - {chantier.nom}")
+        if y < needed:
+            c.showPage(); y = height - 3 * cm
 
-    # --- SECTION PHOTOS ---
+    # --- RAPPORTS PHOTOS ---
     if rapports:
-        c.setFont("Helvetica-Bold", 16)
-        c.setFillColorRGB(0, 0.2, 0.5)
+        c.setFillColorRGB(0, 0.2, 0.5); c.setFont("Helvetica-Bold", 16)
         c.drawString(margin, y, "1. RELEVÉS PHOTOS")
-        c.setFillColorRGB(0, 0, 0)
-        y -= 1.5*cm
+        c.setFillColorRGB(0, 0, 0); y -= 1.5 * cm
 
-        for rapport in rapports:
-            hauteur_texte = 2 * cm
-            liste_images = []
-            
-            if hasattr(rapport, 'images') and rapport.images:
-                for img_obj in rapport.images:
-                    liste_images.append(img_obj.url)
-            elif hasattr(rapport, 'photo_url') and rapport.photo_url:
-                liste_images.append(rapport.photo_url)
-
-            if y_position - hauteur_texte < MARGE_BAS:
-                c.showPage()
-                y_position = DEPART_HAUT
-
+        for rap in rapports:
+            check_space(4*cm)
             c.setFont("Helvetica-Bold", 12)
-            c.drawString(margin, y, f"• {rapport.titre}")
-            y -= 0.6 * cm
-            
-            c.setFont("Helvetica", 10)
-            c.setFillColorRGB(0.3, 0.3, 0.3)
-            desc = rapport.description if rapport.description else ""
-            c.drawString(margin, y, desc)
-            c.setFillColorRGB(0, 0, 0)
-            y -= 0.8 * cm
+            c.drawString(margin, y, f"• {rap.titre}")
+            y -= 0.6*cm
+            c.setFont("Helvetica", 10); c.setFillColorRGB(0.3, 0.3, 0.3)
+            c.drawString(margin, y, rap.description or "")
+            c.setFillColorRGB(0, 0, 0); y -= 0.8*cm
 
-            for img_url in liste_images:
-                check_page(8*cm)
-                pil_image = get_optimized_image(img_url)
-                if pil_image:
+            # Images (V1 + V2)
+            imgs = [img.url for img in rap.images] if hasattr(rap, 'images') and rap.images else []
+            if not imgs and rap.photo_url: imgs.append(rap.photo_url)
+
+            for url in imgs:
+                check_space(7*cm)
+                img = get_optimized_image(url)
+                if img:
                     try:
-                        pil_image = ImageOps.exif_transpose(pil_image)
-                        rl_image = ImageReader(pil_image)
-                        img_w_pdf = 12*cm
-                        img_h_pdf = 7*cm
-                        x_img = (width - img_w_pdf) / 2
-                        c.drawImage(rl_image, x_img, y - img_h_pdf, width=img_w_pdf, height=img_h_pdf, preserveAspectRatio=True)
-                        pil_image.close()
-                        y -= (img_h_pdf + 0.5*cm)
+                        img = ImageOps.exif_transpose(img)
+                        c.drawImage(ImageReader(img), margin+1*cm, y-6*cm, 8*cm, 6*cm, preserveAspectRatio=True)
                     except: pass
-            
+                y -= 6.5*cm
             y -= 0.5*cm
-            c.setLineWidth(0.5)
-            c.setStrokeColorRGB(0.8, 0.8, 0.8)
-            c.line(margin, y, width-margin, y)
-            c.setStrokeColorRGB(0, 0, 0)
-            y -= 1*cm
+            c.setLineWidth(0.5); c.setStrokeColorRGB(0.8,0.8,0.8)
+            c.line(margin, y, width-margin, y); y -= 1*cm
 
-    # --- SECTION QHSE ---
+    # --- INSPECTIONS QHSE (NOUVEAU) ---
     if inspections:
-        check_page(4*cm)
-        c.setFont("Helvetica-Bold", 16)
-        c.setFillColorRGB(0, 0.2, 0.5)
+        check_page_break = lambda h: check_space(h) # Alias rapide
+        check_page_break(4*cm)
+        c.setFillColorRGB(0, 0.2, 0.5); c.setFont("Helvetica-Bold", 16)
         c.drawString(margin, y, "2. CONTRÔLES QHSE")
-        c.setFillColorRGB(0, 0, 0)
-        y -= 1.5*cm
+        c.setFillColorRGB(0, 0, 0); y -= 1.5 * cm
 
         for insp in inspections:
-            check_page(3*cm)
+            check_space(3*cm)
             c.setFont("Helvetica-Bold", 12)
             c.drawString(margin, y, f"📋 {insp.titre}")
             y -= 0.8*cm
             
             questions = insp.data if isinstance(insp.data, list) else []
-            for item in questions:
-                check_page(1.5*cm)
-                q = item.get('q', '')
-                s = item.get('status', 'NA')
-                
+            for q in questions:
+                check_space(1*cm)
                 c.setFont("Helvetica", 10)
-                c.drawString(margin + 0.5*cm, y, f"- {q}")
+                c.drawString(margin+0.5*cm, y, f"- {q.get('q','')}")
                 
-                if s == 'OK':
-                    c.setFillColorRGB(0, 0.6, 0)
-                    c.drawString(width - 4*cm, y, "CONFORME")
-                elif s == 'NOK':
-                    c.setFillColorRGB(0.8, 0, 0)
-                    c.setFont("Helvetica-Bold", 10)
-                    c.drawString(width - 4*cm, y, "NON CONFORME")
-                else:
-                    c.setFillColorRGB(0.5, 0.5, 0.5)
-                    c.drawString(width - 4*cm, y, "N/A")
+                stat = q.get('status', 'NA')
+                if stat == 'OK': c.setFillColorRGB(0, 0.6, 0); txt="CONFORME"
+                elif stat == 'NOK': c.setFillColorRGB(0.8, 0, 0); txt="NON CONFORME"
+                else: c.setFillColorRGB(0.5, 0.5, 0.5); txt="N/A"
                 
+                c.drawRightString(width-margin, y, txt)
                 c.setFillColorRGB(0, 0, 0)
-                c.setFont("Helvetica", 10)
                 y -= 0.6*cm
             y -= 0.5*cm
 
     # --- SIGNATURE ---
-    check_page(5*cm)
-    y -= 1*cm
-    c.setLineWidth(1)
-    c.line(margin, y, width - margin, y)
-    y -= 1*cm
-    
+    check_space(5*cm)
+    y -= 1*cm; c.setStrokeColorRGB(0,0,0); c.setLineWidth(1)
+    c.line(margin, y, width-margin, y); y -= 1*cm
     c.setFont("Helvetica-Bold", 12)
-    c.drawString(width - 8 * cm, y, "Validation :")
+    c.drawString(width-8*cm, y, "Validation :")
     
     if chantier.signature_url:
-        sig_img = get_optimized_image(chantier.signature_url)
-        if sig_img:
-            try:
-                rl_sig = ImageReader(sig_img)
-                c.drawImage(rl_sig, width - 8 * cm, y - 4 * cm, width=5*cm, height=3*cm, preserveAspectRatio=True, mask='auto')
+        sig = get_optimized_image(chantier.signature_url)
+        if sig:
+            try: c.drawImage(ImageReader(sig), width-8*cm, y-4*cm, 5*cm, 3*cm, mask='auto', preserveAspectRatio=True)
             except: pass
-
+            
     c.save()
-    return output_path
 
 # ==========================================
 # 2. GENERATEUR PPSPS
