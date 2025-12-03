@@ -9,14 +9,21 @@ from io import BytesIO
 from datetime import datetime
 
 def get_optimized_image(path_or_url):
+    """Télécharge une image de manière sécurisée (Cloudinary ou Local)."""
+    if not path_or_url: return None
     try:
+        # CAS 1 : URL Cloudinary
         if path_or_url.startswith("http"):
             optimized_url = path_or_url
+            # Optimisation : Largeur 1000px, Qualité Auto, Format JPG
             if "cloudinary.com" in path_or_url and "/upload/" in path_or_url:
                 optimized_url = path_or_url.replace("/upload/", "/upload/w_1000,q_auto,f_jpg/")
-            response = requests.get(optimized_url, stream=True)
+            
+            response = requests.get(optimized_url, stream=True, timeout=10)
             if response.status_code == 200:
                 return Image.open(BytesIO(response.content))
+        
+        # CAS 2 : Fichier Local
         else:
             clean_path = path_or_url.replace("/static/", "")
             possible_paths = [os.path.join("uploads", clean_path), clean_path]
@@ -24,55 +31,70 @@ def get_optimized_image(path_or_url):
                 if os.path.exists(p):
                     return Image.open(p)
     except Exception as e:
-        print(f"Erreur image: {e}")
+        print(f"Erreur chargement image ({path_or_url}): {e}")
     return None
 
 def draw_cover_page(c, chantier, titre, soustitre):
+    """Dessine la page de garde commune"""
     width, height = A4
-    # Image de fond
+    
+    # 1. Image de fond (Cover)
     if chantier.cover_url:
         cover = get_optimized_image(chantier.cover_url)
         if cover:
             try:
                 w, h = cover.size
                 aspect = h / float(w)
+                # Image plein écran
                 c.drawImage(ImageReader(cover), 0, 0, width=width, height=width*aspect, preserveAspectRatio=True)
+                # Voile noir semi-transparent pour lisibilité
                 c.setFillColorRGB(0, 0, 0, 0.6)
                 c.rect(0, 0, width, height, fill=1, stroke=0)
             except: pass
     else:
+        # Fond bleu par défaut si pas d'image
         c.setFillColorRGB(0.1, 0.2, 0.4)
         c.rect(0, 0, width, height, fill=1, stroke=0)
 
-    # Logo
+    # 2. Logo (centré en haut)
     logo = get_optimized_image("logo.png")
     if logo:
         try:
+            rl_logo = ImageReader(logo)
+            # Petit fond blanc sous le logo
             c.setFillColorRGB(1, 1, 1)
             c.roundRect(width/2-3*cm, height-4*cm, 6*cm, 3*cm, 10, fill=1, stroke=0)
-            c.drawImage(ImageReader(logo), width/2-2.5*cm, height-3.8*cm, 5*cm, 2.5*cm, mask='auto', preserveAspectRatio=True)
+            c.drawImage(rl_logo, width/2-2.5*cm, height-3.8*cm, 5*cm, 2.5*cm, mask='auto', preserveAspectRatio=True)
         except: pass
 
-    # Textes
-    c.setFillColorRGB(1, 1, 1)
+    # 3. Titres
+    c.setFillColorRGB(1, 1, 1) # Blanc
     c.setFont("Helvetica-Bold", 32)
     c.drawCentredString(width/2, height/2+1*cm, titre)
     c.setFont("Helvetica", 16)
     c.drawCentredString(width/2, height/2-0.5*cm, soustitre)
     
+    # Ligne de séparation
     c.setStrokeColorRGB(1, 1, 1); c.setLineWidth(2)
     c.line(width/2-4*cm, height/2-1.5*cm, width/2+4*cm, height/2-1.5*cm)
 
+    # 4. Infos Chantier
     c.setFont("Helvetica-Bold", 22)
-    c.drawCentredString(width/2, height/2-3*cm, chantier.nom)
+    # Protection contre titre vide (or "")
+    c.drawCentredString(width/2, height/2-3*cm, chantier.nom or "Chantier sans nom")
     c.setFont("Helvetica", 14)
-    c.drawCentredString(width/2, height/2-4*cm, chantier.adresse)
+    c.drawCentredString(width/2, height/2-4*cm, chantier.adresse or "")
     
+    # 5. Date en bas
     c.setFont("Helvetica-Oblique", 10)
-    c.drawCentredString(width/2, 2*cm, f"Édité le {datetime.now().strftime('%d/%m/%Y')}")
-    c.showPage()
+    date_str = datetime.now().strftime('%d/%m/%Y')
+    c.drawCentredString(width/2, 2*cm, f"Édité le {date_str}")
+    
+    c.showPage() # Fin page de garde
 
-# 👇 C'EST ICI LA CORRECTION : AJOUT DE L'ARGUMENT 'inspections'
+# ==========================================
+# 1. GENERATEUR JOURNAL DE BORD
+# ==========================================
 def generate_pdf(chantier, rapports, inspections, output_path):
     c = canvas.Canvas(output_path, pagesize=A4)
     width, height = A4
@@ -86,7 +108,7 @@ def generate_pdf(chantier, rapports, inspections, output_path):
         if y < needed:
             c.showPage(); y = height - 3 * cm
 
-    # --- RAPPORTS PHOTOS ---
+    # --- SECTION PHOTOS ---
     if rapports:
         c.setFillColorRGB(0, 0.2, 0.5); c.setFont("Helvetica-Bold", 16)
         c.drawString(margin, y, "1. RELEVÉS PHOTOS")
@@ -94,16 +116,31 @@ def generate_pdf(chantier, rapports, inspections, output_path):
 
         for rap in rapports:
             check_space(4*cm)
+            
+            # Titre et Date
             c.setFont("Helvetica-Bold", 12)
-            c.drawString(margin, y, f"• {rap.titre}")
+            titre = rap.titre or "Sans titre"
+            date_rap = ""
+            if rap.date_creation:
+                if isinstance(rap.date_creation, str): date_rap = rap.date_creation[:10]
+                elif isinstance(rap.date_creation, datetime): date_rap = rap.date_creation.strftime('%d/%m')
+            
+            c.drawString(margin, y, f"• {titre} ({date_rap})")
             y -= 0.6*cm
+            
+            # Description (tronquée si trop longue)
+            desc = rap.description or ""
             c.setFont("Helvetica", 10); c.setFillColorRGB(0.3, 0.3, 0.3)
-            c.drawString(margin, y, rap.description or "")
+            display_desc = (desc[:90] + '...') if len(desc) > 90 else desc
+            c.drawString(margin, y, display_desc)
             c.setFillColorRGB(0, 0, 0); y -= 0.8*cm
 
-            # Images (V1 + V2)
-            imgs = [img.url for img in rap.images] if hasattr(rap, 'images') and rap.images else []
-            if not imgs and rap.photo_url: imgs.append(rap.photo_url)
+            # Récupération des images (V1 et V2)
+            imgs = []
+            if hasattr(rap, 'images') and rap.images:
+                imgs = [img.url for img in rap.images]
+            elif hasattr(rap, 'photo_url') and rap.photo_url:
+                imgs = [rap.photo_url]
 
             for url in imgs:
                 check_space(7*cm)
@@ -114,14 +151,14 @@ def generate_pdf(chantier, rapports, inspections, output_path):
                         c.drawImage(ImageReader(img), margin+1*cm, y-6*cm, 8*cm, 6*cm, preserveAspectRatio=True)
                     except: pass
                 y -= 6.5*cm
+            
             y -= 0.5*cm
             c.setLineWidth(0.5); c.setStrokeColorRGB(0.8,0.8,0.8)
             c.line(margin, y, width-margin, y); y -= 1*cm
 
-    # --- INSPECTIONS QHSE (NOUVEAU) ---
+    # --- SECTION QHSE ---
     if inspections:
-        check_page_break = lambda h: check_space(h) # Alias rapide
-        check_page_break(4*cm)
+        check_space(4*cm)
         c.setFillColorRGB(0, 0.2, 0.5); c.setFont("Helvetica-Bold", 16)
         c.drawString(margin, y, "2. CONTRÔLES QHSE")
         c.setFillColorRGB(0, 0, 0); y -= 1.5 * cm
@@ -129,20 +166,22 @@ def generate_pdf(chantier, rapports, inspections, output_path):
         for insp in inspections:
             check_space(3*cm)
             c.setFont("Helvetica-Bold", 12)
-            c.drawString(margin, y, f"📋 {insp.titre}")
+            c.drawString(margin, y, f"📋 {insp.titre or 'Audit'}")
             y -= 0.8*cm
             
             questions = insp.data if isinstance(insp.data, list) else []
             for q in questions:
                 check_space(1*cm)
                 c.setFont("Helvetica", 10)
-                c.drawString(margin+0.5*cm, y, f"- {q.get('q','')}")
+                q_text = q.get('q') or "Question"
+                c.drawString(margin+0.5*cm, y, f"- {q_text}")
                 
                 stat = q.get('status', 'NA')
-                if stat == 'OK': c.setFillColorRGB(0, 0.6, 0); txt="CONFORME"
-                elif stat == 'NOK': c.setFillColorRGB(0.8, 0, 0); txt="NON CONFORME"
-                else: c.setFillColorRGB(0.5, 0.5, 0.5); txt="N/A"
+                txt, color = "N/A", (0.5,0.5,0.5)
+                if stat == 'OK': txt, color = "CONFORME", (0, 0.6, 0)
+                elif stat == 'NOK': txt, color = "NON CONFORME", (0.8, 0, 0)
                 
+                c.setFillColorRGB(*color)
                 c.drawRightString(width-margin, y, txt)
                 c.setFillColorRGB(0, 0, 0)
                 y -= 0.6*cm
@@ -150,7 +189,8 @@ def generate_pdf(chantier, rapports, inspections, output_path):
 
     # --- SIGNATURE ---
     check_space(5*cm)
-    y -= 1*cm; c.setStrokeColorRGB(0,0,0); c.setLineWidth(1)
+    y -= 1*cm
+    c.setStrokeColorRGB(0,0,0); c.setLineWidth(1)
     c.line(margin, y, width-margin, y); y -= 1*cm
     c.setFont("Helvetica-Bold", 12)
     c.drawString(width-8*cm, y, "Validation :")
@@ -190,7 +230,7 @@ def generate_ppsps_pdf(chantier, ppsps, output_path):
     y -= 1*cm
     
     c.setFont("Helvetica", 11)
-    c.drawString(margin, y, f"Responsable Chantier : {ppsps.responsable_chantier}")
+    c.drawString(margin, y, f"Responsable Chantier : {ppsps.responsable_chantier or ''}")
     y -= 0.6*cm
     c.drawString(margin, y, f"Effectif : {ppsps.nb_compagnons} compagnons - Horaires : {ppsps.horaires}")
     y -= 0.6*cm
@@ -233,7 +273,7 @@ def generate_ppsps_pdf(chantier, ppsps, output_path):
     c.drawString(margin, y, f"Repas : {inst.get('repas', '-')}")
     y -= 1.5*cm
 
-    # 4. RISQUES
+    # 4. ANALYSE DES RISQUES
     check_page()
     c.setFont("Helvetica-Bold", 16)
     c.setFillColorRGB(0, 0.2, 0.5)
