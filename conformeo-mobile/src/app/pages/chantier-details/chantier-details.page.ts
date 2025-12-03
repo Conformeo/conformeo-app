@@ -12,11 +12,10 @@ import {
   camera, time, warning, documentText, create, navigate, 
   location, arrowBack, createOutline ,
   scanOutline, checkmarkCircle, shieldCheckmark, downloadOutline,
-  shieldCheckmarkOutline, // <--- AJOUTE ÇA (PPSPS)
-  checkmarkDoneCircleOutline, // <--- AJOUTE ÇA (Audit)
-  documentTextOutline // (Vérifie que tu as celui-là pour le PDF aussi)
+  shieldCheckmarkOutline, 
+  checkmarkDoneCircleOutline, 
+  documentTextOutline, archiveOutline
 } from 'ionicons/icons';
-
 // Imports Standalone
 import { IonBackButton, IonButtons } from '@ionic/angular/standalone';
 
@@ -52,7 +51,7 @@ export class ChantierDetailsPage implements OnInit {
     private modalCtrl: ModalController,
     private platform: Platform // <--- 2. INJECTEZ LA PLATEFORME ICI
   ) {
-    addIcons({ camera, time, warning, documentText, create, navigate, location, arrowBack, documentTextOutline, createOutline, scanOutline, checkmarkCircle, shieldCheckmark, downloadOutline,
+    addIcons({ camera, time, warning, documentText, create, navigate, location, arrowBack, documentTextOutline, createOutline, scanOutline, checkmarkCircle, shieldCheckmark, downloadOutline, archiveOutline,
       shieldCheckmarkOutline, 
     checkmarkDoneCircleOutline
      });
@@ -177,6 +176,10 @@ export class ChantierDetailsPage implements OnInit {
   downloadPPSPS(docId: number) {
     const url = `${this.api['apiUrl']}/ppsps/${docId}/pdf`;
     window.open(url, '_system');
+  }
+
+  downloadDOE() {
+    this.api.downloadDOE(this.chantierId);
   }
 
   async openSignature() {

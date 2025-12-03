@@ -381,4 +381,10 @@ export class ApiService {
   getPPSPSList(chantierId: number): Observable<PPSPS[]> {
     return this.http.get<PPSPS[]>(`${this.apiUrl}/chantiers/${chantierId}/ppsps`);
   }
+
+  // Export DOE (Dossier des Ouvrages Exécutés) en ZIP
+  downloadDOE(chantierId: number) {
+    const url = `${this.apiUrl}/chantiers/${chantierId}/doe`;
+    window.open(url, '_system');
+  }
 }

@@ -3,7 +3,7 @@ import shutil
 from uuid import uuid4
 from typing import List, Optional
 from dotenv import load_dotenv
-
+import zipfile
 # Chargement des variables d'environnement locales (.env) si présentes
 load_dotenv()
 
@@ -306,7 +306,49 @@ def download_ppsps_pdf(ppsps_id: int, db: Session = Depends(get_db)):
 
 
 # ==========================================
-# 8. MIGRATIONS & MAINTENANCE
+# 8 ROUTE DOE (Fin de Chantier)
+# ==========================================
+# --- ROUTE DOE (Fin de Chantier) ---
+@app.get("/chantiers/{chantier_id}/doe")
+def download_doe(chantier_id: int, db: Session = Depends(get_db)):
+    # 1. Récupération des données
+    chantier = db.query(models.Chantier).filter(models.Chantier.id == chantier_id).first()
+    if not chantier: raise HTTPException(status_code=404, detail="Chantier introuvable")
+
+    # 2. Préparation du ZIP
+    zip_filename = f"DOE_{chantier.nom.replace(' ', '_')}.zip"
+    zip_path = f"uploads/{zip_filename}"
+
+    with zipfile.ZipFile(zip_path, 'w') as zipf:
+        
+        # --- A. AJOUT DU JOURNAL DE BORD ---
+        rapports = db.query(models.Rapport).filter(models.Rapport.chantier_id == chantier_id).all()
+        inspections = db.query(models.Inspection).filter(models.Inspection.chantier_id == chantier_id).all()
+        
+        journal_name = f"1_Journal_Suivi_{chantier.id}.pdf"
+        journal_path = f"uploads/{journal_name}"
+        
+        # On génère le PDF frais
+        pdf_generator.generate_pdf(chantier, rapports, inspections, journal_path)
+        
+        # On l'ajoute au ZIP
+        zipf.write(journal_path, journal_name)
+
+        # --- B. AJOUT DES PPSPS ---
+        ppsps_list = db.query(models.PPSPS).filter(models.PPSPS.chantier_id == chantier_id).all()
+        
+        for index, doc in enumerate(ppsps_list):
+            ppsps_name = f"2_PPSPS_{index+1}.pdf"
+            ppsps_path = f"uploads/{ppsps_name}"
+            
+            pdf_generator.generate_ppsps_pdf(chantier, doc, ppsps_path)
+            zipf.write(ppsps_path, ppsps_name)
+            
+    # 3. Envoi du ZIP
+    return FileResponse(path=zip_path, filename=zip_filename, media_type='application/zip')
+
+# ==========================================
+# 9. MIGRATIONS & MAINTENANCE
 # ==========================================
 
 @app.get("/reset_data")
