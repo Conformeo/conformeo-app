@@ -9,10 +9,14 @@ from io import BytesIO
 from datetime import datetime
 
 # --- CONFIGURATION DESIGN SOBRE ---
-COLOR_PRIMARY = (0.1, 0.1, 0.3) # Bleu nuit très sombre (Corporate)
-COLOR_SECONDARY = (0.4, 0.4, 0.4) # Gris moyen
+COLOR_PRIMARY = (0.1, 0.1, 0.3) # Bleu nuit
+COLOR_SECONDARY = (0.4, 0.4, 0.4) # Gris
 FONT_TITLE = "Helvetica-Bold"
 FONT_TEXT = "Helvetica"
+
+# ==========================================
+# 1. FONCTIONS UTILITAIRES (HELPERS)
+# ==========================================
 
 def get_optimized_image(path_or_url):
     """Télécharge une image optimisée."""
@@ -35,68 +39,64 @@ def get_optimized_image(path_or_url):
         print(f"Warning image: {e}")
     return None
 
-def draw_header_footer(c, width, height, chantier, titre_doc):
+def draw_footer(c, width, height, chantier, titre_doc):
     """En-tête et pied de page discret sur toutes les pages"""
     c.saveState()
     
-    # PIED DE PAGE
+    # Ligne de séparation
     c.setStrokeColorRGB(0.8, 0.8, 0.8); c.setLineWidth(0.5)
     c.line(1*cm, 1.5*cm, width-1*cm, 1.5*cm)
     
+    # Texte
     c.setFont(FONT_TEXT, 8); c.setFillColorRGB(0.5, 0.5, 0.5)
     c.drawString(1*cm, 1*cm, f"Conforméo - {titre_doc} - {chantier.nom}")
     c.drawRightString(width-1*cm, 1*cm, f"Page {c.getPageNumber()}")
 
     c.restoreState()
 
-def draw_simple_cover(c, chantier, titre_principal, sous_titre):
-    """Page de garde sobre (Fond blanc, Logo, Titres)"""
+def draw_cover_page(c, chantier, titre_principal, sous_titre):
+    """Page de garde sobre"""
     width, height = A4
     
-    # 1. Logo (Haut Gauche)
+    # 1. Logo
     logo = get_optimized_image("logo.png")
     if logo:
         try:
             rl_logo = ImageReader(logo)
-            # Logo plus discret (4cm de large)
             c.drawImage(rl_logo, 2*cm, height-5*cm, width=4*cm, height=2*cm, mask='auto', preserveAspectRatio=True)
         except: pass
 
-    # 2. Bloc Titre (Centre)
+    # 2. Titres
     y_center = height / 2 + 2*cm
     
     c.setFillColorRGB(*COLOR_PRIMARY)
-    c.setFont(FONT_TITLE, 24) # Taille réduite (24 vs 40)
+    c.setFont(FONT_TITLE, 24)
     c.drawString(2*cm, y_center, titre_principal)
     
     y_center -= 1*cm
     c.setFillColorRGB(*COLOR_SECONDARY)
-    c.setFont(FONT_TEXT, 14) # Taille réduite
+    c.setFont(FONT_TEXT, 14)
     c.drawString(2*cm, y_center, sous_titre)
     
-    # Ligne fine de séparation
     y_center -= 1.5*cm
     c.setStrokeColorRGB(0.8, 0.8, 0.8); c.setLineWidth(0.5)
     c.line(2*cm, y_center, width-2*cm, y_center)
 
-    # 3. Infos Chantier (En dessous)
+    # 3. Infos
     y_center -= 2*cm
-    
     c.setFillColorRGB(0, 0, 0)
     c.setFont(FONT_TITLE, 14)
     c.drawString(2*cm, y_center, "PROJET :")
-    
     c.setFont(FONT_TEXT, 14)
     c.drawString(5*cm, y_center, chantier.nom or "Non défini")
     
     y_center -= 1*cm
     c.setFont(FONT_TITLE, 14)
     c.drawString(2*cm, y_center, "ADRESSE :")
-    
     c.setFont(FONT_TEXT, 14)
     c.drawString(5*cm, y_center, chantier.adresse or "Non définie")
 
-    # 4. Date (Bas de page)
+    # 4. Date
     date_str = datetime.now().strftime('%d/%m/%Y')
     c.setFont(FONT_TEXT, 10); c.setFillColorRGB(0.5, 0.5, 0.5)
     c.drawRightString(width-2*cm, 3*cm, f"Édité le {date_str}")
@@ -104,21 +104,21 @@ def draw_simple_cover(c, chantier, titre_principal, sous_titre):
     c.showPage()
 
 # ==========================================
-# 1. JOURNAL DE BORD (PHOTOS)
+# 2. GENERATEUR JOURNAL DE BORD
 # ==========================================
 def generate_pdf(chantier, rapports, inspections, output_path):
     c = canvas.Canvas(output_path, pagesize=A4)
     width, height = A4
     margin = 2 * cm
     
-    draw_simple_cover(c, chantier, "JOURNAL DE BORD", "Suivi d'exécution & Rapports")
+    draw_cover_page(c, chantier, "JOURNAL DE BORD", "Suivi d'exécution & Rapports")
 
     y = height - 3 * cm
 
     def check_space(needed):
         nonlocal y
         if y < needed:
-            draw_header_footer(c, width, height, chantier, "Journal de Bord")
+            draw_footer(c, width, height, chantier, "Journal de Bord")
             c.showPage()
             y = height - 3 * cm
 
@@ -133,9 +133,12 @@ def generate_pdf(chantier, rapports, inspections, output_path):
         for rap in rapports:
             check_space(4*cm)
             
-            # Titre discret
             c.setFillColorRGB(0,0,0); c.setFont(FONT_TITLE, 11)
-            date_rap = rap.date_creation.strftime('%d/%m') if isinstance(rap.date_creation, datetime) else ""
+            date_rap = ""
+            if rap.date_creation:
+                if isinstance(rap.date_creation, str): date_rap = rap.date_creation[:10]
+                elif isinstance(rap.date_creation, datetime): date_rap = rap.date_creation.strftime('%d/%m')
+            
             c.drawString(margin, y, f"{date_rap} | {rap.titre or 'Observation'}")
             y -= 0.6*cm
             
@@ -144,12 +147,10 @@ def generate_pdf(chantier, rapports, inspections, output_path):
                 c.drawString(margin, y, rap.description)
                 y -= 0.8*cm
 
-            # Images
             imgs = []
             if hasattr(rap, 'images') and rap.images: imgs = [i.url for i in rap.images]
             elif hasattr(rap, 'photo_url') and rap.photo_url: imgs = [rap.photo_url]
 
-            # Grille 2 colonnes
             img_w, img_h, gap = 8*cm, 6*cm, 1*cm
             
             for i in range(0, len(imgs), 2):
@@ -172,7 +173,6 @@ def generate_pdf(chantier, rapports, inspections, output_path):
                             c.drawImage(ImageReader(pil2), margin+img_w+gap, y-img_h, width=img_w, height=img_h, preserveAspectRatio=True)
                         except: pass
                 y -= (img_h + 0.5*cm)
-            
             y -= 0.5*cm
 
     # --- QHSE ---
@@ -187,7 +187,9 @@ def generate_pdf(chantier, rapports, inspections, output_path):
         for insp in inspections:
             check_space(2*cm)
             c.setFillColorRGB(0,0,0); c.setFont(FONT_TITLE, 11)
-            date_audit = insp.date_creation.strftime('%d/%m') if isinstance(insp.date_creation, datetime) else ""
+            date_audit = ""
+            if insp.date_creation:
+                if isinstance(insp.date_creation, datetime): date_audit = insp.date_creation.strftime('%d/%m')
             c.drawString(margin, y, f"{insp.titre or 'Audit'} ({date_audit})")
             y -= 0.8*cm
             
@@ -198,34 +200,50 @@ def generate_pdf(chantier, rapports, inspections, output_path):
                 c.drawString(margin+0.5*cm, y, f"- {q.get('q','')}")
                 
                 stat = q.get('status', 'NA')
-                txt, col = "N/A", (0.5,0.5,0.5)
-                if stat=='OK': txt, col = "CONFORME", (0, 0.5, 0)
-                elif stat=='NOK': txt, col = "NON CONFORME", (0.8, 0, 0)
+                txt, color = "N/A", (0.5,0.5,0.5)
+                if stat=='OK': txt, color = "CONFORME", (0, 0.5, 0)
+                elif stat=='NOK': txt, color = "NON CONFORME", (0.8, 0, 0)
                 
-                c.setFont(FONT_TITLE, 9); c.setFillColorRGB(*col)
+                c.setFont(FONT_TITLE, 9); c.setFillColorRGB(*color)
                 c.drawRightString(width-margin, y, txt)
                 y -= 0.5*cm
             y -= 0.5*cm
 
+    # --- SIGNATURE ---
+    check_space(5*cm)
+    y -= 1*cm
+    c.setStrokeColorRGB(0,0,0); c.setLineWidth(1)
+    c.line(margin, y, width-margin, y)
+    y -= 1*cm
+    c.setFillColorRGB(0,0,0); c.setFont(FONT_TITLE, 12)
+    c.drawString(width-8*cm, y, "Validation :")
+    
+    if chantier.signature_url:
+        sig = get_optimized_image(chantier.signature_url)
+        if sig:
+            try: c.drawImage(ImageReader(sig), width-8*cm, y-4*cm, 5*cm, 3*cm, mask='auto', preserveAspectRatio=True)
+            except: pass
+    
     draw_footer(c, width, height, chantier, "Journal de Bord")
     c.save()
     return output_path
 
 # ==========================================
-# 2. GENERATEUR PPSPS
+# 3. GENERATEUR PPSPS
 # ==========================================
 def generate_ppsps_pdf(chantier, ppsps, output_path):
     c = canvas.Canvas(output_path, pagesize=A4)
     width, height = A4
     margin = 2 * cm
     
-    draw_simple_cover(c, chantier, "P.P.S.P.S", "Plan Particulier de Sécurité")
+    draw_cover_page(c, chantier, "P.P.S.P.S", "Plan Particulier de Sécurité")
 
     y = height - 3 * cm
+
     def check_space(needed):
         nonlocal y
         if y < needed:
-            draw_header_footer(c, width, height, chantier, "PPSPS")
+            draw_footer(c, width, height, chantier, "PPSPS")
             c.showPage()
             y = height - 3 * cm
 
@@ -260,29 +278,25 @@ def generate_ppsps_pdf(chantier, ppsps, output_path):
     c.drawString(margin, y, f"SST : {sec.get('sst_noms','-')}")
     y -= 1*cm
 
-    # 3. RISQUES (Tableau sobre)
+    # 3. RISQUES
     draw_section("3. ANALYSE DES RISQUES")
     taches = ppsps.taches_data or []
-    
     if not taches: c.drawString(margin, y, "Aucun risque spécifique."); y -= 1*cm
 
     for t in taches:
         check_space(2.5*cm)
-        # Ligne grise fine
         c.setStrokeColorRGB(0.9,0.9,0.9); c.setLineWidth(0.5)
         c.line(margin, y, width-margin, y); y -= 0.5*cm
         
         c.setFont(FONT_TITLE, 10); c.drawString(margin, y, t.get('tache',''))
         y -= 0.5*cm
-        
         c.setFont(FONT_TEXT, 9); c.setFillColorRGB(0.8, 0, 0)
         c.drawString(margin+0.5*cm, y, f"Risque : {t.get('risque','')}")
         y -= 0.5*cm
-        
         c.setFillColorRGB(0, 0.4, 0)
         c.drawString(margin+0.5*cm, y, f"Prévention : {t.get('prevention','')}")
         c.setFillColorRGB(0,0,0); y -= 0.8*cm
 
-    draw_header_footer(c, width, height, chantier, "PPSPS")
+    draw_footer(c, width, height, chantier, "PPSPS")
     c.save()
     return output_path
