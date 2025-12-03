@@ -9,25 +9,35 @@ from io import BytesIO
 from datetime import datetime
 
 def get_optimized_image(path_or_url):
-    """Télécharge une image optimisée (redimensionnée) pour économiser la RAM."""
+    """
+    Télécharge une image optimisée (redimensionnée) pour économiser la RAM.
+    """
     try:
+        # CAS 1 : URL Cloudinary (Optimisation Serveur)
         if path_or_url.startswith("http"):
+            # Si c'est du Cloudinary, on injecte des paramètres de redimensionnement
             optimized_url = path_or_url
             if "cloudinary.com" in path_or_url and "/upload/" in path_or_url:
                 optimized_url = path_or_url.replace("/upload/", "/upload/w_1000,q_auto,f_jpg/")
             
+            # On télécharge l'image légère
             response = requests.get(optimized_url, stream=True)
             if response.status_code == 200:
                 img = Image.open(BytesIO(response.content))
                 return img
+        
+        # CAS 2 : Fichier Local (Logo, etc.)
         else:
             clean_path = path_or_url.replace("/static/", "")
             possible_paths = [os.path.join("uploads", clean_path), clean_path]
+            
             for p in possible_paths:
                 if os.path.exists(p):
                     return Image.open(p)
+                    
     except Exception as e:
-        print(f"Erreur image ({path_or_url}): {e}")
+        print(f"Erreur chargement image optimisée ({path_or_url}): {e}")
+    
     return None
 
 def draw_cover_page(c, chantier, titre_principal, sous_titre):
@@ -121,7 +131,7 @@ def generate_pdf(chantier, rapports, inspections, output_path):
             if hasattr(rapport, 'images') and rapport.images:
                 for img_obj in rapport.images:
                     liste_images.append(img_obj.url)
-            elif rapport.photo_url:
+            elif hasattr(rapport, 'photo_url') and rapport.photo_url:
                 liste_images.append(rapport.photo_url)
 
             if y_position - hauteur_texte < MARGE_BAS:
@@ -173,10 +183,7 @@ def generate_pdf(chantier, rapports, inspections, output_path):
         for insp in inspections:
             check_page(3*cm)
             c.setFont("Helvetica-Bold", 12)
-            
-            # 👇 CORRECTION ICI : On affiche juste le titre enregistré
-            c.drawString(margin, y, f"📋 {insp.titre}") 
-            
+            c.drawString(margin, y, f"📋 {insp.titre}")
             y -= 0.8*cm
             
             questions = insp.data if isinstance(insp.data, list) else []
@@ -226,75 +233,16 @@ def generate_pdf(chantier, rapports, inspections, output_path):
     return output_path
 
 # ==========================================
-# 2. GENERATEUR PPSPS (Déjà fait, on le garde propre)
+# 2. GENERATEUR PPSPS
 # ==========================================
-
 def generate_ppsps_pdf(chantier, ppsps, output_path):
     """Génère le PPSPS avec la nouvelle page de garde Design"""
     c = canvas.Canvas(output_path, pagesize=A4)
     width, height = A4
-    
-    # --- PAGE DE GARDE IMMERSIVE ---
-    
-    # 1. Image de fond (Cover du chantier)
-    cover_img = None
-    if chantier.cover_url:
-        cover_img = get_optimized_image(chantier.cover_url)
-    
-    if cover_img:
-        try:
-            img_w, img_h = cover_img.size
-            aspect = img_h / float(img_w)
-            c.drawImage(ImageReader(cover_img), 0, 0, width=width, height=width*aspect, preserveAspectRatio=True)
-            
-            # Voile noir semi-transparent
-            c.setFillColorRGB(0, 0, 0, 0.6)
-            c.rect(0, 0, width, height, fill=1, stroke=0)
-        except: pass
-    else:
-        # Fond bleu par défaut
-        c.setFillColorRGB(0.1, 0.2, 0.4) 
-        c.rect(0, 0, width, height, fill=1, stroke=0)
-
-    # 2. Logo Conforméo
-    logo_img = get_optimized_image("logo.png")
-    if logo_img:
-        try:
-            rl_logo = ImageReader(logo_img)
-            c.setFillColorRGB(1, 1, 1)
-            c.roundRect(width/2 - 3*cm, height - 4*cm, 6*cm, 3*cm, 10, fill=1, stroke=0)
-            c.drawImage(rl_logo, width/2 - 2.5*cm, height - 3.8*cm, width=5*cm, height=2.5*cm, preserveAspectRatio=True, mask='auto')
-        except: pass
-
-    # 3. Titre Principal
-    c.setFillColorRGB(1, 1, 1) # Blanc
-    c.setFont("Helvetica-Bold", 40)
-    c.drawCentredString(width / 2, height / 2 + 2*cm, "P.P.S.P.S")
-    
-    c.setFont("Helvetica", 16)
-    c.drawCentredString(width / 2, height / 2 + 0.5*cm, "Plan Particulier de Sécurité")
-    c.drawCentredString(width / 2, height / 2 - 0.5*cm, "et de Protection de la Santé")
-    
-    c.setLineWidth(2)
-    c.setStrokeColorRGB(1, 1, 1)
-    c.line(width/2 - 4*cm, height/2 - 1.5*cm, width/2 + 4*cm, height/2 - 1.5*cm)
-
-    # 4. Infos Chantier
-    c.setFont("Helvetica-Bold", 24)
-    c.drawCentredString(width / 2, height / 2 - 3*cm, chantier.nom)
-    
-    c.setFont("Helvetica", 14)
-    c.drawCentredString(width / 2, height / 2 - 4*cm, chantier.adresse)
-
-    # 5. Pied de page avec DATE (C'est ici que ça plantait)
-    c.setFont("Helvetica-Oblique", 10)
-    date_str = datetime.now().strftime('%d/%m/%Y')
-    c.drawCentredString(width / 2, 2*cm, f"Document généré le {date_str}")
-    
-    c.showPage() # FIN PAGE DE GARDE
-
-    # --- PAGES SUIVANTES ---
     margin = 2 * cm
+    
+    draw_cover_page(c, chantier, "P.P.S.P.S", "Plan Particulier de Sécurité")
+
     y = height - 3 * cm
 
     def check_page():
@@ -302,11 +250,6 @@ def generate_ppsps_pdf(chantier, ppsps, output_path):
         if y < 3 * cm:
             c.showPage()
             y = height - 3 * cm
-
-    c.setFillColorRGB(0, 0, 0)
-    c.setFont("Helvetica-Bold", 12)
-    c.drawString(margin, height - 1.5*cm, f"PPSPS - {chantier.nom}")
-    c.line(margin, height - 1.8*cm, width - margin, height - 1.8*cm)
 
     # 1. INTERVENANTS
     c.setFont("Helvetica-Bold", 16)
