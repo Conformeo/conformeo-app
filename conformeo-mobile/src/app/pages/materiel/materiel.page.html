@@ -3,19 +3,18 @@
     <ion-buttons slot="start">
       <ion-back-button defaultHref="/home" text="" color="light"></ion-back-button>
     </ion-buttons>
+    <ion-title *ngIf="!searchTerm">Matériel</ion-title>
   </ion-toolbar>
 </ion-header>
 
 <ion-content class="inventory-content">
 
   <div class="mobile-only">
-     
     <div class="header-section">
       <div class="header-top">
         <h1 class="page-title">Inventaire</h1>
         <p class="page-subtitle">Gérez vos équipements</p>
       </div>
-
       <div class="stats-row">
         <div class="stat-item">
           <span class="stat-num">{{ materiels.length }}</span>
@@ -43,8 +42,7 @@
       </button>
     </div>
 
-    <div class="list-container" style="padding-bottom: 100px;">
-      
+    <div class="list-container">
       <div *ngIf="filteredMateriels.length === 0" class="empty-state">
         <ion-icon name="hammer-outline"></ion-icon>
         <p>Aucun matériel trouvé</p>
@@ -67,12 +65,9 @@
         </div>
       </div>
     </div>
-
   </div>
 
-
   <div class="desktop-only">
-    
     <div class="desktop-header">
       <h1>Parc Matériel</h1>
       <div class="actions">
@@ -101,7 +96,6 @@
         </div>
       </div>
     </div>
-
   </div>
 
   <ion-fab vertical="bottom" horizontal="end" slot="fixed" style="margin-bottom: 20px; margin-right: 10px;">

@@ -1,8 +1,16 @@
+/* --- 1. PAR DÉFAUT (MOBILE) --- */
+.mobile-only {
+  display: block;
+}
+.desktop-only {
+  display: none;
+}
+
 .inventory-content {
   --background: #f4f6f9; // Gris très clair pro
 }
 
-// 1. EN-TÊTE BLEU
+// --- HEADER MOBILE ---
 .header-section {
   background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); // Bleu Profond
   padding: 60px 20px 80px 20px; // De la place en bas pour la barre flottante
@@ -38,7 +46,7 @@
   }
 }
 
-// 2. BARRE DE RECHERCHE FLOTTANTE
+// --- RECHERCHE MOBILE ---
 .search-container {
   margin: -35px 20px 20px 20px; // Remonte sur le header
   display: flex;
@@ -66,12 +74,12 @@
     height: 100%;
     font-size: 14px;
     
-    // 👇 LA CORRECTION EST ICI
-    color: #000000 !important; // Force le texte en noir
+    // 👇 CORRECTION TEXTE VISIBLE
+    color: #000000 !important; 
     background: transparent;
     
     &::placeholder { 
-      color: #999 !important; // Gris pour le placeholder
+      color: #999 !important; 
     }
   }
 }
@@ -92,9 +100,9 @@
   &:active { transform: scale(0.95); }
 }
 
-// 3. LISTE
+// --- LISTE MOBILE ---
 .list-container {
-  padding: 0 20px 80px 20px;
+  padding: 0 20px 20px 20px;
 }
 
 .tool-card {
@@ -173,30 +181,20 @@
 }
 
 
-
-
-/* --- 1. PAR DÉFAUT (MOBILE) --- */
-.mobile-only {
-  display: block; /* On affiche le mobile */
-}
-.desktop-only {
-  display: none; /* On CACHE le desktop */
-}
-
-/* --- 2. SUR GRAND ÉCRAN (PC/Mac > 992px) --- */
+/* --- 2. SUR GRAND ÉCRAN (DESKTOP) --- */
 @media (min-width: 992px) {
+  
   .mobile-only {
-    display: none; /* On CACHE le mobile */
+    display: none; /* Cache le mobile */
   }
   .desktop-only {
-    display: block; /* On affiche le desktop */
+    display: block; /* Affiche le desktop */
     height: 100%;
   }
 
-  /* ... Ici tu colles tout le CSS "Waouh" que je t'ai donné avant ... */
-  /* Seulement pour grand écran (Desktop) */  
+  /* Styles spécifiques Desktop */
   .desktop-bg {
-    --background: #f8f9fa; /* Gris très clair Apple */
+    --background: #f8f9fa; 
   }
 
   .desktop-header {
@@ -209,7 +207,7 @@
 
   .equipment-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); /* Magique ! */
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
     gap: 30px;
     padding: 20px 60px;
   }
@@ -218,7 +216,7 @@
     background: white;
     border-radius: 20px;
     padding: 25px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.04); /* Ombre douce "SaaS" */
+    box-shadow: 0 10px 30px rgba(0,0,0,0.04);
     transition: all 0.2s ease;
     cursor: pointer;
     position: relative;

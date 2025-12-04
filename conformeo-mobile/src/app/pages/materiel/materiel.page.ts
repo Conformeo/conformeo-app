@@ -1,10 +1,12 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Platform } from '@ionic/angular/standalone'; 
 import { 
   IonHeader, IonToolbar, IonContent,
   IonButtons, IonButton, IonIcon, IonFab, IonFabButton, 
-  AlertController, IonBackButton,
+  AlertController, IonBackButton, IonMenuButton,
+  IonTitle,
 } from '@ionic/angular/standalone';
 import { Capacitor } from '@capacitor/core';
 import { addIcons } from 'ionicons';
@@ -22,8 +24,10 @@ import { BarcodeScanner, BarcodeFormat } from '@capacitor-mlkit/barcode-scanning
   imports: [CommonModule, 
     FormsModule, 
     IonHeader, 
+    IonMenuButton,
     IonToolbar, 
     IonContent, 
+    IonTitle,
     IonButtons, 
     IonButton, 
     IonIcon, 
@@ -37,15 +41,26 @@ export class MaterielPage implements OnInit {
   chantiers: Chantier[] = [];
   searchTerm: string = '';
 
+  isDesktop = false;
+
   constructor(
     private api: ApiService,
-    private alertCtrl: AlertController
+    private alertCtrl: AlertController,
+    private platform: Platform 
   ) {
     addIcons({ add, hammer, construct, home, swapHorizontal, qrCodeOutline, searchOutline, cube, homeOutline, locationOutline });
+    // Détection de la taille d'écran au démarrage
+    this.checkScreen();
+    // Écoute du redimensionnement
+    this.platform.resize.subscribe(() => this.checkScreen());
   }
 
   ngOnInit() {
     this.loadData();
+  }
+
+  checkScreen() {
+    this.isDesktop = window.innerWidth >= 992;
   }
 
   loadData(event?: any) {
