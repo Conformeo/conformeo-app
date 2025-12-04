@@ -1,0 +1,41 @@
+/* STYLE DU MENU LATÉRAL */
+ion-menu {
+  --width: 280px;
+  border-right: 1px solid #e0e0e0;
+}
+
+.menu-header {
+  padding: 30px 20px;
+  background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+  color: white;
+  
+  h2 { margin: 0; font-weight: 800; font-size: 24px; }
+  p { margin: 5px 0 0; opacity: 0.8; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; }
+}
+
+ion-list {
+  padding-top: 20px;
+}
+
+ion-item {
+  --padding-start: 20px;
+  --inner-padding-end: 20px;
+  margin-bottom: 5px;
+  border-radius: 0 25px 25px 0; /* Arrondi à droite */
+  cursor: pointer;
+
+  ion-icon { font-size: 22px; color: #666; }
+  ion-label { font-weight: 500; color: #444; }
+
+  /* Style quand l'onglet est ACTIF */
+  &.selected {
+    --background: rgba(var(--ion-color-primary-rgb), 0.1);
+    
+    ion-icon { color: var(--ion-color-primary); }
+    ion-label { color: var(--ion-color-primary); font-weight: 700; }
+  }
+  
+  &:hover:not(.selected) {
+    --background: #f4f4f4;
+  }
+}

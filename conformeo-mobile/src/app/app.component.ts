@@ -1,31 +1,56 @@
 import { Component } from '@angular/core';
-import { IonApp, IonRouterOutlet, ToastController } from '@ionic/angular/standalone';
+import { CommonModule } from '@angular/common';
+import { HttpClient } from '@angular/common/http';
+import { RouterLink, RouterLinkActive } from '@angular/router';
+import { 
+  IonApp, IonSplitPane, IonMenu, IonContent, IonList, 
+  IonListHeader, IonNote, IonMenuToggle, IonItem, IonLabel, 
+  IonRouterOutlet, IonIcon, ToastController 
+} from '@ionic/angular/standalone';
+import { addIcons } from 'ionicons';
+import { 
+  gridOutline, hammerOutline, mapOutline, peopleOutline, 
+  settingsOutline, logOutOutline, sync, checkmarkCircle, warning 
+} from 'ionicons/icons';
+
 import { OfflineService } from './services/offline';
 import { ApiService } from './services/api';
-import { HttpClient } from '@angular/common/http';
-
-// 👇 1. IMPORTS DES ICÔNES
-import { addIcons } from 'ionicons';
-import { sync, checkmarkCircle, warning } from 'ionicons/icons';
 
 @Component({
   selector: 'app-root',
   templateUrl: 'app.component.html',
+  styleUrls: ['app.component.scss'],
   standalone: true,
-  imports: [IonApp, IonRouterOutlet],
+  imports: [
+    CommonModule, RouterLink, RouterLinkActive,
+    IonApp, IonSplitPane, IonMenu, IonContent, IonList, 
+    IonListHeader, IonNote, IonMenuToggle, IonItem, IonLabel, 
+    IonRouterOutlet, IonIcon
+  ],
 })
 export class AppComponent {
   
+  // MENU LATÉRAL (Pour le Desktop)
+  public appPages = [
+    { title: 'Tableau de Bord', url: '/dashboard', icon: 'grid-outline' },
+    { title: 'Mes Chantiers', url: '/home', icon: 'map-outline' },
+    { title: 'Parc Matériel', url: '/materiel', icon: 'hammer-outline' },
+    { title: 'Équipes', url: '/home', icon: 'people-outline' },
+    { title: 'Paramètres', url: '/home', icon: 'settings-outline' },
+  ];
+
   constructor(
     private offline: OfflineService,
     private api: ApiService,
     private toastCtrl: ToastController,
     private http: HttpClient
   ) {
-    // 👇 2. ENREGISTREMENT DES ICÔNES
-    // C'est ça qui permet au Toast de les afficher
-    addIcons({ sync, checkmarkCircle, warning });
-
+    // On enregistre TOUTES les icônes (Menu + Notifs)
+    addIcons({ 
+      gridOutline, hammerOutline, mapOutline, peopleOutline, 
+      settingsOutline, logOutOutline, sync, checkmarkCircle, warning 
+    });
+    
     this.initializeApp();
   }
 
@@ -37,17 +62,19 @@ export class AppComponent {
     });
   }
 
+  // --- ROBOT DE SYNCHRONISATION ---
   async processQueue() {
     const queue = await this.offline.getQueue();
     
     if (queue.length === 0) return;
 
+    // Notification de démarrage
     const toastStart = await this.toastCtrl.create({
       message: `🔄 Connexion retrouvée : Synchronisation de ${queue.length} élément(s)...`,
       duration: 3000,
       position: 'top',
       color: 'warning',
-      icon: 'sync' // <--- Maintenant il la trouvera !
+      icon: 'sync'
     });
     toastStart.present();
 
@@ -71,22 +98,35 @@ export class AppComponent {
 
       // CAS 3 : Photo Unique
       else if (action.type === 'POST_RAPPORT_PHOTO') {
-        // ... (code inchangé)
+        const data = action.data; 
+        try {
+          const rawPath = data.localPhotoPath;
+          const fileName = rawPath.substring(rawPath.lastIndexOf('/') + 1);
+          const blob = await this.api.readLocalPhoto(fileName);
+
+          this.api.uploadPhoto(blob).subscribe({
+            next: (res) => {
+               this.api.createRapport(data.rapport, res.url).subscribe();
+            }
+          });
+        } catch (e) { console.error("Erreur photo unique", e); }
       }
 
-      // CAS 4 : Galerie Multi-Photos
+      // CAS 4 : Galerie Multi-Photos (Le Super Tunnel)
       else if (action.type === 'POST_RAPPORT_MULTI') {
-        const data = action.data; 
+        const data = action.data; // { rapport, localPaths: string[] }
         
         try {
-          // A. Lecture locale
+          console.log(`📸 Traitement multi-photos (${data.localPaths.length})...`);
+          
+          // A. Lecture locale des fichiers
           const blobPromises = data.localPaths.map((path: string) => {
              const fileName = path.substring(path.lastIndexOf('/') + 1);
              return this.api.readLocalPhoto(fileName);
           });
           const blobs = await Promise.all(blobPromises);
 
-          // B. Upload Cloudinary
+          // B. Upload Cloudinary en parallèle
           const uploadPromises = blobs.map((blob: Blob) => 
             new Promise<string>((resolve, reject) => {
               this.api.uploadPhoto(blob).subscribe({
@@ -101,6 +141,7 @@ export class AppComponent {
           data.rapport.image_urls = cloudUrls;
 
           // D. Envoi final
+          // On utilise l'URL de prod directement pour être sûr
           const API_URL = 'https://conformeo-api.onrender.com'; 
           
           this.http.post(`${API_URL}/rapports`, data.rapport).subscribe({
@@ -110,7 +151,7 @@ export class AppComponent {
                   duration: 3000,
                   color: 'success',
                   position: 'top',
-                  icon: 'checkmark-circle' // <--- Il la trouvera aussi !
+                  icon: 'checkmark-circle'
                 }).then(t => t.present());
              }
           });
@@ -121,6 +162,7 @@ export class AppComponent {
       }
     }
 
+    // Une fois fini, on vide la file
     await this.offline.clearQueue();
   }
 }
