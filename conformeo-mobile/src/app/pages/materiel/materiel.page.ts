@@ -2,10 +2,9 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { 
-  IonHeader, IonToolbar, IonTitle, IonContent, IonList, IonItem, IonLabel, 
-  IonButtons, IonButton, IonIcon, IonBadge, IonFab, IonFabButton, 
-  AlertController, IonRefresher, IonRefresherContent, IonBackButton,
-  IonSearchbar, IonGrid, IonRow, IonCol
+  IonHeader, IonToolbar, IonContent,
+  IonButtons, IonButton, IonIcon, IonFab, IonFabButton, 
+  AlertController, IonBackButton,
 } from '@ionic/angular/standalone';
 import { Capacitor } from '@capacitor/core';
 import { addIcons } from 'ionicons';
@@ -24,23 +23,12 @@ import { BarcodeScanner, BarcodeFormat } from '@capacitor-mlkit/barcode-scanning
     FormsModule, 
     IonHeader, 
     IonToolbar, 
-    // IonTitle, 
     IonContent, 
-    // IonList, 
-    // IonItem, 
-    // IonLabel, 
     IonButtons, 
     IonButton, 
     IonIcon, 
-    // IonBadge, 
     IonFab, 
     IonFabButton, 
-    // IonRefresher, 
-    // IonRefresherContent, 
-    // IonSearchbar, 
-    // IonGrid, 
-    // IonRow, 
-    // IonCol, 
     IonBackButton]
 })
 export class MaterielPage implements OnInit {

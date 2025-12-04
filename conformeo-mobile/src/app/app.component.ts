@@ -1,11 +1,12 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
-import { RouterLink, RouterLinkActive } from '@angular/router';
+import { Router, NavigationEnd, RouterLink, RouterLinkActive} from '@angular/router';
 import { 
   IonApp, IonSplitPane, IonMenu, IonContent, IonList, 
-  IonMenuToggle, IonItem, IonLabel, 
-  IonRouterOutlet, IonIcon, ToastController 
+  IonItem, IonLabel, IonMenuToggle,
+  IonRouterOutlet, IonIcon, ToastController, MenuController,
+  NavController // <--- 1. AJOUTER L'IMPORT
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
 import { 
@@ -13,7 +14,6 @@ import {
   settingsOutline, logOutOutline, sync, checkmarkCircle, warning 
 } from 'ionicons/icons';
 
-import { NavController } from '@ionic/angular/standalone';
 import { OfflineService } from './services/offline';
 import { ApiService } from './services/api';
 
@@ -23,14 +23,16 @@ import { ApiService } from './services/api';
   styleUrls: ['app.component.scss'],
   standalone: true,
   imports: [
-    CommonModule, RouterLink, RouterLinkActive,
-    IonApp, IonSplitPane, IonMenu, IonContent, IonList, IonMenuToggle, IonItem, IonLabel, 
+    CommonModule,
+    RouterLink,       // <--- 2. AJOUTEZ CECI
+    RouterLinkActive,
+    IonApp, IonSplitPane, IonMenu, IonContent, IonList, 
+    IonItem, IonLabel, IonMenuToggle,
     IonRouterOutlet, IonIcon
   ],
 })
 export class AppComponent {
   
-  // MENU LATÉRAL (Pour le Desktop)
   public appPages = [
     { title: 'Tableau de Bord', url: '/dashboard', icon: 'grid-outline' },
     { title: 'Mes Chantiers', url: '/home', icon: 'map-outline' },
@@ -39,20 +41,29 @@ export class AppComponent {
     { title: 'Paramètres', url: '/home', icon: 'settings-outline' },
   ];
 
+  currentUrl = '';
+
   constructor(
     private offline: OfflineService,
     private api: ApiService,
     private toastCtrl: ToastController,
     private http: HttpClient,
-    private navCtrl: NavController,
+    private router: Router,
+    private menuCtrl: MenuController,
+    private navCtrl: NavController // <--- 2. INJECTION DU NAV CONTROLLER
   ) {
-    // On enregistre TOUTES les icônes (Menu + Notifs)
     addIcons({ 
       gridOutline, hammerOutline, mapOutline, peopleOutline, 
       settingsOutline, logOutOutline, sync, checkmarkCircle, warning 
     });
     
     this.initializeApp();
+
+    this.router.events.subscribe((event) => {
+      if (event instanceof NavigationEnd) {
+        this.currentUrl = event.url;
+      }
+    });
   }
 
   initializeApp() {
@@ -62,18 +73,29 @@ export class AppComponent {
       }
     });
   }
-  
+
+  // --- NAVIGATION ROBUSTE ---
   navigateTo(url: string) {
-    this.navCtrl.navigateRoot(url, { animated: false }); // Force la navigation sans animation
+    // 3. ON UTILISE navCtrl AU LIEU DE router
+    this.navCtrl.navigateRoot(url, { animated: false });
+    
+    // On ferme le menu (utile sur Mobile, ignoré sur Desktop Split Pane)
+    this.menuCtrl.close();
   }
 
-  // --- ROBOT DE SYNCHRONISATION ---
+  isUrlActive(url: string): boolean {
+    return this.currentUrl === url || this.currentUrl.startsWith(url);
+  }
+
+  logout() {
+    console.log("Déconnexion...");
+  }
+
   async processQueue() {
     const queue = await this.offline.getQueue();
     
     if (queue.length === 0) return;
 
-    // Notification de démarrage
     const toastStart = await this.toastCtrl.create({
       message: `🔄 Connexion retrouvée : Synchronisation de ${queue.length} élément(s)...`,
       duration: 3000,
@@ -86,69 +108,46 @@ export class AppComponent {
     console.log("Traitement file d'attente...", queue);
 
     for (const action of queue) {
-      
-      // CAS 1 : Chantier Texte
       if (action.type === 'POST_CHANTIER') {
         this.api.createChantier(action.data).subscribe({
             error: (e) => console.error("Erreur Chantier", e)
         });
       }
-
-      // CAS 2 : Matériel
       else if (action.type === 'POST_MATERIEL') {
         this.api.createMateriel(action.data).subscribe({
             error: (e) => console.error("Erreur Matériel", e)
         });
       }
-
-      // CAS 3 : Photo Unique
       else if (action.type === 'POST_RAPPORT_PHOTO') {
-        const data = action.data; 
-        try {
-          const rawPath = data.localPhotoPath;
-          const fileName = rawPath.substring(rawPath.lastIndexOf('/') + 1);
-          const blob = await this.api.readLocalPhoto(fileName);
-
-          this.api.uploadPhoto(blob).subscribe({
-            next: (res) => {
-               this.api.createRapport(data.rapport, res.url).subscribe();
-            }
-          });
-        } catch (e) { console.error("Erreur photo unique", e); }
+         const data = action.data; 
+         try {
+            const rawPath = data.localPhotoPath;
+            const fileName = rawPath.substring(rawPath.lastIndexOf('/') + 1);
+            const blob = await this.api.readLocalPhoto(fileName);
+            this.api.uploadPhoto(blob).subscribe({
+              next: (res) => {
+                 this.api.createRapport(data.rapport, res.url).subscribe();
+              }
+            });
+         } catch(e) {}
       }
-
-      // CAS 4 : Galerie Multi-Photos (Le Super Tunnel)
       else if (action.type === 'POST_RAPPORT_MULTI') {
-        const data = action.data; // { rapport, localPaths: string[] }
-        
+        const data = action.data;
         try {
-          console.log(`📸 Traitement multi-photos (${data.localPaths.length})...`);
-          
-          // A. Lecture locale des fichiers
           const blobPromises = data.localPaths.map((path: string) => {
              const fileName = path.substring(path.lastIndexOf('/') + 1);
              return this.api.readLocalPhoto(fileName);
           });
           const blobs = await Promise.all(blobPromises);
-
-          // B. Upload Cloudinary en parallèle
           const uploadPromises = blobs.map((blob: Blob) => 
             new Promise<string>((resolve, reject) => {
-              this.api.uploadPhoto(blob).subscribe({
-                next: (res) => resolve(res.url),
-                error: (err) => reject(err)
-              });
+              this.api.uploadPhoto(blob).subscribe({ next: (res) => resolve(res.url), error: reject });
             })
           );
           const cloudUrls = await Promise.all(uploadPromises);
-
-          // C. Mise à jour rapport
           data.rapport.image_urls = cloudUrls;
-
-          // D. Envoi final
-          // On utilise l'URL de prod directement pour être sûr
-          const API_URL = 'https://conformeo-api.onrender.com'; 
           
+          const API_URL = 'https://conformeo-api.onrender.com'; 
           this.http.post(`${API_URL}/rapports`, data.rapport).subscribe({
              next: () => {
                 this.toastCtrl.create({
@@ -160,16 +159,9 @@ export class AppComponent {
                 }).then(t => t.present());
              }
           });
-
-        } catch (e) {
-          console.error("❌ Erreur synchro multi", e);
-        }
+        } catch (e) { console.error("Erreur synchro multi", e); }
       }
     }
-
-    // Une fois fini, on vide la file
     await this.offline.clearQueue();
   }
-
-
 }
