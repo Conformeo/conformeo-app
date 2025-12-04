@@ -359,7 +359,7 @@ def generate_audit_pdf(chantier, inspection, output_path):
         # Fond ligne (alterné ou si NOK)
         if status == 'NOK':
             c.setFillColorRGB(1, 0.9, 0.9) # Fond rouge clair
-            c.rect(margin, y-0.8*cm, width-2*margin, 1.2*cm, fill=1, stroke=0)
+            c.rect(margin, y-0.8*cm, width-2*margin, 0.7*cm, fill=1, stroke=0)
         
         # Question
         c.setFillColorRGB(0,0,0); c.setFont(FONT_TEXT, 10)
