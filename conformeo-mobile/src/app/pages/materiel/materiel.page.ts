@@ -30,7 +30,7 @@ import { BarcodeScanner, BarcodeFormat } from '@capacitor-mlkit/barcode-scanning
     // IonItem, 
     // IonLabel, 
     IonButtons, 
-    // IonButton, 
+    IonButton, 
     IonIcon, 
     // IonBadge, 
     IonFab, 
