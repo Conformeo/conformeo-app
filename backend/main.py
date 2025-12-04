@@ -344,7 +344,14 @@ def download_doe(chantier_id: int, db: Session = Depends(get_db)):
             pdf_generator.generate_ppsps_pdf(chantier, doc, ppsps_path)
             zipf.write(ppsps_path, ppsps_name)
 
-        # --- C. PIC (Plan Installation) ---
+        # --- C. AUDITS (NOUVEAU)
+        for index, insp in enumerate(inspections):
+            audit_name = f"3_Audit_{insp.type}_{index+1}.pdf"
+            audit_path = f"uploads/{audit_name}"
+            pdf_generator.generate_audit_pdf(chantier, insp, audit_path)
+            zipf.write(audit_path, audit_name)
+
+        # --- D. PIC (Plan Installation) ---
         # On cherche le PIC du chantier
         pic = db.query(models.PIC).filter(models.PIC.chantier_id == chantier_id).first()
         

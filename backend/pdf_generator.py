@@ -8,9 +8,9 @@ import requests
 from io import BytesIO
 from datetime import datetime
 
-# --- CONFIGURATION DESIGN SOBRE ---
-COLOR_PRIMARY = (0.1, 0.1, 0.3)
-COLOR_SECONDARY = (0.4, 0.4, 0.4)
+# --- CONFIGURATION DESIGN PRO (FOND BLANC) ---
+COLOR_PRIMARY = (0.1, 0.2, 0.5) # Bleu marine
+COLOR_SECONDARY = (0.4, 0.4, 0.4) # Gris
 FONT_TITLE = "Helvetica-Bold"
 FONT_TEXT = "Helvetica"
 
@@ -44,51 +44,60 @@ def draw_footer(c, width, height, chantier, titre_doc):
     c.restoreState()
 
 def draw_cover_page(c, chantier, titre_principal, sous_titre):
+    """Page de garde SOBRE (Fond Blanc)"""
     width, height = A4
-    if chantier.cover_url:
-        cover = get_optimized_image(chantier.cover_url)
-        if cover:
-            try:
-                w, h = cover.size
-                aspect = h / float(w)
-                c.drawImage(ImageReader(cover), 0, 0, width=width, height=width*aspect, preserveAspectRatio=True)
-                c.setFillColorRGB(0, 0, 0, 0.6)
-                c.rect(0, 0, width, height, fill=1, stroke=0)
-            except: pass
-    else:
-        c.setFillColorRGB(0.1, 0.2, 0.4); c.rect(0, 0, width, height, fill=1, stroke=0)
+    
+    # Pas d'image de fond -> Fond Blanc par défaut
 
+    # 1. Logo (Haut Gauche)
     logo = get_optimized_image("logo.png")
     if logo:
         try:
             rl_logo = ImageReader(logo)
-            c.setFillColorRGB(1, 1, 1)
-            c.roundRect(width/2-3*cm, height-4*cm, 6*cm, 3*cm, 10, fill=1, stroke=0)
-            c.drawImage(rl_logo, width/2-2.5*cm, height-3.8*cm, 5*cm, 2.5*cm, mask='auto', preserveAspectRatio=True)
+            c.drawImage(rl_logo, 2*cm, height-4*cm, width=5*cm, height=2.5*cm, mask='auto', preserveAspectRatio=True)
         except: pass
 
-    y_center = height / 2 + 2*cm
-    c.setFillColorRGB(1, 1, 1); c.setFont(FONT_TITLE, 24)
-    c.drawCentredString(width/2, y_center, titre_principal)
-    y_center -= 1*cm
-    c.setFillColorRGB(*COLOR_SECONDARY); c.setFont(FONT_TEXT, 14)
-    c.drawCentredString(width/2, y_center, sous_titre)
-    y_center -= 1.5*cm
-    c.setStrokeColorRGB(0.8, 0.8, 0.8); c.setLineWidth(0.5)
-    c.line(2*cm, y_center, width-2*cm, y_center)
-    y_center -= 2*cm
-    c.setFillColorRGB(0, 0, 0); c.setFont(FONT_TITLE, 14)
-    c.drawString(2*cm, y_center, "PROJET :")
-    c.setFont(FONT_TEXT, 14)
-    c.drawString(5*cm, y_center, chantier.nom or "Non défini")
-    y_center -= 1*cm
-    c.setFont(FONT_TITLE, 14)
-    c.drawString(2*cm, y_center, "ADRESSE :")
-    c.setFont(FONT_TEXT, 14)
-    c.drawString(5*cm, y_center, chantier.adresse or "Non définie")
+    # 2. Date (Haut Droite)
     date_str = datetime.now().strftime('%d/%m/%Y')
     c.setFont(FONT_TEXT, 10); c.setFillColorRGB(0.5, 0.5, 0.5)
-    c.drawRightString(width-2*cm, 3*cm, f"Édité le {date_str}")
+    c.drawRightString(width-2*cm, height-3*cm, f"Édité le {date_str}")
+
+    # 3. Titres (Centrés et Sombres)
+    y_center = height / 2 + 3*cm
+    
+    c.setFillColorRGB(*COLOR_PRIMARY)
+    c.setFont(FONT_TITLE, 36)
+    c.drawCentredString(width/2, y_center, titre_principal)
+    
+    y_center -= 1.2*cm
+    c.setFillColorRGB(*COLOR_SECONDARY)
+    c.setFont(FONT_TEXT, 18)
+    c.drawCentredString(width/2, y_center, sous_titre)
+    
+    # Ligne de séparation
+    y_center -= 2*cm
+    c.setStrokeColorRGB(*COLOR_PRIMARY); c.setLineWidth(3)
+    c.line(width/2-3*cm, y_center, width/2+3*cm, y_center)
+
+    # 4. Infos Chantier
+    y_center -= 3*cm
+    
+    c.setFillColorRGB(0, 0, 0)
+    c.setFont(FONT_TITLE, 14)
+    c.drawCentredString(width/2, y_center, "PROJET")
+    
+    y_center -= 0.8*cm
+    c.setFont(FONT_TEXT, 16)
+    c.drawCentredString(width/2, y_center, chantier.nom or "Nom du chantier")
+    
+    y_center -= 2*cm
+    c.setFont(FONT_TITLE, 14)
+    c.drawCentredString(width/2, y_center, "ADRESSE")
+    
+    y_center -= 0.8*cm
+    c.setFont(FONT_TEXT, 16)
+    c.drawCentredString(width/2, y_center, chantier.adresse or "Adresse du chantier")
+    
     c.showPage()
 
 # ==========================================
@@ -98,6 +107,7 @@ def generate_pdf(chantier, rapports, inspections, output_path):
     c = canvas.Canvas(output_path, pagesize=A4)
     width, height = A4
     margin = 2 * cm
+    
     draw_cover_page(c, chantier, "JOURNAL DE BORD", "Suivi d'exécution & Rapports")
     y = height - 3 * cm
 
@@ -115,19 +125,28 @@ def generate_pdf(chantier, rapports, inspections, output_path):
         c.line(margin, y, width-margin, y); y -= 1 * cm
 
         for rap in rapports:
-            check_space(4*cm)
+            check_space(5*cm)
+            
+            # Cadre gris léger pour chaque rapport
+            c.setFillColorRGB(0.97, 0.97, 0.97)
+            c.rect(margin, y-1.5*cm, width-2*margin, 1.5*cm, fill=1, stroke=0)
+            
             c.setFillColorRGB(0,0,0); c.setFont(FONT_TITLE, 11)
             date_rap = rap.date_creation.strftime('%d/%m') if isinstance(rap.date_creation, datetime) else ""
-            c.drawString(margin, y, f"{date_rap} | {rap.titre or 'Observation'}")
-            y -= 0.6*cm
+            c.drawString(margin+0.5*cm, y-0.5*cm, f"📅 {date_rap} - {rap.titre or 'Observation'}")
+            
             if rap.description:
-                c.setFont(FONT_TEXT, 10); c.setFillColorRGB(0.2, 0.2, 0.2)
-                c.drawString(margin, y, rap.description)
-                y -= 0.8*cm
+                c.setFont(FONT_TEXT, 10); c.setFillColorRGB(0.3, 0.3, 0.3)
+                c.drawString(margin+0.5*cm, y-1.2*cm, rap.description[:90])
+            
+            y -= 2*cm
+
             imgs = []
             if hasattr(rap, 'images') and rap.images: imgs = [i.url for i in rap.images]
             elif hasattr(rap, 'photo_url') and rap.photo_url: imgs = [rap.photo_url]
+
             img_w, img_h, gap = 8*cm, 6*cm, 1*cm
+            
             for i in range(0, len(imgs), 2):
                 check_space(img_h + 0.5*cm)
                 url1 = imgs[i]
@@ -137,6 +156,7 @@ def generate_pdf(chantier, rapports, inspections, output_path):
                         pil1 = ImageOps.exif_transpose(pil1)
                         c.drawImage(ImageReader(pil1), margin, y-img_h, width=img_w, height=img_h, preserveAspectRatio=True)
                     except: pass
+                
                 if i+1 < len(imgs):
                     url2 = imgs[i+1]
                     pil2 = get_optimized_image(url2)
@@ -159,25 +179,18 @@ def generate_pdf(chantier, rapports, inspections, output_path):
             check_space(2*cm)
             c.setFillColorRGB(0,0,0); c.setFont(FONT_TITLE, 11)
             date_audit = insp.date_creation.strftime('%d/%m') if isinstance(insp.date_creation, datetime) else ""
-            c.drawString(margin, y, f"{insp.titre or 'Audit'} ({date_audit})")
+            c.drawString(margin, y, f"📋 {insp.titre or 'Audit'} ({date_audit})")
             y -= 0.8*cm
             questions = insp.data if isinstance(insp.data, list) else []
             for q in questions:
                 check_space(0.6*cm)
-                
-                # 👇 CORRECTION DU FOND ROUGE (Plus fin et mieux ajusté)
-                status = q.get('status', 'NA')
-                if status == 'NOK':
-                    c.setFillColorRGB(1, 0.92, 0.92) # Rouge très clair
-                    # Hauteur réduite à 0.7cm (au lieu de 1.2) et remontée (y-0.2)
-                    c.rect(margin, y-0.2*cm, width-2*margin, 0.7*cm, fill=1, stroke=0)
-
                 c.setFont(FONT_TEXT, 9); c.setFillColorRGB(0.2, 0.2, 0.2)
                 c.drawString(margin+0.5*cm, y, f"- {q.get('q','')}")
                 
+                stat = q.get('status', 'NA')
                 txt, color = "N/A", (0.5,0.5,0.5)
-                if status=='OK': txt, color = "CONFORME", (0, 0.5, 0)
-                elif status=='NOK': txt, color = "NON CONFORME", (0.8, 0, 0)
+                if stat=='OK': txt, color = "CONFORME", (0, 0.6, 0)
+                elif stat=='NOK': txt, color = "NON CONFORME", (0.8, 0, 0)
                 
                 c.setFont(FONT_TITLE, 9); c.setFillColorRGB(*color)
                 c.drawRightString(width-margin, y, txt)
@@ -187,13 +200,14 @@ def generate_pdf(chantier, rapports, inspections, output_path):
     check_space(5*cm)
     y -= 1*cm; c.setStrokeColorRGB(0,0,0); c.setLineWidth(1)
     c.line(margin, y, width-margin, y); y -= 1*cm
-    c.setFillColorRGB(0,0,0); c.setFont(FONT_TITLE, 12)
+    c.setFont("Helvetica-Bold", 12)
     c.drawString(width-8*cm, y, "Validation :")
     if chantier.signature_url:
         sig = get_optimized_image(chantier.signature_url)
         if sig:
             try: c.drawImage(ImageReader(sig), width-8*cm, y-4*cm, 5*cm, 3*cm, mask='auto', preserveAspectRatio=True)
             except: pass
+            
     draw_footer(c, width, height, chantier, "Journal de Bord")
     c.save()
     return output_path
@@ -205,6 +219,7 @@ def generate_ppsps_pdf(chantier, ppsps, output_path):
     c = canvas.Canvas(output_path, pagesize=A4)
     width, height = A4
     margin = 2 * cm
+    
     draw_cover_page(c, chantier, "P.P.S.P.S", "Plan Particulier de Sécurité")
     y = height - 3 * cm
     
@@ -258,3 +273,56 @@ def generate_ppsps_pdf(chantier, ppsps, output_path):
     draw_footer(c, width, height, chantier, "PPSPS")
     c.save()
     return output_path
+
+# ==========================================
+# 3. GENERATEUR AUDIT UNIQUE (NOUVEAU)
+# ==========================================
+def generate_audit_pdf(chantier, inspection, output_path):
+    c = canvas.Canvas(output_path, pagesize=A4)
+    width, height = A4
+    margin = 2 * cm
+    
+    draw_cover_page(c, chantier, "RAPPORT D'AUDIT", f"{inspection.titre} ({inspection.type})")
+    
+    y = height - 3 * cm
+    def check_space(needed):
+        nonlocal y
+        if y < needed:
+            draw_footer(c, width, height, chantier, "Rapport d'Audit")
+            c.showPage()
+            y = height - 3 * cm
+
+    check_space(3*cm)
+    c.setFillColorRGB(*COLOR_PRIMARY); c.setFont(FONT_TITLE, 16)
+    c.drawString(margin, y, "DÉTAIL DE L'INSPECTION")
+    y -= 0.2*cm; c.setLineWidth(1.5); c.setStrokeColorRGB(*COLOR_PRIMARY)
+    c.line(margin, y, width-margin, y); c.setFillColorRGB(0,0,0); y -= 1*cm
+    
+    c.setFont(FONT_TEXT, 11)
+    date_audit = inspection.date_creation.strftime('%d/%m/%Y à %H:%M')
+    c.drawString(margin, y, f"Date : {date_audit} | Contrôleur : {inspection.createur}")
+    y -= 1.5*cm
+
+    questions = inspection.data if isinstance(inspection.data, list) else []
+    for item in questions:
+        check_space(1.5*cm)
+        q_text = item.get('q', 'Point')
+        status = item.get('status', 'NA')
+        
+        c.setFont(FONT_TEXT, 10)
+        c.drawString(margin, y, q_text)
+        
+        txt, color = "N/A", (0.5,0.5,0.5)
+        if status == 'OK': txt, color = "CONFORME", (0, 0.6, 0)
+        elif status == 'NOK': txt, color = "NON CONFORME", (0.8, 0, 0)
+        
+        c.setFont(FONT_TITLE, 10); c.setFillColorRGB(*color)
+        c.drawRightString(width-margin, y, txt)
+        c.setFillColorRGB(0,0,0)
+        
+        c.setStrokeColorRGB(0.9,0.9,0.9); c.setLineWidth(0.5)
+        c.line(margin, y-0.4*cm, width-margin, y-0.4*cm)
+        y -= 1*cm
+
+    draw_footer(c, width, height, chantier, "Rapport d'Audit")
+    c.save()
