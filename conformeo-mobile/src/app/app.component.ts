@@ -4,7 +4,7 @@ import { HttpClient } from '@angular/common/http';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import { 
   IonApp, IonSplitPane, IonMenu, IonContent, IonList, 
-  IonListHeader, IonNote, IonMenuToggle, IonItem, IonLabel, 
+  IonMenuToggle, IonItem, IonLabel, 
   IonRouterOutlet, IonIcon, ToastController 
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
@@ -23,8 +23,7 @@ import { ApiService } from './services/api';
   standalone: true,
   imports: [
     CommonModule, RouterLink, RouterLinkActive,
-    IonApp, IonSplitPane, IonMenu, IonContent, IonList, 
-    IonListHeader, IonNote, IonMenuToggle, IonItem, IonLabel, 
+    IonApp, IonSplitPane, IonMenu, IonContent, IonList, IonMenuToggle, IonItem, IonLabel, 
     IonRouterOutlet, IonIcon
   ],
 })

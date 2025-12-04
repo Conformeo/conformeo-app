@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { 
   IonContent, IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, 
-  IonList, IonItem, IonLabel, IonNote, IonIcon, IonSegment, IonSegmentButton,
+  IonList, IonLabel, IonIcon, IonSegment, IonSegmentButton,
   IonBackButton, NavController, AlertController
 } from '@ionic/angular/standalone';
 import { ActivatedRoute } from '@angular/router';
@@ -16,7 +16,7 @@ import { ApiService, Inspection } from 'src/app/services/api';
   templateUrl: './qhse-form.page.html',
   styleUrls: ['./qhse-form.page.scss'],
   standalone: true,
-  imports: [CommonModule, FormsModule, IonContent, IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, IonList, IonItem, IonLabel, IonNote, IonIcon, IonSegment, IonSegmentButton, IonBackButton]
+  imports: [CommonModule, FormsModule, IonContent, IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, IonList, IonLabel, IonIcon, IonSegment, IonSegmentButton, IonBackButton]
 })
 export class QhseFormPage implements OnInit {
   chantierId!: number;
