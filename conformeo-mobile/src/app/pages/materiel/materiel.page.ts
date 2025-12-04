@@ -6,14 +6,14 @@ import {
   IonHeader, IonToolbar, IonContent,
   IonButtons, IonButton, IonIcon, IonFab, IonFabButton, 
   AlertController, IonBackButton, IonSearchbar,
-  IonTitle,
+  IonTitle, ModalController // <--- ModalController est ici
 } from '@ionic/angular/standalone';
 import { Capacitor } from '@capacitor/core';
 import { addIcons } from 'ionicons';
-import { add, hammer, construct, home, swapHorizontal, qrCodeOutline, searchOutline, cube, homeOutline, locationOutline } from 'ionicons/icons';
-import { ApiService, Materiel, Chantier } from '../../services/api';
-
-// 👇 NOUVEAUX IMPORTS POUR ML KIT
+// 👇 AJOUT DE shieldCheckmark DANS LES IMPORTS
+import { add, hammer, construct, home, swapHorizontal, qrCodeOutline, searchOutline, cube, homeOutline, locationOutline, shieldCheckmark } from 'ionicons/icons';
+import { ApiService, Materiel, Chantier } from '../../services/api'; // Vérifiez le chemin (../..)
+import { AddMaterielModalComponent } from './add-materiel-modal/add-materiel-modal.component';
 import { BarcodeScanner, BarcodeFormat } from '@capacitor-mlkit/barcode-scanning';
 
 @Component({
@@ -21,7 +21,8 @@ import { BarcodeScanner, BarcodeFormat } from '@capacitor-mlkit/barcode-scanning
   templateUrl: './materiel.page.html',
   styleUrls: ['./materiel.page.scss'],
   standalone: true,
-  imports: [CommonModule, 
+  imports: [
+    CommonModule, 
     FormsModule, 
     IonHeader, 
     IonSearchbar,
@@ -33,7 +34,8 @@ import { BarcodeScanner, BarcodeFormat } from '@capacitor-mlkit/barcode-scanning
     IonIcon, 
     IonFab, 
     IonFabButton, 
-    IonBackButton]
+    IonBackButton
+  ]
 })
 export class MaterielPage implements OnInit {
   materiels: Materiel[] = [];
@@ -46,12 +48,13 @@ export class MaterielPage implements OnInit {
   constructor(
     private api: ApiService,
     private alertCtrl: AlertController,
-    private platform: Platform 
+    private platform: Platform,
+    private modalCtrl: ModalController 
   ) {
-    addIcons({ add, hammer, construct, home, swapHorizontal, qrCodeOutline, searchOutline, cube, homeOutline, locationOutline });
-    // Détection de la taille d'écran au démarrage
+    // 👇 AJOUT DE shieldCheckmark ICI
+    addIcons({ add, hammer, construct, home, swapHorizontal, qrCodeOutline, searchOutline, cube, homeOutline, locationOutline, shieldCheckmark });
+    
     this.checkScreen();
-    // Écoute du redimensionnement
     this.platform.resize.subscribe(() => this.checkScreen());
   }
 
@@ -82,10 +85,9 @@ export class MaterielPage implements OnInit {
     );
   }
 
-  // --- LE NOUVEAU SCANNER (Beaucoup plus court !) ---
+  // --- SCANNER ---
   async startScan() {
     try {
-      // 1. Demander la permission
       const { camera } = await BarcodeScanner.requestPermissions();
       
       if (camera !== 'granted' && camera !== 'limited') {
@@ -93,8 +95,6 @@ export class MaterielPage implements OnInit {
         return;
       }
 
-      // 2. (Android Uniquement) Vérifier le module Google
-      // 👇 C'EST ICI LA CORRECTION 👇
       if (Capacitor.getPlatform() === 'android') {
         const { available } = await BarcodeScanner.isGoogleBarcodeScannerModuleAvailable();
         if (!available) {
@@ -102,12 +102,10 @@ export class MaterielPage implements OnInit {
         }
       }
 
-      // 3. Lancer le scan (Fonctionne sur iOS et Android)
       const { barcodes } = await BarcodeScanner.scan({
         formats: [BarcodeFormat.QrCode]
       });
 
-      // 4. Résultat
       if (barcodes.length > 0) {
         const code = barcodes[0].rawValue;
         this.handleScanResult(code);
@@ -118,9 +116,9 @@ export class MaterielPage implements OnInit {
       alert("Erreur Scanner : " + (e.message || JSON.stringify(e)));
     }
   }
+
   handleScanResult(code: string) {
     const mat = this.materiels.find(m => m.reference === code);
-    
     if (mat) {
       this.moveMateriel(mat);
     } else {
@@ -128,32 +126,26 @@ export class MaterielPage implements OnInit {
     }
   }
 
-  // --- Création (inchangé) ---
+  // --- CREATION (MODALE) ---
   async addMateriel() {
-    const alert = await this.alertCtrl.create({
-      header: 'Nouvel Outil',
-      inputs: [
-        { name: 'nom', type: 'text', placeholder: 'Nom (ex: Perceuse)' },
-        { name: 'ref', type: 'text', placeholder: 'Référence (ex: HIL-01)' }
-      ],
-      buttons: [
-        { text: 'Annuler', role: 'cancel' },
-        {
-          text: 'Créer',
-          handler: (data) => {
-            if (data.nom) {
-              this.api.createMateriel({ nom: data.nom, reference: data.ref, etat: 'Bon' }).subscribe(() => {
-                this.loadData();
-              });
-            }
-          }
-        }
-      ]
+    // 👇 C'EST ICI LE CHANGEMENT : ON OUVRE LA MODALE AU LIEU DE L'ALERTE
+    const modal = await this.modalCtrl.create({
+      component: AddMaterielModalComponent,
+      // cssClass: 'auto-height' // Optionnel
     });
-    await alert.present();
+    
+    await modal.present();
+    
+    // On attend que la modale se ferme
+    const { role } = await modal.onWillDismiss();
+    
+    // Si l'utilisateur a créé (confirm), on recharge la liste
+    if (role === 'confirm') {
+      this.loadData();
+    }
   }
 
-  // --- Déplacement (inchangé) ---
+  // --- DEPLACEMENT (INCHANGÉ) ---
   async moveMateriel(mat: Materiel) {
     const inputs: any[] = [
       { type: 'radio', label: '🏠 Retour au Dépôt', value: null, checked: mat.chantier_id === null }
@@ -185,7 +177,7 @@ export class MaterielPage implements OnInit {
     return c ? c.nom : 'Inconnu';
   }
 
-  // --- Helpers pour les stats ---
+  // --- STATS ---
   getMaterielsSortis(): number {
     return this.materiels.filter(m => m.chantier_id !== null).length;
   }

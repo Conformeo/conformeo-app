@@ -35,6 +35,7 @@
     "@capacitor/keyboard": "7.0.3",
     "@capacitor/network": "^7.0.2",
     "@capacitor/status-bar": "7.0.3",
+    "@imgly/background-removal": "^1.7.0",
     "@ionic/angular": "^8.0.0",
     "@ionic/pwa-elements": "^3.3.0",
     "@ionic/storage-angular": "^4.0.0",
