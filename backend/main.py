@@ -362,7 +362,7 @@ def download_doe(chantier_id: int, db: Session = Depends(get_db)):
                 if response.status_code == 200:
                     # On détermine l'extension (jpg ou png)
                     ext = "jpg" if "jpeg" in response.headers.get("content-type", "") else "png"
-                    pic_name = f"3_Plan_Installation_PIC.{ext}"
+                    pic_name = f"4_Plan_Installation_PIC.{ext}"
                     pic_path = f"uploads/{pic_name}"
                     
                     # On l'écrit sur le disque temporairement
