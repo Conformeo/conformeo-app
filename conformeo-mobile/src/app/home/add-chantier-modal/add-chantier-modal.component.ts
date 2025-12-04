@@ -2,19 +2,12 @@ import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
-// 👇 ON IMPORTE CHAQUE COMPOSANT ICI (C'est la méthode moderne Standalone)
+
+// 👇 TOUS LES IMPORTS IONIC NECESSAIRES
 import { 
-  IonHeader, 
-  IonToolbar, 
-  IonTitle, 
-  IonButtons, 
-  IonButton, 
-  IonContent, 
-  IonList, 
-  IonItem, 
-  IonInput,
-  ModalController,
-  IonIcon
+  IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, 
+  IonContent, IonList, IonItem, IonInput, ModalController,
+  IonIcon 
 } from '@ionic/angular/standalone';
 
 import { ApiService, Chantier } from '../../services/api';
@@ -26,20 +19,12 @@ import { camera } from 'ionicons/icons';
   templateUrl: './add-chantier-modal.component.html',
   styleUrls: ['./add-chantier-modal.component.scss'],
   standalone: true,
-  // 👇 ON LES AJOUTE DANS L'ARRAY IMPORTS
+  // 👇 ON LISTE BIEN TOUT ICI
   imports: [
     CommonModule, 
     FormsModule, 
-    IonHeader, 
-    IonToolbar, 
-    IonTitle, 
-    IonButtons, 
-    IonButton, 
-    IonContent, 
-    IonList, 
-    IonItem, 
-    IonInput,
-    IonIcon
+    IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, 
+    IonContent, IonList, IonItem, IonInput, IonIcon
   ]
 })
 export class AddChantierModalComponent {
@@ -61,9 +46,8 @@ export class AddChantierModalComponent {
     addIcons({ camera });
   }
 
-  
   cancel() {
-    return this.modalCtrl.dismiss(null, 'cancel');
+    this.modalCtrl.dismiss(null, 'cancel');
   }
 
   async takeCoverPhoto() {
@@ -71,19 +55,20 @@ export class AddChantierModalComponent {
       quality: 80,
       allowEditing: false,
       resultType: CameraResultType.Uri,
-      source: CameraSource.Camera // ou Prompt
+      source: CameraSource.Camera
     });
     
-    this.coverPhotoWebPath = image.webPath;
-    const response = await fetch(image.webPath!);
-    this.coverPhotoBlob = await response.blob();
+    if (image.webPath) {
+      this.coverPhotoWebPath = image.webPath;
+      const response = await fetch(image.webPath);
+      this.coverPhotoBlob = await response.blob();
+    }
   }
 
   save() {
-    // Si on a une photo, on l'upload d'abord
     if (this.coverPhotoBlob) {
       this.api.uploadPhoto(this.coverPhotoBlob).subscribe(res => {
-        this.chantier.cover_url = res.url; // On lie l'URL Cloudinary
+        this.chantier.cover_url = res.url;
         this.finalizeCreation();
       });
     } else {
@@ -95,6 +80,5 @@ export class AddChantierModalComponent {
     this.api.createChantier(this.chantier).subscribe(newItem => {
       this.modalCtrl.dismiss(newItem, 'confirm');
     });
-  
   }
 }

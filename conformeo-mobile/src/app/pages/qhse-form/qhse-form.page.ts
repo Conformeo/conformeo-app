@@ -121,21 +121,38 @@ export class QhseFormPage implements OnInit {
   }
 
   async save() {
-    // Attention : ici on ne sauvegarde que l'onglet actif. 
-    // Pour une V2, il faudra fusionner tous les onglets.
+    // 1. On fusionne toutes les questions de toutes les catégories
+    let allQuestions: any[] = [];
     
+    // On parcourt chaque catégorie (ADMIN, EPI, etc.)
+    for (const cat of this.categories) {
+        // On récupère les questions de cette catégorie
+        const questions = this.templates[cat] || [];
+        
+        // On ajoute le nom de la catégorie à chaque question pour s'y retrouver
+        // (Optionnel, mais aide pour le futur)
+        const questionsWithCat = questions.map((q: any) => ({
+            ...q,
+            category: cat 
+        }));
+        
+        allQuestions = [...allQuestions, ...questionsWithCat];
+    }
+
+    // 2. On crée l'objet Inspection GLOBAL
     const inspection: Inspection = {
-      titre: `Audit ${this.templateType}`,
-      type: this.templateType,
+      titre: `Audit Complet du Chantier`, // Titre générique
+      type: 'GLOBAL', // Type global
       chantier_id: this.chantierId,
       createur: 'Moi',
-      data: this.currentQuestions
+      data: allQuestions // On envoie TOUT
     };
 
+    // 3. Envoi
     this.api.createInspection(inspection).subscribe({
       next: () => {
-        alert("Audit enregistré !");
-        this.api.needsRefresh = true; // Pour rafraîchir la liste chantier
+        alert("Audit complet enregistré !");
+        this.api.needsRefresh = true;
         this.navCtrl.back();
       },
       error: (e) => {
