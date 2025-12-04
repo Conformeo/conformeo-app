@@ -3,11 +3,10 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { 
-  IonHeader, IonToolbar, IonTitle, IonContent, IonList, 
-  IonCard, IonCardHeader, IonCardTitle, IonCardSubtitle, IonCardContent, 
-  IonChip, IonIcon, IonLabel, IonFab, IonFabButton, 
+  IonHeader, IonToolbar, IonTitle, IonContent,
+  IonIcon, IonFab, IonFabButton, 
   IonRefresher, IonRefresherContent, ModalController,
-  IonButtons, IonButton, IonBadge, NavController // <--- AJOUT NavController
+  IonButtons, IonButton, NavController // <--- AJOUT NavController
 } from '@ionic/angular/standalone';
 
 import { addIcons } from 'ionicons';
@@ -30,11 +29,9 @@ import { AddChantierModalComponent } from './add-chantier-modal/add-chantier-mod
   standalone: true,
   imports: [
     CommonModule, FormsModule, RouterLink,
-    IonHeader, IonToolbar, IonTitle, IonContent, IonList, 
-    IonCard, IonCardHeader, IonCardTitle, IonCardSubtitle, IonCardContent, 
-    IonChip, IonIcon, IonLabel, IonFab, IonFabButton, 
+    IonHeader, IonToolbar, IonTitle, IonContent,  
+    IonIcon, IonFab, IonFabButton, 
     IonRefresher, IonRefresherContent, IonButtons, IonButton,
-    IonBadge
   ],
 })
 export class HomePage implements OnInit {

@@ -1,10 +1,10 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
-import { Router, NavigationEnd, RouterLink, RouterLinkActive } from '@angular/router';
+import { Router, NavigationEnd } from '@angular/router';
 import { 
   IonApp, IonSplitPane, IonMenu, IonContent, IonList, 
-  IonListHeader, IonNote, IonItem, IonLabel, 
+  IonItem, IonLabel, 
   IonRouterOutlet, IonIcon, ToastController, MenuController,
   NavController 
 } from '@ionic/angular/standalone';
@@ -23,9 +23,9 @@ import { ApiService } from './services/api';
   styleUrls: ['app.component.scss'],
   standalone: true,
   imports: [
-    CommonModule, RouterLink, RouterLinkActive,
+    CommonModule,
     IonApp, IonSplitPane, IonMenu, IonContent, IonList, 
-    IonListHeader, IonNote, IonItem, IonLabel, 
+    IonItem, IonLabel, 
     IonRouterOutlet, IonIcon
   ],
 })

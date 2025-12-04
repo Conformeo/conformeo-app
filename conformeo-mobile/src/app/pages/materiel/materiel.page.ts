@@ -5,7 +5,7 @@ import { Platform } from '@ionic/angular/standalone';
 import { 
   IonHeader, IonToolbar, IonContent,
   IonButtons, IonButton, IonIcon, IonFab, IonFabButton, 
-  AlertController, IonBackButton, IonMenuButton,
+  AlertController, IonBackButton, IonSearchbar,
   IonTitle,
 } from '@ionic/angular/standalone';
 import { Capacitor } from '@capacitor/core';
@@ -24,7 +24,7 @@ import { BarcodeScanner, BarcodeFormat } from '@capacitor-mlkit/barcode-scanning
   imports: [CommonModule, 
     FormsModule, 
     IonHeader, 
-    // IonMenuButton,
+    IonSearchbar,
     IonToolbar, 
     IonContent, 
     IonTitle,
