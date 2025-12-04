@@ -516,3 +516,32 @@ def download_inspection_pdf(inspection_id: int, db: Session = Depends(get_db)):
     pdf_generator.generate_audit_pdf(chantier, inspection, file_path)
     
     return FileResponse(path=file_path, filename=filename, media_type='application/pdf')
+
+
+# ...
+
+# --- MIGRATION V7 (MATERIEL IMAGE) ---
+@app.get("/migrate_db_v7")
+def migrate_db_v7(db: Session = Depends(get_db)):
+    try:
+        db.execute(text("ALTER TABLE materiels ADD COLUMN IF NOT EXISTS image_url VARCHAR"))
+        db.commit()
+        return {"message": "Migration V7 (Images Matériel) réussie !"}
+    except Exception as e:
+        return {"status": "Erreur", "details": str(e)}
+
+@app.post("/materiels", response_model=schemas.MaterielOut)
+def create_materiel(mat: schemas.MaterielCreate, db: Session = Depends(get_db)):
+    new_mat = models.Materiel(
+        nom=mat.nom,
+        reference=mat.reference,
+        etat=mat.etat,
+        image_url=mat.image_url, # <--- AJOUT
+        chantier_id=None 
+    )
+    db.add(new_mat)
+    db.commit()
+    db.refresh(new_mat)
+    return new_mat
+
+# ...

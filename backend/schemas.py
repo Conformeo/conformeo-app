@@ -43,6 +43,7 @@ class MaterielBase(BaseModel):
     nom: str
     reference: str
     etat: str = "Bon"
+    image_url: Optional[str] = None # <--- AJOUT
 
 class MaterielCreate(MaterielBase):
     pass

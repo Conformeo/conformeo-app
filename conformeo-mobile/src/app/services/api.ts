@@ -45,6 +45,7 @@ export interface Materiel {
   nom: string;
   reference: string;
   etat: string;
+  image_url?: string; // <--- AJOUT
   chantier_id?: number | null;
 }
 
@@ -78,6 +79,8 @@ export interface PIC {
   final_url?: string;
   elements_data: any[]; // { type: string, x: number, y: number, label: string }
 }
+
+
 
 @Injectable({
   providedIn: 'root'

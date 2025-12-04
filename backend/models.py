@@ -57,6 +57,7 @@ class Materiel(Base):
     nom = Column(String, index=True)
     reference = Column(String)
     etat = Column(String, default="Bon")
+    image_url = Column(String, nullable=True)
     
     chantier_id = Column(Integer, ForeignKey("chantiers.id"), nullable=True)
     chantier = relationship("Chantier", back_populates="materiels")

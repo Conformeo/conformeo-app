@@ -161,9 +161,8 @@ export class AddMaterielModalComponent {
       nom: this.data.nom,
       reference: this.data.reference,
       etat: 'Bon',
-      // image_url: imageUrl  <-- A DECOMMENTER QUAND BACKEND PRET
+      image_url: imageUrl // <--- C'EST DÉCOMMENTÉ !    };
     };
-
     this.api.createMateriel(mat).subscribe(() => {
       this.modalCtrl.dismiss(true, 'confirm');
     });
