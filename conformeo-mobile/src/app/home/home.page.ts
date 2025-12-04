@@ -1,101 +1,102 @@
 import { Component, OnInit } from '@angular/core';
-import { IonHeader, IonToolbar, IonTitle, IonContent, IonList, IonCard, IonCardHeader, IonCardTitle, IonCardSubtitle, IonCardContent, IonChip, IonIcon, IonLabel, IonFab, IonFabButton, IonRefresher, IonRefresherContent, ModalController, IonButtons, IonButton, IonBadge } from '@ionic/angular/standalone';
-import { ApiService, Chantier } from '../services/api';
 import { CommonModule } from '@angular/common';
-import { addIcons } from 'ionicons';
-import { business, location, checkmarkCircle, alertCircle, add, statsChartOutline, hammerOutline, cloudDone, cloudOffline, syncOutline, construct } from 'ionicons/icons';
-import { AddChantierModalComponent } from './add-chantier-modal/add-chantier-modal.component'; // <--- Import du composant
+import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-// import { IonButton } from '@ionic/angular';
+import { 
+  IonHeader, IonToolbar, IonTitle, IonContent, IonList, 
+  IonCard, IonCardHeader, IonCardTitle, IonCardSubtitle, IonCardContent, 
+  IonChip, IonIcon, IonLabel, IonFab, IonFabButton, 
+  IonRefresher, IonRefresherContent, ModalController,
+  IonButtons, IonButton, IonBadge, NavController // <--- AJOUT NavController
+} from '@ionic/angular/standalone';
 
-import { OfflineService } from '../services/offline'; // Service de gestion offline
+import { addIcons } from 'ionicons';
+// 👇 AJOUT DE TOUTES LES ICONES MANQUANTES
+import { 
+  business, location, checkmarkCircle, alertCircle, add, 
+  statsChartOutline, hammerOutline, cloudDone, cloudOffline, 
+  syncOutline, construct, documentTextOutline, locationOutline,
+  chevronForwardOutline // <--- CELLE DU WARNING
+} from 'ionicons/icons'; 
+
+import { ApiService, Chantier } from '../services/api';
+import { OfflineService } from '../services/offline';
+import { AddChantierModalComponent } from './add-chantier-modal/add-chantier-modal.component';
 
 @Component({
   selector: 'app-home',
   templateUrl: 'home.page.html',
   styleUrls: ['home.page.scss'],
   standalone: true,
-  imports: [CommonModule, 
-    IonHeader, 
-    IonToolbar, 
-    IonTitle, 
-    IonContent, 
-    // IonList, 
-    // IonCard, 
-    // IonCardHeader, 
-    // IonCardTitle, 
-    // IonCardSubtitle, 
-    // IonCardContent, 
-    // IonChip, 
-    IonIcon, 
-    // IonLabel, 
-    IonFab, 
-    IonFabButton, 
-    IonRefresher, 
-    IonRefresherContent,
-    IonButtons,
-    RouterLink, 
-    IonButton,
-    // IonBadge
+  imports: [
+    CommonModule, FormsModule, RouterLink,
+    IonHeader, IonToolbar, IonTitle, IonContent, IonList, 
+    IonCard, IonCardHeader, IonCardTitle, IonCardSubtitle, IonCardContent, 
+    IonChip, IonIcon, IonLabel, IonFab, IonFabButton, 
+    IonRefresher, IonRefresherContent, IonButtons, IonButton,
+    IonBadge
   ],
 })
 export class HomePage implements OnInit {
   chantiers: Chantier[] = [];
-  isOnline = true; 
+  isOnline = true;
 
   constructor(
-    private api: ApiService,
+    public api: ApiService,
     private modalCtrl: ModalController,
-    private offline: OfflineService
+    public offline: OfflineService,
+    private navCtrl: NavController // <--- INJECTION NAVIGATION
   ) {
-addIcons({ business, location, checkmarkCircle, alertCircle, add, statsChartOutline, hammerOutline, cloudDone, cloudOffline, syncOutline, construct });  }
+    // Enregistrement des icônes
+    addIcons({ 
+      business, location, checkmarkCircle, alertCircle, add, 
+      statsChartOutline, hammerOutline, cloudDone, cloudOffline, 
+      syncOutline, construct, documentTextOutline, locationOutline,
+      chevronForwardOutline 
+    });
+  }
 
   ngOnInit() {
-    // On écoute le réseau en temps réel
     this.offline.isOnline.subscribe(state => {
       this.isOnline = state;
     });
-
+    this.loadChantiers();
+  }
+  
+  ionViewWillEnter() {
+    // Recharge la liste quand on revient sur la page (ex: après création)
     this.loadChantiers();
   }
 
+  loadChantiers(event?: any) {
+    this.api.getChantiers().subscribe(data => {
+      this.chantiers = data.reverse(); // Plus récent en haut
+      if (event) event.target.complete();
+    });
+  }
+
+  async openAddModal() {
+    const modal = await this.modalCtrl.create({
+      component: AddChantierModalComponent
+    });
+    await modal.present();
+    const { data, role } = await modal.onWillDismiss();
+    if (role === 'confirm') {
+      this.loadChantiers();
+    }
+  }
+
+  // 👇 FONCTION DE NAVIGATION (Celle qui manquait)
+  navigateTo(url: string) {
+    this.navCtrl.navigateForward(url);
+  }
+
+  // Helper pour la date
   getDaysOpen(dateString?: string): number {
     if (!dateString) return 0;
     const date = new Date(dateString);
     const now = new Date();
     const diff = Math.abs(now.getTime() - date.getTime());
-    return Math.ceil(diff / (1000 * 3600 * 24));
-  }
-
-  loadChantiers(event?: any) {
-    this.api.getChantiers().subscribe({
-      next: (data) => {
-        this.chantiers = data;
-        if (event) event.target.complete();
-      },
-      error: (err) => { console.error(err); if(event) event.target.complete(); }
-    });
-  }
-
-  // --- NOUVELLE FONCTION ---
-  async openAddModal() {
-    const modal = await this.modalCtrl.create({
-      component: AddChantierModalComponent,
-    });
-
-    modal.present();
-
-    // On attend que la modale se ferme
-    const { data, role } = await modal.onWillDismiss();
-
-    if (role === 'confirm') {
-      // Si l'utilisateur a créé un chantier, on l'ajoute directement à la liste
-      this.chantiers.push(data);
-    }
-  }
-
-  forceSync() {
-    // On passe 'api' au service pour qu'il puisse l'utiliser
-    this.offline.debugSyncProcess(this.api);
+    return Math.ceil(diff / (1000 * 3600 * 24)); 
   }
 }

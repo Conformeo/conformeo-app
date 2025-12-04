@@ -1,5 +1,6 @@
 <ion-app>
-  <ion-split-pane contentId="main-content" when="(min-width: 1200px)">    
+  <ion-split-pane contentId="main-content" when="(min-width: 1200px)">
+    
     <ion-menu contentId="main-content" type="overlay">
       <ion-content>
         <div class="menu-header">
@@ -8,12 +9,22 @@
         </div>
 
         <ion-list id="inbox-list">
-          <ion-menu-toggle auto-hide="false" *ngFor="let p of appPages">
-            <ion-item button [routerLink]="[p.url]" routerLinkActive="selected" routerDirection="root" detail="false">
-              <ion-icon aria-hidden="true" slot="start" [name]="p.icon"></ion-icon>
-              <ion-label>{{ p.title }}</ion-label>
-            </ion-item>
-          </ion-menu-toggle>
+          <ion-item *ngFor="let p of appPages" 
+                    button="true" 
+                    (click)="navigateTo(p.url)" 
+                    lines="none" 
+                    detail="false" 
+                    [class.selected]="isUrlActive(p.url)">
+            <ion-icon aria-hidden="true" slot="start" [name]="p.icon"></ion-icon>
+            <ion-label>{{ p.title }}</ion-label>
+          </ion-item>
+        </ion-list>
+
+        <ion-list id="labels-list">
+          <ion-item lines="none" button (click)="logout()">
+            <ion-icon slot="start" name="log-out-outline" color="danger"></ion-icon>
+            <ion-label color="danger">Déconnexion</ion-label>
+          </ion-item>
         </ion-list>
       </ion-content>
     </ion-menu>

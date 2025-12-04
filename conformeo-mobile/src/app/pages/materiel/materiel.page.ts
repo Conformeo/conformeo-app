@@ -24,7 +24,7 @@ import { BarcodeScanner, BarcodeFormat } from '@capacitor-mlkit/barcode-scanning
   imports: [CommonModule, 
     FormsModule, 
     IonHeader, 
-    IonMenuButton,
+    // IonMenuButton,
     IonToolbar, 
     IonContent, 
     IonTitle,

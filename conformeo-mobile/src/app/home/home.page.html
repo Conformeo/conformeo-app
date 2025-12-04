@@ -1,15 +1,13 @@
 <ion-header [translucent]="true">
   <ion-toolbar color="primary">
-    <ion-title>
-      Conforméo
-    </ion-title>
+    <ion-title>Conforméo</ion-title>
 
     <ion-buttons slot="start">
-      <ion-button routerLink="/dashboard">
+      <ion-button (click)="navigateTo('/dashboard')">
         <ion-icon name="stats-chart-outline"></ion-icon>
       </ion-button>
       
-      <ion-button routerLink="/materiel">
+      <ion-button (click)="navigateTo('/materiel')">
         <ion-icon name="hammer-outline"></ion-icon>
       </ion-button>
     </ion-buttons>
@@ -20,8 +18,7 @@
         [color]="isOnline ? 'success' : 'danger'"
         style="font-size: 24px; margin-right: 10px;">
       </ion-icon>
-      
-      </ion-buttons>
+    </ion-buttons>
   </ion-toolbar>
 </ion-header>
 
@@ -39,10 +36,7 @@
     <p>Aucun chantier trouvé.</p>
   </div>
 
-  <ion-content class="ion-padding-top">
-
   <div class="pro-list">
-    
     <div *ngFor="let c of chantiers" class="pro-card" [routerLink]="['/chantier', c.id]">
       
       <div class="card-thumb" [style.background-image]="'url(' + (c.cover_url || 'assets/splash.png') + ')'">
@@ -61,7 +55,7 @@
         <div class="meta-row">
           <span class="tag date">J-{{ getDaysOpen(c.date_creation) }}</span>
           <span class="tag reports">
-            <ion-icon name="document-text-outline"></ion-icon> 3
+            <ion-icon name="document-text-outline"></ion-icon> Voir
           </span>
         </div>
       </div>
@@ -69,14 +63,12 @@
       <div class="card-arrow">
         <ion-icon name="chevron-forward-outline"></ion-icon>
       </div>
-
     </div>
-
   </div>
-  </ion-content>
   
   <ion-fab vertical="bottom" horizontal="end" slot="fixed">
-    <ion-fab-button (click)="openAddModal()"> <ion-icon name="add"></ion-icon>
+    <ion-fab-button (click)="openAddModal()">
+      <ion-icon name="add"></ion-icon>
     </ion-fab-button>
   </ion-fab>
 
