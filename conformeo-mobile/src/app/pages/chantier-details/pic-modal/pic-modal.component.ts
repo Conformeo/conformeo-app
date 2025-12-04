@@ -486,6 +486,7 @@ export class PicModalComponent implements OnInit {
 
                 this.api.savePIC(picData).subscribe(() => {
                     alert("PIC sauvegardé !");
+                    this.api.needsRefresh = true;
                     this.modalCtrl.dismiss();
                 });
             },

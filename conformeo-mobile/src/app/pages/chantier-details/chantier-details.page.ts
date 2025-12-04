@@ -68,11 +68,10 @@ export class ChantierDetailsPage implements OnInit {
   }
 
   ionViewWillEnter() {
-    // On vérifie si quelqu'un a demandé un refresh
     if (this.api.needsRefresh) {
-      console.log("🚩 Drapeau détecté : Rechargement des données...");
-      this.loadRapports();
-      this.api.needsRefresh = false; // On baisse le drapeau
+      console.log("🔄 Refresh demandé !");
+      this.loadData(); // Recharge Chantier + Rapports + Documents
+      this.api.needsRefresh = false;
     }
   }
 

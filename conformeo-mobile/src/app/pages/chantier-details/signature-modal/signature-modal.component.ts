@@ -82,6 +82,7 @@ export class SignatureModalComponent implements AfterViewInit {
         const signatureUrl = res.url;
         
         this.api.signChantier(this.chantierId, signatureUrl).subscribe(() => {
+          this.api.needsRefresh = true;
           this.modalCtrl.dismiss(signatureUrl, 'confirm');
         });
       },
