@@ -175,8 +175,14 @@
   font-size: 13px;
   color: #666;
   display: -webkit-box;
-  -webkit-line-clamp: 2; // Coupe après 2 lignes
   -webkit-box-orient: vertical;
+
+  /* Propriété standard */
+  line-clamp: 2;
+
+  /* Vendor prefix (Safari / WebKit) */
+  -webkit-line-clamp: 2;
+
   overflow: hidden;
 }
 

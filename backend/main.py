@@ -381,22 +381,40 @@ def download_doe(chantier_id: int, db: Session = Depends(get_db)):
 # 9. MIGRATIONS & MAINTENANCE
 # ==========================================
 
-@app.get("/reset_data")
-def reset_data(db: Session = Depends(get_db)):
+# --- ROUTE DE REMISE A ZERO (DEMO) ---
+@app.get("/reset_demo")
+def reset_demo_data(db: Session = Depends(get_db)):
     try:
-        # On supprime dans l'ordre pour respecter les clés étrangères
-        db.query(models.RapportImage).delete() # D'abord les images
+        # 1. On supprime d'abord les "Enfants" (ceux qui dépendent des chantiers)
+        # Images des rapports
+        db.query(models.RapportImage).delete()
+        
+        # Documents et listes
         db.query(models.Rapport).delete()
-        db.query(models.Materiel).delete()
         db.query(models.Inspection).delete()
         db.query(models.PPSPS).delete()
+        
+        # Le PIC (Plan Installation)
+        db.query(models.PIC).delete()
+        
+        # Le Matériel (On le remet à zéro ou on supprime tout ? Ici on supprime tout)
+        db.query(models.Materiel).delete()
+
+        # 2. On supprime les "Parents" (Les Chantiers)
         db.query(models.Chantier).delete()
         
+        # Note: On ne supprime PAS la table 'User' pour que vous puissiez rester connecté.
+
         db.commit()
-        return {"message": "Base de données entièrement nettoyée"}
+        
+        return {
+            "status": "Succès ✨", 
+            "message": "La base de données a été nettoyée pour la démo.",
+            "details": "Tous les chantiers, rapports, photos, ppsps, audits et matériels ont été supprimés."
+        }
     except Exception as e:
-        db.rollback()
-        return {"error": str(e)}
+        db.rollback() # En cas d'erreur, on annule tout pour ne pas casser la base
+        return {"status": "Erreur", "details": str(e)}
 
 @app.get("/migrate_db_v5")
 def migrate_db_v5(db: Session = Depends(get_db)):
