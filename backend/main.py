@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 import zipfile
 # Chargement des variables d'environnement locales (.env) si présentes
 load_dotenv()
-
+import requests
 import cloudinary
 import cloudinary.uploader
 from fastapi import FastAPI, Depends, HTTPException, status, File, UploadFile
@@ -343,7 +343,30 @@ def download_doe(chantier_id: int, db: Session = Depends(get_db)):
             
             pdf_generator.generate_ppsps_pdf(chantier, doc, ppsps_path)
             zipf.write(ppsps_path, ppsps_name)
-            
+
+        # --- C. PIC (Plan Installation) ---
+        # On cherche le PIC du chantier
+        pic = db.query(models.PIC).filter(models.PIC.chantier_id == chantier_id).first()
+        
+        if pic and pic.final_url:
+            try:
+                # On télécharge l'image depuis Cloudinary
+                response = requests.get(pic.final_url)
+                if response.status_code == 200:
+                    # On détermine l'extension (jpg ou png)
+                    ext = "jpg" if "jpeg" in response.headers.get("content-type", "") else "png"
+                    pic_name = f"3_Plan_Installation_PIC.{ext}"
+                    pic_path = f"uploads/{pic_name}"
+                    
+                    # On l'écrit sur le disque temporairement
+                    with open(pic_path, "wb") as f:
+                        f.write(response.content)
+                    
+                    # On l'ajoute au ZIP
+                    zipf.write(pic_path, pic_name)
+            except Exception as e:
+                print(f"Erreur ajout PIC au DOE: {e}")
+
     # 3. Envoi du ZIP
     return FileResponse(path=zip_path, filename=zip_filename, media_type='application/zip')
 
