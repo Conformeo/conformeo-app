@@ -13,6 +13,7 @@ import {
   settingsOutline, logOutOutline, sync, checkmarkCircle, warning 
 } from 'ionicons/icons';
 
+import { NavController } from '@ionic/angular/standalone';
 import { OfflineService } from './services/offline';
 import { ApiService } from './services/api';
 
@@ -42,7 +43,8 @@ export class AppComponent {
     private offline: OfflineService,
     private api: ApiService,
     private toastCtrl: ToastController,
-    private http: HttpClient
+    private http: HttpClient,
+    private navCtrl: NavController,
   ) {
     // On enregistre TOUTES les icônes (Menu + Notifs)
     addIcons({ 
@@ -59,6 +61,10 @@ export class AppComponent {
         this.processQueue();
       }
     });
+  }
+  
+  navigateTo(url: string) {
+    this.navCtrl.navigateRoot(url, { animated: false }); // Force la navigation sans animation
   }
 
   // --- ROBOT DE SYNCHRONISATION ---
@@ -164,4 +170,6 @@ export class AppComponent {
     // Une fois fini, on vide la file
     await this.offline.clearQueue();
   }
+
+
 }

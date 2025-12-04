@@ -8,85 +8,65 @@
 
 <ion-content class="inventory-content">
 
-  <div class="header-section">
-    <div class="header-top">
-      <h1 class="page-title">Inventaire</h1>
-      <p class="page-subtitle">Gérez vos équipements</p>
-    </div>
-
-    <div class="stats-row">
-      <div class="stat-item">
-        <span class="stat-num">{{ materiels.length }}</span>
-        <span class="stat-label">Total</span>
-      </div>
-      <div class="stat-item warning">
-        <span class="stat-num">{{ getMaterielsSortis() }}</span>
-        <span class="stat-label">Sortis</span>
-      </div>
-      <div class="stat-item success">
-        <span class="stat-num">{{ getMaterielsDepot() }}</span>
-        <span class="stat-label">Dépôt</span>
-      </div>
-    </div>
-  </div>
-
-  <div class="search-container">
-    <div class="search-wrapper">
-      <ion-icon name="search-outline" class="search-icon"></ion-icon>
-      <input type="text" placeholder="Rechercher un outil, une réf..." 
-             [(ngModel)]="searchTerm" (input)="filterMateriels()">
-    </div>
-    
-    <button class="scan-btn" (click)="startScan()">
-      <ion-icon name="qr-code-outline"></ion-icon>
-    </button>
-  </div>
-
-  <div class="list-container">
-    
-    <div *ngIf="filteredMateriels.length === 0" class="empty-state">
-      <ion-icon name="hammer-outline"></ion-icon>
-      <p>Aucun matériel trouvé</p>
-    </div>
-
-    <div *ngFor="let mat of filteredMateriels" class="tool-card" (click)="moveMateriel(mat)">
-      
-      <div class="tool-icon" [class.out]="mat.chantier_id">
-        <ion-icon [name]="mat.chantier_id ? 'construct' : 'cube'"></ion-icon>
-      </div>
-
-      <div class="tool-info">
-        <h3 class="tool-name">{{ mat.nom }}</h3>
-        <p class="tool-ref">REF: {{ mat.reference }}</p>
-      </div>
-
-      <div class="tool-status">
-        <div class="status-badge" [class.out]="mat.chantier_id">
-          <ion-icon [name]="mat.chantier_id ? 'location-outline' : 'home-outline'"></ion-icon>
-          <span>{{ mat.chantier_id ? 'Chantier' : 'Dépôt' }}</span>
-        </div>
-        <p class="chantier-name" *ngIf="mat.chantier_id">{{ getChantierName(mat.chantier_id) }}</p>
-      </div>
-
-    </div>
-  </div>
-
-  <ion-fab vertical="bottom" horizontal="end" slot="fixed">
-    <ion-fab-button color="dark" (click)="addMateriel()">
-      <ion-icon name="add"></ion-icon>
-    </ion-fab-button>
-  </ion-fab>
-
-</ion-content>
-
-
-<ion-content class="inventory-content">
-
   <div class="mobile-only">
      
-     <div class="header-section"> ... </div>
-     <div class="search-container"> ... </div>
-     <div class="list-container"> ... </div>
+    <div class="header-section">
+      <div class="header-top">
+        <h1 class="page-title">Inventaire</h1>
+        <p class="page-subtitle">Gérez vos équipements</p>
+      </div>
+
+      <div class="stats-row">
+        <div class="stat-item">
+          <span class="stat-num">{{ materiels.length }}</span>
+          <span class="stat-label">Total</span>
+        </div>
+        <div class="stat-item warning">
+          <span class="stat-num">{{ getMaterielsSortis() }}</span>
+          <span class="stat-label">Sortis</span>
+        </div>
+        <div class="stat-item success">
+          <span class="stat-num">{{ getMaterielsDepot() }}</span>
+          <span class="stat-label">Dépôt</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="search-container">
+      <div class="search-wrapper">
+        <ion-icon name="search-outline" class="search-icon"></ion-icon>
+        <input type="text" placeholder="Rechercher..." 
+               [(ngModel)]="searchTerm" (input)="filterMateriels()">
+      </div>
+      <button class="scan-btn" (click)="startScan()">
+        <ion-icon name="qr-code-outline"></ion-icon>
+      </button>
+    </div>
+
+    <div class="list-container" style="padding-bottom: 100px;">
+      
+      <div *ngIf="filteredMateriels.length === 0" class="empty-state">
+        <ion-icon name="hammer-outline"></ion-icon>
+        <p>Aucun matériel trouvé</p>
+      </div>
+
+      <div *ngFor="let mat of filteredMateriels" class="tool-card" (click)="moveMateriel(mat)">
+        <div class="tool-icon" [class.out]="mat.chantier_id">
+          <ion-icon [name]="mat.chantier_id ? 'construct' : 'cube'"></ion-icon>
+        </div>
+        <div class="tool-info">
+          <h3 class="tool-name">{{ mat.nom }}</h3>
+          <p class="tool-ref">REF: {{ mat.reference }}</p>
+        </div>
+        <div class="tool-status">
+          <div class="status-badge" [class.out]="mat.chantier_id">
+            <ion-icon [name]="mat.chantier_id ? 'location-outline' : 'home-outline'"></ion-icon>
+            <span>{{ mat.chantier_id ? 'Chantier' : 'Dépôt' }}</span>
+          </div>
+          <p class="chantier-name" *ngIf="mat.chantier_id">{{ getChantierName(mat.chantier_id) }}</p>
+        </div>
+      </div>
+    </div>
 
   </div>
 
@@ -96,7 +76,7 @@
     <div class="desktop-header">
       <h1>Parc Matériel</h1>
       <div class="actions">
-         <ion-searchbar placeholder="Rechercher un équipement..." [(ngModel)]="searchTerm" (ionInput)="filterMateriels()"></ion-searchbar>
+         <ion-searchbar placeholder="Rechercher..." [(ngModel)]="searchTerm" (ionInput)="filterMateriels()"></ion-searchbar>
          <ion-button (click)="addMateriel()" color="primary">
            <ion-icon name="add" slot="start"></ion-icon> Nouveau
          </ion-button>
@@ -105,15 +85,12 @@
 
     <div class="equipment-grid">
       <div class="equip-card" *ngFor="let mat of filteredMateriels" (click)="moveMateriel(mat)">
-        
         <div class="status-dot" [class.active]="mat.chantier_id">
           <ion-icon [name]="mat.chantier_id ? 'construct' : 'shield-checkmark'"></ion-icon>
         </div>
-        
         <div class="equip-image">
           <ion-icon name="hammer" style="font-size: 64px; color: #333; opacity: 0.1;"></ion-icon>
         </div>
-
         <div class="equip-info">
           <h3>{{ mat.nom }}</h3>
           <p class="ref">{{ mat.reference }}</p>
@@ -122,13 +99,12 @@
           </div>
           <p class="chantier-name" *ngIf="mat.chantier_id">{{ getChantierName(mat.chantier_id) }}</p>
         </div>
-
       </div>
     </div>
 
   </div>
 
-  <ion-fab vertical="bottom" horizontal="end" slot="fixed" class="mobile-only">
+  <ion-fab vertical="bottom" horizontal="end" slot="fixed" class="mobile-only" style="margin-bottom: 20px;">
     <ion-fab-button color="dark" (click)="addMateriel()">
       <ion-icon name="add"></ion-icon>
     </ion-fab-button>
