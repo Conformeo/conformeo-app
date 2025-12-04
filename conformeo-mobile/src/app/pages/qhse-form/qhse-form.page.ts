@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { 
   IonContent, IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, 
   IonList, IonItem, IonLabel, IonNote, IonIcon, IonSegment, IonSegmentButton,
-  NavController, AlertController, IonBackButton
+  IonBackButton, NavController, AlertController
 } from '@ionic/angular/standalone';
 import { ActivatedRoute } from '@angular/router';
 import { addIcons } from 'ionicons';
@@ -16,39 +16,69 @@ import { ApiService, Inspection } from 'src/app/services/api';
   templateUrl: './qhse-form.page.html',
   styleUrls: ['./qhse-form.page.scss'],
   standalone: true,
-  imports: [CommonModule, 
-    FormsModule, 
-    IonContent, 
-    IonHeader, 
-    IonToolbar, 
-    IonTitle, 
-    IonButtons, 
-    IonButton, 
-    IonList, 
-    // IonItem, 
-    IonLabel, 
-    // IonNote, 
-    IonIcon, 
-    IonSegment, 
-    IonSegmentButton, 
-    IonBackButton]
+  imports: [CommonModule, FormsModule, IonContent, IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, IonList, IonItem, IonLabel, IonNote, IonIcon, IonSegment, IonSegmentButton, IonBackButton]
 })
 export class QhseFormPage implements OnInit {
   chantierId!: number;
-  templateType = 'Securite'; // Par défaut
   
-  // Les modèles de questions
+  // On initialise avec la première catégorie exacte
+  templateType = 'ADMINISTRATIF'; 
+  
+  // Liste des onglets (pour le HTML)
+  categories = [
+    'ADMINISTRATIF', 'EPI', 'CHUTES & ACCÈS', 'ÉLECTRICITÉ', 
+    'LEVAGE & ENGINS', 'OUTILLAGE', 'HYGIÈNE', 'ENVIRONNEMENT'
+  ];
+
+  // Données des questions (Clés en MAJUSCULES pour matcher)
   templates: any = {
-    'Securite': [
-      { q: "Port des EPI (Casque, Chaussures)", status: null },
-      { q: "Balisage de la zone respecté", status: null },
-      { q: "Échafaudages conformes", status: null },
-      { q: "Coffret électrique fermé", status: null }
+    'ADMINISTRATIF': [
+      { q: "Panneau de chantier affiché ?", status: null },
+      { q: "Registre de sécurité disponible ?", status: null },
+      { q: "PPSPS à jour et consultable ?", status: null },
+      { q: "Zones de stockage définies ?", status: null }
     ],
-    'Environnement': [
-      { q: "Tri des déchets effectué", status: null },
-      { q: "Pas de fuite produits chimiques", status: null },
-      { q: "Propreté générale du chantier", status: null }
+    'EPI': [
+      { q: "Casque de sécurité porté ?", status: null },
+      { q: "Chaussures de sécurité portées ?", status: null },
+      { q: "Gilets haute-visibilité portés ?", status: null },
+      { q: "Protections auditives/oculaires ?", status: null }
+    ],
+    'CHUTES & ACCÈS': [
+      { q: "Garde-corps conformes ?", status: null },
+      { q: "Trémies et ouvertures protégées ?", status: null },
+      { q: "Échelles attachées et bon état ?", status: null },
+      { q: "Échafaudages vérifiés ?", status: null },
+      { q: "Zones de circulation dégagées ?", status: null }
+    ],
+    'ÉLECTRICITÉ': [
+      { q: "Coffrets fermés à clé ?", status: null },
+      { q: "Câbles en bon état ?", status: null },
+      { q: "Câbles relevés (pas au sol) ?", status: null },
+      { q: "Prises conformes ?", status: null }
+    ],
+    'LEVAGE & ENGINS': [
+      { q: "VGP engins à jour ?", status: null },
+      { q: "CACES conducteurs valides ?", status: null },
+      { q: "Élingues conformes ?", status: null },
+      { q: "Zone de manœuvre balisée ?", status: null }
+    ],
+    'OUTILLAGE': [
+      { q: "Outils en bon état ?", status: null },
+      { q: "Carters sur meuleuses ?", status: null },
+      { q: "Rallonges déroulées ?", status: null }
+    ],
+    'HYGIÈNE': [
+      { q: "Sanitaires propres ?", status: null },
+      { q: "Réfectoire propre ?", status: null },
+      { q: "Eau potable disponible ?", status: null },
+      { q: "Trousse secours complète ?", status: null }
+    ],
+    'ENVIRONNEMENT': [
+      { q: "Tri des déchets respecté ?", status: null },
+      { q: "Pas de stockage sauvage ?", status: null },
+      { q: "Kit anti-pollution présent ?", status: null },
+      { q: "Pas de fuite produits ?", status: null }
     ]
   };
 
@@ -66,13 +96,24 @@ export class QhseFormPage implements OnInit {
   ngOnInit() {
     const id = this.route.snapshot.paramMap.get('id');
     if (id) this.chantierId = +id;
-    this.loadTemplate('Securite');
+    
+    // Chargement initial
+    this.loadTemplate('ADMINISTRATIF');
   }
 
   loadTemplate(type: string) {
     this.templateType = type;
-    // On copie le template pour ne pas modifier l'original en mémoire
-    this.currentQuestions = JSON.parse(JSON.stringify(this.templates[type] || []));
+    // Si on a déjà répondu, on garde les réponses, sinon on charge le template vierge
+    // (Ici on simplifie : on recharge le template vierge à chaque changement d'onglet pour l'instant)
+    // Pour garder les réponses entre onglets, il faudrait un objet global 'allResponses'.
+    
+    // Pour ce fix rapide : on charge les questions
+    if (!this.templates[type]) {
+        console.error("Template introuvable pour :", type);
+        this.currentQuestions = [];
+    } else {
+        this.currentQuestions = this.templates[type]; 
+    }
   }
 
   setStatus(index: number, status: string) {
@@ -80,28 +121,27 @@ export class QhseFormPage implements OnInit {
   }
 
   async save() {
-    // Vérification que tout est rempli ? (Optionnel)
-    const incomplete = this.currentQuestions.find(i => i.status === null);
-    if (incomplete) {
-      const alert = await this.alertCtrl.create({
-        header: 'Incomplet',
-        message: 'Veuillez répondre à toutes les questions.',
-        buttons: ['OK']
-      });
-      await alert.present();
-      return;
-    }
-
+    // Attention : ici on ne sauvegarde que l'onglet actif. 
+    // Pour une V2, il faudra fusionner tous les onglets.
+    
     const inspection: Inspection = {
       titre: `Audit ${this.templateType}`,
       type: this.templateType,
       chantier_id: this.chantierId,
-      createur: 'Moi', // À remplacer par le user connecté plus tard
+      createur: 'Moi',
       data: this.currentQuestions
     };
 
-    this.api.createInspection(inspection).subscribe(() => {
-      this.navCtrl.back();
+    this.api.createInspection(inspection).subscribe({
+      next: () => {
+        alert("Audit enregistré !");
+        this.api.needsRefresh = true; // Pour rafraîchir la liste chantier
+        this.navCtrl.back();
+      },
+      error: (e) => {
+          console.error(e);
+          alert("Erreur lors de la sauvegarde.");
+      }
     });
   }
 }

@@ -300,3 +300,84 @@ def generate_ppsps_pdf(chantier, ppsps, output_path):
     draw_footer(c, width, height, chantier, "PPSPS")
     c.save()
     return output_path
+
+def generate_audit_pdf(chantier, inspection, output_path):
+    c = canvas.Canvas(output_path, pagesize=A4)
+    width, height = A4
+    margin = 2 * cm
+    
+    # PAGE DE GARDE
+    draw_cover_page(c, chantier, "RAPPORT D'AUDIT", f"{inspection.titre} ({inspection.type})")
+
+    y = height - 3 * cm
+
+    def check_space(needed):
+        nonlocal y
+        if y < needed:
+            draw_footer(c, width, height, chantier, "Rapport d'Audit")
+            c.showPage()
+            y = height - 3 * cm
+
+    # 1. EN-TÊTE AUDIT
+    check_space(3*cm)
+    c.setFillColorRGB(*COLOR_PRIMARY); c.setFont(FONT_TITLE, 16)
+    c.drawString(margin, y, f"DÉTAIL DE L'INSPECTION")
+    y -= 0.2*cm; c.setLineWidth(1.5); c.setStrokeColorRGB(*COLOR_PRIMARY)
+    c.line(margin, y, width-margin, y)
+    c.setFillColorRGB(0,0,0)
+    y -= 1*cm
+    
+    c.setFont(FONT_TEXT, 11)
+    date_audit = inspection.date_creation.strftime('%d/%m/%Y à %H:%M')
+    c.drawString(margin, y, f"Date de l'audit : {date_audit}")
+    y -= 0.6*cm
+    c.drawString(margin, y, f"Contrôleur : {inspection.createur}")
+    y -= 1.5*cm
+
+    # 2. TABLEAU DES POINTS DE CONTRÔLE
+    questions = inspection.data if isinstance(inspection.data, list) else []
+    
+    # Statistiques
+    total = len(questions)
+    ok = len([q for q in questions if q.get('status') == 'OK'])
+    nok = len([q for q in questions if q.get('status') == 'NOK'])
+    na = len([q for q in questions if q.get('status') == 'NA'])
+    
+    # Résumé visuel
+    c.setFillColorRGB(0.95, 0.95, 0.95)
+    c.roundRect(margin, y-1.5*cm, width-2*margin, 1.5*cm, 6, fill=1, stroke=0)
+    c.setFillColorRGB(0,0,0); c.setFont(FONT_TITLE, 12)
+    c.drawCentredString(width/2, y-1*cm, f"RÉSULTAT : {ok} Conformes  |  {nok} Non Conformes  |  {na} N/A")
+    y -= 2.5*cm
+
+    for item in questions:
+        check_space(2*cm)
+        
+        q_text = item.get('q', 'Point de contrôle')
+        status = item.get('status', 'NA')
+        
+        # Fond ligne (alterné ou si NOK)
+        if status == 'NOK':
+            c.setFillColorRGB(1, 0.9, 0.9) # Fond rouge clair
+            c.rect(margin, y-0.8*cm, width-2*margin, 1.2*cm, fill=1, stroke=0)
+        
+        # Question
+        c.setFillColorRGB(0,0,0); c.setFont(FONT_TEXT, 10)
+        c.drawString(margin + 0.5*cm, y, q_text)
+        
+        # Statut (Pastille)
+        txt, color = "N/A", (0.5,0.5,0.5)
+        if status == 'OK': txt, color = "CONFORME", (0, 0.6, 0)
+        elif status == 'NOK': txt, color = "NON CONFORME", (0.8, 0, 0)
+        
+        c.setFont(FONT_TITLE, 10); c.setFillColorRGB(*color)
+        c.drawRightString(width-margin-0.5*cm, y, txt)
+        
+        # Ligne séparation
+        c.setStrokeColorRGB(0.9, 0.9, 0.9); c.setLineWidth(0.5)
+        c.line(margin, y-0.4*cm, width-margin, y-0.4*cm)
+        
+        y -= 1*cm
+
+    draw_footer(c, width, height, chantier, "Rapport d'Audit")
+    c.save()

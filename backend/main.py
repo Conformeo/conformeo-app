@@ -447,3 +447,24 @@ def create_or_update_pic(pic: schemas.PICCreate, db: Session = Depends(get_db)):
 @app.get("/chantiers/{chantier_id}/pic", response_model=Optional[schemas.PICOut])
 def read_pic_chantier(chantier_id: int, db: Session = Depends(get_db)):
     return db.query(models.PIC).filter(models.PIC.chantier_id == chantier_id).first()
+
+
+@app.get("/inspections/{inspection_id}/pdf")
+def download_inspection_pdf(inspection_id: int, db: Session = Depends(get_db)):
+    # 1. Récupérer l'inspection
+    inspection = db.query(models.Inspection).filter(models.Inspection.id == inspection_id).first()
+    if not inspection:
+        raise HTTPException(status_code=404, detail="Audit introuvable")
+    
+    # 2. Récupérer le chantier lié
+    chantier = db.query(models.Chantier).filter(models.Chantier.id == inspection.chantier_id).first()
+    
+    # 3. Générer le nom du fichier
+    date_str = inspection.date_creation.strftime('%Y-%m-%d')
+    filename = f"Audit_{inspection.type}_{date_str}.pdf"
+    file_path = f"uploads/{filename}"
+    
+    # 4. Appeler le générateur PDF dédié (qu'on va créer juste après)
+    pdf_generator.generate_audit_pdf(chantier, inspection, file_path)
+    
+    return FileResponse(path=file_path, filename=filename, media_type='application/pdf')

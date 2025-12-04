@@ -13,9 +13,10 @@
 
 <ion-content class="ion-padding">
 
-  <ion-segment [(ngModel)]="templateType" (ionChange)="loadTemplate($event.detail.value!.toString())" mode="ios" style="margin-bottom: 20px;">
-    <ion-segment-button value="Securite"><ion-label>Sécurité</ion-label></ion-segment-button>
-    <ion-segment-button value="Environnement"><ion-label>Environnement</ion-label></ion-segment-button>
+  <ion-segment [(ngModel)]="templateType" (ionChange)="loadTemplate($event.detail.value!.toString())" scrollable mode="md">
+    <ion-segment-button *ngFor="let cat of categories" [value]="cat">
+      <ion-label>{{ cat }}</ion-label>
+    </ion-segment-button>
   </ion-segment>
 
   <ion-list lines="full">

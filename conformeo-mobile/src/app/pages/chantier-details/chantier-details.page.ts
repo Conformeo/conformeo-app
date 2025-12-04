@@ -12,7 +12,7 @@ import {
   camera, time, warning, documentText, create, navigate, 
   location, arrowBack, createOutline ,
   scanOutline, checkmarkCircle, shieldCheckmark, downloadOutline,
-  shieldCheckmarkOutline, 
+  shieldCheckmarkOutline, map, checkmarkDoneCircle,
   checkmarkDoneCircleOutline, 
   documentTextOutline, archiveOutline, mapOutline
 } from 'ionicons/icons';
@@ -52,8 +52,9 @@ export class ChantierDetailsPage implements OnInit {
     private modalCtrl: ModalController,
     private platform: Platform // <--- 2. INJECTEZ LA PLATEFORME ICI
   ) {
-    addIcons({ camera, time, warning, documentText, create, navigate, location, arrowBack, documentTextOutline, createOutline, scanOutline, checkmarkCircle, shieldCheckmark, downloadOutline, archiveOutline,
-      shieldCheckmarkOutline, 
+    addIcons({ camera, time, warning, documentText, create, navigate, location, arrowBack, documentTextOutline, 
+      createOutline, scanOutline, checkmarkCircle, shieldCheckmark, downloadOutline, archiveOutline,
+      shieldCheckmarkOutline, map, checkmarkDoneCircle,
     checkmarkDoneCircleOutline, mapOutline
      });
   }
@@ -111,6 +112,41 @@ export class ChantierDetailsPage implements OnInit {
                 icon: 'shield-checkmark-outline',
                 color: 'warning', // Jaune
                 action: () => this.downloadPPSPS(doc.id!)
+            });
+        });
+    });
+
+    // C. PIC (Plan Installation) 
+    this.api.getPIC(this.chantierId).subscribe(pic => {
+        if (pic && pic.final_url) {
+            this.documentsList.push({
+                type: 'PIC',
+                titre: 'Plan Installation (PIC)',
+                date: new Date().toISOString(), // Ou date_update si dispo
+                icon: 'map',
+                color: 'tertiary', // Violet/Rose
+                action: () => {
+                    // On ouvre l'image du plan
+                    window.open(this.getFullUrl(pic.final_url!), '_system');
+                }
+            });
+        }
+    });
+
+    // D. Audits QHSE 
+    this.api.getInspections(this.chantierId).subscribe(audits => {
+        audits.forEach(audit => {
+            this.documentsList.push({
+                type: 'AUDIT',
+                titre: `Audit ${audit.type}`,
+                date: audit.date_creation,
+                icon: 'checkmark-done-circle', // Icône Audit
+                color: 'success', // Vert
+                action: () => {
+                    // Ouvre le PDF spécifique de l'audit
+                    const url = `${this.api['apiUrl']}/inspections/${audit.id}/pdf`;
+                    window.open(url, '_system');
+                }
             });
         });
     });
