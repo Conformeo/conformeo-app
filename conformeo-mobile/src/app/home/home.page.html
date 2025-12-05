@@ -40,9 +40,12 @@
     <div *ngFor="let c of chantiers" class="pro-card" [routerLink]="['/chantier', c.id]">
       
       <div class="card-thumb">
-        <img [src]="getCoverUrl(c.cover_url)" 
-             style="width: 100%; height: 100%; object-fit: cover; border-radius: 12px;"
-             onerror="this.src='assets/splash.png'"> <div class="status-dot" [class.active]="c.est_actif"></div>
+        <img 
+          [src]="getCoverUrl(c.cover_url)" 
+          crossorigin="anonymous"  style="width: 100%; height: 100%; object-fit: cover; border-radius: 12px;"
+          onerror="this.src='assets/splash.png'"
+        />
+        <div class="status-dot" [class.active]="c.est_actif"></div>
       </div>
 
       <div class="card-content">
