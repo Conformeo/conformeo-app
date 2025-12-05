@@ -172,21 +172,32 @@ export class MaterielPage implements OnInit {
   }
 
   // Fonction pour transformer l'URL HD en URL Miniature optimisée
-  getThumbUrl(url: string | undefined): string {
-    if (!url) return '';
-    
-    // Si c'est une image Cloudinary, on l'optimise
-    if (url.includes('cloudinary.com') && url.includes('/upload/')) {
-      // On insère les options de redimensionnement après "/upload/"
-      // w_200 = Largeur 200px
-      // h_200 = Hauteur 200px
-      // c_fit = L'image rentre dedans sans être coupée
-      // f_auto = Format automatique (WebP si possible)
-      return url.replace('/upload/', '/upload/w_200,h_200,c_fit,q_auto,f_auto/');
-    }
-    
-    return url;
+  getThumbUrl(image: string | undefined | null): string {
+  if (!image) {
+    // Optionnel : une image de fallback
+    return 'assets/placeholder-tool.png';
   }
+
+  // 1) Cas : on a déjà une URL complète
+  if (image.startsWith('http')) {
+    // Si c'est bien une URL Cloudinary "upload"
+    if (image.includes('cloudinary.com') && image.includes('/upload/')) {
+      return image.replace(
+        '/upload/',
+        '/upload/w_200,h_200,c_fit,q_auto,f_auto/'
+      );
+    }
+    // Autre URL (S3, backend, etc.) -> on la retourne tel quel
+    return image;
+  }
+
+  // 2) Cas : c'est un public_id Cloudinary, pas une URL
+  // Exemple: "parc-materiel/mon-image"
+  const cloudName = 'CLOUDINARY_CLOUD_NAME'; // à remplacer une bonne fois pour toutes
+
+  return `https://res.cloudinary.com/${cloudName}/image/upload/w_200,h_200,c_fit,q_auto,f_auto/${image}.png`;
+}
+
 
   getChantierName(id: number | null | undefined): string {
     if (!id) return 'Au Dépôt';

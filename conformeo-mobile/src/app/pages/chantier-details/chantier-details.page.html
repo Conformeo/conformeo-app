@@ -6,8 +6,7 @@
     </ion-button>
   </div>
 
-  <div class="header-image"
-       [style.background-image]="'url(' + (chantier?.cover_url || 'assets/splash.png') + ')'">
+  <div class="header-image" [style.background-image]="'url(' + (chantier?.cover_url || 'assets/splash.png') + ')'">
     <div class="header-overlay">
       <div class="header-text">
         <h1 class="chantier-title">{{ chantier?.nom }}</h1>
@@ -17,113 +16,97 @@
   </div>
 
   <div class="body-container">
-    <!-- Carte infos -->
+    
     <div class="info-card">
       <div class="location-row">
         <ion-icon name="location" color="primary"></ion-icon>
         <span>{{ chantier?.adresse }}</span>
       </div>
-
+      
       <div class="actions-row">
         <div class="action-btn" (click)="downloadPdf()">
-          <div class="icon-circle">
-            <ion-icon name="document-text"></ion-icon>
-          </div>
+          <div class="icon-circle"><ion-icon name="document-text"></ion-icon></div>
           <span>PDF</span>
         </div>
-
         <div class="action-btn mobile-only-action" [routerLink]="['/qhse-form', chantierId]">
-          <div class="icon-circle" style="color: #2dd36f;">
-            <ion-icon name="checkmark-done-circle-outline"></ion-icon>
-          </div>
+          <div class="icon-circle" style="color: #2dd36f;"><ion-icon name="checkmark-done-circle-outline"></ion-icon></div>
           <span>Audit</span>
         </div>
-
         <div class="action-btn" (click)="openPIC()">
-          <div class="icon-circle" style="color: #9c27b0;">
-            <ion-icon name="map-outline"></ion-icon>
-          </div>
+          <div class="icon-circle" style="color: #9c27b0;"><ion-icon name="map-outline"></ion-icon></div>
           <span>PIC</span>
         </div>
-
         <div class="action-btn mobile-only-action" [routerLink]="['/ppsps-form', chantierId]">
-          <div class="icon-circle" style="color: #ffc409;">
-            <ion-icon name="shield-checkmark-outline"></ion-icon>
+          <div class="icon-circle" style="color: #ffc409;"> <ion-icon name="shield-checkmark-outline"></ion-icon>
           </div>
           <span>PPSPS</span>
         </div>
-
         <div class="action-btn" (click)="openSignature()">
-          <div class="icon-circle">
-            <ion-icon name="download-outline"></ion-icon>
-          </div>
+          <div class="icon-circle"><ion-icon name="download-outline"></ion-icon></div>
           <span>Signer</span>
         </div>
-
         <div class="action-btn" (click)="openItinerary()">
-          <div class="icon-circle">
-            <ion-icon name="navigate"></ion-icon>
-          </div>
+          <div class="icon-circle"><ion-icon name="navigate"></ion-icon></div>
           <span>Y aller</span>
         </div>
       </div>
     </div>
-
-    <!-- Documents -->
+    
     <div style="margin-bottom: 20px;">
       <h3 class="section-title">Documents</h3>
-
+      
       <ion-card style="border-radius: 12px; margin: 0; box-shadow: 0 4px 10px rgba(0,0,0,0.05);">
         <ion-list lines="none">
+          
           <ion-item button *ngFor="let doc of documentsList" (click)="doc.action()">
-            <div slot="start"
-                 [style.background]="'var(--ion-color-' + doc.color + ')'"
-                 style="width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white;">
+            
+            <div slot="start" [style.background]="'var(--ion-color-' + doc.color + ')'" style="width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white;">
               <ion-icon [name]="doc.icon"></ion-icon>
             </div>
-
+            
             <ion-label>
               <h2>{{ doc.titre }}</h2>
               <p>Édité le {{ doc.date | date:'dd/MM/yyyy' }}</p>
             </ion-label>
-
+            
             <ion-icon name="download-outline" slot="end" color="medium"></ion-icon>
           </ion-item>
+
         </ion-list>
       </ion-card>
     </div>
 
-    <!-- Journal de bord -->
     <h3 class="section-title">Journal de bord</h3>
 
     <div class="feed-list">
+      
       <div *ngIf="rapports.length === 0" class="empty-state">
         <p>Aucune observation. Commencez par prendre une photo !</p>
       </div>
 
       <div *ngFor="let rap of rapports" class="feed-card" (click)="openRapportDetails(rap)">
-        <div class="feed-image"
-             *ngIf="hasImage(rap)"
-             [style.background-image]="'url(' + getFirstImage(rap) + ')'">
+        
+        <div class="feed-image" 
+             [style.background-image]="'url(' + getFirstImage(rap) + ')'"
+             *ngIf="hasImage(rap)">
         </div>
 
         <div class="feed-content">
           <div class="feed-header">
             <span class="feed-date">{{ rap.date_creation | date:'dd MMM HH:mm' }}</span>
-            <span [ngClass]="['feed-badge', rap.niveau_urgence]">
-              {{ rap.niveau_urgence }}
-            </span>
+            <span class="feed-badge" [class]="rap.niveau_urgence">{{ rap.niveau_urgence }}</span>
           </div>
-
           <h4 class="feed-title">{{ rap.titre }}</h4>
           <p class="feed-desc">{{ rap.description }}</p>
         </div>
       </div>
+
     </div>
+
   </div>
 
-  <!-- FABs -->
   <ion-fab vertical="bottom" horizontal="end" slot="fixed">
+    
     <ion-fab-button (click)="takePhoto()" color="primary" style="margin-bottom: 10px;">
       <ion-icon name="camera"></ion-icon>
     </ion-fab-button>
@@ -131,20 +114,20 @@
     <ion-fab-button color="success" [routerLink]="['/smart-scan', chantierId]">
       <ion-icon name="scan-outline"></ion-icon>
     </ion-fab-button>
+
   </ion-fab>
 
-  <!-- Bloc DOE -->
   <div style="margin: 40px 0 80px 0; text-align: center;">
-    <ion-note>Fin de chantier ?</ion-note>
-
-    <ion-button expand="block" color="tertiary" (click)="downloadDOE()" style="margin-top: 10px;">
-      <ion-icon name="archive-outline" slot="start"></ion-icon>
-      Télécharger le DOE Complet
-    </ion-button>
-
-    <p style="font-size: 12px; color: #888; margin-top: 10px;">
-      Contient : Journal de bord, Photos, Audits, PPSPS.
-    </p>
-  </div>
+      <ion-note>Fin de chantier ?</ion-note>
+      
+      <ion-button expand="block" color="tertiary" (click)="downloadDOE()" style="margin-top: 10px;">
+        <ion-icon name="archive-outline" slot="start"></ion-icon>
+        Télécharger le DOE Complet
+      </ion-button>
+      
+      <p style="font-size: 12px; color: #888; margin-top: 10px;">
+        Contient : Journal de bord, Photos, Audits, PPSPS.
+      </p>
+    </div>
 
 </ion-content>
