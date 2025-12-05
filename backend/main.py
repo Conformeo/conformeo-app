@@ -4,9 +4,10 @@ from uuid import uuid4
 from typing import List, Optional
 from dotenv import load_dotenv
 import zipfile
+
 # Chargement des variables d'environnement locales (.env) si présentes
 load_dotenv()
-import requests
+
 import cloudinary
 import cloudinary.uploader
 from fastapi import FastAPI, Depends, HTTPException, status, File, UploadFile
@@ -21,6 +22,7 @@ from sqlalchemy.orm import Session
 import models, schemas, security
 import pdf_generator
 from database import engine, get_db
+from datetime import datetime
 
 # Création des tables
 models.Base.metadata.create_all(bind=engine)
@@ -52,7 +54,7 @@ app.mount("/static", StaticFiles(directory="uploads"), name="static")
 # --- CORS (Autorisations larges pour le dev) ---
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],      # Autorise tout le monde
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -116,6 +118,15 @@ def create_chantier(chantier: schemas.ChantierCreate, db: Session = Depends(get_
 def read_chantiers(db: Session = Depends(get_db)):
     return db.query(models.Chantier).all()
 
+@app.put("/chantiers/{chantier_id}/signature")
+def sign_chantier(chantier_id: int, signature_url: str, db: Session = Depends(get_db)):
+    chantier = db.query(models.Chantier).filter(models.Chantier.id == chantier_id).first()
+    if not chantier:
+        raise HTTPException(status_code=404, detail="Chantier introuvable")
+    
+    chantier.signature_url = signature_url
+    db.commit()
+    return {"status": "signed", "url": signature_url}
 
 # ==========================================
 # 3. RAPPORTS & PHOTOS
@@ -170,17 +181,18 @@ def read_rapports_chantier(chantier_id: int, db: Session = Depends(get_db)):
 @app.get("/chantiers/{chantier_id}/pdf")
 def download_pdf(chantier_id: int, db: Session = Depends(get_db)):
     chantier = db.query(models.Chantier).filter(models.Chantier.id == chantier_id).first()
-    if not chantier: raise HTTPException(status_code=404, detail="Chantier introuvable")
+    if not chantier:
+        raise HTTPException(status_code=404, detail="Chantier introuvable")
 
     rapports = db.query(models.Rapport).filter(models.Rapport.chantier_id == chantier_id).all()
     
-    # 👇 ON RECUPERE LES INSPECTIONS
+    # On récupère les inspections pour les inclure dans le rapport
     inspections = db.query(models.Inspection).filter(models.Inspection.chantier_id == chantier_id).all()
 
     filename = f"Rapport_{chantier.id}.pdf"
     file_path = f"uploads/{filename}"
 
-    # 👇 ON APPELLE AVEC 4 ARGUMENTS
+    # On passe 'inspections' à la fonction
     pdf_generator.generate_pdf(chantier, rapports, inspections, file_path)
 
     return FileResponse(path=file_path, filename=filename, media_type='application/pdf')
@@ -205,6 +217,8 @@ def create_materiel(mat: schemas.MaterielCreate, db: Session = Depends(get_db)):
         nom=mat.nom,
         reference=mat.reference,
         etat=mat.etat,
+        # 👇 C'EST ICI LE CORRECTIF : ON SAUVEGARDE L'IMAGE
+        image_url=mat.image_url,
         chantier_id=None 
     )
     db.add(new_mat)
@@ -224,22 +238,6 @@ def transfer_materiel(materiel_id: int, chantier_id: Optional[int] = None, db: S
     mat.chantier_id = chantier_id
     db.commit()
     return {"status": "success"}
-
-
-# ==========================================
-# 5. SIGNATURE
-# ==========================================
-
-@app.put("/chantiers/{chantier_id}/signature")
-def sign_chantier(chantier_id: int, signature_url: str, db: Session = Depends(get_db)):
-    chantier = db.query(models.Chantier).filter(models.Chantier.id == chantier_id).first()
-    if not chantier:
-        raise HTTPException(status_code=404, detail="Chantier introuvable")
-    
-    chantier.signature_url = signature_url
-    db.commit()
-    return {"status": "signed", "url": signature_url}
-
 
 # ==========================================
 # 6. QHSE (INSPECTIONS)
@@ -262,6 +260,20 @@ def create_inspection(inspection: schemas.InspectionCreate, db: Session = Depend
 @app.get("/chantiers/{chantier_id}/inspections", response_model=List[schemas.InspectionOut])
 def read_inspections(chantier_id: int, db: Session = Depends(get_db)):
     return db.query(models.Inspection).filter(models.Inspection.chantier_id == chantier_id).all()
+
+@app.get("/inspections/{inspection_id}/pdf")
+def download_inspection_pdf(inspection_id: int, db: Session = Depends(get_db)):
+    inspection = db.query(models.Inspection).filter(models.Inspection.id == inspection_id).first()
+    if not inspection: raise HTTPException(status_code=404, detail="Audit introuvable")
+    
+    chantier = db.query(models.Chantier).filter(models.Chantier.id == inspection.chantier_id).first()
+    
+    date_str = inspection.date_creation.strftime('%Y-%m-%d')
+    filename = f"Audit_{inspection.type}_{date_str}.pdf"
+    file_path = f"uploads/{filename}"
+    
+    pdf_generator.generate_audit_pdf(chantier, inspection, file_path)
+    return FileResponse(path=file_path, filename=filename, media_type='application/pdf')
 
 
 # ==========================================
@@ -304,122 +316,108 @@ def download_ppsps_pdf(ppsps_id: int, db: Session = Depends(get_db)):
     pdf_generator.generate_ppsps_pdf(chantier, ppsps, file_path)
     return FileResponse(path=file_path, filename=filename, media_type='application/pdf')
 
+# ==========================================
+# 8. DOE & PIC
+# ==========================================
 
-# ==========================================
-# 8 ROUTE DOE (Fin de Chantier)
-# ==========================================
-# --- ROUTE DOE (Fin de Chantier) ---
+@app.post("/pics", response_model=schemas.PICOut)
+def create_or_update_pic(pic: schemas.PICCreate, db: Session = Depends(get_db)):
+    existing_pic = db.query(models.PIC).filter(models.PIC.chantier_id == pic.chantier_id).first()
+    
+    if existing_pic:
+        existing_pic.background_url = pic.background_url
+        existing_pic.final_url = pic.final_url
+        existing_pic.elements_data = pic.elements_data
+        existing_pic.date_update = datetime.now()
+        db.commit()
+        db.refresh(existing_pic)
+        return existing_pic
+    else:
+        new_pic = models.PIC(
+            chantier_id=pic.chantier_id,
+            background_url=pic.background_url,
+            final_url=pic.final_url,
+            elements_data=pic.elements_data
+        )
+        db.add(new_pic)
+        db.commit()
+        db.refresh(new_pic)
+        return new_pic
+
+@app.get("/chantiers/{chantier_id}/pic", response_model=Optional[schemas.PICOut])
+def read_pic_chantier(chantier_id: int, db: Session = Depends(get_db)):
+    return db.query(models.PIC).filter(models.PIC.chantier_id == chantier_id).first()
+
 @app.get("/chantiers/{chantier_id}/doe")
 def download_doe(chantier_id: int, db: Session = Depends(get_db)):
-    # 1. Récupération des données
     chantier = db.query(models.Chantier).filter(models.Chantier.id == chantier_id).first()
     if not chantier: raise HTTPException(status_code=404, detail="Chantier introuvable")
 
-    # 2. Préparation du ZIP
     zip_filename = f"DOE_{chantier.nom.replace(' ', '_')}.zip"
     zip_path = f"uploads/{zip_filename}"
 
     with zipfile.ZipFile(zip_path, 'w') as zipf:
-        
-        # --- A. AJOUT DU JOURNAL DE BORD ---
+        # A. Journal
         rapports = db.query(models.Rapport).filter(models.Rapport.chantier_id == chantier_id).all()
         inspections = db.query(models.Inspection).filter(models.Inspection.chantier_id == chantier_id).all()
-        
-        journal_name = f"1_Journal_Suivi_{chantier.id}.pdf"
+        journal_name = f"1_Journal_Suivi.pdf"
         journal_path = f"uploads/{journal_name}"
-        
-        # On génère le PDF frais
         pdf_generator.generate_pdf(chantier, rapports, inspections, journal_path)
-        
-        # On l'ajoute au ZIP
         zipf.write(journal_path, journal_name)
 
-        # --- B. AJOUT DES PPSPS ---
+        # B. PPSPS
         ppsps_list = db.query(models.PPSPS).filter(models.PPSPS.chantier_id == chantier_id).all()
-        
         for index, doc in enumerate(ppsps_list):
             ppsps_name = f"2_PPSPS_{index+1}.pdf"
             ppsps_path = f"uploads/{ppsps_name}"
-            
             pdf_generator.generate_ppsps_pdf(chantier, doc, ppsps_path)
             zipf.write(ppsps_path, ppsps_name)
 
-        # --- C. AUDITS (NOUVEAU)
+        # C. Audits
         for index, insp in enumerate(inspections):
             audit_name = f"3_Audit_{insp.type}_{index+1}.pdf"
             audit_path = f"uploads/{audit_name}"
             pdf_generator.generate_audit_pdf(chantier, insp, audit_path)
             zipf.write(audit_path, audit_name)
 
-        # --- D. PIC (Plan Installation) ---
-        # On cherche le PIC du chantier
+        # D. PIC
         pic = db.query(models.PIC).filter(models.PIC.chantier_id == chantier_id).first()
-        
         if pic and pic.final_url:
             try:
-                # On télécharge l'image depuis Cloudinary
                 response = requests.get(pic.final_url)
                 if response.status_code == 200:
-                    # On détermine l'extension (jpg ou png)
                     ext = "jpg" if "jpeg" in response.headers.get("content-type", "") else "png"
                     pic_name = f"4_Plan_Installation_PIC.{ext}"
                     pic_path = f"uploads/{pic_name}"
-                    
-                    # On l'écrit sur le disque temporairement
-                    with open(pic_path, "wb") as f:
-                        f.write(response.content)
-                    
-                    # On l'ajoute au ZIP
+                    with open(pic_path, "wb") as f: f.write(response.content)
                     zipf.write(pic_path, pic_name)
-            except Exception as e:
-                print(f"Erreur ajout PIC au DOE: {e}")
+            except: pass
 
-    # 3. Envoi du ZIP
     return FileResponse(path=zip_path, filename=zip_filename, media_type='application/zip')
 
 # ==========================================
 # 9. MIGRATIONS & MAINTENANCE
 # ==========================================
 
-# --- ROUTE DE REMISE A ZERO (DEMO) ---
-@app.get("/reset_demo")
-def reset_demo_data(db: Session = Depends(get_db)):
+@app.get("/reset_data")
+def reset_data(db: Session = Depends(get_db)):
     try:
-        # 1. On supprime d'abord les "Enfants" (ceux qui dépendent des chantiers)
-        # Images des rapports
         db.query(models.RapportImage).delete()
-        
-        # Documents et listes
         db.query(models.Rapport).delete()
+        db.query(models.Materiel).delete()
         db.query(models.Inspection).delete()
         db.query(models.PPSPS).delete()
-        
-        # Le PIC (Plan Installation)
         db.query(models.PIC).delete()
-        
-        # Le Matériel (On le remet à zéro ou on supprime tout ? Ici on supprime tout)
-        db.query(models.Materiel).delete()
-
-        # 2. On supprime les "Parents" (Les Chantiers)
         db.query(models.Chantier).delete()
-        
-        # Note: On ne supprime PAS la table 'User' pour que vous puissiez rester connecté.
-
         db.commit()
-        
-        return {
-            "status": "Succès ✨", 
-            "message": "La base de données a été nettoyée pour la démo.",
-            "details": "Tous les chantiers, rapports, photos, ppsps, audits et matériels ont été supprimés."
-        }
+        return {"message": "Base nettoyée"}
     except Exception as e:
-        db.rollback() # En cas d'erreur, on annule tout pour ne pas casser la base
-        return {"status": "Erreur", "details": str(e)}
+        db.rollback()
+        return {"error": str(e)}
 
 @app.get("/migrate_db_v5")
 def migrate_db_v5(db: Session = Depends(get_db)):
     try:
-        # Création des nouvelles colonnes pour le PPSPS
         db.execute(text("ALTER TABLE ppsps ADD COLUMN IF NOT EXISTS secours_data JSON"))
         db.execute(text("ALTER TABLE ppsps ADD COLUMN IF NOT EXISTS installations_data JSON"))
         db.execute(text("ALTER TABLE ppsps ADD COLUMN IF NOT EXISTS taches_data JSON"))
@@ -428,6 +426,33 @@ def migrate_db_v5(db: Session = Depends(get_db)):
         return {"message": "Migration V5 (PPSPS OPPBTP) réussie !"}
     except Exception as e:
         return {"status": "Erreur", "details": str(e)}
+
+@app.get("/migrate_db_v6")
+def migrate_db_v6(db: Session = Depends(get_db)):
+    try:
+        models.Base.metadata.create_all(bind=engine)
+        return {"message": "Migration V6 (PIC) réussie !"}
+    except Exception as e:
+        return {"status": "Erreur", "details": str(e)}
+
+@app.get("/migrate_db_v7")
+def migrate_db_v7(db: Session = Depends(get_db)):
+    try:
+        db.execute(text("ALTER TABLE materiels ADD COLUMN IF NOT EXISTS image_url VARCHAR"))
+        db.commit()
+        return {"message": "Migration V7 (Images Matériel) réussie !"}
+    except Exception as e:
+        return {"status": "Erreur", "details": str(e)}
+
+@app.get("/force_fix_materiel")
+def force_fix_materiel(db: Session = Depends(get_db)):
+    try:
+        db.execute(text("ALTER TABLE materiels ADD COLUMN image_url VARCHAR"))
+        db.commit()
+        return {"message": "✅ Succès : Colonne image_url ajoutée !"}
+    except Exception as e:
+        db.rollback()
+        return {"message": f"Info (Déjà fait ?) : {str(e)}"}
 
 @app.get("/force_fix_ppsps")
 def force_fix_ppsps(db: Session = Depends(get_db)):
@@ -448,109 +473,6 @@ def force_fix_ppsps(db: Session = Depends(get_db)):
             except Exception as e:
                 db.rollback()
                 results.append(f"Ignoré: {str(e)}")
-                
         return {"status": "Terminé", "details": results}
     except Exception as e:
         return {"status": "Erreur critique", "details": str(e)}
-
-# ...
-
-# --- MIGRATION V6 (TABLE PIC) ---
-@app.get("/migrate_db_v6")
-def migrate_db_v6(db: Session = Depends(get_db)):
-    try:
-        models.Base.metadata.create_all(bind=engine)
-        return {"message": "Migration V6 (PIC) réussie !"}
-    except Exception as e:
-        return {"status": "Erreur", "details": str(e)}
-
-# --- ROUTES PIC ---
-@app.post("/pics", response_model=schemas.PICOut)
-def create_or_update_pic(pic: schemas.PICCreate, db: Session = Depends(get_db)):
-    # On vérifie si un PIC existe déjà pour ce chantier
-    existing_pic = db.query(models.PIC).filter(models.PIC.chantier_id == pic.chantier_id).first()
-    
-    if existing_pic:
-        # Mise à jour
-        existing_pic.background_url = pic.background_url
-        existing_pic.final_url = pic.final_url
-        existing_pic.elements_data = pic.elements_data
-        existing_pic.date_update = datetime.now()
-        db.commit()
-        db.refresh(existing_pic)
-        return existing_pic
-    else:
-        # Création
-        new_pic = models.PIC(
-            chantier_id=pic.chantier_id,
-            background_url=pic.background_url,
-            final_url=pic.final_url,
-            elements_data=pic.elements_data
-        )
-        db.add(new_pic)
-        db.commit()
-        db.refresh(new_pic)
-        return new_pic
-
-@app.get("/chantiers/{chantier_id}/pic", response_model=Optional[schemas.PICOut])
-def read_pic_chantier(chantier_id: int, db: Session = Depends(get_db)):
-    return db.query(models.PIC).filter(models.PIC.chantier_id == chantier_id).first()
-
-
-@app.get("/inspections/{inspection_id}/pdf")
-def download_inspection_pdf(inspection_id: int, db: Session = Depends(get_db)):
-    # 1. Récupérer l'inspection
-    inspection = db.query(models.Inspection).filter(models.Inspection.id == inspection_id).first()
-    if not inspection:
-        raise HTTPException(status_code=404, detail="Audit introuvable")
-    
-    # 2. Récupérer le chantier lié
-    chantier = db.query(models.Chantier).filter(models.Chantier.id == inspection.chantier_id).first()
-    
-    # 3. Générer le nom du fichier
-    date_str = inspection.date_creation.strftime('%Y-%m-%d')
-    filename = f"Audit_{inspection.type}_{date_str}.pdf"
-    file_path = f"uploads/{filename}"
-    
-    # 4. Appeler le générateur PDF dédié (qu'on va créer juste après)
-    pdf_generator.generate_audit_pdf(chantier, inspection, file_path)
-    
-    return FileResponse(path=file_path, filename=filename, media_type='application/pdf')
-
-
-# ...
-
-# --- MIGRATION V7 (MATERIEL IMAGE) ---
-@app.get("/migrate_db_v7")
-def migrate_db_v7(db: Session = Depends(get_db)):
-    try:
-        db.execute(text("ALTER TABLE materiels ADD COLUMN IF NOT EXISTS image_url VARCHAR"))
-        db.commit()
-        return {"message": "Migration V7 (Images Matériel) réussie !"}
-    except Exception as e:
-        return {"status": "Erreur", "details": str(e)}
-
-@app.post("/materiels", response_model=schemas.MaterielOut)
-def create_materiel(mat: schemas.MaterielCreate, db: Session = Depends(get_db)):
-    new_mat = models.Materiel(
-        nom=mat.nom,
-        reference=mat.reference,
-        etat=mat.etat,
-        image_url=mat.image_url, # <--- AJOUT
-        chantier_id=None 
-    )
-    db.add(new_mat)
-    db.commit()
-    db.refresh(new_mat)
-    return new_mat
-
-@app.get("/force_fix_materiel")
-def force_fix_materiel(db: Session = Depends(get_db)):
-    try:
-        # On force l'ajout de la colonne
-        db.execute(text("ALTER TABLE materiels ADD COLUMN image_url VARCHAR"))
-        db.commit()
-        return {"message": "✅ Succès : Colonne image_url ajoutée !"}
-    except Exception as e:
-        db.rollback()
-        return {"message": f"Info (Déjà fait ?) : {str(e)}"}
