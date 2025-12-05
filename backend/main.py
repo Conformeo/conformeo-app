@@ -509,3 +509,45 @@ def force_fix_ppsps(db: Session = Depends(get_db)):
         return {"status": "Terminé", "details": results}
     except Exception as e:
         return {"status": "Erreur critique", "details": str(e)}
+
+
+@app.get("/migrate_multi_tenant")
+def migrate_multi_tenant(db: Session = Depends(get_db)):
+    try:
+        # 1. Créer la table companies
+        models.Base.metadata.create_all(bind=engine)
+        
+        # 2. Ajouter les colonnes company_id (si elles n'existent pas)
+        # Note : SQLite ne supporte pas bien ADD COLUMN avec ForeignKey en une ligne, 
+        # mais Postgres (Render) le gère très bien.
+        tables = ["users", "chantiers", "materiels"]
+        for t in tables:
+            try:
+                db.execute(text(f"ALTER TABLE {t} ADD COLUMN company_id INTEGER"))
+            except:
+                print(f"Colonne company_id existe déjà pour {t}")
+
+        db.commit()
+
+        # 3. Créer l'entreprise par défaut si elle n'existe pas
+        demo_company = db.query(models.Company).filter(models.Company.id == 1).first()
+        if not demo_company:
+            demo_company = models.Company(name="Ma Société BTP (Démo)", subscription_plan="enterprise")
+            db.add(demo_company)
+            db.commit()
+            db.refresh(demo_company)
+        
+        cid = demo_company.id
+
+        # 4. Rattacher toutes les données orphelines à cette entreprise
+        db.execute(text(f"UPDATE users SET company_id = {cid} WHERE company_id IS NULL"))
+        db.execute(text(f"UPDATE chantiers SET company_id = {cid} WHERE company_id IS NULL"))
+        db.execute(text(f"UPDATE materiels SET company_id = {cid} WHERE company_id IS NULL"))
+        
+        db.commit()
+
+        return {"message": "Migration Multi-Tenant réussie ! Toutes les données sont rattachées à 'Ma Société BTP'."}
+
+    except Exception as e:
+        db.rollback()
+        return {"status": "Erreur", "details": str(e)}

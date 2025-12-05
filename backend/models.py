@@ -3,6 +3,31 @@ from sqlalchemy.orm import relationship
 from database import Base
 from datetime import datetime
 
+# 👇 NOUVELLE TABLE : L'ENTREPRISE (Le "Tenant")
+class Company(Base):
+    __tablename__ = "companies"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, index=True)
+    subscription_plan = Column(String, default="free") # free, pro, enterprise
+    created_at = Column(DateTime, default=datetime.now)
+
+    # Relations Parents (Une entreprise a plusieurs...)
+    users = relationship("User", back_populates="company")
+    chantiers = relationship("Chantier", back_populates="company")
+    materiels = relationship("Materiel", back_populates="company")
+
+class User(Base):
+    __tablename__ = "users"
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String, unique=True, index=True)
+    hashed_password = Column(String)
+    role = Column(String, default="conducteur")
+    is_active = Column(Boolean, default=True)
+    
+    # 👇 LIEN VERS L'ENTREPRISE
+    company_id = Column(Integer, ForeignKey("companies.id"), nullable=True)
+    company = relationship("Company", back_populates="users")
+
 class Chantier(Base):
     __tablename__ = "chantiers"
 
@@ -15,11 +40,31 @@ class Chantier(Base):
     signature_url = Column(String, nullable=True)
     cover_url = Column(String, nullable=True)
 
+    # 👇 LIEN VERS L'ENTREPRISE
+    company_id = Column(Integer, ForeignKey("companies.id"), nullable=True)
+    company = relationship("Company", back_populates="chantiers")
+
     rapports = relationship("Rapport", back_populates="chantier")
     materiels = relationship("Materiel", back_populates="chantier")
     inspections = relationship("Inspection", back_populates="chantier")
     ppsps_docs = relationship("PPSPS", back_populates="chantier")
     pic = relationship("PIC", uselist=False, back_populates="chantier")
+
+class Materiel(Base):
+    __tablename__ = "materiels"
+
+    id = Column(Integer, primary_key=True, index=True)
+    nom = Column(String, index=True)
+    reference = Column(String)
+    etat = Column(String, default="Bon")
+    image_url = Column(String, nullable=True)
+    
+    # 👇 LIEN VERS L'ENTREPRISE (Le stock appartient à la boîte)
+    company_id = Column(Integer, ForeignKey("companies.id"), nullable=True)
+    company = relationship("Company", back_populates="materiels")
+    
+    chantier_id = Column(Integer, ForeignKey("chantiers.id"), nullable=True)
+    chantier = relationship("Chantier", back_populates="materiels")
 
 class RapportImage(Base):
     __tablename__ = "rapport_images"
@@ -37,7 +82,6 @@ class Rapport(Base):
     titre = Column(String)
     description = Column(String)
     
-    # 👇 RESTAUREZ CETTE LIGNE (Elle est nécessaire pour main.py)
     photo_url = Column(String, nullable=True) 
     
     chantier_id = Column(Integer, ForeignKey("chantiers.id"))
@@ -50,41 +94,17 @@ class Rapport(Base):
     chantier = relationship("Chantier", back_populates="rapports")
     images = relationship("RapportImage", back_populates="rapport")
 
-class Materiel(Base):
-    __tablename__ = "materiels"
-
-    id = Column(Integer, primary_key=True, index=True)
-    nom = Column(String, index=True)
-    reference = Column(String)
-    etat = Column(String, default="Bon")
-    image_url = Column(String, nullable=True)
-    
-    chantier_id = Column(Integer, ForeignKey("chantiers.id"), nullable=True)
-    chantier = relationship("Chantier", back_populates="materiels")
-
-class User(Base):
-    __tablename__ = "users"
-
-    id = Column(Integer, primary_key=True, index=True)
-    email = Column(String, unique=True, index=True)
-    hashed_password = Column(String)
-    role = Column(String, default="conducteur")
-    is_active = Column(Boolean, default=True)
-
 class Inspection(Base):
     __tablename__ = "inspections"
 
     id = Column(Integer, primary_key=True, index=True)
-    titre = Column(String) # Ex: "Vérification Échafaudage"
-    type = Column(String) # "Sécurité", "Environnement", "Qualité"
-    
-    # Les données de l'audit : 
-    # Ex: [{"question": "Harnais attaché ?", "statut": "OK", "commentaire": ""}, ...]
+    titre = Column(String)
+    type = Column(String)
     data = Column(JSON) 
     
     chantier_id = Column(Integer, ForeignKey("chantiers.id"))
     date_creation = Column(DateTime, default=datetime.now)
-    createur = Column(String) # Nom du contrôleur
+    createur = Column(String)
 
     chantier = relationship("Chantier", back_populates="inspections")
 
@@ -94,30 +114,21 @@ class PPSPS(Base):
     id = Column(Integer, primary_key=True, index=True)
     chantier_id = Column(Integer, ForeignKey("chantiers.id"))
     
-    # 1. Renseignements Généraux
     maitre_ouvrage = Column(String)
     maitre_oeuvre = Column(String)
     coordonnateur_sps = Column(String)
-    responsable_chantier = Column(String) # Conducteur travaux ou Chef chantier
+    responsable_chantier = Column(String)
     nb_compagnons = Column(Integer)
     horaires = Column(String)
-    duree_travaux = Column(String) # Ex: "3 mois"
+    duree_travaux = Column(String)
 
-    # 2. Secours (JSON: { sst_noms: [], hopital: "", num_urgence: "", trousse_loc: "" })
     secours_data = Column(JSON)
-
-    # 3. Hygiène & Installations (JSON: { vestiaires: "", refectoire: "", toilettes: "", eau: "" })
     installations_data = Column(JSON)
-
-    # 4. Tâches & Risques (JSON: [ { tache: "", risque: "", prevention: "" }, ... ])
-    # Remplace l'ancienne colonne 'risques' simple
     taches_data = Column(JSON)
     
     date_creation = Column(DateTime, default=datetime.now)
 
     chantier = relationship("Chantier", back_populates="ppsps_docs")
-
-# ... imports existants ...
 
 class PIC(Base):
     __tablename__ = "pics"
@@ -125,13 +136,8 @@ class PIC(Base):
     id = Column(Integer, primary_key=True, index=True)
     chantier_id = Column(Integer, ForeignKey("chantiers.id"))
     
-    # L'image de fond (Plan vierge)
     background_url = Column(String)
-    
-    # L'image finale générée (pour le PDF)
     final_url = Column(String)
-    
-    # Les données modifiables (Position des icônes : [{"type": "grue", "x": 100, "y": 200}, ...])
     elements_data = Column(JSON)
     
     date_update = Column(DateTime, default=datetime.now)

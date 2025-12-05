@@ -2,16 +2,31 @@ from pydantic import BaseModel, EmailStr
 from typing import Optional, List
 from datetime import datetime
 
+# --- ENTREPRISE (NOUVEAU) ---
+class CompanyCreate(BaseModel):
+    name: str
+
+class CompanyOut(BaseModel):
+    id: int
+    name: str
+    subscription_plan: str
+    class Config:
+        from_attributes = True
+
 # --- UTILISATEURS ---
 class UserCreate(BaseModel):
     email: EmailStr
     password: str
     role: str = "conducteur"
+    # 👇 AJOUT : Pour créer sa boite à l'inscription
+    company_name: Optional[str] = None 
 
 class UserOut(BaseModel):
     id: int
     email: EmailStr
     role: str
+    # 👇 AJOUT : L'utilisateur appartient à une entreprise
+    company_id: Optional[int] = None 
     is_active: bool
     class Config:
         from_attributes = True
@@ -43,7 +58,7 @@ class MaterielBase(BaseModel):
     nom: str
     reference: str
     etat: str = "Bon"
-    image_url: Optional[str] = None # <--- AJOUT
+    image_url: Optional[str] = None 
 
 class MaterielCreate(MaterielBase):
     pass
@@ -56,7 +71,6 @@ class MaterielOut(MaterielBase):
 
 # --- RAPPORTS & IMAGES ---
 
-# 1. Structure d'une image seule dans la liste
 class RapportImageOut(BaseModel):
     url: str
     class Config:
@@ -70,15 +84,13 @@ class RapportBase(BaseModel):
     latitude: Optional[float] = None
     longitude: Optional[float] = None
 
-# 2. Ce qu'on envoie pour CREER (Une liste de liens textes)
 class RapportCreate(RapportBase):
     image_urls: List[str] = [] 
 
-# 3. Ce que l'API RENVOIE (Une liste d'objets images)
 class RapportOut(RapportBase):
     id: int
-    photo_url: Optional[str] = None # On garde pour compatibilité
-    images: List[RapportImageOut] = [] # La galerie
+    photo_url: Optional[str] = None 
+    images: List[RapportImageOut] = [] 
     date_creation: datetime
     class Config:
         from_attributes = True
@@ -87,7 +99,7 @@ class RapportOut(RapportBase):
 class InspectionBase(BaseModel):
     titre: str
     type: str
-    data: List[dict] # Liste de questions/réponses
+    data: List[dict] 
     chantier_id: int
     createur: str
 
@@ -101,7 +113,6 @@ class InspectionOut(InspectionBase):
         from_attributes = True
 
 # --- PPSPS DOCUMENTS ---
-
 class PPSPSBase(BaseModel):
     maitre_ouvrage: Optional[str] = ""
     maitre_oeuvre: Optional[str] = ""
@@ -125,7 +136,6 @@ class PPSPSOut(PPSPSBase):
     date_creation: datetime
     class Config:
         from_attributes = True
-
 
 # --- PIC (Plan Installation Chantier) ---
 class PICBase(BaseModel):
