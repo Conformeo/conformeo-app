@@ -225,4 +225,25 @@ export class MaterielPage implements OnInit {
   getMaterielsDepot(): number {
     return this.materiels.filter(m => !m.chantier_id).length;
   }
+
+  async deleteMateriel(event: Event, mat: Materiel) {
+    event.stopPropagation(); // Empêche d'ouvrir le menu "Déplacer"
+    
+    const alert = await this.alertCtrl.create({
+      header: 'Supprimer ?',
+      message: `Voulez-vous supprimer ${mat.nom} ?`,
+      buttons: [
+        { text: 'Non', role: 'cancel' },
+        {
+          text: 'Oui',
+          handler: () => {
+            this.api.deleteMateriel(mat.id!).subscribe(() => {
+              this.loadData(); // Rafraîchir la liste
+            });
+          }
+        }
+      ]
+    });
+    await alert.present();
+  }
 }

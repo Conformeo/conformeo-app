@@ -17,6 +17,7 @@ import {
   documentTextOutline, archiveOutline, mapOutline
 } from 'ionicons/icons';
 import { IonBackButton, IonButtons } from '@ionic/angular/standalone';
+import { AlertController, NavController } from '@ionic/angular/standalone'; // Vérifie les imports
 
 // Import des modales
 import { PicModalComponent } from './pic-modal/pic-modal.component';
@@ -42,7 +43,9 @@ export class ChantierDetailsPage implements OnInit {
     private route: ActivatedRoute,
     public api: ApiService,
     private modalCtrl: ModalController,
-    private platform: Platform
+    private platform: Platform,
+    private alertCtrl: AlertController,
+    private navCtrl: NavController
   ) {
     addIcons({ 
       camera, time, warning, documentText, create, navigate, location, arrowBack, 
@@ -301,4 +304,24 @@ export class ChantierDetailsPage implements OnInit {
     }
     return this.getFullUrl(rap.photo_url);
   }
+
+  async deleteChantier() {
+  const alert = await this.alertCtrl.create({
+    header: 'Supprimer le chantier ?',
+    message: 'Cette action est irréversible. Tous les rapports et documents seront effacés.',
+    buttons: [
+      { text: 'Annuler', role: 'cancel' },
+      {
+        text: 'Supprimer',
+        role: 'destructive',
+        handler: () => {
+          this.api.deleteChantier(this.chantierId).subscribe(() => {
+            this.navCtrl.navigateBack('/home');
+          });
+        }
+      }
+    ]
+  });
+  await alert.present();
+}
 }

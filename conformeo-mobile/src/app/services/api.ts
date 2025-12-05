@@ -401,6 +401,14 @@ export class ApiService {
     return this.http.get<PIC>(`${this.apiUrl}/chantiers/${chantierId}/pic`);
   }
 
+  deleteChantier(id: number): Observable<any> {
+    return this.http.delete(`${this.apiUrl}/chantiers/${id}`);
+  }
+
+  deleteMateriel(id: number): Observable<any> {
+    return this.http.delete(`${this.apiUrl}/materiels/${id}`);
+  }
+
   // Export DOE (Dossier des Ouvrages Exécutés) en ZIP
   downloadDOE(chantierId: number) {
     const url = `${this.apiUrl}/chantiers/${chantierId}/doe`;

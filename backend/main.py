@@ -395,6 +395,39 @@ def download_doe(chantier_id: int, db: Session = Depends(get_db)):
 
     return FileResponse(path=zip_path, filename=zip_filename, media_type='application/zip')
 
+# --- ROUTES SUPPRESSION ---
+
+@app.delete("/chantiers/{chantier_id}")
+def delete_chantier(chantier_id: int, db: Session = Depends(get_db)):
+    chantier = db.query(models.Chantier).filter(models.Chantier.id == chantier_id).first()
+    if not chantier:
+        raise HTTPException(status_code=404, detail="Chantier introuvable")
+
+    # 1. Supprimer les dépendances (Enfants)
+    # On met à jour le matériel pour qu'il retourne au dépôt (id=None) au lieu de le supprimer
+    db.query(models.Materiel).filter(models.Materiel.chantier_id == chantier_id).update({"chantier_id": None})
+    
+    # On supprime les documents liés
+    db.query(models.RapportImage).filter(models.RapportImage.rapport.has(chantier_id=chantier_id)).delete(synchronize_session=False)
+    db.query(models.Rapport).filter(models.Rapport.chantier_id == chantier_id).delete()
+    db.query(models.Inspection).filter(models.Inspection.chantier_id == chantier_id).delete()
+    db.query(models.PPSPS).filter(models.PPSPS.chantier_id == chantier_id).delete()
+    db.query(models.PIC).filter(models.PIC.chantier_id == chantier_id).delete()
+
+    # 2. Supprimer le chantier (Parent)
+    db.delete(chantier)
+    db.commit()
+    return {"status": "success", "message": "Chantier et ses données supprimés"}
+
+@app.delete("/materiels/{materiel_id}")
+def delete_materiel(materiel_id: int, db: Session = Depends(get_db)):
+    item = db.query(models.Materiel).filter(models.Materiel.id == materiel_id).first()
+    if not item: raise HTTPException(status_code=404, detail="Matériel introuvable")
+    
+    db.delete(item)
+    db.commit()
+    return {"status": "success"}
+
 # ==========================================
 # 9. MIGRATIONS & MAINTENANCE
 # ==========================================
