@@ -172,49 +172,27 @@ export class MaterielPage implements OnInit {
   }
 
   // Fonction pour transformer l'URL HD en URL Miniature optimisée
-  getThumbUrl(image: string | undefined | null): string {
-    if (!image) {
-      // éventuel placeholder
-      return 'assets/placeholder-tool.png';
+  getThumbUrl(url: string | undefined): string {
+    if (!url) return '';
+    
+    // Si c'est une image Cloudinary, on l'optimise
+    if (url.includes('cloudinary.com') && url.includes('/upload/')) {
+      // On insère les options de redimensionnement après "/upload/"
+      // w_200 = Largeur 200px
+      // h_200 = Hauteurcloudinary 200px
+      // c_fit = L'image rentre dedans sans être coupée
+      // f_auto = Format automatique (WebP si possible)
+      return url.replace('/upload/', '/upload/w_200,h_200,c_fit,q_auto,f_auto/');
     }
-
-    // Cas 1 : déjà une URL complète
-    if (image.startsWith('http')) {
-      if (image.includes('cloudinary.com') && image.includes('/upload/')) {
-        return image.replace(
-          '/upload/',
-          '/upload/w_200,h_200,c_fit,q_auto,f_auto/'
-        );
-      }
-      return image;
-    }
-
-    // Cas 2 : seulement un public_id Cloudinary
-    const cloudName = 'dzxnmavhx'; // à mettre en dur une fois
-    return `https://res.cloudinary.com/${cloudName}/image/upload/w_200,h_200,c_fit,q_auto,f_auto/${image}.png`;
+    
+    return url;
   }
-
-
 
   getChantierName(id: number | null | undefined): string {
     if (!id) return 'Au Dépôt';
     const c = this.chantiers.find(x => x.id === id);
     return c ? c.nom : 'Inconnu';
   }
-
-  // Dans MaterielPage
-getImageUrl(mat: Materiel): string {
-  const raw =
-    (mat as any).image_url ||
-    (mat as any).imageUrl ||
-    (mat as any).image ||
-    '';
-
-  if (!raw) return '';
-
-  return this.getThumbUrl(raw);
-}
-
 
   // --- STATS ---
   getMaterielsSortis(): number {
