@@ -6,7 +6,13 @@
     </ion-button>
   </div>
 
-  <div class="header-image" [style.background-image]="'url(' + (chantier?.cover_url || 'assets/splash.png') + ')'">
+  <div class="header-image-container">
+    <img 
+      [src]="chantier?.cover_url || 'assets/splash.png'" 
+      class="cover-img"
+      onerror="this.src='assets/splash.png'"
+    />
+    
     <div class="header-overlay">
       <div class="header-text">
         <h1 class="chantier-title">{{ chantier?.nom }}</h1>
