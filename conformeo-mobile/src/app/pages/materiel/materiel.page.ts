@@ -6,14 +6,18 @@ import {
   IonHeader, IonToolbar, IonContent,
   IonButtons, IonButton, IonIcon, IonFab, IonFabButton, 
   AlertController, IonBackButton, IonSearchbar,
-  IonTitle, ModalController // <--- ModalController est ici
+  IonTitle, ModalController
 } from '@ionic/angular/standalone';
 import { Capacitor } from '@capacitor/core';
 import { addIcons } from 'ionicons';
-// 👇 AJOUT DE shieldCheckmark DANS LES IMPORTS
-import { add, hammer, construct, home, swapHorizontal, qrCodeOutline, searchOutline, cube, homeOutline, locationOutline, shieldCheckmark } from 'ionicons/icons';
-import { ApiService, Materiel, Chantier } from '../../services/api'; // Vérifiez le chemin (../..)
+import { 
+  add, hammer, construct, home, swapHorizontal, qrCodeOutline,
+  searchOutline, cube, homeOutline, locationOutline, shieldCheckmark
+} from 'ionicons/icons';
+
+import { ApiService, Materiel, Chantier } from '../../services/api';
 import { AddMaterielModalComponent } from './add-materiel-modal/add-materiel-modal.component';
+
 import { BarcodeScanner, BarcodeFormat } from '@capacitor-mlkit/barcode-scanning';
 
 @Component({
@@ -22,22 +26,14 @@ import { BarcodeScanner, BarcodeFormat } from '@capacitor-mlkit/barcode-scanning
   styleUrls: ['./materiel.page.scss'],
   standalone: true,
   imports: [
-    CommonModule, 
-    FormsModule, 
-    IonHeader, 
-    IonSearchbar,
-    IonToolbar, 
-    IonContent, 
-    IonTitle,
-    IonButtons, 
-    IonButton, 
-    IonIcon, 
-    IonFab, 
-    IonFabButton, 
-    IonBackButton
+    CommonModule, FormsModule, IonHeader, IonSearchbar,
+    IonToolbar, IonContent, IonTitle,
+    IonButtons, IonButton, IonIcon, IonFab,
+    IonFabButton, IonBackButton
   ]
 })
 export class MaterielPage implements OnInit {
+
   materiels: Materiel[] = [];
   filteredMateriels: Materiel[] = [];
   chantiers: Chantier[] = [];
@@ -49,11 +45,13 @@ export class MaterielPage implements OnInit {
     private api: ApiService,
     private alertCtrl: AlertController,
     private platform: Platform,
-    private modalCtrl: ModalController 
+    private modalCtrl: ModalController
   ) {
-    // 👇 AJOUT DE shieldCheckmark ICI
-    addIcons({ add, hammer, construct, home, swapHorizontal, qrCodeOutline, searchOutline, cube, homeOutline, locationOutline, shieldCheckmark });
-    
+    addIcons({
+      add, hammer, construct, home, swapHorizontal, qrCodeOutline,
+      searchOutline, cube, homeOutline, locationOutline, shieldCheckmark
+    });
+
     this.checkScreen();
     this.platform.resize.subscribe(() => this.checkScreen());
   }
@@ -66,6 +64,9 @@ export class MaterielPage implements OnInit {
     this.isDesktop = window.innerWidth >= 992;
   }
 
+  // -----------------------------------------------------
+  // 🔄 CHARGEMENT DES DONNÉES
+  // -----------------------------------------------------
   loadData(event?: any) {
     this.api.getMateriels().subscribe(mats => {
       this.materiels = mats;
@@ -78,18 +79,23 @@ export class MaterielPage implements OnInit {
     });
   }
 
+  // -----------------------------------------------------
+  // 🔍 FILTRE
+  // -----------------------------------------------------
   filterMateriels() {
-    const term = this.searchTerm.toLowerCase();
-    this.filteredMateriels = this.materiels.filter(m => 
-      m.nom.toLowerCase().includes(term) || m.reference.toLowerCase().includes(term)
+    const term = this.searchTerm.toLowerCase().trim();
+    this.filteredMateriels = this.materiels.filter(m =>
+      m.nom.toLowerCase().includes(term) ||
+      m.reference.toLowerCase().includes(term)
     );
   }
 
-  // --- SCANNER ---
+  // -----------------------------------------------------
+  // 📸 SCANNER
+  // -----------------------------------------------------
   async startScan() {
     try {
       const { camera } = await BarcodeScanner.requestPermissions();
-      
       if (camera !== 'granted' && camera !== 'limited') {
         alert("Permission caméra refusée.");
         return;
@@ -97,9 +103,7 @@ export class MaterielPage implements OnInit {
 
       if (Capacitor.getPlatform() === 'android') {
         const { available } = await BarcodeScanner.isGoogleBarcodeScannerModuleAvailable();
-        if (!available) {
-          await BarcodeScanner.installGoogleBarcodeScannerModule();
-        }
+        if (!available) await BarcodeScanner.installGoogleBarcodeScannerModule();
       }
 
       const { barcodes } = await BarcodeScanner.scan({
@@ -107,8 +111,7 @@ export class MaterielPage implements OnInit {
       });
 
       if (barcodes.length > 0) {
-        const code = barcodes[0].rawValue;
-        this.handleScanResult(code);
+        this.handleScanResult(barcodes[0].rawValue);
       }
 
     } catch (e: any) {
@@ -119,6 +122,7 @@ export class MaterielPage implements OnInit {
 
   handleScanResult(code: string) {
     const mat = this.materiels.find(m => m.reference === code);
+
     if (mat) {
       this.moveMateriel(mat);
     } else {
@@ -126,80 +130,99 @@ export class MaterielPage implements OnInit {
     }
   }
 
-  // --- CREATION (MODALE) ---
+  // -----------------------------------------------------
+  // ➕ AJOUT VIA MODALE
+  // -----------------------------------------------------
   async addMateriel() {
-    // 👇 C'EST ICI LE CHANGEMENT : ON OUVRE LA MODALE AU LIEU DE L'ALERTE
     const modal = await this.modalCtrl.create({
-      component: AddMaterielModalComponent,
-      // cssClass: 'auto-height' // Optionnel
+      component: AddMaterielModalComponent
     });
     
     await modal.present();
-    
-    // On attend que la modale se ferme
+
     const { role } = await modal.onWillDismiss();
-    
-    // Si l'utilisateur a créé (confirm), on recharge la liste
     if (role === 'confirm') {
       this.loadData();
     }
   }
 
-  // --- DEPLACEMENT (INCHANGÉ) ---
+  // -----------------------------------------------------
+  // 🔁 DEPLACEMENT
+  // -----------------------------------------------------
   async moveMateriel(mat: Materiel) {
+
     const inputs: any[] = [
-      { type: 'radio', label: '🏠 Retour au Dépôt', value: null, checked: mat.chantier_id === null }
+      { type: 'radio', label: '🏠 Retour au Dépôt', value: null, checked: !mat.chantier_id }
     ];
 
     this.chantiers.forEach(c => {
-      inputs.push({ type: 'radio', label: `🏗️ ${c.nom}`, value: c.id, checked: mat.chantier_id === c.id });
+      inputs.push({
+        type: 'radio',
+        label: `🏗️ ${c.nom}`,
+        value: c.id,
+        checked: mat.chantier_id === c.id
+      });
     });
 
     const alert = await this.alertCtrl.create({
       header: `Déplacer : ${mat.nom}`,
-      inputs: inputs,
+      inputs,
       buttons: [
         { text: 'Annuler', role: 'cancel' },
         {
           text: 'Valider Transfert',
-          handler: (chantierId) => {
-            this.api.transferMateriel(mat.id!, chantierId).subscribe(() => this.loadData());
+          handler: chantierId => {
+            this.api.transferMateriel(mat.id!, chantierId).subscribe(() => {
+              this.loadData();
+            });
           }
         }
       ]
     });
+
     await alert.present();
   }
 
-  // Fonction pour transformer l'URL HD en URL Miniature optimisée
+  // -----------------------------------------------------
+  // 🖼️ IMAGE CLOUDINARY → MINIATURE
+  // -----------------------------------------------------
+
+  /** Retourne la vraie URL de l'image, ou '' si rien */
+  getImageUrl(mat: Materiel): string {
+    if (!mat.image_url || mat.image_url.trim() === '') {
+      return '';
+    }
+    return mat.image_url;
+  }
+
+  /** Génère une miniature Cloudinary propre */
   getThumbUrl(url: string | undefined): string {
     if (!url) return '';
-    
-    // Si c'est une image Cloudinary, on l'optimise
+
     if (url.includes('cloudinary.com') && url.includes('/upload/')) {
-      // On insère les options de redimensionnement après "/upload/"
-      // w_200 = Largeur 200px
-      // h_200 = Hauteurcloudinary 200px
-      // c_fit = L'image rentre dedans sans être coupée
-      // f_auto = Format automatique (WebP si possible)
-      return url.replace('/upload/', '/upload/w_200,h_200,c_fit,q_auto,f_auto/');
+      return url.replace(
+        '/upload/',
+        '/upload/w_250,h_250,c_fit,q_auto,f_auto/'
+      );
     }
-    
+
     return url;
   }
 
+  // -----------------------------------------------------
+  // 🏷️ NOMS & STATISTIQUES
+  // -----------------------------------------------------
   getChantierName(id: number | null | undefined): string {
     if (!id) return 'Au Dépôt';
     const c = this.chantiers.find(x => x.id === id);
     return c ? c.nom : 'Inconnu';
   }
 
-  // --- STATS ---
   getMaterielsSortis(): number {
-    return this.materiels.filter(m => m.chantier_id !== null).length;
+    return this.materiels.filter(m => m.chantier_id).length;
   }
 
   getMaterielsDepot(): number {
-    return this.materiels.filter(m => m.chantier_id === null).length;
+    return this.materiels.filter(m => !m.chantier_id).length;
   }
 }
