@@ -17,7 +17,11 @@ import {
   documentTextOutline, archiveOutline, mapOutline
 } from 'ionicons/icons';
 // Imports Standalone
-import { IonBackButton, IonButtons } from '@ionic/angular/standalone';
+// import { IonBackButton, IonButtons } from '@ionic/angular/standalone';
+import { IonContent, IonIcon, IonButton, IonFab, IonFabButton, IonList, IonItem, IonLabel, IonCard, IonNote} from '@ionic/angular/standalone';
+
+import {  } from '@ionic/angular/standalone';
+// Import des modales
 import { PicModalComponent } from './pic-modal/pic-modal.component';
 // Import des modales
 import { NewRapportModalComponent } from './new-rapport-modal/new-rapport-modal.component';
@@ -32,8 +36,16 @@ import { SignatureModalComponent } from './signature-modal/signature-modal.compo
   imports: [IonicModule, 
     CommonModule, 
     FormsModule, 
-    // IonButtons, 
-    // IonBackButton, 
+    IonContent,
+    IonButton,
+    IonIcon,
+    IonFab,
+    IonFabButton,
+    IonList,
+    IonItem,
+    IonLabel,
+    IonCard,
+    IonNote, 
     RouterLink]
 })
 export class ChantierDetailsPage implements OnInit {
