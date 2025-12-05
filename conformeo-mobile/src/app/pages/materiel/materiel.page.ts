@@ -171,6 +171,23 @@ export class MaterielPage implements OnInit {
     await alert.present();
   }
 
+  // Fonction pour transformer l'URL HD en URL Miniature optimisée
+  getThumbUrl(url: string | undefined): string {
+    if (!url) return '';
+    
+    // Si c'est une image Cloudinary, on l'optimise
+    if (url.includes('cloudinary.com') && url.includes('/upload/')) {
+      // On insère les options de redimensionnement après "/upload/"
+      // w_200 = Largeur 200px
+      // h_200 = Hauteur 200px
+      // c_fit = L'image rentre dedans sans être coupée
+      // f_auto = Format automatique (WebP si possible)
+      return url.replace('/upload/', '/upload/w_200,h_200,c_fit,q_auto,f_auto/');
+    }
+    
+    return url;
+  }
+
   getChantierName(id: number | null | undefined): string {
     if (!id) return 'Au Dépôt';
     const c = this.chantiers.find(x => x.id === id);

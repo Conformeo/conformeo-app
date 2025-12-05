@@ -39,7 +39,9 @@
       <div *ngFor="let mat of filteredMateriels" class="tool-card" (click)="moveMateriel(mat)">
         
         <div class="tool-icon" [class.out]="mat.chantier_id">
-          <img *ngIf="mat.image_url" [src]="mat.image_url" style="width:100%; height:100%; object-fit: contain; padding: 5px; border-radius: 8px;">
+          <img *ngIf="mat.image_url" [src]="getThumbUrl(mat.image_url)" 
+               style="width:100%; height:100%; object-fit: contain; border-radius: 8px; background: white;">
+          
           <ion-icon *ngIf="!mat.image_url" [name]="mat.chantier_id ? 'construct' : 'cube'"></ion-icon>
         </div>
 
@@ -72,7 +74,9 @@
         </div>
         
         <div class="equip-image">
-           <img *ngIf="mat.image_url" [src]="mat.image_url" style="width:100%; height:100%; object-fit: contain;">
+           <img *ngIf="mat.image_url" [src]="getThumbUrl(mat.image_url)" 
+                style="width:100%; height:100%; object-fit: contain;">
+           
            <ion-icon *ngIf="!mat.image_url" name="hammer" style="font-size: 64px; color: #333; opacity: 0.1;"></ion-icon>
         </div>
 
