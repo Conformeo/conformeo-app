@@ -202,7 +202,12 @@ export class ChantierDetailsPage implements OnInit {
 
       await this.api.addRapportWithMultiplePhotos(newRapport, blobs);
       
+      // 1. On recharge la liste LOCALE (pour voir la photo tout de suite)
       setTimeout(() => { this.loadRapports(); }, 500);
+
+      // 2. 👇 AJOUT : On lève le drapeau GLOBAL
+      // Comme ça, la page d'accueil ("Mes Chantiers") se mettra aussi à jour au retour
+      this.api.needsRefresh = true;
     }
   }
 
