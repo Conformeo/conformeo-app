@@ -8,6 +8,7 @@ import zipfile
 # Chargement des variables d'environnement locales (.env) si présentes
 load_dotenv()
 
+import requests
 import cloudinary
 import cloudinary.uploader
 from fastapi import FastAPI, Depends, HTTPException, status, File, UploadFile
@@ -51,7 +52,7 @@ else:
 os.makedirs("uploads", exist_ok=True)
 app.mount("/static", StaticFiles(directory="uploads"), name="static")
 
-# --- CORS (Autorisations larges pour le dev) ---
+# --- CORS ---
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -60,7 +61,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Petit endpoint de test
 @app.get("/")
 def root():
     return {"message": "Conformeo API is running 🚀", "cors": "enabled"}
@@ -128,6 +128,27 @@ def sign_chantier(chantier_id: int, signature_url: str, db: Session = Depends(ge
     db.commit()
     return {"status": "signed", "url": signature_url}
 
+# --- SUPPRESSION CHANTIER ---
+@app.delete("/chantiers/{chantier_id}")
+def delete_chantier(chantier_id: int, db: Session = Depends(get_db)):
+    chantier = db.query(models.Chantier).filter(models.Chantier.id == chantier_id).first()
+    if not chantier:
+        raise HTTPException(status_code=404, detail="Chantier introuvable")
+
+    # 1. Supprimer les dépendances (Enfants)
+    db.query(models.Materiel).filter(models.Materiel.chantier_id == chantier_id).update({"chantier_id": None})
+    db.query(models.RapportImage).filter(models.RapportImage.rapport.has(chantier_id=chantier_id)).delete(synchronize_session=False)
+    db.query(models.Rapport).filter(models.Rapport.chantier_id == chantier_id).delete()
+    db.query(models.Inspection).filter(models.Inspection.chantier_id == chantier_id).delete()
+    db.query(models.PPSPS).filter(models.PPSPS.chantier_id == chantier_id).delete()
+    db.query(models.PIC).filter(models.PIC.chantier_id == chantier_id).delete()
+
+    # 2. Supprimer le chantier (Parent)
+    db.delete(chantier)
+    db.commit()
+    return {"status": "success", "message": "Chantier et ses données supprimés"}
+
+
 # ==========================================
 # 3. RAPPORTS & PHOTOS
 # ==========================================
@@ -144,7 +165,6 @@ async def upload_image(file: UploadFile = File(...)):
 
 @app.post("/rapports", response_model=schemas.RapportOut)
 def create_rapport(rapport: schemas.RapportCreate, db: Session = Depends(get_db)):
-    # 1. Création du rapport parent
     new_rapport = models.Rapport(
         titre=rapport.titre,
         description=rapport.description,
@@ -158,12 +178,10 @@ def create_rapport(rapport: schemas.RapportCreate, db: Session = Depends(get_db)
     db.commit()
     db.refresh(new_rapport)
 
-    # 2. Création des images enfants
     if rapport.image_urls:
         for url in rapport.image_urls:
             new_img = models.RapportImage(url=url, rapport_id=new_rapport.id)
             db.add(new_img)
-        
         db.commit()
         db.refresh(new_rapport)
         
@@ -171,7 +189,6 @@ def create_rapport(rapport: schemas.RapportCreate, db: Session = Depends(get_db)
 
 @app.get("/rapports", response_model=List[schemas.RapportOut])
 def read_all_rapports(db: Session = Depends(get_db)):
-    """Permet de voir tous les rapports via le navigateur"""
     return db.query(models.Rapport).all()
 
 @app.get("/chantiers/{chantier_id}/rapports", response_model=List[schemas.RapportOut])
@@ -181,18 +198,14 @@ def read_rapports_chantier(chantier_id: int, db: Session = Depends(get_db)):
 @app.get("/chantiers/{chantier_id}/pdf")
 def download_pdf(chantier_id: int, db: Session = Depends(get_db)):
     chantier = db.query(models.Chantier).filter(models.Chantier.id == chantier_id).first()
-    if not chantier:
-        raise HTTPException(status_code=404, detail="Chantier introuvable")
+    if not chantier: raise HTTPException(status_code=404, detail="Chantier introuvable")
 
     rapports = db.query(models.Rapport).filter(models.Rapport.chantier_id == chantier_id).all()
-    
-    # On récupère les inspections pour les inclure dans le rapport
     inspections = db.query(models.Inspection).filter(models.Inspection.chantier_id == chantier_id).all()
 
     filename = f"Rapport_{chantier.id}.pdf"
     file_path = f"uploads/{filename}"
 
-    # On passe 'inspections' à la fonction
     pdf_generator.generate_pdf(chantier, rapports, inspections, file_path)
 
     return FileResponse(path=file_path, filename=filename, media_type='application/pdf')
@@ -217,7 +230,6 @@ def create_materiel(mat: schemas.MaterielCreate, db: Session = Depends(get_db)):
         nom=mat.nom,
         reference=mat.reference,
         etat=mat.etat,
-        # 👇 C'EST ICI LE CORRECTIF : ON SAUVEGARDE L'IMAGE
         image_url=mat.image_url,
         chantier_id=None 
     )
@@ -233,14 +245,22 @@ def read_materiels(db: Session = Depends(get_db)):
 @app.put("/materiels/{materiel_id}/transfert")
 def transfer_materiel(materiel_id: int, chantier_id: Optional[int] = None, db: Session = Depends(get_db)):
     mat = db.query(models.Materiel).filter(models.Materiel.id == materiel_id).first()
-    if not mat:
-        raise HTTPException(status_code=404, detail="Matériel introuvable")
+    if not mat: raise HTTPException(status_code=404, detail="Matériel introuvable")
     mat.chantier_id = chantier_id
     db.commit()
     return {"status": "success"}
 
+@app.delete("/materiels/{materiel_id}")
+def delete_materiel(materiel_id: int, db: Session = Depends(get_db)):
+    item = db.query(models.Materiel).filter(models.Materiel.id == materiel_id).first()
+    if not item: raise HTTPException(status_code=404, detail="Matériel introuvable")
+    db.delete(item)
+    db.commit()
+    return {"status": "success"}
+
+
 # ==========================================
-# 6. QHSE (INSPECTIONS)
+# 5. QHSE (INSPECTIONS)
 # ==========================================
 
 @app.post("/inspections", response_model=schemas.InspectionOut)
@@ -277,7 +297,7 @@ def download_inspection_pdf(inspection_id: int, db: Session = Depends(get_db)):
 
 
 # ==========================================
-# 7. PPSPS
+# 6. PPSPS
 # ==========================================
 
 @app.post("/ppsps", response_model=schemas.PPSPSOut)
@@ -316,8 +336,9 @@ def download_ppsps_pdf(ppsps_id: int, db: Session = Depends(get_db)):
     pdf_generator.generate_ppsps_pdf(chantier, ppsps, file_path)
     return FileResponse(path=file_path, filename=filename, media_type='application/pdf')
 
+
 # ==========================================
-# 8. DOE & PIC
+# 7. DOE & PIC
 # ==========================================
 
 @app.post("/pics", response_model=schemas.PICOut)
@@ -395,41 +416,8 @@ def download_doe(chantier_id: int, db: Session = Depends(get_db)):
 
     return FileResponse(path=zip_path, filename=zip_filename, media_type='application/zip')
 
-# --- ROUTES SUPPRESSION ---
-
-@app.delete("/chantiers/{chantier_id}")
-def delete_chantier(chantier_id: int, db: Session = Depends(get_db)):
-    chantier = db.query(models.Chantier).filter(models.Chantier.id == chantier_id).first()
-    if not chantier:
-        raise HTTPException(status_code=404, detail="Chantier introuvable")
-
-    # 1. Supprimer les dépendances (Enfants)
-    # On met à jour le matériel pour qu'il retourne au dépôt (id=None) au lieu de le supprimer
-    db.query(models.Materiel).filter(models.Materiel.chantier_id == chantier_id).update({"chantier_id": None})
-    
-    # On supprime les documents liés
-    db.query(models.RapportImage).filter(models.RapportImage.rapport.has(chantier_id=chantier_id)).delete(synchronize_session=False)
-    db.query(models.Rapport).filter(models.Rapport.chantier_id == chantier_id).delete()
-    db.query(models.Inspection).filter(models.Inspection.chantier_id == chantier_id).delete()
-    db.query(models.PPSPS).filter(models.PPSPS.chantier_id == chantier_id).delete()
-    db.query(models.PIC).filter(models.PIC.chantier_id == chantier_id).delete()
-
-    # 2. Supprimer le chantier (Parent)
-    db.delete(chantier)
-    db.commit()
-    return {"status": "success", "message": "Chantier et ses données supprimés"}
-
-@app.delete("/materiels/{materiel_id}")
-def delete_materiel(materiel_id: int, db: Session = Depends(get_db)):
-    item = db.query(models.Materiel).filter(models.Materiel.id == materiel_id).first()
-    if not item: raise HTTPException(status_code=404, detail="Matériel introuvable")
-    
-    db.delete(item)
-    db.commit()
-    return {"status": "success"}
-
 # ==========================================
-# 9. MIGRATIONS & MAINTENANCE
+# 8. MIGRATIONS & MAINTENANCE
 # ==========================================
 
 @app.get("/reset_data")
@@ -448,88 +436,17 @@ def reset_data(db: Session = Depends(get_db)):
         db.rollback()
         return {"error": str(e)}
 
-@app.get("/migrate_db_v5")
-def migrate_db_v5(db: Session = Depends(get_db)):
-    try:
-        db.execute(text("ALTER TABLE ppsps ADD COLUMN IF NOT EXISTS secours_data JSON"))
-        db.execute(text("ALTER TABLE ppsps ADD COLUMN IF NOT EXISTS installations_data JSON"))
-        db.execute(text("ALTER TABLE ppsps ADD COLUMN IF NOT EXISTS taches_data JSON"))
-        db.execute(text("ALTER TABLE ppsps ADD COLUMN IF NOT EXISTS duree_travaux VARCHAR"))
-        db.commit()
-        return {"message": "Migration V5 (PPSPS OPPBTP) réussie !"}
-    except Exception as e:
-        return {"status": "Erreur", "details": str(e)}
-
-@app.get("/migrate_db_v6")
-def migrate_db_v6(db: Session = Depends(get_db)):
-    try:
-        models.Base.metadata.create_all(bind=engine)
-        return {"message": "Migration V6 (PIC) réussie !"}
-    except Exception as e:
-        return {"status": "Erreur", "details": str(e)}
-
-@app.get("/migrate_db_v7")
-def migrate_db_v7(db: Session = Depends(get_db)):
-    try:
-        db.execute(text("ALTER TABLE materiels ADD COLUMN IF NOT EXISTS image_url VARCHAR"))
-        db.commit()
-        return {"message": "Migration V7 (Images Matériel) réussie !"}
-    except Exception as e:
-        return {"status": "Erreur", "details": str(e)}
-
-@app.get("/force_fix_materiel")
-def force_fix_materiel(db: Session = Depends(get_db)):
-    try:
-        db.execute(text("ALTER TABLE materiels ADD COLUMN image_url VARCHAR"))
-        db.commit()
-        return {"message": "✅ Succès : Colonne image_url ajoutée !"}
-    except Exception as e:
-        db.rollback()
-        return {"message": f"Info (Déjà fait ?) : {str(e)}"}
-
-@app.get("/force_fix_ppsps")
-def force_fix_ppsps(db: Session = Depends(get_db)):
-    try:
-        commands = [
-            "ALTER TABLE ppsps ADD COLUMN responsable_chantier VARCHAR",
-            "ALTER TABLE ppsps ADD COLUMN duree_travaux VARCHAR",
-            "ALTER TABLE ppsps ADD COLUMN secours_data JSON",
-            "ALTER TABLE ppsps ADD COLUMN installations_data JSON",
-            "ALTER TABLE ppsps ADD COLUMN taches_data JSON"
-        ]
-        results = []
-        for cmd in commands:
-            try:
-                db.execute(text(cmd))
-                db.commit()
-                results.append(f"Succès: {cmd}")
-            except Exception as e:
-                db.rollback()
-                results.append(f"Ignoré: {str(e)}")
-        return {"status": "Terminé", "details": results}
-    except Exception as e:
-        return {"status": "Erreur critique", "details": str(e)}
-
-
 @app.get("/migrate_multi_tenant")
 def migrate_multi_tenant(db: Session = Depends(get_db)):
     try:
-        # 1. Créer la table companies
         models.Base.metadata.create_all(bind=engine)
-        
-        # 2. Ajouter les colonnes company_id (si elles n'existent pas)
-        # Note : SQLite ne supporte pas bien ADD COLUMN avec ForeignKey en une ligne, 
-        # mais Postgres (Render) le gère très bien.
         tables = ["users", "chantiers", "materiels"]
         for t in tables:
             try:
                 db.execute(text(f"ALTER TABLE {t} ADD COLUMN company_id INTEGER"))
-            except:
-                print(f"Colonne company_id existe déjà pour {t}")
-
+            except: pass
         db.commit()
 
-        # 3. Créer l'entreprise par défaut si elle n'existe pas
         demo_company = db.query(models.Company).filter(models.Company.id == 1).first()
         if not demo_company:
             demo_company = models.Company(name="Ma Société BTP (Démo)", subscription_plan="enterprise")
@@ -538,16 +455,11 @@ def migrate_multi_tenant(db: Session = Depends(get_db)):
             db.refresh(demo_company)
         
         cid = demo_company.id
-
-        # 4. Rattacher toutes les données orphelines à cette entreprise
         db.execute(text(f"UPDATE users SET company_id = {cid} WHERE company_id IS NULL"))
         db.execute(text(f"UPDATE chantiers SET company_id = {cid} WHERE company_id IS NULL"))
         db.execute(text(f"UPDATE materiels SET company_id = {cid} WHERE company_id IS NULL"))
-        
         db.commit()
-
-        return {"message": "Migration Multi-Tenant réussie ! Toutes les données sont rattachées à 'Ma Société BTP'."}
-
+        return {"message": "Migration Multi-Tenant réussie !"}
     except Exception as e:
         db.rollback()
         return {"status": "Erreur", "details": str(e)}
