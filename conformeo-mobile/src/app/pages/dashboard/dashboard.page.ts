@@ -1,89 +1,54 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { IonicModule } from '@ionic/angular';
-import { RouterLink } from '@angular/router';
+import { ApiService } from 'src/app/services/api';
+import { BaseChartDirective } from 'ng2-charts'; // Pour les graphiques
+import { ChartConfiguration, ChartOptions } from 'chart.js';
 import { addIcons } from 'ionicons';
-import { barChart, people, alertCircle, documentText, hammer, statsChart } from 'ionicons/icons';
-import { ApiService } from '../../services/api';
-
-// 👇 IMPORTS POUR LES GRAPHIQUES
-import { BaseChartDirective } from 'ng2-charts';
-import { ChartConfiguration, ChartData, ChartType } from 'chart.js';
-import { Chart, registerables } from 'chart.js';
-
-// Enregistrement des composants Chart.js
-Chart.register(...registerables);
+import { business, documentText, hammer, warning, cameraOutline } from 'ionicons/icons';
 
 @Component({
   selector: 'app-dashboard',
   templateUrl: './dashboard.page.html',
   styleUrls: ['./dashboard.page.scss'],
   standalone: true,
-  imports: [IonicModule, CommonModule, RouterLink, BaseChartDirective] // <--- Ajout BaseChartDirective
+  imports: [CommonModule, IonicModule, BaseChartDirective]
 })
 export class DashboardPage implements OnInit {
   
-  // Données KPI
-  stats = {
-    total_chantiers: 0,
-    actifs: 0,
-    rapports: 0,
-    alertes: 0
-  };
+  stats: any = {};
+  recentRapports: any[] = [];
 
-  // --- CONFIGURATION DU GRAPHIQUE (Camembert) ---
-  public pieChartOptions: ChartConfiguration['options'] = {
-    responsive: true,
-    plugins: {
-      legend: {
-        display: true,
-        position: 'bottom',
-      },
-    }
+  // Config Graphique
+  public barChartData: ChartConfiguration<'bar'>['data'] = {
+    labels: ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'],
+    datasets: [
+      { data: [5, 8, 12, 7, 10, 2, 0], label: 'Rapports', backgroundColor: '#1e3c72', borderRadius: 5 }
+    ]
   };
-  
-  public pieChartType: ChartType = 'doughnut'; // Type "Beignet"
-  
-  public pieChartData: ChartData<'doughnut', number[], string | string[]> = {
-    labels: [ 'Au Dépôt', 'Sur Chantier' ],
-    datasets: [ {
-      data: [ 0, 0 ], // Sera rempli par l'API
-      backgroundColor: ['#2dd36f', '#ffc409'], // Vert (Ionic success) et Jaune (Ionic warning)
-      hoverBackgroundColor: ['#28ba62', '#e0ac08'],
-      borderWidth: 0
-    } ]
+  public barChartOptions: ChartOptions<'bar'> = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: { y: { beginAtZero: true, grid: { display: false } }, x: { grid: { display: false } } }
   };
 
   constructor(private api: ApiService) {
-    addIcons({ barChart, people, alertCircle, documentText, hammer, statsChart });
+    addIcons({ business, documentText, hammer, warning, cameraOutline });
   }
 
   ngOnInit() {
-    this.loadStats();
-    this.loadMaterielStats();
-  }
-
-  loadStats() {
-    this.api.getDashboardStats().subscribe(data => {
+    // 1. Récupérer les stats globales
+    this.api.getStats().subscribe(data => {
       this.stats = data;
     });
-  }
 
-  // On calcule les stats du matériel nous-mêmes pour le graphique
-  loadMaterielStats() {
-    this.api.getMateriels().subscribe(mats => {
-      const auDepot = mats.filter(m => m.chantier_id === null).length;
-      const surChantier = mats.filter(m => m.chantier_id !== null).length;
-
-      // Mise à jour du graphique
-      this.pieChartData = {
-        labels: [ 'Au Dépôt', 'Sur Chantier' ],
-        datasets: [ {
-          data: [ auDepot, surChantier ],
-          backgroundColor: ['#2dd36f', '#ffc409'],
-          borderWidth: 0
-        } ]
-      };
-    });
+    // 2. Récupérer les derniers rapports (Simulation pour l'instant, à créer dans API)
+    // Idéalement : this.api.getRecentActivity()...
+    this.recentRapports = [
+        { titre: 'Inspection Toiture', date_creation: new Date(), chantier_nom: 'Résidence Fleurs', niveau_urgence: 'Faible' },
+        { titre: 'Fissure Mur Nord', date_creation: new Date(), chantier_nom: 'Gare du Nord', niveau_urgence: 'Critique' },
+        { titre: 'Livraison Placo', date_creation: new Date(), chantier_nom: 'Villa Corse', niveau_urgence: 'Moyen' },
+    ];
   }
 }

@@ -375,6 +375,10 @@ export class ApiService {
     return this.http.put(url, {});
   }
 
+  // Récupérer les statistiques pour le Dashboard
+  getStats(): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/dashboard/stats`);
+  }
 
   getInspections(chantierId: number): Observable<Inspection[]> {
     // Tu peux ajouter le cache offline ici si tu veux (comme pour les rapports)
