@@ -9,87 +9,185 @@
 
 <ion-content class="inventory-content">
 
+  <!-- ============================
+       📱 VERSION MOBILE
+  ============================ -->
   <div class="mobile-only">
+
+    <!-- HEADER MOBILE -->
     <div class="header-section">
       <div class="header-top">
         <h1 class="page-title">Inventaire</h1>
         <p class="page-subtitle">Gérez vos équipements</p>
       </div>
+
+      <!-- STATS -->
       <div class="stats-row">
-        <div class="stat-item"><span class="stat-num">{{ materiels.length }}</span><span class="stat-label">Total</span></div>
-        <div class="stat-item warning"><span class="stat-num">{{ getMaterielsSortis() }}</span><span class="stat-label">Sortis</span></div>
-        <div class="stat-item success"><span class="stat-num">{{ getMaterielsDepot() }}</span><span class="stat-label">Dépôt</span></div>
+        <div class="stat-item">
+          <span class="stat-num">{{ materiels.length }}</span>
+          <span class="stat-label">Total</span>
+        </div>
+        <div class="stat-item warning">
+          <span class="stat-num">{{ getMaterielsSortis() }}</span>
+          <span class="stat-label">Sortis</span>
+        </div>
+        <div class="stat-item success">
+          <span class="stat-num">{{ getMaterielsDepot() }}</span>
+          <span class="stat-label">Dépôt</span>
+        </div>
       </div>
     </div>
 
+    <!-- SEARCH -->
     <div class="search-container">
       <div class="search-wrapper">
         <ion-icon name="search-outline" class="search-icon"></ion-icon>
-        <input type="text" placeholder="Rechercher..." [(ngModel)]="searchTerm" (input)="filterMateriels()">
+        <input 
+          type="text" 
+          placeholder="Rechercher..." 
+          [(ngModel)]="searchTerm" 
+          (input)="filterMateriels()">
       </div>
-      <button class="scan-btn" (click)="startScan()"><ion-icon name="qr-code-outline"></ion-icon></button>
+
+      <button class="scan-btn" (click)="startScan()">
+        <ion-icon name="qr-code-outline"></ion-icon>
+      </button>
     </div>
 
+    <!-- LISTE MOBILE -->
     <div class="list-container" style="padding-bottom: 100px;">
+
+      <!-- ÉTAT VIDE -->
       <div *ngIf="filteredMateriels.length === 0" class="empty-state">
         <ion-icon name="hammer-outline"></ion-icon>
         <p>Aucun matériel trouvé</p>
       </div>
 
-      <div *ngFor="let mat of filteredMateriels" class="tool-card" (click)="moveMateriel(mat)">
-        
+      <!-- CARDS MOBILE -->
+      <div 
+        *ngFor="let mat of filteredMateriels" 
+        class="tool-card" 
+        (click)="moveMateriel(mat)"
+      >
+
+        <!-- ICON / IMAGE -->
         <div class="tool-icon" [class.out]="mat.chantier_id">
-          <img *ngIf="mat.image_url" [src]="getThumbUrl(mat.image_url)" 
-               style="width:100%; height:100%; object-fit: contain; border-radius: 8px; background: white;">
-          
-          <ion-icon *ngIf="!mat.image_url" [name]="mat.chantier_id ? 'construct' : 'cube'"></ion-icon>
+
+          <!-- IMAGE CLOUDINARY -->
+          <img 
+            *ngIf="getImageUrl(mat)" 
+            [src]="getThumbUrl(getImageUrl(mat))"
+            style="width:100%; height:100%; object-fit:contain; border-radius: 8px; background:white;"
+          >
+
+          <!-- ICON SI PAS D’IMAGE -->
+          <ion-icon 
+            *ngIf="!getImageUrl(mat)"
+            [name]="mat.chantier_id ? 'construct' : 'cube'">
+          </ion-icon>
+
         </div>
 
+        <!-- INFOS -->
         <div class="tool-info">
           <h3 class="tool-name">{{ mat.nom }}</h3>
           <p class="tool-ref">REF: {{ mat.reference }}</p>
         </div>
+
+        <!-- STATUT -->
         <div class="tool-status">
           <div class="status-badge" [class.out]="mat.chantier_id">
             <ion-icon [name]="mat.chantier_id ? 'location-outline' : 'home-outline'"></ion-icon>
             <span>{{ mat.chantier_id ? 'Chantier' : 'Dépôt' }}</span>
           </div>
-          <p class="chantier-name" *ngIf="mat.chantier_id">{{ getChantierName(mat.chantier_id) }}</p>
+
+          <p class="chantier-name" *ngIf="mat.chantier_id">
+            {{ getChantierName(mat.chantier_id) }}
+          </p>
         </div>
+
       </div>
     </div>
   </div>
 
+  <!-- ============================
+       🖥️ VERSION DESKTOP
+  ============================ -->
   <div class="desktop-only">
+
     <div class="desktop-header">
       <h1>Parc Matériel</h1>
+
       <div class="actions">
-         <ion-searchbar placeholder="Rechercher..." [(ngModel)]="searchTerm" (ionInput)="filterMateriels()"></ion-searchbar>
-         </div>
+        <ion-searchbar 
+          placeholder="Rechercher..." 
+          [(ngModel)]="searchTerm" 
+          (ionInput)="filterMateriels()">
+        </ion-searchbar>
+
+        <ion-button color="primary" (click)="addMateriel()">
+          <ion-icon name="add" slot="start"></ion-icon>
+          Nouveau
+        </ion-button>
+      </div>
     </div>
+
     <div class="equipment-grid">
-      <div class="equip-card" *ngFor="let mat of filteredMateriels" (click)="moveMateriel(mat)">
+
+      <div 
+        *ngFor="let mat of filteredMateriels" 
+        class="equip-card" 
+        (click)="moveMateriel(mat)"
+      >
+
         <div class="status-dot" [class.active]="mat.chantier_id">
           <ion-icon [name]="mat.chantier_id ? 'construct' : 'shield-checkmark'"></ion-icon>
         </div>
-        
+
+        <!-- IMAGE OU ICON -->
         <div class="equip-image">
-           <img *ngIf="mat.image_url" [src]="getThumbUrl(mat.image_url)" 
-                style="width:100%; height:100%; object-fit: contain;">
-           
-           <ion-icon *ngIf="!mat.image_url" name="hammer" style="font-size: 64px; color: #333; opacity: 0.1;"></ion-icon>
+
+          <!-- IMAGE CLOUDINARY -->
+          <img 
+            *ngIf="getImageUrl(mat)" 
+            [src]="getThumbUrl(getImageUrl(mat))"
+            style="width:100%; height:100%; object-fit:contain;"
+          >
+
+          <!-- ICON SI PAS D’IMAGE -->
+          <ion-icon 
+            *ngIf="!getImageUrl(mat)"
+            name="hammer" 
+            style="font-size:64px; color:#333; opacity:0.1;">
+          </ion-icon>
+
         </div>
 
+        <!-- INFOS -->
         <div class="equip-info">
-          <h3>{{ mat.nom }}</h3><p class="ref">{{ mat.reference }}</p>
-          <div class="location-tag" [class.out]="mat.chantier_id">{{ mat.chantier_id ? 'Sur Chantier' : 'Au Dépôt' }}</div>
-          <p class="chantier-name" *ngIf="mat.chantier_id">{{ getChantierName(mat.chantier_id) }}</p>
+          <h3>{{ mat.nom }}</h3>
+          <p class="ref">{{ mat.reference }}</p>
+
+          <div class="location-tag" [class.out]="mat.chantier_id">
+            {{ mat.chantier_id ? 'Sur Chantier' : 'Au Dépôt' }}
+          </div>
+
+          <p class="chantier-name" *ngIf="mat.chantier_id">
+            {{ getChantierName(mat.chantier_id) }}
+          </p>
         </div>
+
       </div>
+
     </div>
   </div>
 
-  <ion-fab vertical="bottom" horizontal="end" slot="fixed" style="margin-bottom: calc(20px + var(--ion-safe-area-bottom, 0px)); margin-right: 10px;">
+  <!-- BOUTON FLOTTANT -->
+  <ion-fab 
+    vertical="bottom" horizontal="end" 
+    slot="fixed" 
+    style="margin-bottom: calc(20px + var(--ion-safe-area-bottom, 0)); margin-right: 10px;"
+  >
     <ion-fab-button color="dark" (click)="addMateriel()">
       <ion-icon name="add"></ion-icon>
     </ion-fab-button>
