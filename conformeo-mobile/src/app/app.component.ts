@@ -64,13 +64,13 @@ export class AppComponent {
     });
   }
 
-  // 👇 LA FONCTION QUI REGLE LE DOUBLE CLIC
+ // --- NAVIGATION ROBUSTE (CORRIGÉE) ---
   navigateTo(url: string) {
-    // 1. On ferme le menu d'abord (Important !)
-    this.menuCtrl.close().then(() => {
-        // 2. On navigue ensuite
-        this.navCtrl.navigateRoot(url, { animated: false });
-    });
+    // 1. On navigue TOUT DE SUITE (sans attendre)
+    this.navCtrl.navigateRoot(url, { animated: false });
+    
+    // 2. On demande au menu de se fermer (ne marchera que sur Mobile, ignoré sur Desktop)
+    this.menuCtrl.close(); 
   }
 
   isUrlActive(url: string): boolean {
