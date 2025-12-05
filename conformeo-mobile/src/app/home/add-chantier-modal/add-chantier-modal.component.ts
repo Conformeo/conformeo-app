@@ -3,28 +3,27 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 
-// 👇 TOUS LES IMPORTS IONIC NECESSAIRES
+// 👇 TOUS LES IMPORTS IONIC INDISPENSABLES
 import { 
   IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, 
   IonContent, IonList, IonItem, IonInput, ModalController,
-  IonIcon 
+  IonIcon, IonSpinner 
 } from '@ionic/angular/standalone';
 
 import { ApiService, Chantier } from '../../services/api';
 import { addIcons } from 'ionicons';
-import { camera } from 'ionicons/icons';
+import { camera, cloudUpload, save, close } from 'ionicons/icons';
 
 @Component({
   selector: 'app-add-chantier-modal',
   templateUrl: './add-chantier-modal.component.html',
   styleUrls: ['./add-chantier-modal.component.scss'],
   standalone: true,
-  // 👇 ON LISTE BIEN TOUT ICI
+  // 👇 C'est ici que ça manquait !
   imports: [
-    CommonModule, 
-    FormsModule, 
+    CommonModule, FormsModule, 
     IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, 
-    IonContent, IonList, IonItem, IonInput, IonIcon
+    IonContent, IonList, IonItem, IonInput, IonIcon, IonSpinner
   ]
 })
 export class AddChantierModalComponent {
@@ -38,12 +37,13 @@ export class AddChantierModalComponent {
 
   coverPhotoWebPath: string | undefined;
   coverPhotoBlob: Blob | undefined;
+  isUploading = false;
 
   constructor(
     private modalCtrl: ModalController,
     private api: ApiService
   ) {
-    addIcons({ camera });
+    addIcons({ camera, cloudUpload, save, close });
   }
 
   cancel() {
@@ -55,7 +55,7 @@ export class AddChantierModalComponent {
       quality: 80,
       allowEditing: false,
       resultType: CameraResultType.Uri,
-      source: CameraSource.Camera
+      source: CameraSource.Camera // Ou Prompt
     });
     
     if (image.webPath) {
@@ -67,9 +67,16 @@ export class AddChantierModalComponent {
 
   save() {
     if (this.coverPhotoBlob) {
-      this.api.uploadPhoto(this.coverPhotoBlob).subscribe(res => {
-        this.chantier.cover_url = res.url;
-        this.finalizeCreation();
+      this.isUploading = true;
+      this.api.uploadPhoto(this.coverPhotoBlob).subscribe({
+        next: (res) => {
+           this.chantier.cover_url = res.url; // On récupère l'URL Cloudinary
+           this.finalizeCreation();
+        },
+        error: () => {
+           this.isUploading = false;
+           alert("Erreur upload photo");
+        }
       });
     } else {
       this.finalizeCreation();
