@@ -3,14 +3,13 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { 
   IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, 
-  IonContent, IonList, IonItem, IonInput, 
+  IonContent, IonList, IonItem, IonInput, IonLabel, 
   IonIcon, IonSpinner, ModalController 
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
-import { close, save, cloudUpload, image } from 'ionicons/icons';
-import { ApiService, Materiel } from 'src/app/services/api';
-
-// 👇 L'IMPORT MAGIQUE
+import { close, save, camera, image } from 'ionicons/icons';
+import { ApiService } from 'src/app/services/api';
+import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { removeBackground } from '@imgly/background-removal';
 
 @Component({
@@ -27,18 +26,19 @@ import { removeBackground } from '@imgly/background-removal';
 
     <ion-content class="ion-padding">
       
-      <div class="upload-zone" (click)="fileInput.click()" [class.has-image]="processedImage">
-        <input #fileInput type="file" (change)="onFileSelected($event)" accept="image/*" hidden />
+      <div class="photo-zone" (click)="takePicture()" [class.has-image]="processedImage">
         
         <div *ngIf="!processedImage && !isProcessing" class="placeholder">
-          <ion-icon name="cloud-upload" size="large"></ion-icon>
-          <p>Cliquez pour ajouter une photo</p>
-          <small>Le fond sera supprimé automatiquement ✨</small>
+          <div class="icon-circle">
+            <ion-icon name="camera"></ion-icon>
+          </div>
+          <p>Prendre une photo</p>
+          <small>Détourage automatique IA ✨</small>
         </div>
 
         <div *ngIf="isProcessing" class="processing">
-          <ion-spinner color="primary"></ion-spinner>
-          <p>Détourage par IA en cours...</p>
+          <ion-spinner name="crescent" color="primary"></ion-spinner>
+          <p>L'IA détoure votre objet...</p>
         </div>
 
         <img *ngIf="processedImage" [src]="processedImage" class="preview-img" />
@@ -46,15 +46,15 @@ import { removeBackground } from '@imgly/background-removal';
 
       <ion-list lines="full">
         <ion-item>
-          <ion-input label="Nom de l'équipement" labelPlacement="stacked" [(ngModel)]="data.nom" placeholder="Ex: Perceuse Makita"></ion-input>
+          <ion-input label="Nom" labelPlacement="stacked" [(ngModel)]="data.nom" placeholder="Ex: Perfo Hilti"></ion-input>
         </ion-item>
         <ion-item>
-          <ion-input label="Référence / Série" labelPlacement="stacked" [(ngModel)]="data.reference" placeholder="Ex: MAK-2024-01"></ion-input>
+          <ion-input label="Référence" labelPlacement="stacked" [(ngModel)]="data.reference" placeholder="Ex: TE-30"></ion-input>
         </ion-item>
       </ion-list>
 
       <div class="ion-padding">
-        <ion-button expand="block" (click)="save()" [disabled]="!data.nom || isUploading">
+        <ion-button expand="block" (click)="save()" [disabled]="!data.nom || isUploading" size="large">
           <span *ngIf="!isUploading">Enregistrer</span>
           <ion-spinner *ngIf="isUploading"></ion-spinner>
         </ion-button>
@@ -63,72 +63,87 @@ import { removeBackground } from '@imgly/background-removal';
     </ion-content>
   `,
   styles: [`
-    .upload-zone {
-      height: 200px;
-      border: 2px dashed #ccc;
-      border-radius: 12px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+    .photo-zone {
+      height: 220px;
+      background: #f4f5f8;
+      border-radius: 16px;
       margin-bottom: 20px;
-      background: #f9f9f9;
-      cursor: pointer;
-      position: relative;
-      overflow: hidden;
+      display: flex; align-items: center; justify-content: center;
+      border: 2px dashed #ccc;
+      position: relative; overflow: hidden;
     }
-    .upload-zone.has-image { border: 2px solid var(--ion-color-primary); background: white; }
+    .photo-zone.has-image { border: none; background: white; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
     
-    .placeholder { text-align: center; color: #888; }
-    .placeholder ion-icon { font-size: 48px; color: var(--ion-color-primary); margin-bottom: 10px; }
+    .icon-circle {
+      width: 60px; height: 60px; background: #e0e0e0; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center; margin: 0 auto 10px;
+    }
+    .placeholder ion-icon { font-size: 30px; color: #666; }
+    .placeholder p { margin: 0; font-weight: 600; color: #444; }
+    .placeholder small { color: #888; }
     
     .processing { text-align: center; color: var(--ion-color-primary); font-weight: bold; }
     
-    .preview-img { 
-      height: 100%; 
-      width: auto; 
-      object-fit: contain; 
-      /* Petit damier pour montrer la transparence */
+    /* Fond damier pour voir la transparence */
+    .preview-img {
+      height: 100%; width: auto; object-fit: contain;
       background-image: linear-gradient(45deg, #eee 25%, transparent 25%), linear-gradient(-45deg, #eee 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #eee 75%), linear-gradient(-45deg, transparent 75%, #eee 75%);
       background-size: 20px 20px;
-      background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
     }
   `],
   standalone: true,
-  imports: [CommonModule, FormsModule, IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, IonContent, IonList, IonItem, IonInput, IonIcon, IonSpinner]
+  imports: [CommonModule, FormsModule, IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, IonContent, IonList, IonItem, IonInput, IonLabel, IonIcon, IonSpinner]
 })
 export class AddMaterielModalComponent {
   
   data = { nom: '', reference: '' };
-  
-  processedImage: string | null = null; // URL pour l'affichage (base64)
-  imageBlob: Blob | null = null;        // Fichier pour l'upload
+  processedImage: string | null = null;
+  imageBlob: Blob | null = null;
   
   isProcessing = false;
   isUploading = false;
 
   constructor(private modalCtrl: ModalController, private api: ApiService) {
-    addIcons({ close, save, cloudUpload, image });
+    addIcons({ close, save, camera, image });
   }
 
-  async onFileSelected(event: any) {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    this.isProcessing = true;
-
+  // 👇 LA NOUVELLE FONCTION CAMERA (Comme Chantier)
+  async takePicture() {
     try {
-      // 👇 LA MAGIE IMGLY
-      // Config : On peut ajuster la qualité ou le modèle si besoin
-      const blob = await removeBackground(file);
-      
-      this.imageBlob = blob;
-      this.processedImage = URL.createObjectURL(blob);
-      
+      const image = await Camera.getPhoto({
+        quality: 90,
+        allowEditing: false,
+        resultType: CameraResultType.Uri,
+        source: CameraSource.Camera, // Ou Prompt pour laisser le choix
+        correctOrientation: true
+      });
+
+      if (image.webPath) {
+        this.processImage(image.webPath);
+      }
+    } catch (e) {
+      console.log("Annulé");
+    }
+  }
+
+  async processImage(path: string) {
+    this.isProcessing = true;
+    try {
+        // 1. Convertir le chemin en Blob
+        const response = await fetch(path);
+        const originalBlob = await response.blob();
+
+        // 2. Détourage IA
+        const blobSansFond = await removeBackground(originalBlob);
+        
+        this.imageBlob = blobSansFond;
+        this.processedImage = URL.createObjectURL(blobSansFond);
+        
     } catch (error) {
-      console.error("Erreur détourage", error);
-      alert("Impossible de détourer l'image. Essayez une autre photo.");
+        console.error("Erreur IA", error);
+        alert("Erreur lors du détourage. Réessayez avec un fond plus uni.");
     } finally {
-      this.isProcessing = false;
+        this.isProcessing = false;
     }
   }
 
@@ -137,11 +152,8 @@ export class AddMaterielModalComponent {
   save() {
     if (this.imageBlob) {
       this.isUploading = true;
-      // 1. Upload de l'image détourée vers Cloudinary
       this.api.uploadPhoto(this.imageBlob).subscribe({
         next: (res) => {
-           // 2. Création du matériel avec l'image (On triche, on n'a pas encore de colonne 'image' dans Materiel, on va l'ajouter !)
-           // Pour l'instant on sauvegarde, on ajoutera la colonne après.
            this.createItem(res.url);
         },
         error: () => {
@@ -155,14 +167,13 @@ export class AddMaterielModalComponent {
   }
 
   createItem(imageUrl: string | null) {
-    // Note : Il faudra ajouter 'image_url' au modèle Materiel Backend pour que ça soit stocké !
-    // Pour l'instant on envoie juste les infos de base.
     const mat: any = {
       nom: this.data.nom,
       reference: this.data.reference,
       etat: 'Bon',
-      image_url: imageUrl // <--- C'EST DÉCOMMENTÉ !    };
+      image_url: imageUrl // On envoie l'URL !
     };
+
     this.api.createMateriel(mat).subscribe(() => {
       this.modalCtrl.dismiss(true, 'confirm');
     });
