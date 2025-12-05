@@ -173,30 +173,27 @@ export class MaterielPage implements OnInit {
 
   // Fonction pour transformer l'URL HD en URL Miniature optimisée
   getThumbUrl(image: string | undefined | null): string {
-  if (!image) {
-    // Optionnel : une image de fallback
-    return 'assets/placeholder-tool.png';
-  }
-
-  // 1) Cas : on a déjà une URL complète
-  if (image.startsWith('http')) {
-    // Si c'est bien une URL Cloudinary "upload"
-    if (image.includes('cloudinary.com') && image.includes('/upload/')) {
-      return image.replace(
-        '/upload/',
-        '/upload/w_200,h_200,c_fit,q_auto,f_auto/'
-      );
+    if (!image) {
+      // éventuel placeholder
+      return 'assets/placeholder-tool.png';
     }
-    // Autre URL (S3, backend, etc.) -> on la retourne tel quel
-    return image;
+
+    // Cas 1 : déjà une URL complète
+    if (image.startsWith('http')) {
+      if (image.includes('cloudinary.com') && image.includes('/upload/')) {
+        return image.replace(
+          '/upload/',
+          '/upload/w_200,h_200,c_fit,q_auto,f_auto/'
+        );
+      }
+      return image;
+    }
+
+    // Cas 2 : seulement un public_id Cloudinary
+    const cloudName = 'dzxnmavhx'; // à mettre en dur une fois
+    return `https://res.cloudinary.com/${cloudName}/image/upload/w_200,h_200,c_fit,q_auto,f_auto/${image}.png`;
   }
 
-  // 2) Cas : c'est un public_id Cloudinary, pas une URL
-  // Exemple: "parc-materiel/mon-image"
-  const cloudName = 'CLOUDINARY_CLOUD_NAME'; // à remplacer une bonne fois pour toutes
-
-  return `https://res.cloudinary.com/${cloudName}/image/upload/w_200,h_200,c_fit,q_auto,f_auto/${image}.png`;
-}
 
 
   getChantierName(id: number | null | undefined): string {
@@ -204,6 +201,20 @@ export class MaterielPage implements OnInit {
     const c = this.chantiers.find(x => x.id === id);
     return c ? c.nom : 'Inconnu';
   }
+
+  // Dans MaterielPage
+getImageUrl(mat: Materiel): string {
+  const raw =
+    (mat as any).image_url ||
+    (mat as any).imageUrl ||
+    (mat as any).image ||
+    '';
+
+  if (!raw) return '';
+
+  return this.getThumbUrl(raw);
+}
+
 
   // --- STATS ---
   getMaterielsSortis(): number {
