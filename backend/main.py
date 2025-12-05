@@ -544,4 +544,13 @@ def create_materiel(mat: schemas.MaterielCreate, db: Session = Depends(get_db)):
     db.refresh(new_mat)
     return new_mat
 
-# ...
+@app.get("/force_fix_materiel")
+def force_fix_materiel(db: Session = Depends(get_db)):
+    try:
+        # On force l'ajout de la colonne
+        db.execute(text("ALTER TABLE materiels ADD COLUMN image_url VARCHAR"))
+        db.commit()
+        return {"message": "✅ Succès : Colonne image_url ajoutée !"}
+    except Exception as e:
+        db.rollback()
+        return {"message": f"Info (Déjà fait ?) : {str(e)}"}
