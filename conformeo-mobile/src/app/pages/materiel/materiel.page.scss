@@ -268,13 +268,17 @@
 }
 
 .tool-card {
-  position: relative; /* Pour positionner le bouton */
+  position: relative; /* Important pour que le bouton se place dedans */
   /* ... */
 }
+
+/* Style du bouton poubelle */
 .delete-tool-btn {
   position: absolute;
-  top: 10px;
-  right: 10px;
-  z-index: 10;
-  padding: 5px;
+  top: 5px;
+  right: 5px;
+  z-index: 10; /* Au-dessus du reste */
+  padding: 8px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.8); /* Petit fond blanc pour lisibilité */
 }

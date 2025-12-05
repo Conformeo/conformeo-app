@@ -12,7 +12,8 @@ import { Capacitor } from '@capacitor/core';
 import { addIcons } from 'ionicons';
 import { 
   add, hammer, construct, home, swapHorizontal, qrCodeOutline,
-  searchOutline, cube, homeOutline, locationOutline, shieldCheckmark
+  searchOutline, cube, homeOutline, locationOutline, shieldCheckmark,
+  trashOutline
 } from 'ionicons/icons';
 
 import { ApiService, Materiel, Chantier } from '../../services/api';
@@ -49,7 +50,8 @@ export class MaterielPage implements OnInit {
   ) {
     addIcons({
       add, hammer, construct, home, swapHorizontal, qrCodeOutline,
-      searchOutline, cube, homeOutline, locationOutline, shieldCheckmark
+      searchOutline, cube, homeOutline, locationOutline, shieldCheckmark,
+      trashOutline
     });
 
     this.checkScreen();
@@ -232,23 +234,22 @@ export class MaterielPage implements OnInit {
   }
 
   async deleteMateriel(event: Event, mat: Materiel) {
-    event.stopPropagation(); // Empêche d'ouvrir le menu "Déplacer"
-    
-    const alert = await this.alertCtrl.create({
-      header: 'Supprimer ?',
-      message: `Voulez-vous supprimer ${mat.nom} ?`,
-      buttons: [
-        { text: 'Non', role: 'cancel' },
-        {
-          text: 'Oui',
-          handler: () => {
-            this.api.deleteMateriel(mat.id!).subscribe(() => {
-              this.loadData(); // Rafraîchir la liste
-            });
-          }
+  event.stopPropagation(); // Empêche d'ouvrir le menu "Déplacer"
+  const alert = await this.alertCtrl.create({
+    header: 'Supprimer ?',
+    message: `Voulez-vous supprimer ${mat.nom} ?`,
+    buttons: [
+      { text: 'Non', role: 'cancel' },
+      {
+        text: 'Oui',
+        handler: () => {
+          this.api.deleteMateriel(mat.id!).subscribe(() => {
+            this.loadData();
+          });
         }
-      ]
-    });
-    await alert.present();
-  }
+      }
+    ]
+  });
+  await alert.present();
+}
 }
