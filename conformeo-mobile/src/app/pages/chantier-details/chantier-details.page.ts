@@ -1,25 +1,25 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { filter } from 'rxjs/operators'; // <--- AJOUTER filter
-import { Platform } from '@ionic/angular/standalone';
 import { FormsModule } from '@angular/forms';
 import { IonicModule, ModalController } from '@ionic/angular';
-import { ActivatedRoute, RouterLink } from '@angular/router'; // Ajout RouterLink
-import { ApiService, Rapport, Chantier, PPSPS } from 'src/app/services/api'; // Import Chantier
+import { ActivatedRoute, RouterLink } from '@angular/router';
+// CORRECTION: Import from api.service
+import { ApiService, Rapport, Chantier, PPSPS } from 'src/app/services/api'; 
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
+import { Platform } from '@ionic/angular/standalone'; // Import Platform
 import { addIcons } from 'ionicons';
 import { 
   camera, time, warning, documentText, create, navigate, 
-  location, arrowBack, createOutline ,
+  location, arrowBack, createOutline,
   scanOutline, checkmarkCircle, shieldCheckmark, downloadOutline,
   shieldCheckmarkOutline, map, checkmarkDoneCircle,
   checkmarkDoneCircleOutline, 
   documentTextOutline, archiveOutline, mapOutline
 } from 'ionicons/icons';
-// Imports Standalone
 import { IonBackButton, IonButtons } from '@ionic/angular/standalone';
-import { PicModalComponent } from './pic-modal/pic-modal.component';
+
 // Import des modales
+import { PicModalComponent } from './pic-modal/pic-modal.component';
 import { NewRapportModalComponent } from './new-rapport-modal/new-rapport-modal.component';
 import { RapportDetailsModalComponent } from './rapport-details-modal/rapport-details-modal.component';
 import { SignatureModalComponent } from './signature-modal/signature-modal.component';
@@ -29,48 +29,41 @@ import { SignatureModalComponent } from './signature-modal/signature-modal.compo
   templateUrl: './chantier-details.page.html',
   styleUrls: ['./chantier-details.page.scss'],
   standalone: true,
-  imports: [IonicModule, 
-    CommonModule, 
-    FormsModule, 
-    // IonButtons, 
-    // IonBackButton, 
-    RouterLink]
+  imports: [IonicModule, CommonModule, FormsModule, IonButtons, IonBackButton, RouterLink]
 })
 export class ChantierDetailsPage implements OnInit {
   chantierId: number = 0;
   
   chantier: Chantier | undefined; 
   rapports: Rapport[] = [];
-  photoUrlTemp: string | undefined;
-
-  ppspsList: PPSPS[] = [];
   documentsList: any[] = [];
   
   constructor(
     private route: ActivatedRoute,
-    public api: ApiService, // Public pour accès HTML si besoin
+    public api: ApiService,
     private modalCtrl: ModalController,
-    private platform: Platform // <--- 2. INJECTEZ LA PLATEFORME ICI
+    private platform: Platform
   ) {
-    addIcons({ camera, time, warning, documentText, create, navigate, location, arrowBack, documentTextOutline, 
-      createOutline, scanOutline, checkmarkCircle, shieldCheckmark, downloadOutline, archiveOutline,
-      shieldCheckmarkOutline, map, checkmarkDoneCircle,
-    checkmarkDoneCircleOutline, mapOutline
-     });
+    addIcons({ 
+      camera, time, warning, documentText, create, navigate, location, arrowBack, 
+      documentTextOutline, createOutline, scanOutline, checkmarkCircle, 
+      shieldCheckmark, downloadOutline, archiveOutline, shieldCheckmarkOutline, 
+      map, checkmarkDoneCircle, checkmarkDoneCircleOutline, mapOutline 
+    });
   }
 
   ngOnInit() {
     const id = this.route.snapshot.paramMap.get('id');
     if (id) {
       this.chantierId = +id;
-      this.loadData(); // Premier chargement
+      this.loadData();
     }
   }
 
   ionViewWillEnter() {
     if (this.api.needsRefresh) {
       console.log("🔄 Refresh demandé !");
-      this.loadData(); // Recharge Chantier + Rapports + Documents
+      this.loadData();
       this.api.needsRefresh = false;
     }
   }
@@ -79,53 +72,58 @@ export class ChantierDetailsPage implements OnInit {
     // 1. Charger les infos du chantier
     this.api.getChantierById(this.chantierId).subscribe(data => {
       this.chantier = data;
+      // Une fois qu'on a le chantier, on construit la liste des documents
+      this.buildDocumentsList(); 
     });
 
     // 2. Charger les rapports (Photos)
     this.loadRapports();
+  }
 
-    // 3. CONSTRUIRE LA LISTE DES DOCUMENTS
-    // On réinitialise la liste à chaque chargement pour éviter les doublons
+  loadRapports() {
+    this.api.getRapports(this.chantierId).subscribe(data => {
+      this.rapports = data.reverse();
+    });
+  }
+
+  // --- CONSTRUCTION LISTE DOCUMENTS ---
+  buildDocumentsList() {
     this.documentsList = [];
 
-    // A. Ajouter le "Journal de Bord" (C'est un document virtuel qui existe toujours)
+    // A. Journal de Bord (Toujours présent)
     this.documentsList.push({
         type: 'RAPPORT',
         titre: 'Journal de Bord (Photos & QHSE)',
-        // On utilise la date du jour ou celle du chantier comme date de référence
         date: new Date().toISOString(), 
         icon: 'document-text-outline',
-        color: 'primary', // Bleu
-        action: () => this.downloadPdf() // L'action qui lance le téléchargement
+        color: 'primary',
+        action: () => this.downloadPdf()
     });
 
-    // B. Ajouter les PPSPS qui viennent de l'API
+    // B. PPSPS
     this.api.getPPSPSList(this.chantierId).subscribe(docs => {
-        this.ppspsList = docs; // On garde la liste brute au cas où
-        
         docs.forEach(doc => {
             this.documentsList.push({
                 type: 'PPSPS',
                 titre: 'PPSPS Officiel',
                 date: doc.date_creation,
                 icon: 'shield-checkmark-outline',
-                color: 'warning', // Jaune
+                color: 'warning',
                 action: () => this.downloadPPSPS(doc.id!)
             });
         });
     });
 
-    // C. PIC (Plan Installation) 
+    // C. PIC
     this.api.getPIC(this.chantierId).subscribe(pic => {
         if (pic && pic.final_url) {
             this.documentsList.push({
                 type: 'PIC',
                 titre: 'Plan Installation (PIC)',
-                date: new Date().toISOString(), // Ou date_update si dispo
-                icon: 'map',
-                color: 'tertiary', // Violet/Rose
+                date: new Date().toISOString(), // Ou pic.date_update
+                icon: 'map-outline',
+                color: 'tertiary',
                 action: () => {
-                    // On ouvre l'image du plan
                     window.open(this.getFullUrl(pic.final_url!), '_system');
                 }
             });
@@ -139,22 +137,27 @@ export class ChantierDetailsPage implements OnInit {
                 type: 'AUDIT',
                 titre: `Audit ${audit.type}`,
                 date: audit.date_creation,
-                icon: 'checkmark-done-circle', // Icône Audit
-                color: 'success', // Vert
+                icon: 'checkmark-done-circle-outline',
+                color: 'success',
                 action: () => {
-                    // Ouvre le PDF spécifique de l'audit
                     const url = `${this.api['apiUrl']}/inspections/${audit.id}/pdf`;
                     window.open(url, '_system');
                 }
             });
         });
     });
-  }
 
-  loadRapports() {
-    this.api.getRapports(this.chantierId).subscribe(data => {
-      this.rapports = data.reverse();
-    });
+    // E. Signature (Maintenant appelé APRÈS chargement du chantier)
+    if (this.chantier && this.chantier.signature_url) {
+        this.documentsList.push({
+            type: 'SIGNATURE',
+            titre: 'Signature Client',
+            date: this.chantier.date_creation, // Ou idéalement date_signature si ajoutée
+            icon: 'create-outline',
+            color: 'medium',
+            action: () => window.open(this.getFullUrl(this.chantier!.signature_url), '_system')
+        });
+    }
   }
 
   // --- ACTIONS ---
@@ -202,11 +205,7 @@ export class ChantierDetailsPage implements OnInit {
 
       await this.api.addRapportWithMultiplePhotos(newRapport, blobs);
       
-      // 1. On recharge la liste LOCALE (pour voir la photo tout de suite)
       setTimeout(() => { this.loadRapports(); }, 500);
-
-      // 2. 👇 AJOUT : On lève le drapeau GLOBAL
-      // Comme ça, la page d'accueil ("Mes Chantiers") se mettra aussi à jour au retour
       this.api.needsRefresh = true;
     }
   }
@@ -220,16 +219,12 @@ export class ChantierDetailsPage implements OnInit {
     const destination = encodeURIComponent(this.chantier.adresse);
     let url = '';
 
-    // Logique adaptée à chaque téléphone
     if (this.platform.is('ios')) {
-      // Ouvre Apple Maps directement
       url = `maps:?q=${destination}`;
     } else if (this.platform.is('android')) {
-      // Ouvre le choix GPS Android (Waze/Maps)
       url = `geo:0,0?q=${destination}`;
     } else {
-      // Fallback Web (Ouvre Google Maps dans le navigateur)
-      url = `https://www.google.com/maps/search/?api=1&query=${destination}`;
+      url = `http://googleusercontent.com/maps.google.com/maps?q=${destination}`;
     }
 
     window.open(url, '_system');
@@ -254,7 +249,14 @@ export class ChantierDetailsPage implements OnInit {
       component: PicModalComponent,
       componentProps: { chantierId: this.chantierId }
     });
-    modal.present();
+    
+    await modal.present();
+    // Refresh au retour si sauvegarde
+    const { role } = await modal.onWillDismiss();
+    if (this.api.needsRefresh) {
+       this.loadData();
+       this.api.needsRefresh = false;
+    }
   }
 
   async openSignature() {
@@ -262,7 +264,13 @@ export class ChantierDetailsPage implements OnInit {
       component: SignatureModalComponent,
       componentProps: { chantierId: this.chantierId }
     });
+    
     await modal.present();
+    const { role } = await modal.onWillDismiss();
+    if (this.api.needsRefresh) {
+        this.loadData();
+        this.api.needsRefresh = false;
+    }
   }
 
   async openRapportDetails(rapport: Rapport) {
