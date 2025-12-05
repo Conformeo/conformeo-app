@@ -39,7 +39,7 @@
   <div class="pro-list">
     <div *ngFor="let c of chantiers" class="pro-card" [routerLink]="['/chantier', c.id]">
       
-      <div class="card-thumb" [style.background-image]="'url(' + (c.cover_url || 'assets/splash.png') + ')'">
+      <div class="card-thumb" [style.background-image]="'url(' + getCoverUrl(c.cover_url) + ')'">
         <div class="status-dot" [class.active]="c.est_actif"></div>
       </div>
 

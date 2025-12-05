@@ -188,9 +188,9 @@
 
 .empty-state { text-align: center; color: #999; margin-top: 30px; font-style: italic; }
 
-/* CACHER SUR DESKTOP (Largeur > 992px) */
-@media (min-width: 1200px) {
-  .mobile-only-action {
-    display: none !important;
-  }
-}
+// /* CACHER SUR DESKTOP (Largeur > 992px) */
+// @media (min-width: 1200px) {
+//   .mobile-only-action {
+//     display: none !important;
+//   }
+// }

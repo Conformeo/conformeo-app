@@ -96,4 +96,21 @@ export class HomePage implements OnInit {
     const diff = Math.abs(now.getTime() - date.getTime());
     return Math.ceil(diff / (1000 * 3600 * 24)); 
   }
+
+  // ...
+
+  // Fonction pour forcer l'affichage sécurisé et gérer les erreurs
+  getCoverUrl(url: string | undefined): string {
+    if (!url) {
+      return 'assets/splash.png'; // Image par défaut si vide
+    }
+    
+    // Si c'est une image Cloudinary en HTTP, on la force en HTTPS
+    if (url.startsWith('http:')) {
+      return url.replace('http:', 'https:');
+    }
+    
+    return url;
+  }
+
 }
