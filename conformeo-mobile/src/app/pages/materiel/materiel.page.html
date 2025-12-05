@@ -9,19 +9,15 @@
 
 <ion-content class="inventory-content">
 
-  <!-- ============================
-       📱 VERSION MOBILE
-  ============================ -->
+  <!-- Mobile View -->
   <div class="mobile-only">
 
-    <!-- HEADER MOBILE -->
     <div class="header-section">
       <div class="header-top">
         <h1 class="page-title">Inventaire</h1>
         <p class="page-subtitle">Gérez vos équipements</p>
       </div>
 
-      <!-- STATS -->
       <div class="stats-row">
         <div class="stat-item">
           <span class="stat-num">{{ materiels.length }}</span>
@@ -38,7 +34,6 @@
       </div>
     </div>
 
-    <!-- SEARCH -->
     <div class="search-container">
       <div class="search-wrapper">
         <ion-icon name="search-outline" class="search-icon"></ion-icon>
@@ -54,33 +49,32 @@
       </button>
     </div>
 
-    <!-- LISTE MOBILE -->
     <div class="list-container" style="padding-bottom: 100px;">
 
-      <!-- ÉTAT VIDE -->
       <div *ngIf="filteredMateriels.length === 0" class="empty-state">
         <ion-icon name="hammer-outline"></ion-icon>
         <p>Aucun matériel trouvé</p>
       </div>
 
-      <!-- CARDS MOBILE -->
       <div 
         *ngFor="let mat of filteredMateriels" 
         class="tool-card" 
         (click)="moveMateriel(mat)"
       >
+        
+        <div class="delete-tool-btn" (click)="deleteMateriel($event, mat)">
+           <ion-icon name="trash-outline" color="danger"></ion-icon>
+        </div>
 
-        <!-- ICON / IMAGE -->
         <div class="tool-icon" [class.out]="mat.chantier_id">
 
-          <!-- IMAGE CLOUDINARY -->
           <img 
             *ngIf="getImageUrl(mat)" 
             [src]="getThumbUrl(getImageUrl(mat))"
+            crossorigin="anonymous"
             style="width:100%; height:100%; object-fit:contain; border-radius: 8px; background:white;"
           >
 
-          <!-- ICON SI PAS D’IMAGE -->
           <ion-icon 
             *ngIf="!getImageUrl(mat)"
             [name]="mat.chantier_id ? 'construct' : 'cube'">
@@ -88,13 +82,11 @@
 
         </div>
 
-        <!-- INFOS -->
         <div class="tool-info">
           <h3 class="tool-name">{{ mat.nom }}</h3>
           <p class="tool-ref">REF: {{ mat.reference }}</p>
         </div>
 
-        <!-- STATUT -->
         <div class="tool-status">
           <div class="status-badge" [class.out]="mat.chantier_id">
             <ion-icon [name]="mat.chantier_id ? 'location-outline' : 'home-outline'"></ion-icon>
@@ -110,9 +102,7 @@
     </div>
   </div>
 
-  <!-- ============================
-       🖥️ VERSION DESKTOP
-  ============================ -->
+  <!-- Desktop View -->
   <div class="desktop-only">
 
     <div class="desktop-header">
@@ -134,22 +124,24 @@
         class="equip-card" 
         (click)="moveMateriel(mat)"
       >
+        
+        <div class="delete-tool-btn" (click)="deleteMateriel($event, mat)" style="top: 10px; right: 10px;">
+           <ion-icon name="trash-outline" color="danger"></ion-icon>
+        </div>
 
         <div class="status-dot" [class.active]="mat.chantier_id">
           <ion-icon [name]="mat.chantier_id ? 'construct' : 'shield-checkmark'"></ion-icon>
         </div>
 
-        <!-- IMAGE OU ICON -->
         <div class="equip-image">
 
-          <!-- IMAGE CLOUDINARY -->
           <img 
             *ngIf="getImageUrl(mat)" 
             [src]="getThumbUrl(getImageUrl(mat))"
+            crossorigin="anonymous"
             style="width:100%; height:100%; object-fit:contain;"
           >
 
-          <!-- ICON SI PAS D’IMAGE -->
           <ion-icon 
             *ngIf="!getImageUrl(mat)"
             name="hammer" 
@@ -158,7 +150,6 @@
 
         </div>
 
-        <!-- INFOS -->
         <div class="equip-info">
           <h3>{{ mat.nom }}</h3>
           <p class="ref">{{ mat.reference }}</p>
@@ -177,7 +168,6 @@
     </div>
   </div>
 
-  <!-- BOUTON FLOTTANT -->
   <ion-fab 
     vertical="bottom" horizontal="end" 
     slot="fixed" 

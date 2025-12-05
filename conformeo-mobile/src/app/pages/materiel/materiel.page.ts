@@ -195,10 +195,15 @@ export class MaterielPage implements OnInit {
     return mat.image_url;
   }
 
-  /** Génère une miniature Cloudinary propre */
   getThumbUrl(url: string | undefined): string {
     if (!url) return '';
 
+    // 1. Forcer HTTPS
+    if (url.startsWith('http:')) {
+      url = url.replace('http:', 'https:');
+    }
+
+    // 2. Optimisation Cloudinary
     if (url.includes('cloudinary.com') && url.includes('/upload/')) {
       return url.replace(
         '/upload/',
