@@ -482,3 +482,37 @@ def migrate_v7(db: Session = Depends(get_db)):
         db.commit()
         return {"msg": "Migration V7 OK"}
     except: return {"msg": "Déjà fait"}
+
+# ==========================================
+# 10. GESTION D'ÉQUIPE (SaaS)
+# ==========================================
+
+@app.get("/team", response_model=List[schemas.UserOut])
+def read_team(db: Session = Depends(get_db), current_user: models.User = Depends(security.get_current_user)):
+    # On renvoie tous les utilisateurs qui ont le même company_id que moi
+    return db.query(models.User).filter(models.User.company_id == current_user.company_id).all()
+
+@app.post("/team", response_model=schemas.UserOut)
+def add_team_member(
+    user: schemas.UserCreate, 
+    db: Session = Depends(get_db), 
+    current_user: models.User = Depends(security.get_current_user)
+):
+    # 1. Vérif droits (Seul un admin peut ajouter ?) - On laisse ouvert pour l'instant
+    
+    # 2. Vérif Email
+    if db.query(models.User).filter(models.User.email == user.email).first():
+        raise HTTPException(status_code=400, detail="Cet email est déjà utilisé")
+    
+    # 3. Création du membre rattaché à l'entreprise
+    hashed_pwd = security.get_password_hash(user.password)
+    new_member = models.User(
+        email=user.email,
+        hashed_password=hashed_pwd,
+        role=user.role, # 'conducteur', 'ouvrier', etc.
+        company_id=current_user.company_id # <--- C'EST ICI QUE LA MAGIE OPERE
+    )
+    db.add(new_member)
+    db.commit()
+    db.refresh(new_member)
+    return new_member

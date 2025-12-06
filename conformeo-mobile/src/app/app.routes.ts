@@ -34,4 +34,12 @@ export const routes: Routes = [
     path: 'smart-scan/:id',
     loadComponent: () => import('./pages/smart-scan/smart-scan.page').then( m => m.SmartScanPage)
   },
+  {
+    path: 'equipe',
+    loadComponent: () => import('./pages/equipe/equipe.page').then( m => m.EquipePage)
+  },
+  {
+    path: 'equipe',
+    loadComponent: () => import('./pages/equipe/equipe.page').then( m => m.EquipePage)
+  },
 ];

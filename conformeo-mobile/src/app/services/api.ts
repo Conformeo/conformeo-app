@@ -433,4 +433,17 @@ export class ApiService {
     const url = `${this.apiUrl}/chantiers/${chantierId}/doe`;
     window.open(url, '_system');
   }
+
+
+  // ==========================================
+  // 👥 GESTION EQUIPE
+  // ==========================================
+
+  getTeam(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiUrl}/team`);
+  }
+
+  addTeamMember(user: any): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/team`, user);
+  }
 }
