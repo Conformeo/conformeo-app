@@ -66,10 +66,15 @@ export class AppComponent {
 
  // --- NAVIGATION ROBUSTE (CORRIGÉE) ---
   navigateTo(url: string) {
-    // 1. On navigue TOUT DE SUITE (sans attendre)
-    this.navCtrl.navigateRoot(url, { animated: false });
+    // 1. Si on est déjà sur la page, on ne fait rien (évite l'erreur "already activated")
+    if (this.router.url === url) {
+        return;
+    }
+
+    // 2. Navigation standard (plus douce)
+    this.router.navigateByUrl(url);
     
-    // 2. On demande au menu de se fermer (ne marchera que sur Mobile, ignoré sur Desktop)
+    // 3. Fermer le menu (seulement si nécessaire)
     this.menuCtrl.close(); 
   }
 
