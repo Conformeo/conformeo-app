@@ -44,14 +44,36 @@ export class DashboardPage implements OnInit {
 
   ngOnInit() {
     this.api.getStats().subscribe(data => {
-      this.stats = data;
-    });
+      console.log("Données Dashboard reçues :", data);
+      
+      // 1. Mise à jour des KPIs
+      // Attention : mon API renvoie maintenant un objet imbriqué "kpis"
+      // Si votre HTML utilise 'stats.actifs', il faut mapper
+      this.stats = data.kpis; 
 
-    // Données simulées pour l'instant
-    this.recentRapports = [
-        { titre: 'Inspection Toiture', date_creation: new Date(), chantier_nom: 'Résidence Fleurs', niveau_urgence: 'Faible' },
-        { titre: 'Fissure Mur Nord', date_creation: new Date(), chantier_nom: 'Gare du Nord', niveau_urgence: 'Critique' },
-        { titre: 'Livraison Placo', date_creation: new Date(), chantier_nom: 'Villa Corse', niveau_urgence: 'Moyen' },
-    ];
+      // 2. Mise à jour de la liste récente
+      this.recentRapports = data.recents;
+
+      // 3. Mise à jour du Graphique
+      this.updateChart(data.chart.labels, data.chart.values);
+    });
+  }
+
+  updateChart(labels: string[], values: number[]) {
+    this.barChartData = {
+      labels: labels,
+      datasets: [
+        { 
+          data: values, 
+          label: 'Rapports / Jour', 
+          backgroundColor: '#1e3c72', 
+          borderRadius: 5,
+          hoverBackgroundColor: '#2a5298'
+        }
+      ]
+    };
+    // Astuce : Pour forcer le rafraîchissement visuel du chart s'il ne bouge pas
+    // on peut parfois avoir besoin de réassigner l'option ou trigger un change detection,
+    // mais avec ng2-charts, réassigner 'barChartData' suffit souvent.
   }
 }
