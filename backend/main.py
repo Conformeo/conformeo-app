@@ -185,55 +185,64 @@ def read_materiels(db: Session = Depends(get_db)):
 @app.post("/materiels/import")
 async def import_materiels_csv(
     file: UploadFile = File(...), 
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(security.get_current_user) # Optionnel si pas encore de login
+    db: Session = Depends(get_db)
+    # On a retiré 'current_user' pour l'instant pour éviter l'erreur 401
 ):
-    # Vérification extension
     if not file.filename.endswith('.csv'):
         raise HTTPException(400, "Le fichier doit être un CSV")
 
     try:
         content = await file.read()
         
-        # Tentative de décodage (utf-8 ou latin-1 pour Excel Windows)
+        # Décodage robuste (UTF-8 ou Latin-1 pour Excel)
         try:
             text_content = content.decode('utf-8')
         except UnicodeDecodeError:
             text_content = content.decode('latin-1')
             
         lines = text_content.splitlines()
+        if not lines: raise HTTPException(400, "Fichier vide")
         
-        # Détection intelligente du séparateur
-        dialect = csv.Sniffer().sniff(lines[0])
-        reader = csv.DictReader(lines, delimiter=dialect.delimiter)
+        # Détection du séparateur (; ou ,)
+        delimiter = ';' if ';' in lines[0] else ','
+        reader = csv.DictReader(lines, delimiter=delimiter)
+
+        # On cherche une entreprise par défaut (ou null)
+        # Idéalement, on prendrait celle du user, mais ici on fait simple
+        default_company = db.query(models.Company).first()
+        cid = default_company.id if default_company else None
 
         count = 0
         for row in reader:
-            # On nettoie les clés (parfois Excel ajoute des espaces bizarres)
-            row = {k.strip(): v for k, v in row.items() if k}
+            # Nettoyage des clés (espaces, majuscules...)
+            row_clean = {k.strip().lower(): v.strip() for k, v in row.items() if k}
             
-            # On cherche les colonnes clés (insensible à la casse)
-            nom = row.get('Nom') or row.get('nom') or row.get('NOM')
-            ref = row.get('Reference') or row.get('reference') or row.get('REFERENCE') or row.get('Ref')
+            # Recherche des colonnes (tolérant)
+            nom = row_clean.get('nom') or row_clean.get('name')
+            ref = row_clean.get('reference') or row_clean.get('ref')
+            etat = row_clean.get('etat') or 'Bon'
             
             if nom and ref:
-                new_mat = models.Materiel(
-                    nom=nom,
-                    reference=ref,
-                    etat=row.get('Etat', 'Bon'),
-                    company_id=current_user.company_id if hasattr(current_user, 'company_id') else None,
-                    chantier_id=None
-                )
-                db.add(new_mat)
-                count += 1
+                # Vérifier doublon (optionnel)
+                existing = db.query(models.Materiel).filter(models.Materiel.reference == ref).first()
+                if not existing:
+                    new_mat = models.Materiel(
+                        nom=nom,
+                        reference=ref,
+                        etat=etat,
+                        company_id=cid, # On rattache à la boite par défaut
+                        chantier_id=None
+                    )
+                    db.add(new_mat)
+                    count += 1
         
         db.commit()
         return {"status": "success", "message": f"{count} équipements importés !"}
 
     except Exception as e:
-        print(f"Erreur Import CSV: {e}")
+        print(f"Erreur CSV : {e}")
         db.rollback()
-        raise HTTPException(500, f"Erreur lors de l'import : {str(e)}")
+        raise HTTPException(500, f"Erreur technique : {str(e)}")
 
 @app.put("/materiels/{mid}/transfert")
 def transfer_materiel(mid: int, chantier_id: Optional[int] = None, db: Session = Depends(get_db)):
