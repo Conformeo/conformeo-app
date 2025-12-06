@@ -2,8 +2,11 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { IonicModule } from '@ionic/angular';
 import { ApiService } from 'src/app/services/api';
-import { BaseChartDirective } from 'ng2-charts'; // Pour les graphiques
-import { ChartConfiguration, ChartOptions } from 'chart.js';
+import { BaseChartDirective } from 'ng2-charts';
+
+// 👇 IMPORTS CHART.JS INDISPENSABLES
+import { Chart, ChartConfiguration, ChartOptions, registerables } from 'chart.js';
+
 import { addIcons } from 'ionicons';
 import { business, documentText, hammer, warning, cameraOutline } from 'ionicons/icons';
 
@@ -19,7 +22,6 @@ export class DashboardPage implements OnInit {
   stats: any = {};
   recentRapports: any[] = [];
 
-  // Config Graphique
   public barChartData: ChartConfiguration<'bar'>['data'] = {
     labels: ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'],
     datasets: [
@@ -34,17 +36,18 @@ export class DashboardPage implements OnInit {
   };
 
   constructor(private api: ApiService) {
+    // 👇 ENREGISTREMENT DES COMPOSANTS CHART.JS
+    Chart.register(...registerables);
+    
     addIcons({ business, documentText, hammer, warning, cameraOutline });
   }
 
   ngOnInit() {
-    // 1. Récupérer les stats globales
     this.api.getStats().subscribe(data => {
       this.stats = data;
     });
 
-    // 2. Récupérer les derniers rapports (Simulation pour l'instant, à créer dans API)
-    // Idéalement : this.api.getRecentActivity()...
+    // Données simulées pour l'instant
     this.recentRapports = [
         { titre: 'Inspection Toiture', date_creation: new Date(), chantier_nom: 'Résidence Fleurs', niveau_urgence: 'Faible' },
         { titre: 'Fissure Mur Nord', date_creation: new Date(), chantier_nom: 'Gare du Nord', niveau_urgence: 'Critique' },
