@@ -1,31 +1,41 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { IonicModule } from '@ionic/angular';
-import { ApiService } from 'src/app/services/api';
+import { RouterLink } from '@angular/router';
 import { BaseChartDirective } from 'ng2-charts';
-
-// 👇 IMPORTS CHART.JS INDISPENSABLES
-import { Chart, ChartConfiguration, ChartOptions, registerables } from 'chart.js';
-
+import { ChartConfiguration, ChartOptions, Chart, registerables } from 'chart.js';
 import { addIcons } from 'ionicons';
 import { business, documentText, hammer, warning, cameraOutline } from 'ionicons/icons';
+import { ApiService } from 'src/app/services/api';
+
+// Enregistrement des composants graphiques
+Chart.register(...registerables);
 
 @Component({
   selector: 'app-dashboard',
   templateUrl: './dashboard.page.html',
   styleUrls: ['./dashboard.page.scss'],
   standalone: true,
-  imports: [CommonModule, IonicModule, BaseChartDirective]
+  imports: [CommonModule, IonicModule, BaseChartDirective, RouterLink]
 })
 export class DashboardPage implements OnInit {
-  
-  stats: any = {};
+
+  // Données KPIs (Initialisées à 0)
+  stats: any = {
+    actifs: 0,
+    rapports: 0,
+    materiel_sorti: 0,
+    alertes: 0
+  };
+
+  // Données Liste
   recentRapports: any[] = [];
 
+  // Config Graphique
   public barChartData: ChartConfiguration<'bar'>['data'] = {
     labels: ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'],
     datasets: [
-      { data: [5, 8, 12, 7, 10, 2, 0], label: 'Rapports', backgroundColor: '#1e3c72', borderRadius: 5 }
+      { data: [0, 0, 0, 0, 0, 0, 0], label: 'Rapports', backgroundColor: '#1e3c72', borderRadius: 5 }
     ]
   };
   public barChartOptions: ChartOptions<'bar'> = {
@@ -36,44 +46,32 @@ export class DashboardPage implements OnInit {
   };
 
   constructor(private api: ApiService) {
-    // 👇 ENREGISTREMENT DES COMPOSANTS CHART.JS
-    Chart.register(...registerables);
-    
     addIcons({ business, documentText, hammer, warning, cameraOutline });
   }
 
   ngOnInit() {
+    // --- 1. Appel API pour les KPIs ---
     this.api.getStats().subscribe(data => {
-      console.log("Données Dashboard reçues :", data);
+      // On suppose que l'API renvoie un objet simple pour l'instant
+      this.stats = data; 
       
-      // 1. Mise à jour des KPIs
-      // Attention : mon API renvoie maintenant un objet imbriqué "kpis"
-      // Si votre HTML utilise 'stats.actifs', il faut mapper
-      this.stats = data.kpis; 
-
-      // 2. Mise à jour de la liste récente
-      this.recentRapports = data.recents;
-
-      // 3. Mise à jour du Graphique
-      this.updateChart(data.chart.labels, data.chart.values);
+      // --- 2. Simulation Graphique & Liste (En attendant l'API avancée) ---
+      this.simulateData();
     });
   }
 
-  updateChart(labels: string[], values: number[]) {
+  simulateData() {
+    // Simulation Graphique
     this.barChartData = {
-      labels: labels,
-      datasets: [
-        { 
-          data: values, 
-          label: 'Rapports / Jour', 
-          backgroundColor: '#1e3c72', 
-          borderRadius: 5,
-          hoverBackgroundColor: '#2a5298'
-        }
-      ]
+      labels: ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'],
+      datasets: [{ data: [5, 8, 12, 7, 10, 2, 0], label: 'Rapports', backgroundColor: '#1e3c72', borderRadius: 5 }]
     };
-    // Astuce : Pour forcer le rafraîchissement visuel du chart s'il ne bouge pas
-    // on peut parfois avoir besoin de réassigner l'option ou trigger un change detection,
-    // mais avec ng2-charts, réassigner 'barChartData' suffit souvent.
+
+    // Simulation Liste
+    this.recentRapports = [
+      { titre: 'Inspection Toiture', date_creation: new Date(), chantier_nom: 'Résidence Fleurs', niveau_urgence: 'Faible' },
+      { titre: 'Fissure Mur Nord', date_creation: new Date(), chantier_nom: 'Gare du Nord', niveau_urgence: 'Critique' },
+      { titre: 'Livraison Placo', date_creation: new Date(), chantier_nom: 'Villa Corse', niveau_urgence: 'Moyen' },
+    ];
   }
 }

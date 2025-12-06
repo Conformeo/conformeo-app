@@ -2,18 +2,17 @@
   <ion-toolbar style="--background: #f8f9fa;">
     <ion-buttons slot="start">
       <ion-back-button defaultHref="/home" text="" color="dark"></ion-back-button>
-      
-      <ion-menu-button color="dark"></ion-menu-button> 
+      <ion-menu-button color="dark"></ion-menu-button>
     </ion-buttons>
     
-    <ion-title style="color: #1a1a1a; font-weight: 800; font-size: 24px;">
+    <ion-title style="font-weight: 800; font-size: 24px; color: #1a1a1a;">
       Tableau de Bord
     </ion-title>
-    
+
     <ion-buttons slot="end">
-      <div class="user-profile">
-        <span class="user-name">Admin</span>
-        <div class="user-avatar">A</div>
+      <div class="user-badge">
+        <span>Admin</span>
+        <div class="avatar">A</div>
       </div>
     </ion-buttons>
   </ion-toolbar>
@@ -22,37 +21,37 @@
 <ion-content style="--background: #f8f9fa;">
   
   <div class="dashboard-container">
-    
+
     <div class="kpi-grid">
-      <div class="kpi-card blue">
-        <div class="kpi-icon"><ion-icon name="business"></ion-icon></div>
-        <div class="kpi-info">
+      <div class="kpi-card">
+        <div class="kpi-icon blue"><ion-icon name="business"></ion-icon></div>
+        <div class="kpi-content">
           <h3>Chantiers Actifs</h3>
-          <span class="value">{{ stats?.actifs || 0 }}</span>
+          <span class="value">{{ stats.actifs || 0 }}</span>
         </div>
       </div>
-
+      
       <div class="kpi-card green">
-        <div class="kpi-icon"><ion-icon name="document-text"></ion-icon></div>
-        <div class="kpi-info">
+        <div class="kpi-icon green"><ion-icon name="document-text"></ion-icon></div>
+        <div class="kpi-content">
           <h3>Rapports (Mois)</h3>
-          <span class="value">{{ stats?.rapports || 0 }}</span>
+          <span class="value">{{ stats.rapports || 0 }}</span>
         </div>
       </div>
 
       <div class="kpi-card orange">
-        <div class="kpi-icon"><ion-icon name="hammer"></ion-icon></div>
-        <div class="kpi-info">
+        <div class="kpi-icon orange"><ion-icon name="hammer"></ion-icon></div>
+        <div class="kpi-content">
           <h3>Matériel Sorti</h3>
-          <span class="value">{{ stats?.materiel_sorti || 0 }}</span>
+          <span class="value">{{ stats.materiel_sorti || 0 }}</span>
         </div>
       </div>
 
       <div class="kpi-card red">
-        <div class="kpi-icon"><ion-icon name="warning"></ion-icon></div>
-        <div class="kpi-info">
+        <div class="kpi-icon red"><ion-icon name="warning"></ion-icon></div>
+        <div class="kpi-content">
           <h3>Alertes Sécurité</h3>
-          <span class="value">{{ stats?.alertes || 0 }}</span>
+          <span class="value">{{ stats.alertes || 0 }}</span>
         </div>
       </div>
     </div>
@@ -60,7 +59,9 @@
     <div class="main-grid">
       
       <div class="chart-card">
-        <h3>Activité de la semaine</h3>
+        <div class="card-header">
+          <h3>Activité de la semaine</h3>
+        </div>
         <div class="chart-wrapper">
           <canvas baseChart
             [data]="barChartData"
@@ -70,26 +71,27 @@
         </div>
       </div>
 
-      <div class="recent-card">
-        <h3>Derniers Rapports</h3>
-        <ion-list lines="none">
-          <ion-item *ngFor="let rap of recentRapports">
-            <ion-icon name="camera-outline" slot="start" color="medium"></ion-icon>
-            <ion-label>
-              <h2>{{ rap.titre }}</h2>
+      <div class="list-card">
+        <div class="card-header">
+          <h3>Derniers Rapports</h3>
+          <ion-button fill="clear" size="small" routerLink="/home">VOIR TOUT</ion-button>
+        </div>
+        
+        <div class="recent-list">
+          <div class="recent-item" *ngFor="let rap of recentRapports">
+            <div class="item-icon"><ion-icon name="camera-outline"></ion-icon></div>
+            <div class="item-info">
+              <h4>{{ rap.titre }}</h4>
               <p>{{ rap.date_creation | date:'dd/MM HH:mm' }} - {{ rap.chantier_nom }}</p>
-            </ion-label>
-            <ion-badge [color]="rap.niveau_urgence === 'Critique' ? 'danger' : 'success'">
-              {{ rap.niveau_urgence }}
-            </ion-badge>
-          </ion-item>
-        </ion-list>
-        <ion-button fill="clear" expand="block" routerLink="/chantiers">Voir tout</ion-button>
+            </div>
+            <div class="item-status">
+              <span class="badge" [class]="rap.niveau_urgence">{{ rap.niveau_urgence }}</span>
+            </div>
+          </div>
+        </div>
       </div>
 
     </div>
 
   </div>
-  
-
 </ion-content>

@@ -1,6 +1,6 @@
 .dashboard-container {
   padding: 30px;
-  max-width: 1400px;
+  max-width: 1600px;
   margin: 0 auto;
 }
 
@@ -15,60 +15,69 @@
 .kpi-card {
   background: white;
   border-radius: 16px;
-  padding: 25px;
+  padding: 20px;
   display: flex;
   align-items: center;
   box-shadow: 0 4px 20px rgba(0,0,0,0.03);
   transition: transform 0.2s;
-  
-  &:hover { transform: translateY(-5px); }
-
-  .kpi-icon {
-    width: 60px; height: 60px;
-    border-radius: 12px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 28px;
-    margin-right: 20px;
-  }
-
-  .kpi-info {
-    h3 { margin: 0; font-size: 14px; color: #888; font-weight: 500; }
-    .value { font-size: 28px; font-weight: 800; color: #333; }
-  }
-
-  /* Couleurs */
-  &.blue .kpi-icon { background: #e3f2fd; color: #1976d2; }
-  &.green .kpi-icon { background: #e8f5e9; color: #2e7d32; }
-  &.orange .kpi-icon { background: #fff3e0; color: #ef6c00; }
-  &.red .kpi-icon { background: #ffebee; color: #c62828; }
+  &:hover { transform: translateY(-3px); }
 }
 
-/* --- GRAPHS & LISTES --- */
+.kpi-icon {
+  width: 60px; height: 60px;
+  border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28px; margin-right: 15px;
+  
+  &.blue { background: #e3f2fd; color: #1976d2; }
+  &.green { background: #e8f5e9; color: #2e7d32; }
+  &.orange { background: #fff3e0; color: #ef6c00; }
+  &.red { background: #ffebee; color: #c62828; }
+}
+
+.kpi-content h3 { margin: 0 0 5px; font-size: 13px; color: #888; font-weight: 500; }
+.kpi-content .value { font-size: 28px; font-weight: 800; color: #333; }
+
+/* --- GRAPHS & LISTE --- */
 .main-grid {
   display: grid;
-  grid-template-columns: 2fr 1fr; /* 2/3 Graph, 1/3 Liste */
+  grid-template-columns: 2fr 1fr; /* 2/3 pour le graph, 1/3 pour la liste */
   gap: 30px;
 }
+@media (max-width: 1000px) { .main-grid { grid-template-columns: 1fr; } }
 
-@media (max-width: 992px) {
-  .main-grid { grid-template-columns: 1fr; } /* Mobile : empilé */
-}
-
-.chart-card, .recent-card {
+.chart-card, .list-card {
   background: white;
   border-radius: 20px;
   padding: 25px;
   box-shadow: 0 4px 20px rgba(0,0,0,0.03);
-  
-  h3 { margin-top: 0; font-size: 18px; font-weight: 700; color: #333; margin-bottom: 20px; }
 }
 
-.chart-wrapper {
-  height: 300px;
-  position: relative;
+.card-header {
+  display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;
+  h3 { margin: 0; font-size: 18px; font-weight: 700; color: #333; }
 }
 
-.user-profile {
-  display: flex; align-items: center; gap: 10px; margin-right: 20px;
-  .user-avatar { width: 35px; height: 35px; background: #1e3c72; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; }
+.chart-wrapper { height: 300px; }
+
+/* Liste Récente */
+.recent-item {
+  display: flex; align-items: center; padding: 12px 0; border-bottom: 1px solid #f0f0f0;
+  &:last-child { border-bottom: none; }
+}
+.item-icon { color: #888; font-size: 20px; margin-right: 15px; }
+.item-info { flex: 1; }
+.item-info h4 { margin: 0 0 4px; font-size: 14px; font-weight: 600; color: #333; }
+.item-info p { margin: 0; font-size: 12px; color: #999; }
+
+.badge { font-size: 10px; padding: 4px 8px; border-radius: 6px; font-weight: 600; }
+.badge.Faible { background: #e8f5e9; color: #2e7d32; }
+.badge.Moyen { background: #fff3e0; color: #ef6c00; }
+.badge.Critique { background: #ffebee; color: #c62828; }
+
+/* User Badge Header */
+.user-badge {
+  display: flex; align-items: center; gap: 10px; background: #fff; padding: 5px 5px 5px 15px; border-radius: 30px;
+  span { font-weight: 600; font-size: 14px; }
+  .avatar { width: 32px; height: 32px; background: #1e3c72; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; }
 }
