@@ -83,7 +83,8 @@ def get_stats(db: Session = Depends(get_db)):
     actifs = db.query(models.Chantier).filter(models.Chantier.est_actif == True).count()
     rap = db.query(models.Rapport).count()
     alert = db.query(models.Rapport).filter(models.Rapport.niveau_urgence.in_(['Critique', 'Moyen'])).count()
-
+    nb_materiel_sorti = db.query(models.Materiel).filter(models.Materiel.chantier_id != None).count()
+    
     # 2. GRAPHIQUE
     today = datetime.now().date()
     labels, values = [], []
@@ -119,7 +120,7 @@ def get_stats(db: Session = Depends(get_db)):
             })
 
     return {
-        "kpis": { "total_chantiers": total, "actifs": actifs, "rapports": rap, "alertes": alert, "materiel_sorti": 0 },
+        "kpis": { "total_chantiers": total, "actifs": actifs, "rapports": rap, "alertes": alert, "materiel_sorti": nb_materiel_sorti },
         "chart": { "labels": labels, "values": values },
         "recents": rec_fmt,
         "map": map_data # <--- NOUVEAU

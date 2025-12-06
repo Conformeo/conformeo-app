@@ -1,25 +1,24 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { IonicModule, ModalController } from '@ionic/angular';
+import { IonicModule, ModalController, AlertController, NavController } from '@ionic/angular'; // Groupé les imports Ionic
 import { ActivatedRoute, RouterLink } from '@angular/router';
-// CORRECTION: Import from api.service
-import { ApiService, Rapport, Chantier, PPSPS } from 'src/app/services/api'; 
+import { ApiService, Rapport, Chantier, PPSPS } from 'src/app/services/api';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
-import { Platform } from '@ionic/angular/standalone'; // Import Platform
+import { Platform } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
+import { IonBackButton, IonButtons } from '@ionic/angular/standalone';
+
+// 👇 TOUTES LES ICONES (Y compris trashOutline qui manquait)
 import { 
   camera, time, warning, documentText, create, navigate, 
-  location, arrowBack, createOutline,
+  location, arrowBack, createOutline, trashOutline, // <--- AJOUT trashOutline
   scanOutline, checkmarkCircle, shieldCheckmark, downloadOutline,
   shieldCheckmarkOutline, map, checkmarkDoneCircle,
   checkmarkDoneCircleOutline, 
   documentTextOutline, archiveOutline, mapOutline
 } from 'ionicons/icons';
-import { IonBackButton, IonButtons } from '@ionic/angular/standalone';
-import { AlertController, NavController } from '@ionic/angular/standalone'; // Vérifie les imports
 
-// Import des modales
 import { PicModalComponent } from './pic-modal/pic-modal.component';
 import { NewRapportModalComponent } from './new-rapport-modal/new-rapport-modal.component';
 import { RapportDetailsModalComponent } from './rapport-details-modal/rapport-details-modal.component';
@@ -38,6 +37,7 @@ export class ChantierDetailsPage implements OnInit {
   chantier: Chantier | undefined; 
   rapports: Rapport[] = [];
   documentsList: any[] = [];
+  ppspsList: PPSPS[] = []; // Ajout variable manquante si utilisée
   
   constructor(
     private route: ActivatedRoute,
@@ -47,11 +47,30 @@ export class ChantierDetailsPage implements OnInit {
     private alertCtrl: AlertController,
     private navCtrl: NavController
   ) {
+    // 👇 ENREGISTREMENT EXPLICITE (Mapping Nom -> Variable)
     addIcons({ 
-      camera, time, warning, documentText, create, navigate, location, arrowBack, 
-      documentTextOutline, createOutline, scanOutline, checkmarkCircle, 
-      shieldCheckmark, downloadOutline, archiveOutline, shieldCheckmarkOutline, 
-      map, checkmarkDoneCircle, checkmarkDoneCircleOutline, mapOutline 
+      'camera': camera, 
+      'time': time, 
+      'warning': warning, 
+      'document-text': documentText, 
+      'create': create, 
+      'navigate': navigate, 
+      'location': location, 
+      'arrow-back': arrowBack, 
+      'document-text-outline': documentTextOutline, 
+      'create-outline': createOutline, 
+      'scan-outline': scanOutline, 
+      'checkmark-circle': checkmarkCircle, 
+      'shield-checkmark': shieldCheckmark, 
+      'download-outline': downloadOutline, 
+      'archive-outline': archiveOutline, 
+      'shield-checkmark-outline': shieldCheckmarkOutline, 
+      'map': map, 
+      'map-outline': mapOutline,
+      'trash-outline': trashOutline, // <--- AJOUT
+      // C'est ici que ça bloquait pour l'audit :
+      'checkmark-done-circle': checkmarkDoneCircle,
+      'checkmark-done-circle-outline': checkmarkDoneCircleOutline
     });
   }
 
@@ -72,14 +91,10 @@ export class ChantierDetailsPage implements OnInit {
   }
 
   loadData() {
-    // 1. Charger les infos du chantier
     this.api.getChantierById(this.chantierId).subscribe(data => {
       this.chantier = data;
-      // Une fois qu'on a le chantier, on construit la liste des documents
       this.buildDocumentsList(); 
     });
-
-    // 2. Charger les rapports (Photos)
     this.loadRapports();
   }
 
@@ -93,7 +108,7 @@ export class ChantierDetailsPage implements OnInit {
   buildDocumentsList() {
     this.documentsList = [];
 
-    // A. Journal de Bord (Toujours présent)
+    // A. Journal
     this.documentsList.push({
         type: 'RAPPORT',
         titre: 'Journal de Bord (Photos & QHSE)',
@@ -105,6 +120,7 @@ export class ChantierDetailsPage implements OnInit {
 
     // B. PPSPS
     this.api.getPPSPSList(this.chantierId).subscribe(docs => {
+        this.ppspsList = docs;
         docs.forEach(doc => {
             this.documentsList.push({
                 type: 'PPSPS',
@@ -123,12 +139,10 @@ export class ChantierDetailsPage implements OnInit {
             this.documentsList.push({
                 type: 'PIC',
                 titre: 'Plan Installation (PIC)',
-                date: new Date().toISOString(), // Ou pic.date_update
+                date: new Date().toISOString(),
                 icon: 'map-outline',
                 color: 'tertiary',
-                action: () => {
-                    window.open(this.getFullUrl(pic.final_url!), '_system');
-                }
+                action: () => window.open(this.getFullUrl(pic.final_url!), '_system')
             });
         }
     });
@@ -140,7 +154,7 @@ export class ChantierDetailsPage implements OnInit {
                 type: 'AUDIT',
                 titre: `Audit ${audit.type}`,
                 date: audit.date_creation,
-                icon: 'checkmark-done-circle-outline',
+                icon: 'checkmark-done-circle-outline', // Icône explicitement mappée
                 color: 'success',
                 action: () => {
                     const url = `${this.api['apiUrl']}/inspections/${audit.id}/pdf`;
@@ -150,12 +164,12 @@ export class ChantierDetailsPage implements OnInit {
         });
     });
 
-    // E. Signature (Maintenant appelé APRÈS chargement du chantier)
+    // E. Signature
     if (this.chantier && this.chantier.signature_url) {
         this.documentsList.push({
             type: 'SIGNATURE',
             titre: 'Signature Client',
-            date: this.chantier.date_creation, // Ou idéalement date_signature si ajoutée
+            date: this.chantier.date_creation,
             icon: 'create-outline',
             color: 'medium',
             action: () => window.open(this.getFullUrl(this.chantier!.signature_url), '_system')
@@ -181,7 +195,7 @@ export class ChantierDetailsPage implements OnInit {
         this.uploadAndCreateRapport(blob, image.webPath);
       }
     } catch (e) {
-      console.log('Annulé/Erreur', e);
+      console.log('Annulé', e);
     }
   }
 
@@ -218,7 +232,6 @@ export class ChantierDetailsPage implements OnInit {
       alert("Adresse du chantier introuvable.");
       return;
     }
-
     const destination = encodeURIComponent(this.chantier.adresse);
     let url = '';
 
@@ -229,7 +242,6 @@ export class ChantierDetailsPage implements OnInit {
     } else {
       url = `http://googleusercontent.com/maps.google.com/maps?q=${destination}`;
     }
-
     window.open(url, '_system');
   }
   
@@ -254,7 +266,6 @@ export class ChantierDetailsPage implements OnInit {
     });
     
     await modal.present();
-    // Refresh au retour si sauvegarde
     const { role } = await modal.onWillDismiss();
     if (this.api.needsRefresh) {
        this.loadData();
@@ -284,7 +295,28 @@ export class ChantierDetailsPage implements OnInit {
     modal.present();
   }
 
-  // --- HELPERS VISUELS ---
+  // --- SUPPRESSION CHANTIER ---
+  async deleteChantier() {
+    const alert = await this.alertCtrl.create({
+      header: 'Supprimer le chantier ?',
+      message: 'Cette action est irréversible. Tous les rapports et documents seront effacés.',
+      buttons: [
+        { text: 'Annuler', role: 'cancel' },
+        {
+          text: 'Supprimer',
+          role: 'destructive',
+          handler: () => {
+            this.api.deleteChantier(this.chantierId).subscribe(() => {
+              this.navCtrl.navigateBack('/home');
+            });
+          }
+        }
+      ]
+    });
+    await alert.present();
+  }
+
+  // --- HELPERS ---
 
   getFullUrl(path: string | undefined) {
     if (!path) return '';
@@ -304,24 +336,4 @@ export class ChantierDetailsPage implements OnInit {
     }
     return this.getFullUrl(rap.photo_url);
   }
-
-  async deleteChantier() {
-  const alert = await this.alertCtrl.create({
-    header: 'Supprimer le chantier ?',
-    message: 'Cette action est irréversible. Tous les rapports et documents seront effacés.',
-    buttons: [
-      { text: 'Annuler', role: 'cancel' },
-      {
-        text: 'Supprimer',
-        role: 'destructive',
-        handler: () => {
-          this.api.deleteChantier(this.chantierId).subscribe(() => {
-            this.navCtrl.navigateBack('/home');
-          });
-        }
-      }
-    ]
-  });
-  await alert.present();
-}
 }

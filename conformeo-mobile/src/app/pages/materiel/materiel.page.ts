@@ -10,13 +10,16 @@ import {
 } from '@ionic/angular/standalone';
 import { Capacitor } from '@capacitor/core';
 import { addIcons } from 'ionicons';
+
+// 👇 J'AI AJOUTÉ 'hammerOutline' ICI
 import { 
   add, hammer, construct, home, swapHorizontal, qrCodeOutline,
   searchOutline, cube, homeOutline, locationOutline, shieldCheckmark,
-  trashOutline
+  trashOutline, hammerOutline 
 } from 'ionicons/icons';
 
-import { ApiService, Materiel, Chantier } from '../../services/api';
+// 👇 VERIFIEZ BIEN CE CHEMIN (Souvent c'est .service à la fin)
+import { ApiService, Materiel, Chantier } from 'src/app/services/api';
 import { AddMaterielModalComponent } from './add-materiel-modal/add-materiel-modal.component';
 
 import { BarcodeScanner, BarcodeFormat } from '@capacitor-mlkit/barcode-scanning';
@@ -51,7 +54,8 @@ export class MaterielPage implements OnInit {
     addIcons({
       add, hammer, construct, home, swapHorizontal, qrCodeOutline,
       searchOutline, cube, homeOutline, locationOutline, shieldCheckmark,
-      trashOutline
+      'trash-outline': trashOutline,
+      'hammer-outline': hammerOutline // <--- Maintenant ça marche !
     });
 
     this.checkScreen();
@@ -66,9 +70,7 @@ export class MaterielPage implements OnInit {
     this.isDesktop = window.innerWidth >= 992;
   }
 
-  // -----------------------------------------------------
-  // 🔄 CHARGEMENT DES DONNÉES
-  // -----------------------------------------------------
+  // --- CHARGEMENT ---
   loadData(event?: any) {
     this.api.getMateriels().subscribe(mats => {
       this.materiels = mats;
@@ -81,9 +83,7 @@ export class MaterielPage implements OnInit {
     });
   }
 
-  // -----------------------------------------------------
-  // 🔍 FILTRE
-  // -----------------------------------------------------
+  // --- FILTRE ---
   filterMateriels() {
     const term = this.searchTerm.toLowerCase().trim();
     this.filteredMateriels = this.materiels.filter(m =>
@@ -92,9 +92,7 @@ export class MaterielPage implements OnInit {
     );
   }
 
-  // -----------------------------------------------------
-  // 📸 SCANNER
-  // -----------------------------------------------------
+  // --- SCANNER ---
   async startScan() {
     try {
       const { camera } = await BarcodeScanner.requestPermissions();
@@ -102,20 +100,14 @@ export class MaterielPage implements OnInit {
         alert("Permission caméra refusée.");
         return;
       }
-
       if (Capacitor.getPlatform() === 'android') {
         const { available } = await BarcodeScanner.isGoogleBarcodeScannerModuleAvailable();
         if (!available) await BarcodeScanner.installGoogleBarcodeScannerModule();
       }
-
-      const { barcodes } = await BarcodeScanner.scan({
-        formats: [BarcodeFormat.QrCode]
-      });
-
+      const { barcodes } = await BarcodeScanner.scan({ formats: [BarcodeFormat.QrCode] });
       if (barcodes.length > 0) {
         this.handleScanResult(barcodes[0].rawValue);
       }
-
     } catch (e: any) {
       console.error(e);
       alert("Erreur Scanner : " + (e.message || JSON.stringify(e)));
@@ -124,45 +116,28 @@ export class MaterielPage implements OnInit {
 
   handleScanResult(code: string) {
     const mat = this.materiels.find(m => m.reference === code);
-
-    if (mat) {
-      this.moveMateriel(mat);
-    } else {
-      alert(`Aucun matériel trouvé avec la référence : ${code}`);
-    }
+    if (mat) this.moveMateriel(mat);
+    else alert(`Aucun matériel trouvé avec la référence : ${code}`);
   }
 
-  // -----------------------------------------------------
-  // ➕ AJOUT VIA MODALE
-  // -----------------------------------------------------
+  // --- AJOUT ---
   async addMateriel() {
     const modal = await this.modalCtrl.create({
       component: AddMaterielModalComponent
     });
-    
     await modal.present();
-
     const { role } = await modal.onWillDismiss();
-    if (role === 'confirm') {
-      this.loadData();
-    }
+    if (role === 'confirm') this.loadData();
   }
 
-  // -----------------------------------------------------
-  // 🔁 DEPLACEMENT
-  // -----------------------------------------------------
+  // --- DEPLACEMENT ---
   async moveMateriel(mat: Materiel) {
-
     const inputs: any[] = [
       { type: 'radio', label: '🏠 Retour au Dépôt', value: null, checked: !mat.chantier_id }
     ];
-
     this.chantiers.forEach(c => {
       inputs.push({
-        type: 'radio',
-        label: `🏗️ ${c.nom}`,
-        value: c.id,
-        checked: mat.chantier_id === c.id
+        type: 'radio', label: `🏗️ ${c.nom}`, value: c.id, checked: mat.chantier_id === c.id
       });
     });
 
@@ -181,44 +156,44 @@ export class MaterielPage implements OnInit {
         }
       ]
     });
-
     await alert.present();
   }
 
-  // -----------------------------------------------------
-  // 🖼️ IMAGE CLOUDINARY → MINIATURE
-  // -----------------------------------------------------
+  // --- SUPPRESSION ---
+  async deleteMateriel(event: Event, mat: Materiel) {
+    event.stopPropagation();
+    const alert = await this.alertCtrl.create({
+      header: 'Supprimer ?',
+      message: `Voulez-vous supprimer ${mat.nom} ?`,
+      buttons: [
+        { text: 'Non', role: 'cancel' },
+        {
+          text: 'Oui',
+          handler: () => {
+            this.api.deleteMateriel(mat.id!).subscribe(() => {
+              this.loadData();
+            });
+          }
+        }
+      ]
+    });
+    await alert.present();
+  }
 
-  /** Retourne la vraie URL de l'image, ou '' si rien */
+  // --- HELPERS IMAGES ---
   getImageUrl(mat: Materiel): string {
-    if (!mat.image_url || mat.image_url.trim() === '') {
-      return '';
-    }
-    return mat.image_url;
+    return (mat.image_url && mat.image_url.trim() !== '') ? mat.image_url : '';
   }
 
   getThumbUrl(url: string | undefined): string {
     if (!url) return '';
-
-    // 1. Forcer HTTPS
-    if (url.startsWith('http:')) {
-      url = url.replace('http:', 'https:');
-    }
-
-    // 2. Optimisation Cloudinary
+    if (url.startsWith('http:')) url = url.replace('http:', 'https:');
     if (url.includes('cloudinary.com') && url.includes('/upload/')) {
-      return url.replace(
-        '/upload/',
-        '/upload/w_250,h_250,c_fit,q_auto,f_auto/'
-      );
+      return url.replace('/upload/', '/upload/w_250,h_250,c_fit,q_auto,f_auto/');
     }
-
     return url;
   }
 
-  // -----------------------------------------------------
-  // 🏷️ NOMS & STATISTIQUES
-  // -----------------------------------------------------
   getChantierName(id: number | null | undefined): string {
     if (!id) return 'Au Dépôt';
     const c = this.chantiers.find(x => x.id === id);
@@ -232,24 +207,4 @@ export class MaterielPage implements OnInit {
   getMaterielsDepot(): number {
     return this.materiels.filter(m => !m.chantier_id).length;
   }
-
-  async deleteMateriel(event: Event, mat: Materiel) {
-  event.stopPropagation(); // Empêche d'ouvrir le menu "Déplacer"
-  const alert = await this.alertCtrl.create({
-    header: 'Supprimer ?',
-    message: `Voulez-vous supprimer ${mat.nom} ?`,
-    buttons: [
-      { text: 'Non', role: 'cancel' },
-      {
-        text: 'Oui',
-        handler: () => {
-          this.api.deleteMateriel(mat.id!).subscribe(() => {
-            this.loadData();
-          });
-        }
-      }
-    ]
-  });
-  await alert.present();
-}
 }

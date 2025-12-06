@@ -50,7 +50,7 @@ export class DashboardPage implements OnInit {
   };
 
   constructor(private api: ApiService) {
-    addIcons({ business, documentText, hammer, warning, cameraOutline });
+    addIcons({ business, documentText, hammer, warning, cameraOutline });  
   }
 
   ngOnInit() {

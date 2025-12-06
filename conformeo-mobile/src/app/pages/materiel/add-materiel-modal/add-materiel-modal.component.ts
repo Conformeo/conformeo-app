@@ -152,13 +152,20 @@ export class AddMaterielModalComponent {
   save() {
     if (this.imageBlob) {
       this.isUploading = true;
-      this.api.uploadPhoto(this.imageBlob).subscribe({
+      
+      // 👇 CORRECTION : On transforme le Blob en Fichier nommé
+      const fileToUpload = new File([this.imageBlob], "materiel_detoure.png", { 
+        type: "image/png" 
+      });
+
+      this.api.uploadPhoto(fileToUpload).subscribe({
         next: (res) => {
            this.createItem(res.url);
         },
-        error: () => {
+        error: (err) => {
+          console.error("Erreur upload", err);
           this.isUploading = false;
-          alert("Erreur upload image");
+          alert("Erreur lors de l'envoi de l'image. Vérifiez votre connexion.");
         }
       });
     } else {
