@@ -1,0 +1,27 @@
+.photo-zone {
+      height: 220px;
+      background: #f4f5f8;
+      border-radius: 16px;
+      margin-bottom: 20px;
+      display: flex; align-items: center; justify-content: center;
+      border: 2px dashed #ccc;
+      position: relative; overflow: hidden;
+    }
+    .photo-zone.has-image { border: none; background: white; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+    
+    .icon-circle {
+      width: 60px; height: 60px; background: #e0e0e0; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center; margin: 0 auto 10px;
+    }
+    .placeholder ion-icon { font-size: 30px; color: #666; }
+    .placeholder p { margin: 0; font-weight: 600; color: #444; }
+    .placeholder small { color: #888; }
+    
+    .processing { text-align: center; color: var(--ion-color-primary); font-weight: bold; }
+    
+    /* Fond damier pour voir la transparence */
+    .preview-img {
+      height: 100%; width: auto; object-fit: contain;
+      background-image: linear-gradient(45deg, #eee 25%, transparent 25%), linear-gradient(-45deg, #eee 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #eee 75%), linear-gradient(-45deg, transparent 75%, #eee 75%);
+      background-size: 20px 20px;
+    }

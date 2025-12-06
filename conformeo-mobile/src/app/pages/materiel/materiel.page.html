@@ -127,8 +127,16 @@
         (click)="moveMateriel(mat)"
       >
 
-        <div class="delete-tool-btn" (click)="deleteMateriel($event, mat)" style="top: 10px; right: 10px;">
-           <ion-icon name="trash-outline" color="danger"></ion-icon>
+       <div class="action-buttons" style="position: absolute; top: 10px; right: 10px; z-index: 10; display: flex; gap: 5px;">
+           
+           <div (click)="editMateriel($event, mat)" style="background: white; padding: 6px; border-radius: 50%; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+              <ion-icon name="create-outline" color="primary"></ion-icon>
+           </div>
+
+           <div (click)="deleteMateriel($event, mat)" style="background: white; padding: 6px; border-radius: 50%; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+              <ion-icon name="trash-outline" color="danger"></ion-icon>
+           </div>
+
         </div>
 
         <div class="status-dot" [class.active]="mat.chantier_id">

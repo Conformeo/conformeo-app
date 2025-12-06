@@ -1,3 +1,46 @@
-<p>
-  add-materiel-modal works!
-</p>
+<ion-header>
+  <ion-toolbar color="primary">
+    <ion-title>{{ existingItem ? 'Modifier' : 'Nouvel' }} Équipement</ion-title>
+    <ion-buttons slot="end">
+      <ion-button (click)="cancel()">Fermer</ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  
+  <div class="photo-zone" (click)="takePicture()" [class.has-image]="processedImage">
+    
+    <div *ngIf="!processedImage && !isProcessing" class="placeholder">
+      <div class="icon-circle">
+        <ion-icon name="camera"></ion-icon>
+      </div>
+      <p>Prendre une photo</p>
+      <small>Détourage automatique IA ✨</small>
+    </div>
+
+    <div *ngIf="isProcessing" class="processing">
+      <ion-spinner name="crescent" color="primary"></ion-spinner>
+      <p>L'IA détoure votre objet...</p>
+    </div>
+
+    <img *ngIf="processedImage" [src]="processedImage" class="preview-img" />
+  </div>
+
+  <ion-list lines="full">
+    <ion-item>
+      <ion-input label="Nom" labelPlacement="stacked" [(ngModel)]="data.nom" placeholder="Ex: Perfo Hilti"></ion-input>
+    </ion-item>
+    <ion-item>
+      <ion-input label="Référence" labelPlacement="stacked" [(ngModel)]="data.reference" placeholder="Ex: TE-30"></ion-input>
+    </ion-item>
+  </ion-list>
+
+  <div class="ion-padding">
+    <ion-button expand="block" (click)="save()" [disabled]="!data.nom || isSaving" size="large">
+      <span *ngIf="!isSaving">Enregistrer</span>
+      <ion-spinner *ngIf="isSaving"></ion-spinner>
+    </ion-button>
+  </div>
+
+</ion-content>

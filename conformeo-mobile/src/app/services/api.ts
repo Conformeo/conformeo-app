@@ -45,7 +45,7 @@ export interface Materiel {
   nom: string;
   reference: string;
   etat: string;
-  image_url?: string; // <--- AJOUT
+  image_url?: string | null;
   chantier_id?: number | null;
 }
 
@@ -414,6 +414,10 @@ export class ApiService {
 
   deleteChantier(id: number): Observable<any> {
     return this.http.delete(`${this.apiUrl}/chantiers/${id}`);
+  }
+
+  updateMateriel(id: number, mat: any): Observable<any> {
+    return this.http.put(`${this.apiUrl}/materiels/${id}`, mat);
   }
 
   deleteMateriel(id: number): Observable<any> {

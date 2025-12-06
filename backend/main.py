@@ -182,6 +182,7 @@ def create_materiel(mat: schemas.MaterielCreate, db: Session = Depends(get_db)):
 def read_materiels(db: Session = Depends(get_db)):
     return db.query(models.Materiel).all()
 
+
 @app.post("/materiels/import")
 async def import_materiels_csv(
     file: UploadFile = File(...), 
@@ -251,6 +252,28 @@ def transfer_materiel(mid: int, chantier_id: Optional[int] = None, db: Session =
     m.chantier_id = chantier_id
     db.commit()
     return {"status": "moved"}
+
+@app.put("/materiels/{materiel_id}")
+def update_materiel(
+    materiel_id: int, 
+    mat_update: schemas.MaterielCreate, 
+    db: Session = Depends(get_db)
+):
+    # 1. On cherche l'objet
+    db_mat = db.query(models.Materiel).filter(models.Materiel.id == materiel_id).first()
+    if not db_mat:
+        raise HTTPException(status_code=404, detail="Matériel introuvable")
+    
+    # 2. On met à jour les champs
+    db_mat.nom = mat_update.nom
+    db_mat.reference = mat_update.reference
+    # On met à jour l'image SEULEMENT si une nouvelle URL est envoyée
+    if mat_update.image_url:
+        db_mat.image_url = mat_update.image_url
+        
+    db.commit()
+    db.refresh(db_mat)
+    return db_mat
 
 @app.delete("/materiels/{mid}")
 def delete_materiel(mid: int, db: Session = Depends(get_db)):

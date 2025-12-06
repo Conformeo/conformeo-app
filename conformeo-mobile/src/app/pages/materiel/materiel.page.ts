@@ -14,7 +14,7 @@ import { addIcons } from 'ionicons';
 import { 
   add, hammer, construct, home, swapHorizontal, qrCodeOutline,
   searchOutline, cube, homeOutline, locationOutline, shieldCheckmark,
-  trashOutline, hammerOutline, cloudUploadOutline // <--- 2. ICONE IMPORTÉE
+  trashOutline, hammerOutline, cloudUploadOutline, createOutline // <--- 2. ICONE IMPORTÉE
 } from 'ionicons/icons';
 
 import { ApiService, Materiel, Chantier } from 'src/app/services/api';
@@ -50,7 +50,7 @@ export class MaterielPage implements OnInit {
   ) {
     addIcons({
       add, hammer, construct, home, swapHorizontal, qrCodeOutline,
-      searchOutline, cube, homeOutline, locationOutline, shieldCheckmark,
+      searchOutline, cube, homeOutline, locationOutline, shieldCheckmark, createOutline,
       'trash-outline': trashOutline,
       'hammer-outline': hammerOutline,
       'cloud-upload-outline': cloudUploadOutline // <--- 4. ENREGISTREMENT ICONE
@@ -142,6 +142,18 @@ export class MaterielPage implements OnInit {
     const modal = await this.modalCtrl.create({
       component: AddMaterielModalComponent
     });
+    await modal.present();
+    const { role } = await modal.onWillDismiss();
+    if (role === 'confirm') this.loadData();
+  }
+
+  async editMateriel(event: Event, mat: Materiel) {
+    event.stopPropagation();
+    const modal = await this.modalCtrl.create({
+      component: AddMaterielModalComponent,
+      componentProps: { existingItem: mat } // On passe l'objet à modifier
+    });
+    
     await modal.present();
     const { role } = await modal.onWillDismiss();
     if (role === 'confirm') this.loadData();
