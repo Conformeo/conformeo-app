@@ -81,3 +81,13 @@
   span { font-weight: 600; font-size: 14px; }
   .avatar { width: 32px; height: 32px; background: #1e3c72; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; }
 }
+
+.map-card {
+  background: white;
+  border-radius: 20px;
+  padding: 20px;
+  margin-bottom: 30px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.03);
+  
+  h3 { margin-top: 0; margin-bottom: 15px; font-size: 18px; font-weight: 700; color: #333; }
+}

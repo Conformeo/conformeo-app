@@ -78,56 +78,53 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
 # ==========================================
 @app.get("/dashboard/stats")
 def get_stats(db: Session = Depends(get_db)):
-    # A. KPIs
-    total_chantiers = db.query(models.Chantier).count()
-    chantiers_actifs = db.query(models.Chantier).filter(models.Chantier.est_actif == True).count()
-    total_rapports = db.query(models.Rapport).count()
-    alertes = db.query(models.Rapport).filter(models.Rapport.niveau_urgence.in_(['Critique', 'Moyen'])).count()
+    # 1. KPIs
+    total = db.query(models.Chantier).count()
+    actifs = db.query(models.Chantier).filter(models.Chantier.est_actif == True).count()
+    rap = db.query(models.Rapport).count()
+    alert = db.query(models.Rapport).filter(models.Rapport.niveau_urgence.in_(['Critique', 'Moyen'])).count()
 
-    # B. GRAPHIQUE (7 derniers jours)
+    # 2. GRAPHIQUE
     today = datetime.now().date()
-    chart_labels = []
-    chart_values = []
-    
+    labels, values = [], []
     for i in range(6, -1, -1):
         day = today - timedelta(days=i)
-        label = day.strftime("%d/%m") 
-        chart_labels.append(label)
-        
+        labels.append(day.strftime("%d/%m"))
         start = datetime.combine(day, datetime.min.time())
         end = datetime.combine(day, datetime.max.time())
-        
         cnt = db.query(models.Rapport).filter(models.Rapport.date_creation >= start, models.Rapport.date_creation <= end).count()
-        chart_values.append(cnt)
+        values.append(cnt)
 
-    # C. RECENTS
+    # 3. RECENTS
     recents = db.query(models.Rapport).order_by(models.Rapport.date_creation.desc()).limit(5).all()
-    recent_fmt = []
-    for r in recents:
-        c_nom = r.chantier.nom if r.chantier else "Inconnu"
-        recent_fmt.append({
-            "titre": r.titre,
-            "date_creation": r.date_creation,
-            "chantier_nom": c_nom,
-            "niveau_urgence": r.niveau_urgence
-        })
+    rec_fmt = [{"titre": r.titre, "date": r.date_creation, "chantier": r.chantier.nom if r.chantier else "-", "urgence": r.niveau_urgence} for r in recents]
 
-    # RETOUR FORMATÉ
+    # 4. DONNÉES CARTE (NOUVEAU !)
+    # On récupère tous les chantiers qui ont des rapports géolocalisés
+    # (Ou on pourrait géolocaliser les chantiers eux-mêmes, mais utilisons les rapports pour l'instant)
+    map_data = []
+    # Pour simplifier, on prend les chantiers actifs et on simule ou on prend le dernier rapport GPS
+    chantiers = db.query(models.Chantier).filter(models.Chantier.est_actif == True).all()
+    for c in chantiers:
+        # On cherche le dernier rapport avec GPS pour ce chantier
+        last_gps = db.query(models.Rapport).filter(models.Rapport.chantier_id == c.id, models.Rapport.latitude != None).first()
+        if last_gps:
+            map_data.append({
+                "id": c.id,
+                "nom": c.nom,
+                "client": c.client,
+                "lat": last_gps.latitude,
+                "lng": last_gps.longitude,
+                "status": "OK"
+            })
+
     return {
-        "kpis": {
-            "total_chantiers": total_chantiers,
-            "actifs": chantiers_actifs,
-            "rapports": total_rapports,
-            "alertes": alertes,
-            "materiel_sorti": db.query(models.Materiel).filter(models.Materiel.chantier_id != None).count()
-        },
-        "chart": {
-            "labels": chart_labels,
-            "values": chart_values
-        },
-        "recents": recent_fmt
+        "kpis": { "total_chantiers": total, "actifs": actifs, "rapports": rap, "alertes": alert, "materiel_sorti": 0 },
+        "chart": { "labels": labels, "values": values },
+        "recents": rec_fmt,
+        "map": map_data # <--- NOUVEAU
     }
-
+    
 # ==========================================
 # 3. CHANTIERS
 # ==========================================
