@@ -186,36 +186,52 @@ def read_materiels(db: Session = Depends(get_db)):
 async def import_materiels_csv(
     file: UploadFile = File(...), 
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(security.get_current_user)
+    current_user: models.User = Depends(security.get_current_user) # Optionnel si pas encore de login
 ):
+    # Vérification extension
     if not file.filename.endswith('.csv'):
         raise HTTPException(400, "Le fichier doit être un CSV")
 
     try:
-        # 1. Lire le fichier
-        csv_content = await file.read()
-        decoded_content = csv_content.decode('utf-8').splitlines()
-        reader = csv.DictReader(decoded_content, delimiter=';') # Point-virgule pour Excel FR
+        content = await file.read()
+        
+        # Tentative de décodage (utf-8 ou latin-1 pour Excel Windows)
+        try:
+            text_content = content.decode('utf-8')
+        except UnicodeDecodeError:
+            text_content = content.decode('latin-1')
+            
+        lines = text_content.splitlines()
+        
+        # Détection intelligente du séparateur
+        dialect = csv.Sniffer().sniff(lines[0])
+        reader = csv.DictReader(lines, delimiter=dialect.delimiter)
 
         count = 0
         for row in reader:
-            # 2. Vérifier les colonnes (Nom, Référence, Etat)
-            if 'Nom' in row and 'Reference' in row:
-                # 3. Créer l'objet
+            # On nettoie les clés (parfois Excel ajoute des espaces bizarres)
+            row = {k.strip(): v for k, v in row.items() if k}
+            
+            # On cherche les colonnes clés (insensible à la casse)
+            nom = row.get('Nom') or row.get('nom') or row.get('NOM')
+            ref = row.get('Reference') or row.get('reference') or row.get('REFERENCE') or row.get('Ref')
+            
+            if nom and ref:
                 new_mat = models.Materiel(
-                    nom=row['Nom'],
-                    reference=row['Reference'],
-                    etat=row.get('Etat', 'Bon'), # Par défaut "Bon"
-                    company_id=current_user.company_id, # On lie à l'entreprise !
+                    nom=nom,
+                    reference=ref,
+                    etat=row.get('Etat', 'Bon'),
+                    company_id=current_user.company_id if hasattr(current_user, 'company_id') else None,
                     chantier_id=None
                 )
                 db.add(new_mat)
                 count += 1
         
         db.commit()
-        return {"status": "success", "message": f"{count} équipements importés avec succès !"}
+        return {"status": "success", "message": f"{count} équipements importés !"}
 
     except Exception as e:
+        print(f"Erreur Import CSV: {e}")
         db.rollback()
         raise HTTPException(500, f"Erreur lors de l'import : {str(e)}")
 

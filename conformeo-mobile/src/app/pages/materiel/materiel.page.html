@@ -71,12 +71,13 @@
             *ngIf="getImageUrl(mat)" 
             [src]="getThumbUrl(getImageUrl(mat))"
             crossorigin="anonymous"
-            style="width:100%; height:100%; object-fit:contain; border-radius: 8px; background:white;"
+            style="width:100%; height:100%; object-fit: cover; display: block;"
           >
 
           <ion-icon 
             *ngIf="!getImageUrl(mat)"
-            [name]="mat.chantier_id ? 'construct' : 'cube'">
+            [name]="mat.chantier_id ? 'construct' : 'cube'"
+            style="margin: auto;">
           </ion-icon>
 
         </div>
@@ -109,10 +110,7 @@
       <div class="actions">
         
         <input type="file" #csvInput (change)="onCSVSelected($event)" accept=".csv" style="display: none;" />
-        
-        <ion-button (click)="csvInput.click()" color="secondary" fill="outline" style="margin-right: 10px;">
-           <ion-icon name="cloud-upload-outline" slot="start"></ion-icon> Importer CSV
-        </ion-button>
+        <ion-button (click)="csvInput.click()">Importer CSV</ion-button>
         <ion-searchbar 
           placeholder="Rechercher..." 
           [(ngModel)]="searchTerm" 
