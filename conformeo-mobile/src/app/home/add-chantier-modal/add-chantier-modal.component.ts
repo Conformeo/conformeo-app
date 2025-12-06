@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, Input, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
@@ -26,7 +26,9 @@ import { camera, cloudUpload, save, close } from 'ionicons/icons';
     IonContent, IonList, IonItem, IonInput, IonIcon, IonSpinner
   ]
 })
-export class AddChantierModalComponent {
+export class AddChantierModalComponent implements OnInit{
+
+  @Input() existingChantier: any = null;
 
   chantier: Chantier = {
     nom: '',
@@ -44,6 +46,14 @@ export class AddChantierModalComponent {
     private api: ApiService
   ) {
     addIcons({ camera, cloudUpload, save, close });
+  }
+
+  ngOnInit() {
+    // SI MODIFICATION : On remplit les champs
+    if (this.existingChantier) {
+      this.chantier = { ...this.existingChantier }; // Copie pour ne pas modifier l'original tout de suite
+      this.coverPhotoWebPath = this.chantier.cover_url; // Pour afficher l'image existante
+    }
   }
 
   cancel() {
@@ -66,37 +76,38 @@ export class AddChantierModalComponent {
   }
 
   save() {
-    // 1. Sécurité Anti-Doublon
     if (this.isSaving) return;
-    this.isSaving = true; // 🔒 On verrouille
+    this.isSaving = true;
 
+    // CAS 1 : Nouvelle photo à uploader
     if (this.coverPhotoBlob) {
       this.api.uploadPhoto(this.coverPhotoBlob).subscribe({
         next: (res) => {
            this.chantier.cover_url = res.url;
-           this.finalizeCreation();
+           this.finalizeSave();
         },
-        error: () => {
-           this.isSaving = false; // 🔓 On déverrouille si erreur
-           alert("Erreur upload photo");
-        }
+        error: () => { this.isSaving = false; alert("Erreur upload photo"); }
       });
-    } else {
-      this.finalizeCreation();
+    } 
+    // CAS 2 : Pas de nouvelle photo (ou on garde l'ancienne)
+    else {
+      this.finalizeSave();
     }
   }
 
-  finalizeCreation() {
-    this.api.createChantier(this.chantier).subscribe({
-      next: (newItem) => {
-        this.modalCtrl.dismiss(newItem, 'confirm');
-        // Pas besoin de déverrouiller, la modale se ferme
-      },
-      error: (err) => {
-        console.error(err);
-        this.isSaving = false; // 🔓 On déverrouille si erreur
-        alert("Erreur lors de la création du chantier");
-      }
-    });
+  finalizeSave() {
+    if (this.existingChantier) {
+      // MODE UPDATE
+      this.api.updateChantier(this.existingChantier.id, this.chantier).subscribe({
+        next: (updated) => this.modalCtrl.dismiss(updated, 'confirm'),
+        error: () => { this.isSaving = false; alert("Erreur modification"); }
+      });
+    } else {
+      // MODE CREATE
+      this.api.createChantier(this.chantier).subscribe({
+        next: (created) => this.modalCtrl.dismiss(created, 'confirm'),
+        error: () => { this.isSaving = false; alert("Erreur création"); }
+      });
+    }
   }
 }

@@ -15,7 +15,14 @@
     
     <div class="header-overlay">
       <div class="header-text">
-        <h1 class="chantier-title">{{ chantier?.nom }}</h1>
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <h1 class="chantier-title">{{ chantier?.nom }}</h1>
+          
+          <ion-button fill="clear" color="light" size="small" (click)="editChantier()">
+            <ion-icon name="create-outline" slot="icon-only"></ion-icon>
+          </ion-button>
+        </div>
+        
         <p class="chantier-subtitle">{{ chantier?.client }}</p>
       </div>
     </div>

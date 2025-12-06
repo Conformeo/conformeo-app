@@ -233,6 +233,10 @@ export class ApiService {
     return this.http.post<Chantier>(`${this.apiUrl}/chantiers`, chantier);
   }
 
+  updateChantier(id: number, data: any): Observable<any> {
+    return this.http.put(`${this.apiUrl}/chantiers/${id}`, data);
+  }
+
   getChantierById(id: number): Observable<Chantier> {
     // Pour simplifier, on filtre la liste locale (marche online et offline)
     return this.getChantiers().pipe(

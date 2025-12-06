@@ -8,6 +8,7 @@ import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { Platform } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
 import { IonBackButton, IonButtons } from '@ionic/angular/standalone';
+import { AddChantierModalComponent } from 'src/app/home/add-chantier-modal/add-chantier-modal.component';
 
 // 👇 TOUTES LES ICONES (Y compris trashOutline qui manquait)
 import { 
@@ -243,6 +244,21 @@ export class ChantierDetailsPage implements OnInit {
       url = `http://googleusercontent.com/maps.google.com/maps?q=${destination}`;
     }
     window.open(url, '_system');
+  }
+
+  async editChantier() {
+    const modal = await this.modalCtrl.create({
+      component: AddChantierModalComponent,
+      componentProps: { existingChantier: this.chantier }
+    });
+    
+    await modal.present();
+    const { role, data } = await modal.onWillDismiss();
+    
+    if (role === 'confirm' && data) {
+      this.chantier = data; // Mise à jour immédiate de l'affichage
+      this.api.needsRefresh = true; // Pour mettre à jour la liste d'accueil au retour
+    }
   }
   
   downloadPdf() {

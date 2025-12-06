@@ -137,6 +137,29 @@ def create_chantier(chantier: schemas.ChantierCreate, db: Session = Depends(get_
     db.add(new_c); db.commit(); db.refresh(new_c)
     return new_c
 
+@app.put("/chantiers/{chantier_id}")
+def update_chantier(
+    chantier_id: int, 
+    chantier_update: schemas.ChantierCreate, 
+    db: Session = Depends(get_db)
+):
+    # 1. On récupère le chantier
+    c = db.query(models.Chantier).filter(models.Chantier.id == chantier_id).first()
+    if not c: raise HTTPException(status_code=404, detail="Chantier introuvable")
+    
+    # 2. On met à jour les infos
+    c.nom = chantier_update.nom
+    c.adresse = chantier_update.adresse
+    c.client = chantier_update.client
+    
+    # 3. Si une nouvelle photo est envoyée, on remplace l'ancienne
+    if chantier_update.cover_url:
+        c.cover_url = chantier_update.cover_url
+        
+    db.commit()
+    db.refresh(c)
+    return c
+
 @app.get("/chantiers", response_model=List[schemas.ChantierOut])
 def read_chantiers(db: Session = Depends(get_db)):
     return db.query(models.Chantier).all()
