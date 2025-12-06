@@ -6,22 +6,19 @@ import {
   IonHeader, IonToolbar, IonContent,
   IonButtons, IonButton, IonIcon, IonFab, IonFabButton, 
   AlertController, IonBackButton, IonSearchbar,
-  IonTitle, ModalController
+  IonTitle, ModalController, LoadingController // <--- 1. IMPORT AJOUTÉ
 } from '@ionic/angular/standalone';
 import { Capacitor } from '@capacitor/core';
 import { addIcons } from 'ionicons';
 
-// 👇 J'AI AJOUTÉ 'hammerOutline' ICI
 import { 
   add, hammer, construct, home, swapHorizontal, qrCodeOutline,
   searchOutline, cube, homeOutline, locationOutline, shieldCheckmark,
-  trashOutline, hammerOutline 
+  trashOutline, hammerOutline, cloudUploadOutline // <--- 2. ICONE IMPORTÉE
 } from 'ionicons/icons';
 
-// 👇 VERIFIEZ BIEN CE CHEMIN (Souvent c'est .service à la fin)
 import { ApiService, Materiel, Chantier } from 'src/app/services/api';
 import { AddMaterielModalComponent } from './add-materiel-modal/add-materiel-modal.component';
-
 import { BarcodeScanner, BarcodeFormat } from '@capacitor-mlkit/barcode-scanning';
 
 @Component({
@@ -42,20 +39,21 @@ export class MaterielPage implements OnInit {
   filteredMateriels: Materiel[] = [];
   chantiers: Chantier[] = [];
   searchTerm: string = '';
-
   isDesktop = false;
 
   constructor(
     private api: ApiService,
     private alertCtrl: AlertController,
     private platform: Platform,
-    private modalCtrl: ModalController
+    private modalCtrl: ModalController,
+    private loadingCtrl: LoadingController // <--- 3. INJECTION DU CONTROLEUR
   ) {
     addIcons({
       add, hammer, construct, home, swapHorizontal, qrCodeOutline,
       searchOutline, cube, homeOutline, locationOutline, shieldCheckmark,
       'trash-outline': trashOutline,
-      'hammer-outline': hammerOutline // <--- Maintenant ça marche !
+      'hammer-outline': hammerOutline,
+      'cloud-upload-outline': cloudUploadOutline // <--- 4. ENREGISTREMENT ICONE
     });
 
     this.checkScreen();
@@ -70,26 +68,45 @@ export class MaterielPage implements OnInit {
     this.isDesktop = window.innerWidth >= 992;
   }
 
-  // --- CHARGEMENT ---
   loadData(event?: any) {
     this.api.getMateriels().subscribe(mats => {
       this.materiels = mats;
       this.filteredMateriels = mats;
       if (event) event.target.complete();
     });
-
     this.api.getChantiers().subscribe(chantiers => {
       this.chantiers = chantiers;
     });
   }
 
-  // --- FILTRE ---
   filterMateriels() {
     const term = this.searchTerm.toLowerCase().trim();
     this.filteredMateriels = this.materiels.filter(m =>
       m.nom.toLowerCase().includes(term) ||
       m.reference.toLowerCase().includes(term)
     );
+  }
+
+  // --- IMPORT CSV (NOUVEAU) ---
+  async onCSVSelected(event: any) {
+    const file = event.target.files[0];
+    if (file) {
+      const loading = await this.loadingCtrl.create({ message: 'Import en cours...' });
+      await loading.present();
+
+      this.api.importMaterielsCSV(file).subscribe({
+        next: (res) => {
+          loading.dismiss();
+          alert(res.message);
+          this.loadData(); // On rafraîchit la liste
+        },
+        error: (err) => {
+          loading.dismiss();
+          console.error(err);
+          alert("Erreur lors de l'import. Vérifiez le format du fichier.");
+        }
+      });
+    }
   }
 
   // --- SCANNER ---

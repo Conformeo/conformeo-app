@@ -100,6 +100,8 @@ export class AddMaterielModalComponent {
   processedImage: string | null = null;
   imageBlob: Blob | null = null;
   
+  isSaving = false;
+  
   isProcessing = false;
   isUploading = false;
 
@@ -150,22 +152,20 @@ export class AddMaterielModalComponent {
   cancel() { this.modalCtrl.dismiss(null, 'cancel'); }
 
   save() {
+    // 1. Sécurité
+    if (this.isSaving) return;
+    this.isSaving = true; // 🔒 Verrouillage
+
     if (this.imageBlob) {
-      this.isUploading = true;
-      
-      // 👇 CORRECTION : On transforme le Blob en Fichier nommé
-      const fileToUpload = new File([this.imageBlob], "materiel_detoure.png", { 
-        type: "image/png" 
-      });
+      const fileToUpload = new File([this.imageBlob], "materiel.png", { type: "image/png" });
 
       this.api.uploadPhoto(fileToUpload).subscribe({
         next: (res) => {
            this.createItem(res.url);
         },
         error: (err) => {
-          console.error("Erreur upload", err);
-          this.isUploading = false;
-          alert("Erreur lors de l'envoi de l'image. Vérifiez votre connexion.");
+          this.isSaving = false; // 🔓 Erreur
+          alert("Erreur lors de l'envoi de l'image.");
         }
       });
     } else {
@@ -178,11 +178,17 @@ export class AddMaterielModalComponent {
       nom: this.data.nom,
       reference: this.data.reference,
       etat: 'Bon',
-      image_url: imageUrl // On envoie l'URL !
+      image_url: imageUrl
     };
 
-    this.api.createMateriel(mat).subscribe(() => {
-      this.modalCtrl.dismiss(true, 'confirm');
+    this.api.createMateriel(mat).subscribe({
+      next: () => {
+        this.modalCtrl.dismiss(true, 'confirm');
+      },
+      error: () => {
+        this.isSaving = false; // 🔓 Erreur
+        alert("Erreur création matériel");
+      }
     });
   }
 }

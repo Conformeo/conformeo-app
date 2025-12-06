@@ -90,14 +90,30 @@ export class DashboardPage implements OnInit {
   }
 
   initMap(sites: any[]) {
-    // Éviter de réinitialiser si déjà là
     if (this.map) {
-        this.map.remove(); // On nettoie proprement avant de refaire
+        this.map.remove();
     }
 
-    // Centre par défaut (France) ou sur le premier chantier
+    // 👇 LE FIX MAGIQUE POUR LES ICONES PERDUES 👇
+    const iconRetinaUrl = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png';
+    const iconUrl = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png';
+    const shadowUrl = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png';
+    
+    const defaultIcon = L.icon({
+      iconUrl: iconUrl,
+      iconRetinaUrl: iconRetinaUrl,
+      shadowUrl: shadowUrl,
+      iconSize: [25, 41],
+      iconAnchor: [12, 41],
+      popupAnchor: [1, -34],
+      shadowSize: [41, 41]
+    });
+    L.Marker.prototype.options.icon = defaultIcon;
+    // 👆 FIN DU FIX 👆
+
+    // Centre sur le premier chantier ou la France
     const center = sites.length > 0 ? [sites[0].lat, sites[0].lng] : [46.603354, 1.888334];
-    const zoom = sites.length > 0 ? 10 : 5;
+    const zoom = sites.length > 0 ? 12 : 5; // Zoom plus fort si on a des chantiers
 
     this.map = L.map('mapId').setView(center as any, zoom);
 
@@ -107,12 +123,13 @@ export class DashboardPage implements OnInit {
 
     // Ajouter les épingles
     sites.forEach(s => {
-       L.marker([s.lat, s.lng])
-        .addTo(this.map)
-        .bindPopup(`<b>${s.nom}</b><br>${s.client}`);
+       if (s.lat && s.lng) {
+         L.marker([s.lat, s.lng])
+          .addTo(this.map)
+          .bindPopup(`<b>${s.nom}</b><br>${s.client}`);
+       }
     });
     
-    // Astuce : Force le redimensionnement après affichage pour éviter les zones grises
     setTimeout(() => { this.map.invalidateSize(); }, 200);
   }
 }

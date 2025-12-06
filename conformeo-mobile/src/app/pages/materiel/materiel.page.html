@@ -60,7 +60,7 @@
         class="tool-card" 
         (click)="moveMateriel(mat)"
       >
-        
+
         <div class="delete-tool-btn" (click)="deleteMateriel($event, mat)">
            <ion-icon name="trash-outline" color="danger"></ion-icon>
         </div>
@@ -107,11 +107,17 @@
       <h1>Parc Matériel</h1>
 
       <div class="actions">
+        
+        <input type="file" #csvInput (change)="onCSVSelected($event)" accept=".csv" style="display: none;" />
+        
+        <ion-button (click)="csvInput.click()" color="secondary" fill="outline" style="margin-right: 10px;">
+           <ion-icon name="cloud-upload-outline" slot="start"></ion-icon> Importer CSV
+        </ion-button>
         <ion-searchbar 
           placeholder="Rechercher..." 
           [(ngModel)]="searchTerm" 
           (ionInput)="filterMateriels()">
-      </ion-searchbar>
+        </ion-searchbar>
       </div>
     </div>
 
@@ -122,7 +128,7 @@
         class="equip-card" 
         (click)="moveMateriel(mat)"
       >
-        
+
         <div class="delete-tool-btn" (click)="deleteMateriel($event, mat)" style="top: 10px; right: 10px;">
            <ion-icon name="trash-outline" color="danger"></ion-icon>
         </div>

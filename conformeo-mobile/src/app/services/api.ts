@@ -375,6 +375,13 @@ export class ApiService {
     return this.http.put(url, {});
   }
 
+  // Importer des matériels via un fichier CSV
+  importMaterielsCSV(file: File): Observable<any> {
+    const formData = new FormData();
+    formData.append('file', file);
+    return this.http.post(`${this.apiUrl}/materiels/import`, formData);
+  }
+
   // Récupérer les statistiques pour le Dashboard
   getStats(): Observable<any> {
     return this.http.get<any>(`${this.apiUrl}/dashboard/stats`);

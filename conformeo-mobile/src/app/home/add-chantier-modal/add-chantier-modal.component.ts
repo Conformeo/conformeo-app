@@ -37,7 +37,7 @@ export class AddChantierModalComponent {
 
   coverPhotoWebPath: string | undefined;
   coverPhotoBlob: Blob | undefined;
-  isUploading = false;
+  isSaving = false;
 
   constructor(
     private modalCtrl: ModalController,
@@ -66,15 +66,18 @@ export class AddChantierModalComponent {
   }
 
   save() {
+    // 1. Sécurité Anti-Doublon
+    if (this.isSaving) return;
+    this.isSaving = true; // 🔒 On verrouille
+
     if (this.coverPhotoBlob) {
-      this.isUploading = true;
       this.api.uploadPhoto(this.coverPhotoBlob).subscribe({
         next: (res) => {
-           this.chantier.cover_url = res.url; // On récupère l'URL Cloudinary
+           this.chantier.cover_url = res.url;
            this.finalizeCreation();
         },
         error: () => {
-           this.isUploading = false;
+           this.isSaving = false; // 🔓 On déverrouille si erreur
            alert("Erreur upload photo");
         }
       });
@@ -84,8 +87,16 @@ export class AddChantierModalComponent {
   }
 
   finalizeCreation() {
-    this.api.createChantier(this.chantier).subscribe(newItem => {
-      this.modalCtrl.dismiss(newItem, 'confirm');
+    this.api.createChantier(this.chantier).subscribe({
+      next: (newItem) => {
+        this.modalCtrl.dismiss(newItem, 'confirm');
+        // Pas besoin de déverrouiller, la modale se ferme
+      },
+      error: (err) => {
+        console.error(err);
+        this.isSaving = false; // 🔓 On déverrouille si erreur
+        alert("Erreur lors de la création du chantier");
+      }
     });
   }
 }

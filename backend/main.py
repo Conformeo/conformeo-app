@@ -4,6 +4,8 @@ from uuid import uuid4
 from typing import List, Optional
 from dotenv import load_dotenv
 import zipfile
+import csv
+import codecs
 from datetime import datetime, timedelta, date # <--- Ajout timedelta, date
 
 load_dotenv()
@@ -180,6 +182,43 @@ def create_materiel(mat: schemas.MaterielCreate, db: Session = Depends(get_db)):
 def read_materiels(db: Session = Depends(get_db)):
     return db.query(models.Materiel).all()
 
+@app.post("/materiels/import")
+async def import_materiels_csv(
+    file: UploadFile = File(...), 
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(security.get_current_user)
+):
+    if not file.filename.endswith('.csv'):
+        raise HTTPException(400, "Le fichier doit être un CSV")
+
+    try:
+        # 1. Lire le fichier
+        csv_content = await file.read()
+        decoded_content = csv_content.decode('utf-8').splitlines()
+        reader = csv.DictReader(decoded_content, delimiter=';') # Point-virgule pour Excel FR
+
+        count = 0
+        for row in reader:
+            # 2. Vérifier les colonnes (Nom, Référence, Etat)
+            if 'Nom' in row and 'Reference' in row:
+                # 3. Créer l'objet
+                new_mat = models.Materiel(
+                    nom=row['Nom'],
+                    reference=row['Reference'],
+                    etat=row.get('Etat', 'Bon'), # Par défaut "Bon"
+                    company_id=current_user.company_id, # On lie à l'entreprise !
+                    chantier_id=None
+                )
+                db.add(new_mat)
+                count += 1
+        
+        db.commit()
+        return {"status": "success", "message": f"{count} équipements importés avec succès !"}
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(500, f"Erreur lors de l'import : {str(e)}")
+
 @app.put("/materiels/{mid}/transfert")
 def transfer_materiel(mid: int, chantier_id: Optional[int] = None, db: Session = Depends(get_db)):
     m = db.query(models.Materiel).filter(models.Materiel.id == mid).first()
@@ -194,6 +233,8 @@ def delete_materiel(mid: int, db: Session = Depends(get_db)):
     if not m: raise HTTPException(404)
     db.delete(m); db.commit()
     return {"status": "deleted"}
+
+    
 
 # ==========================================
 # 5. DOCS (Rapports, Audit, PPSPS, PIC)
