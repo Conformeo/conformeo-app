@@ -35,7 +35,7 @@ export class AppComponent {
     { title: 'Tableau de Bord', url: '/dashboard', icon: 'grid-outline' },
     { title: 'Mes Chantiers', url: '/home', icon: 'map-outline' },
     { title: 'Parc Matériel', url: '/materiel', icon: 'hammer-outline' },
-    { title: 'Équipes', url: '/home', icon: 'people-outline' },
+    { title: 'Équipes', url: '/equipe', icon: 'people-outline' },
     { title: 'Paramètres', url: '/home', icon: 'settings-outline' },
   ];
 
