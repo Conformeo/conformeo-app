@@ -4,8 +4,8 @@ from uuid import uuid4
 from typing import List, Optional
 from dotenv import load_dotenv
 import zipfile
+from datetime import datetime, timedelta, date # <--- Ajout timedelta, date
 
-# Chargement des variables d'environnement locales (.env) si présentes
 load_dotenv()
 
 import requests
@@ -17,42 +17,30 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
-from sqlalchemy import text, func
+from sqlalchemy import text, func # <--- Ajout func
 from sqlalchemy.orm import Session
 
 import models, schemas, security
 import pdf_generator
 from database import engine, get_db
-from datetime import datetime, timedelta, date
 
-# Création des tables
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Conforméo API")
 
-# --- CONFIGURATION CLOUDINARY ---
+# --- CONFIGURATION ---
 cloudinary_config = {
     "cloud_name": os.getenv("CLOUDINARY_CLOUD_NAME"),
     "api_key": os.getenv("CLOUDINARY_API_KEY"),
     "api_secret": os.getenv("CLOUDINARY_API_SECRET"),
     "secure": True,
 }
-
-# Vérification et application de la configuration
-required_keys = ["cloud_name", "api_key", "api_secret"]
-missing = [k for k in required_keys if not cloudinary_config.get(k)]
-
-if missing:
-    print(f"⚠️ Cloudinary non configuré correctement. Clés manquantes : {', '.join(missing)}")
-else:
+if cloudinary_config["cloud_name"]:
     cloudinary.config(**cloudinary_config)
-    print(f"✅ Cloudinary configuré pour le cloud: {cloudinary_config['cloud_name']}")
 
-# --- CONFIGURATION FICHIERS LOCAUX ---
 os.makedirs("uploads", exist_ok=True)
 app.mount("/static", StaticFiles(directory="uploads"), name="static")
 
-# --- CORS ---
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -63,167 +51,40 @@ app.add_middleware(
 
 @app.get("/")
 def root():
-    return {"message": "Conformeo API is running 🚀", "cors": "enabled"}
-
+    return {"message": "Conforméo API Ready 🚀"}
 
 # ==========================================
-# 1. UTILISATEURS & AUTH
+# 1. UTILISATEURS
 # ==========================================
-
 @app.post("/users", response_model=schemas.UserOut)
 def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
-    db_user = db.query(models.User).filter(models.User.email == user.email).first()
-    if db_user:
-        raise HTTPException(status_code=400, detail="Cet email est déjà utilisé")
-    
+    if db.query(models.User).filter(models.User.email == user.email).first():
+        raise HTTPException(status_code=400, detail="Email pris")
     hashed_pwd = security.get_password_hash(user.password)
     new_user = models.User(email=user.email, hashed_password=hashed_pwd, role=user.role)
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
+    db.add(new_user); db.commit(); db.refresh(new_user)
     return new_user
 
 @app.post("/token", response_model=schemas.Token)
-def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     user = db.query(models.User).filter(models.User.email == form_data.username).first()
     if not user or not security.verify_password(form_data.password, user.hashed_password):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Email ou mot de passe incorrect",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    
-    access_token = security.create_access_token(data={"sub": user.email, "role": user.role})
-    return {"access_token": access_token, "token_type": "bearer"}
-
+        raise HTTPException(status_code=401, detail="Erreur login")
+    token = security.create_access_token(data={"sub": user.email, "role": user.role})
+    return {"access_token": token, "token_type": "bearer"}
 
 # ==========================================
-# 2. CHANTIERS
+# 2. DASHBOARD (LA VERSION INTELLIGENTE)
 # ==========================================
-
-@app.post("/chantiers", response_model=schemas.ChantierOut)
-def create_chantier(chantier: schemas.ChantierCreate, db: Session = Depends(get_db)):
-    new_chantier = models.Chantier(
-        nom=chantier.nom,
-        adresse=chantier.adresse,
-        client=chantier.client,
-        cover_url=chantier.cover_url
-    )
-    db.add(new_chantier)
-    db.commit()
-    db.refresh(new_chantier)
-    return new_chantier
-
-@app.get("/chantiers", response_model=List[schemas.ChantierOut])
-def read_chantiers(db: Session = Depends(get_db)):
-    return db.query(models.Chantier).all()
-
-@app.put("/chantiers/{chantier_id}/signature")
-def sign_chantier(chantier_id: int, signature_url: str, db: Session = Depends(get_db)):
-    chantier = db.query(models.Chantier).filter(models.Chantier.id == chantier_id).first()
-    if not chantier:
-        raise HTTPException(status_code=404, detail="Chantier introuvable")
-    
-    chantier.signature_url = signature_url
-    db.commit()
-    return {"status": "signed", "url": signature_url}
-
-# --- SUPPRESSION CHANTIER ---
-@app.delete("/chantiers/{chantier_id}")
-def delete_chantier(chantier_id: int, db: Session = Depends(get_db)):
-    chantier = db.query(models.Chantier).filter(models.Chantier.id == chantier_id).first()
-    if not chantier:
-        raise HTTPException(status_code=404, detail="Chantier introuvable")
-
-    # 1. Supprimer les dépendances (Enfants)
-    db.query(models.Materiel).filter(models.Materiel.chantier_id == chantier_id).update({"chantier_id": None})
-    db.query(models.RapportImage).filter(models.RapportImage.rapport.has(chantier_id=chantier_id)).delete(synchronize_session=False)
-    db.query(models.Rapport).filter(models.Rapport.chantier_id == chantier_id).delete()
-    db.query(models.Inspection).filter(models.Inspection.chantier_id == chantier_id).delete()
-    db.query(models.PPSPS).filter(models.PPSPS.chantier_id == chantier_id).delete()
-    db.query(models.PIC).filter(models.PIC.chantier_id == chantier_id).delete()
-
-    # 2. Supprimer le chantier (Parent)
-    db.delete(chantier)
-    db.commit()
-    return {"status": "success", "message": "Chantier et ses données supprimés"}
-
-
-# ==========================================
-# 3. RAPPORTS & PHOTOS
-# ==========================================
-
-@app.post("/upload")
-async def upload_image(file: UploadFile = File(...)):
-    """Envoie l'image sur Cloudinary et renvoie l'URL sécurisée."""
-    try:
-        result = cloudinary.uploader.upload(file.file, folder="conformeo_chantiers")
-        return {"url": result.get("secure_url")}
-    except Exception as e:
-        print(f"Erreur Upload Cloudinary: {e}")
-        raise HTTPException(status_code=500, detail=f"Cloudinary error: {str(e)}")
-
-@app.post("/rapports", response_model=schemas.RapportOut)
-def create_rapport(rapport: schemas.RapportCreate, db: Session = Depends(get_db)):
-    new_rapport = models.Rapport(
-        titre=rapport.titre,
-        description=rapport.description,
-        chantier_id=rapport.chantier_id,
-        niveau_urgence=rapport.niveau_urgence,
-        latitude=rapport.latitude,
-        longitude=rapport.longitude,
-        photo_url=rapport.image_urls[0] if rapport.image_urls else None
-    )
-    db.add(new_rapport)
-    db.commit()
-    db.refresh(new_rapport)
-
-    if rapport.image_urls:
-        for url in rapport.image_urls:
-            new_img = models.RapportImage(url=url, rapport_id=new_rapport.id)
-            db.add(new_img)
-        db.commit()
-        db.refresh(new_rapport)
-        
-    return new_rapport
-
-@app.get("/rapports", response_model=List[schemas.RapportOut])
-def read_all_rapports(db: Session = Depends(get_db)):
-    return db.query(models.Rapport).all()
-
-@app.get("/chantiers/{chantier_id}/rapports", response_model=List[schemas.RapportOut])
-def read_rapports_chantier(chantier_id: int, db: Session = Depends(get_db)):
-    return db.query(models.Rapport).filter(models.Rapport.chantier_id == chantier_id).all()
-
-@app.get("/chantiers/{chantier_id}/pdf")
-def download_pdf(chantier_id: int, db: Session = Depends(get_db)):
-    chantier = db.query(models.Chantier).filter(models.Chantier.id == chantier_id).first()
-    if not chantier: raise HTTPException(status_code=404, detail="Chantier introuvable")
-
-    rapports = db.query(models.Rapport).filter(models.Rapport.chantier_id == chantier_id).all()
-    inspections = db.query(models.Inspection).filter(models.Inspection.chantier_id == chantier_id).all()
-
-    filename = f"Rapport_{chantier.id}.pdf"
-    file_path = f"uploads/{filename}"
-
-    pdf_generator.generate_pdf(chantier, rapports, inspections, file_path)
-
-    return FileResponse(path=file_path, filename=filename, media_type='application/pdf')
-
-
-# ==========================================
-# 4. DASHBOARD & MATERIEL
-# ==========================================
-
 @app.get("/dashboard/stats")
 def get_stats(db: Session = Depends(get_db)):
-    # 1. KPIs
+    # A. KPIs
     total_chantiers = db.query(models.Chantier).count()
     chantiers_actifs = db.query(models.Chantier).filter(models.Chantier.est_actif == True).count()
     total_rapports = db.query(models.Rapport).count()
     alertes = db.query(models.Rapport).filter(models.Rapport.niveau_urgence.in_(['Critique', 'Moyen'])).count()
 
-    # 2. GRAPHIQUE
+    # B. GRAPHIQUE (7 derniers jours)
     today = datetime.now().date()
     chart_labels = []
     chart_values = []
@@ -233,282 +94,281 @@ def get_stats(db: Session = Depends(get_db)):
         label = day.strftime("%d/%m") 
         chart_labels.append(label)
         
-        start_of_day = datetime.combine(day, datetime.min.time())
-        end_of_day = datetime.combine(day, datetime.max.time())
+        start = datetime.combine(day, datetime.min.time())
+        end = datetime.combine(day, datetime.max.time())
         
-        count = db.query(models.Rapport).filter(
-            models.Rapport.date_creation >= start_of_day,
-            models.Rapport.date_creation <= end_of_day
-        ).count()
-        chart_values.append(count)
+        cnt = db.query(models.Rapport).filter(models.Rapport.date_creation >= start, models.Rapport.date_creation <= end).count()
+        chart_values.append(cnt)
 
-    # 3. RÉCENTS
-    recents = db.query(models.Rapport)\
-        .order_by(models.Rapport.date_creation.desc())\
-        .limit(5)\
-        .all()
-    
-    recent_formatted = []
+    # C. RECENTS
+    recents = db.query(models.Rapport).order_by(models.Rapport.date_creation.desc()).limit(5).all()
+    recent_fmt = []
     for r in recents:
-        chantier_nom = r.chantier.nom if r.chantier else "Chantier Inconnu"
-        recent_formatted.append({
+        c_nom = r.chantier.nom if r.chantier else "Inconnu"
+        recent_fmt.append({
             "titre": r.titre,
             "date_creation": r.date_creation,
-            "chantier_nom": chantier_nom,
+            "chantier_nom": c_nom,
             "niveau_urgence": r.niveau_urgence
         })
 
-    # 👇 C'EST CE FORMAT QUE LE MOBILE ATTEND
+    # RETOUR FORMATÉ
     return {
         "kpis": {
             "total_chantiers": total_chantiers,
             "actifs": chantiers_actifs,
             "rapports": total_rapports,
-            "alertes": alertes
+            "alertes": alertes,
+            "materiel_sorti": db.query(models.Materiel).filter(models.Materiel.chantier_id != None).count()
         },
         "chart": {
             "labels": chart_labels,
             "values": chart_values
         },
-        "recents": recent_formatted
+        "recents": recent_fmt
     }
 
+# ==========================================
+# 3. CHANTIERS
+# ==========================================
+@app.post("/chantiers", response_model=schemas.ChantierOut)
+def create_chantier(chantier: schemas.ChantierCreate, db: Session = Depends(get_db)):
+    new_c = models.Chantier(nom=chantier.nom, adresse=chantier.adresse, client=chantier.client, cover_url=chantier.cover_url)
+    db.add(new_c); db.commit(); db.refresh(new_c)
+    return new_c
+
+@app.get("/chantiers", response_model=List[schemas.ChantierOut])
+def read_chantiers(db: Session = Depends(get_db)):
+    return db.query(models.Chantier).all()
+
+@app.put("/chantiers/{cid}/signature")
+def sign_chantier(cid: int, signature_url: str, db: Session = Depends(get_db)):
+    c = db.query(models.Chantier).filter(models.Chantier.id == cid).first()
+    if not c: raise HTTPException(404, "Introuvable")
+    c.signature_url = signature_url
+    db.commit()
+    return {"status": "signed"}
+
+@app.delete("/chantiers/{cid}")
+def delete_chantier(cid: int, db: Session = Depends(get_db)):
+    c = db.query(models.Chantier).filter(models.Chantier.id == cid).first()
+    if not c: raise HTTPException(404, "Introuvable")
+    
+    # Nettoyage en cascade
+    db.query(models.Materiel).filter(models.Materiel.chantier_id == cid).update({"chantier_id": None})
+    db.query(models.RapportImage).filter(models.RapportImage.rapport.has(chantier_id=cid)).delete(synchronize_session=False)
+    db.query(models.Rapport).filter(models.Rapport.chantier_id == cid).delete()
+    db.query(models.Inspection).filter(models.Inspection.chantier_id == cid).delete()
+    db.query(models.PPSPS).filter(models.PPSPS.chantier_id == cid).delete()
+    db.query(models.PIC).filter(models.PIC.chantier_id == cid).delete()
+    
+    db.delete(c)
+    db.commit()
+    return {"status": "deleted"}
+
+# ==========================================
+# 4. MATERIEL
+# ==========================================
 @app.post("/materiels", response_model=schemas.MaterielOut)
 def create_materiel(mat: schemas.MaterielCreate, db: Session = Depends(get_db)):
-    new_mat = models.Materiel(
-        nom=mat.nom,
-        reference=mat.reference,
-        etat=mat.etat,
-        image_url=mat.image_url,
-        chantier_id=None 
+    new_m = models.Materiel(
+        nom=mat.nom, reference=mat.reference, etat=mat.etat, 
+        image_url=mat.image_url # Avec Image !
     )
-    db.add(new_mat)
-    db.commit()
-    db.refresh(new_mat)
-    return new_mat
+    db.add(new_m); db.commit(); db.refresh(new_m)
+    return new_m
 
 @app.get("/materiels", response_model=List[schemas.MaterielOut])
 def read_materiels(db: Session = Depends(get_db)):
     return db.query(models.Materiel).all()
 
-@app.put("/materiels/{materiel_id}/transfert")
-def transfer_materiel(materiel_id: int, chantier_id: Optional[int] = None, db: Session = Depends(get_db)):
-    mat = db.query(models.Materiel).filter(models.Materiel.id == materiel_id).first()
-    if not mat: raise HTTPException(status_code=404, detail="Matériel introuvable")
-    mat.chantier_id = chantier_id
+@app.put("/materiels/{mid}/transfert")
+def transfer_materiel(mid: int, chantier_id: Optional[int] = None, db: Session = Depends(get_db)):
+    m = db.query(models.Materiel).filter(models.Materiel.id == mid).first()
+    if not m: raise HTTPException(404)
+    m.chantier_id = chantier_id
     db.commit()
-    return {"status": "success"}
+    return {"status": "moved"}
 
-@app.delete("/materiels/{materiel_id}")
-def delete_materiel(materiel_id: int, db: Session = Depends(get_db)):
-    item = db.query(models.Materiel).filter(models.Materiel.id == materiel_id).first()
-    if not item: raise HTTPException(status_code=404, detail="Matériel introuvable")
-    db.delete(item)
-    db.commit()
-    return {"status": "success"}
-
+@app.delete("/materiels/{mid}")
+def delete_materiel(mid: int, db: Session = Depends(get_db)):
+    m = db.query(models.Materiel).filter(models.Materiel.id == mid).first()
+    if not m: raise HTTPException(404)
+    db.delete(m); db.commit()
+    return {"status": "deleted"}
 
 # ==========================================
-# 5. QHSE (INSPECTIONS)
+# 5. DOCS (Rapports, Audit, PPSPS, PIC)
 # ==========================================
+@app.post("/upload")
+async def upload_image(file: UploadFile = File(...)):
+    try:
+        res = cloudinary.uploader.upload(file.file, folder="conformeo_chantiers")
+        return {"url": res.get("secure_url")}
+    except Exception as e: raise HTTPException(500, str(e))
+
+@app.post("/rapports", response_model=schemas.RapportOut)
+def create_rapport(r: schemas.RapportCreate, db: Session = Depends(get_db)):
+    new_r = models.Rapport(
+        titre=r.titre, description=r.description, chantier_id=r.chantier_id,
+        niveau_urgence=r.niveau_urgence, latitude=r.latitude, longitude=r.longitude,
+        photo_url=r.image_urls[0] if r.image_urls else None
+    )
+    db.add(new_r); db.commit(); db.refresh(new_r)
+    if r.image_urls:
+        for u in r.image_urls: db.add(models.RapportImage(url=u, rapport_id=new_r.id))
+        db.commit(); db.refresh(new_r)
+    return new_r
+
+@app.get("/chantiers/{cid}/rapports", response_model=List[schemas.RapportOut])
+def read_rapports_chantier(cid: int, db: Session = Depends(get_db)):
+    return db.query(models.Rapport).filter(models.Rapport.chantier_id == cid).all()
 
 @app.post("/inspections", response_model=schemas.InspectionOut)
-def create_inspection(inspection: schemas.InspectionCreate, db: Session = Depends(get_db)):
-    new_insp = models.Inspection(
-        titre=inspection.titre,
-        type=inspection.type,
-        data=inspection.data,
-        chantier_id=inspection.chantier_id,
-        createur=inspection.createur
+def create_inspection(i: schemas.InspectionCreate, db: Session = Depends(get_db)):
+    new_i = models.Inspection(
+        titre=i.titre, type=i.type, data=i.data, chantier_id=i.chantier_id, createur=i.createur
     )
-    db.add(new_insp)
-    db.commit()
-    db.refresh(new_insp)
-    return new_insp
+    db.add(new_i); db.commit(); db.refresh(new_i)
+    return new_i
 
-@app.get("/chantiers/{chantier_id}/inspections", response_model=List[schemas.InspectionOut])
-def read_inspections(chantier_id: int, db: Session = Depends(get_db)):
-    return db.query(models.Inspection).filter(models.Inspection.chantier_id == chantier_id).all()
-
-@app.get("/inspections/{inspection_id}/pdf")
-def download_inspection_pdf(inspection_id: int, db: Session = Depends(get_db)):
-    inspection = db.query(models.Inspection).filter(models.Inspection.id == inspection_id).first()
-    if not inspection: raise HTTPException(status_code=404, detail="Audit introuvable")
-    
-    chantier = db.query(models.Chantier).filter(models.Chantier.id == inspection.chantier_id).first()
-    
-    date_str = inspection.date_creation.strftime('%Y-%m-%d')
-    filename = f"Audit_{inspection.type}_{date_str}.pdf"
-    file_path = f"uploads/{filename}"
-    
-    pdf_generator.generate_audit_pdf(chantier, inspection, file_path)
-    return FileResponse(path=file_path, filename=filename, media_type='application/pdf')
-
-
-# ==========================================
-# 6. PPSPS
-# ==========================================
+@app.get("/chantiers/{cid}/inspections", response_model=List[schemas.InspectionOut])
+def read_inspections(cid: int, db: Session = Depends(get_db)):
+    return db.query(models.Inspection).filter(models.Inspection.chantier_id == cid).all()
 
 @app.post("/ppsps", response_model=schemas.PPSPSOut)
-def create_ppsps(ppsps: schemas.PPSPSCreate, db: Session = Depends(get_db)):
-    new_ppsps = models.PPSPS(
-        chantier_id=ppsps.chantier_id,
-        maitre_ouvrage=ppsps.maitre_ouvrage,
-        maitre_oeuvre=ppsps.maitre_oeuvre,
-        coordonnateur_sps=ppsps.coordonnateur_sps,
-        responsable_chantier=ppsps.responsable_chantier,
-        nb_compagnons=ppsps.nb_compagnons,
-        horaires=ppsps.horaires,
-        duree_travaux=ppsps.duree_travaux,
-        secours_data=ppsps.secours_data,
-        installations_data=ppsps.installations_data,
-        taches_data=ppsps.taches_data
+def create_ppsps(p: schemas.PPSPSCreate, db: Session = Depends(get_db)):
+    new_p = models.PPSPS(
+        chantier_id=p.chantier_id, maitre_ouvrage=p.maitre_ouvrage, maitre_oeuvre=p.maitre_oeuvre,
+        coordonnateur_sps=p.coordonnateur_sps, responsable_chantier=p.responsable_chantier,
+        nb_compagnons=p.nb_compagnons, horaires=p.horaires, duree_travaux=p.duree_travaux,
+        secours_data=p.secours_data, installations_data=p.installations_data, taches_data=p.taches_data
     )
-    db.add(new_ppsps)
-    db.commit()
-    db.refresh(new_ppsps)
-    return new_ppsps
+    db.add(new_p); db.commit(); db.refresh(new_p)
+    return new_p
 
-@app.get("/chantiers/{chantier_id}/ppsps", response_model=List[schemas.PPSPSOut])
-def read_ppsps_chantier(chantier_id: int, db: Session = Depends(get_db)):
-    return db.query(models.PPSPS).filter(models.PPSPS.chantier_id == chantier_id).all()
-
-@app.get("/ppsps/{ppsps_id}/pdf")
-def download_ppsps_pdf(ppsps_id: int, db: Session = Depends(get_db)):
-    ppsps = db.query(models.PPSPS).filter(models.PPSPS.id == ppsps_id).first()
-    if not ppsps: raise HTTPException(status_code=404, detail="PPSPS introuvable")
-    
-    chantier = db.query(models.Chantier).filter(models.Chantier.id == ppsps.chantier_id).first()
-    filename = f"PPSPS_{chantier.nom}.pdf"
-    file_path = f"uploads/{filename}"
-    
-    pdf_generator.generate_ppsps_pdf(chantier, ppsps, file_path)
-    return FileResponse(path=file_path, filename=filename, media_type='application/pdf')
-
-
-# ==========================================
-# 7. DOE & PIC
-# ==========================================
+@app.get("/chantiers/{cid}/ppsps", response_model=List[schemas.PPSPSOut])
+def read_ppsps(cid: int, db: Session = Depends(get_db)):
+    return db.query(models.PPSPS).filter(models.PPSPS.chantier_id == cid).all()
 
 @app.post("/pics", response_model=schemas.PICOut)
-def create_or_update_pic(pic: schemas.PICCreate, db: Session = Depends(get_db)):
-    existing_pic = db.query(models.PIC).filter(models.PIC.chantier_id == pic.chantier_id).first()
-    
-    if existing_pic:
-        existing_pic.background_url = pic.background_url
-        existing_pic.final_url = pic.final_url
-        existing_pic.elements_data = pic.elements_data
-        existing_pic.date_update = datetime.now()
-        db.commit()
-        db.refresh(existing_pic)
-        return existing_pic
+def create_pic(p: schemas.PICCreate, db: Session = Depends(get_db)):
+    ex = db.query(models.PIC).filter(models.PIC.chantier_id == p.chantier_id).first()
+    if ex:
+        ex.background_url = p.background_url; ex.final_url = p.final_url
+        ex.elements_data = p.elements_data; ex.date_update = datetime.now()
+        db.commit(); db.refresh(ex); return ex
     else:
-        new_pic = models.PIC(
-            chantier_id=pic.chantier_id,
-            background_url=pic.background_url,
-            final_url=pic.final_url,
-            elements_data=pic.elements_data
-        )
-        db.add(new_pic)
-        db.commit()
-        db.refresh(new_pic)
-        return new_pic
+        new_pic = models.PIC(chantier_id=p.chantier_id, background_url=p.background_url, final_url=p.final_url, elements_data=p.elements_data)
+        db.add(new_pic); db.commit(); db.refresh(new_pic); return new_pic
 
-@app.get("/chantiers/{chantier_id}/pic", response_model=Optional[schemas.PICOut])
-def read_pic_chantier(chantier_id: int, db: Session = Depends(get_db)):
-    return db.query(models.PIC).filter(models.PIC.chantier_id == chantier_id).first()
+@app.get("/chantiers/{cid}/pic", response_model=Optional[schemas.PICOut])
+def read_pic(cid: int, db: Session = Depends(get_db)):
+    return db.query(models.PIC).filter(models.PIC.chantier_id == cid).first()
 
-@app.get("/chantiers/{chantier_id}/doe")
-def download_doe(chantier_id: int, db: Session = Depends(get_db)):
-    chantier = db.query(models.Chantier).filter(models.Chantier.id == chantier_id).first()
-    if not chantier: raise HTTPException(status_code=404, detail="Chantier introuvable")
+# ==========================================
+# 6. PDF & DOWNLOADS
+# ==========================================
 
-    zip_filename = f"DOE_{chantier.nom.replace(' ', '_')}.zip"
-    zip_path = f"uploads/{zip_filename}"
+@app.get("/chantiers/{cid}/pdf")
+def download_pdf(cid: int, db: Session = Depends(get_db)):
+    c = db.query(models.Chantier).filter(models.Chantier.id == cid).first()
+    if not c: raise HTTPException(404)
+    raps = db.query(models.Rapport).filter(models.Rapport.chantier_id == cid).all()
+    inss = db.query(models.Inspection).filter(models.Inspection.chantier_id == cid).all()
+    path = f"uploads/Rapport_{cid}.pdf"
+    pdf_generator.generate_pdf(c, raps, inss, path)
+    return FileResponse(path, filename=f"Journal_{c.nom}.pdf", media_type='application/pdf')
 
-    with zipfile.ZipFile(zip_path, 'w') as zipf:
-        # A. Journal
-        rapports = db.query(models.Rapport).filter(models.Rapport.chantier_id == chantier_id).all()
-        inspections = db.query(models.Inspection).filter(models.Inspection.chantier_id == chantier_id).all()
-        journal_name = f"1_Journal_Suivi.pdf"
-        journal_path = f"uploads/{journal_name}"
-        pdf_generator.generate_pdf(chantier, rapports, inspections, journal_path)
-        zipf.write(journal_path, journal_name)
+@app.get("/inspections/{iid}/pdf")
+def download_audit_pdf(iid: int, db: Session = Depends(get_db)):
+    i = db.query(models.Inspection).filter(models.Inspection.id == iid).first()
+    if not i: raise HTTPException(404)
+    c = db.query(models.Chantier).filter(models.Chantier.id == i.chantier_id).first()
+    path = f"uploads/Audit_{iid}.pdf"
+    pdf_generator.generate_audit_pdf(c, i, path)
+    return FileResponse(path, filename=f"Audit_{i.type}.pdf", media_type='application/pdf')
 
-        # B. PPSPS
-        ppsps_list = db.query(models.PPSPS).filter(models.PPSPS.chantier_id == chantier_id).all()
-        for index, doc in enumerate(ppsps_list):
-            ppsps_name = f"2_PPSPS_{index+1}.pdf"
-            ppsps_path = f"uploads/{ppsps_name}"
-            pdf_generator.generate_ppsps_pdf(chantier, doc, ppsps_path)
-            zipf.write(ppsps_path, ppsps_name)
+@app.get("/ppsps/{pid}/pdf")
+def download_ppsps_pdf(pid: int, db: Session = Depends(get_db)):
+    p = db.query(models.PPSPS).filter(models.PPSPS.id == pid).first()
+    if not p: raise HTTPException(404)
+    c = db.query(models.Chantier).filter(models.Chantier.id == p.chantier_id).first()
+    path = f"uploads/PPSPS_{pid}.pdf"
+    pdf_generator.generate_ppsps_pdf(c, p, path)
+    return FileResponse(path, filename=f"PPSPS_{c.nom}.pdf", media_type='application/pdf')
 
-        # C. Audits
-        for index, insp in enumerate(inspections):
-            audit_name = f"3_Audit_{insp.type}_{index+1}.pdf"
-            audit_path = f"uploads/{audit_name}"
-            pdf_generator.generate_audit_pdf(chantier, insp, audit_path)
-            zipf.write(audit_path, audit_name)
+@app.get("/chantiers/{cid}/doe")
+def download_doe(cid: int, db: Session = Depends(get_db)):
+    c = db.query(models.Chantier).filter(models.Chantier.id == cid).first()
+    if not c: raise HTTPException(404)
+    
+    zip_name = f"uploads/DOE_{c.id}.zip"
+    with zipfile.ZipFile(zip_name, 'w') as z:
+        # Journal
+        raps = db.query(models.Rapport).filter(models.Rapport.chantier_id == cid).all()
+        inss = db.query(models.Inspection).filter(models.Inspection.chantier_id == cid).all()
+        j_path = f"uploads/J_{c.id}.pdf"
+        pdf_generator.generate_pdf(c, raps, inss, j_path)
+        z.write(j_path, "1_Journal_Chantier.pdf")
+        
+        # PPSPS
+        ppsps = db.query(models.PPSPS).filter(models.PPSPS.chantier_id == cid).all()
+        for idx, p in enumerate(ppsps):
+            p_path = f"uploads/P_{p.id}.pdf"
+            pdf_generator.generate_ppsps_pdf(c, p, p_path)
+            z.write(p_path, f"2_PPSPS_{idx+1}.pdf")
 
-        # D. PIC
-        pic = db.query(models.PIC).filter(models.PIC.chantier_id == chantier_id).first()
+        # Audits
+        for idx, i in enumerate(inss):
+            a_path = f"uploads/A_{i.id}.pdf"
+            pdf_generator.generate_audit_pdf(c, i, a_path)
+            z.write(a_path, f"3_Audit_{i.type}_{idx+1}.pdf")
+            
+        # PIC
+        pic = db.query(models.PIC).filter(models.PIC.chantier_id == cid).first()
         if pic and pic.final_url:
             try:
-                response = requests.get(pic.final_url)
-                if response.status_code == 200:
-                    ext = "jpg" if "jpeg" in response.headers.get("content-type", "") else "png"
-                    pic_name = f"4_Plan_Installation_PIC.{ext}"
-                    pic_path = f"uploads/{pic_name}"
-                    with open(pic_path, "wb") as f: f.write(response.content)
-                    zipf.write(pic_path, pic_name)
+                r = requests.get(pic.final_url)
+                if r.status_code == 200:
+                    pic_path = f"uploads/PIC_{cid}.jpg"
+                    with open(pic_path, "wb") as f: f.write(r.content)
+                    z.write(pic_path, "4_Plan_Installation.jpg")
             except: pass
+            
+    return FileResponse(zip_name, filename=f"DOE_{c.nom}.zip", media_type='application/zip')
 
-    return FileResponse(path=zip_path, filename=zip_filename, media_type='application/zip')
-
-# ==========================================
-# 8. MIGRATIONS & MAINTENANCE
-# ==========================================
-
-@app.get("/reset_data")
-def reset_data(db: Session = Depends(get_db)):
-    try:
-        db.query(models.RapportImage).delete()
-        db.query(models.Rapport).delete()
-        db.query(models.Materiel).delete()
-        db.query(models.Inspection).delete()
-        db.query(models.PPSPS).delete()
-        db.query(models.PIC).delete()
-        db.query(models.Chantier).delete()
-        db.commit()
-        return {"message": "Base nettoyée"}
-    except Exception as e:
-        db.rollback()
-        return {"error": str(e)}
-
+# --- MIGRATIONS ---
 @app.get("/migrate_multi_tenant")
 def migrate_multi_tenant(db: Session = Depends(get_db)):
     try:
         models.Base.metadata.create_all(bind=engine)
         tables = ["users", "chantiers", "materiels"]
         for t in tables:
-            try:
-                db.execute(text(f"ALTER TABLE {t} ADD COLUMN company_id INTEGER"))
+            try: db.execute(text(f"ALTER TABLE {t} ADD COLUMN company_id INTEGER"))
             except: pass
         db.commit()
+        return {"msg": "Migration Multi-Tenant OK"}
+    except Exception as e: return {"error": str(e)}
 
-        demo_company = db.query(models.Company).filter(models.Company.id == 1).first()
-        if not demo_company:
-            demo_company = models.Company(name="Ma Société BTP (Démo)", subscription_plan="enterprise")
-            db.add(demo_company)
-            db.commit()
-            db.refresh(demo_company)
-        
-        cid = demo_company.id
-        db.execute(text(f"UPDATE users SET company_id = {cid} WHERE company_id IS NULL"))
-        db.execute(text(f"UPDATE chantiers SET company_id = {cid} WHERE company_id IS NULL"))
-        db.execute(text(f"UPDATE materiels SET company_id = {cid} WHERE company_id IS NULL"))
+@app.get("/migrate_db_v5")
+def migrate_v5(db: Session = Depends(get_db)):
+    try:
+        cols = [
+            "secours_data JSON", "installations_data JSON", 
+            "taches_data JSON", "duree_travaux VARCHAR"
+        ]
+        for col in cols:
+            try: db.execute(text(f"ALTER TABLE ppsps ADD COLUMN {col}"))
+            except: pass
         db.commit()
-        return {"message": "Migration Multi-Tenant réussie !"}
-    except Exception as e:
-        db.rollback()
-        return {"status": "Erreur", "details": str(e)}
+        return {"msg": "Migration V5 OK"}
+    except Exception as e: return {"error": str(e)}
+
+@app.get("/migrate_db_v7")
+def migrate_v7(db: Session = Depends(get_db)):
+    try:
+        db.execute(text("ALTER TABLE materiels ADD COLUMN image_url VARCHAR"))
+        db.commit()
+        return {"msg": "Migration V7 OK"}
+    except: return {"msg": "Déjà fait"}
