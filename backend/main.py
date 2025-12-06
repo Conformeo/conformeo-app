@@ -17,13 +17,13 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
-from sqlalchemy import text
+from sqlalchemy import text, func
 from sqlalchemy.orm import Session
 
 import models, schemas, security
 import pdf_generator
 from database import engine, get_db
-from datetime import datetime
+from datetime import datetime, timedelta, date
 
 # Création des tables
 models.Base.metadata.create_all(bind=engine)
@@ -415,6 +415,65 @@ def download_doe(chantier_id: int, db: Session = Depends(get_db)):
             except: pass
 
     return FileResponse(path=zip_path, filename=zip_filename, media_type='application/zip')
+
+@app.get("/dashboard/stats")
+def get_stats(db: Session = Depends(get_db)):
+    # 1. KPIs (Compteurs)
+    total_chantiers = db.query(models.Chantier).count()
+    chantiers_actifs = db.query(models.Chantier).filter(models.Chantier.est_actif == True).count()
+    total_rapports = db.query(models.Rapport).count()
+    alertes = db.query(models.Rapport).filter(models.Rapport.niveau_urgence.in_(['Critique', 'Moyen'])).count()
+
+    # 2. GRAPHIQUE (7 derniers jours)
+    today = datetime.now().date()
+    chart_labels = []
+    chart_values = []
+    
+    for i in range(6, -1, -1):
+        day = today - timedelta(days=i)
+        label = day.strftime("%d/%m") 
+        chart_labels.append(label)
+        
+        start_of_day = datetime.combine(day, datetime.min.time())
+        end_of_day = datetime.combine(day, datetime.max.time())
+        
+        count = db.query(models.Rapport).filter(
+            models.Rapport.date_creation >= start_of_day,
+            models.Rapport.date_creation <= end_of_day
+        ).count()
+        chart_values.append(count)
+
+    # 3. ACTIVITÉ RÉCENTE (5 derniers)
+    recents = db.query(models.Rapport)\
+        .order_by(models.Rapport.date_creation.desc())\
+        .limit(5)\
+        .all()
+    
+    recent_formatted = []
+    for r in recents:
+        chantier_nom = r.chantier.nom if r.chantier else "Chantier Inconnu"
+        recent_formatted.append({
+            "titre": r.titre,
+            "date_creation": r.date_creation,
+            "chantier_nom": chantier_nom,
+            "niveau_urgence": r.niveau_urgence
+        })
+
+    # 👇 LE FORMAT QUE LE FRONTEND ATTEND
+    return {
+        "kpis": {
+            "total_chantiers": total_chantiers,
+            "actifs": chantiers_actifs,
+            "rapports": total_rapports,
+            "alertes": alertes
+        },
+        "chart": {
+            "labels": chart_labels,
+            "values": chart_values
+        },
+        "recents": recent_formatted
+    }
+
 
 # ==========================================
 # 8. MIGRATIONS & MAINTENANCE
