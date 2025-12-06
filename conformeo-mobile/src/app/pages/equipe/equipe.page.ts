@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { IonicModule, ModalController } from '@ionic/angular';
-import { ApiService } from 'src/app/services/api.service';
+import { ApiService } from 'src/app/services/api';
 import { AddMemberModalComponent } from './add-member-modal/add-member-modal.component';
 import { addIcons } from 'ionicons';
 import { personAddOutline, personCircleOutline, mailOutline, briefcaseOutline } from 'ionicons/icons';
