@@ -202,6 +202,59 @@ def update_chantier(
 def read_chantiers(db: Session = Depends(get_db)):
     return db.query(models.Chantier).all()
 
+@app.post("/chantiers/import")
+async def import_chantiers_csv(
+    file: UploadFile = File(...), 
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(security.get_current_user) # Sécurisé
+):
+    if not file.filename.endswith('.csv'):
+        raise HTTPException(400, "Le fichier doit être un CSV")
+
+    try:
+        content = await file.read()
+        
+        # Décodage robuste
+        try:
+            text_content = content.decode('utf-8')
+        except UnicodeDecodeError:
+            text_content = content.decode('latin-1')
+            
+        lines = text_content.splitlines()
+        if not lines: raise HTTPException(400, "Fichier vide")
+        
+        # Détection séparateur
+        delimiter = ';' if ';' in lines[0] else ','
+        reader = csv.DictReader(lines, delimiter=delimiter)
+
+        count = 0
+        for row in reader:
+            row = {k.strip(): v for k, v in row.items() if k}
+            
+            # Colonnes attendues : Nom, Client, Adresse
+            nom = row.get('Nom') or row.get('nom')
+            client = row.get('Client') or row.get('client')
+            adresse = row.get('Adresse') or row.get('adresse')
+            
+            if nom:
+                new_c = models.Chantier(
+                    nom=nom,
+                    client=client or "Client Inconnu",
+                    adresse=adresse or "Adresse Inconnue",
+                    est_actif=True,
+                    company_id=current_user.company_id, # Lié à l'entreprise
+                    date_creation=datetime.now()
+                )
+                db.add(new_c)
+                count += 1
+        
+        db.commit()
+        return {"status": "success", "message": f"{count} chantiers importés !"}
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(500, f"Erreur Import : {str(e)}")
+
 @app.put("/chantiers/{cid}/signature")
 def sign_chantier(cid: int, signature_url: str, db: Session = Depends(get_db)):
     c = db.query(models.Chantier).filter(models.Chantier.id == cid).first()

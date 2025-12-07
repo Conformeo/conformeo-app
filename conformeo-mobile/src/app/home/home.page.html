@@ -13,12 +13,27 @@
     </ion-buttons>
 
     <ion-buttons slot="end">
+      <input type="file" #csvInput (change)="onCSVSelected($event)" accept=".csv" style="display: none;" />
+      <ion-button (click)="csvInput.click()">
+        <ion-icon name="cloud-upload-outline"></ion-icon>
+      </ion-button>
+
       <ion-icon 
         [name]="isOnline ? 'cloud-done' : 'cloud-offline'" 
         [color]="isOnline ? 'success' : 'danger'"
         style="font-size: 24px; margin-right: 10px;">
       </ion-icon>
     </ion-buttons>
+  </ion-toolbar>
+
+  <ion-toolbar color="primary">
+    <ion-searchbar 
+        placeholder="Rechercher un chantier..." 
+        [(ngModel)]="searchTerm" 
+        (ionInput)="filterChantiers()" 
+        color="light"
+        style="padding-bottom: 10px;">
+    </ion-searchbar>
   </ion-toolbar>
 </ion-header>
 
@@ -29,20 +44,21 @@
   </ion-refresher>
 
   <h2 style="margin-left: 16px; margin-top: 10px; font-weight: 700;">
-    Mes Chantiers
+    Mes Chantiers ({{ filteredChantiers.length }})
   </h2>
   
-  <div *ngIf="chantiers.length === 0" style="text-align: center; margin-top: 50px; opacity: 0.6;">
+  <div *ngIf="filteredChantiers.length === 0" style="text-align: center; margin-top: 50px; opacity: 0.6;">
     <p>Aucun chantier trouvé.</p>
   </div>
 
   <div class="pro-list">
-    <div *ngFor="let c of chantiers" class="pro-card" [routerLink]="['/chantier', c.id]">
+    <div *ngFor="let c of filteredChantiers" class="pro-card" [routerLink]="['/chantier', c.id]">
       
       <div class="card-thumb">
         <img 
           [src]="getCoverUrl(c.cover_url)" 
-          crossorigin="anonymous"  style="width: 100%; height: 100%; object-fit: cover; border-radius: 12px;"
+          crossorigin="anonymous"  
+          style="width: 100%; height: 100%; object-fit: cover; border-radius: 12px;"
           onerror="this.src='assets/splash.png'"
         />
         <div class="status-dot" [class.active]="c.est_actif"></div>
