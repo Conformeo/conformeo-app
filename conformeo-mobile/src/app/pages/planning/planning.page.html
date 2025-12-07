@@ -1,0 +1,21 @@
+<ion-header class="ion-no-border">
+  <ion-toolbar style="--background: #f8f9fa;">
+    <ion-buttons slot="start">
+      <ion-menu-button color="dark"></ion-menu-button>
+    </ion-buttons>
+    <ion-title style="color: #1a1a1a; font-weight: 800;">Planning des Chantiers</ion-title>
+    <ion-buttons slot="end">
+      <ion-button color="primary">
+        <ion-icon name="filter" slot="start"></ion-icon> Filtrer
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding" style="--background: #f8f9fa;">
+  
+  <div class="calendar-card">
+    <full-calendar [options]="calendarOptions"></full-calendar>
+  </div>
+
+</ion-content>

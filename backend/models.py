@@ -46,6 +46,10 @@ class Chantier(Base):
     signature_url = Column(String, nullable=True)
     cover_url = Column(String, nullable=True)
 
+    date_debut = Column(DateTime, nullable=True)
+    date_fin = Column(DateTime, nullable=True)
+    statut_planning = Column(String, default="prevu") # prevu, en_cours, termine, retard
+    
     # 👇 LIEN VERS L'ENTREPRISE
     company_id = Column(Integer, ForeignKey("companies.id"), nullable=True)
     company = relationship("Company", back_populates="chantiers")

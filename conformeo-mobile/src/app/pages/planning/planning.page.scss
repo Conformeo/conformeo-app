@@ -1,0 +1,15 @@
+.calendar-card {
+  background: white;
+  padding: 20px;
+  border-radius: 20px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+  min-height: 80vh;
+}
+
+/* Personnalisation FullCalendar pour faire SaaS */
+::ng-deep {
+  .fc-toolbar-title { font-size: 1.5em !important; font-weight: 700; color: #333; }
+  .fc-button-primary { background-color: #1e3c72 !important; border: none !important; border-radius: 8px !important; }
+  .fc-event { border-radius: 4px; padding: 2px 5px; font-size: 0.85em; cursor: pointer; }
+  .fc-day-today { background-color: rgba(30, 60, 114, 0.05) !important; }
+}

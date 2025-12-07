@@ -48,4 +48,8 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/parametres/parametres.page').then( m => m.ParametresPage),
     canActivate: [authGuard]
   },
+  {
+    path: 'planning',
+    loadComponent: () => import('./pages/planning/planning.page').then( m => m.PlanningPage)
+  },
 ];

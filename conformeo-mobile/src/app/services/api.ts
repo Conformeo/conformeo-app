@@ -18,6 +18,11 @@ export interface Chantier {
   cover_url?: string;
   date_creation?: string;
   company_id?: number; // Multi-Tenant
+
+  // 👇 AJOUTEZ CES 3 LIGNES (Champs Planning)
+  date_debut?: string;
+  date_fin?: string;
+  statut_planning?: string;
 }
 
 export interface Rapport {

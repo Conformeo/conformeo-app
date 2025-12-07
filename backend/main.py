@@ -598,3 +598,34 @@ def add_team_member(
     db.commit()
     db.refresh(new_member)
     return new_member
+
+# ...
+
+# --- MIGRATION V9 (PLANNING) ---
+@app.get("/migrate_db_v9")
+def migrate_db_v9(db: Session = Depends(get_db)):
+    try:
+        db.execute(text("ALTER TABLE chantiers ADD COLUMN IF NOT EXISTS date_debut TIMESTAMP"))
+        db.execute(text("ALTER TABLE chantiers ADD COLUMN IF NOT EXISTS date_fin TIMESTAMP"))
+        db.execute(text("ALTER TABLE chantiers ADD COLUMN IF NOT EXISTS statut_planning VARCHAR DEFAULT 'prevu'"))
+        db.commit()
+        return {"message": "Migration V9 (Planning) réussie !"}
+    except Exception as e:
+        return {"status": "Erreur", "details": str(e)}
+
+@app.post("/chantiers", response_model=schemas.ChantierOut)
+def create_chantier(chantier: schemas.ChantierCreate, db: Session = Depends(get_db), current_user: models.User = Depends(security.get_current_user)):
+    new_chantier = models.Chantier(
+        nom=chantier.nom,
+        adresse=chantier.adresse,
+        client=chantier.client,
+        cover_url=chantier.cover_url,
+        company_id=current_user.company_id,
+        # 👇 AJOUT DATES (Par défaut aujourd'hui + 30 jours si vide)
+        date_debut=chantier.date_debut or datetime.now(),
+        date_fin=chantier.date_fin or (datetime.now() + timedelta(days=30))
+    )
+    db.add(new_chantier)
+    db.commit()
+    db.refresh(new_chantier)
+    return new_chantier

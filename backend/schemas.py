@@ -53,6 +53,9 @@ class ChantierBase(BaseModel):
     adresse: str
     client: str
     cover_url: Optional[str] = None
+    date_debut: Optional[datetime] = None
+    date_fin: Optional[datetime] = None
+    statut_planning: Optional[str] = "prevu"
 
 class ChantierCreate(ChantierBase):
     pass
