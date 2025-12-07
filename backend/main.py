@@ -4,9 +4,9 @@ from uuid import uuid4
 from typing import List, Optional
 from dotenv import load_dotenv
 import zipfile
-import csv
+from datetime import datetime, timedelta, date
+import csv 
 import codecs
-from datetime import datetime, timedelta, date # <--- Ajout timedelta, date
 
 load_dotenv()
 
@@ -19,7 +19,7 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
-from sqlalchemy import text, func # <--- Ajout func
+from sqlalchemy import text, func
 from sqlalchemy.orm import Session
 
 import models, schemas, security
@@ -62,8 +62,20 @@ def root():
 def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     if db.query(models.User).filter(models.User.email == user.email).first():
         raise HTTPException(status_code=400, detail="Email pris")
+    
+    # Création Entreprise si demandée (Signup)
+    if user.company_name:
+        new_company = models.Company(name=user.company_name, subscription_plan="free")
+        db.add(new_company); db.commit(); db.refresh(new_company)
+        company_id = new_company.id
+        role = "admin"
+    else:
+        # Sinon (Invitation), on verra plus tard, ici on met null ou on gère dans /team
+        company_id = None 
+        role = user.role
+
     hashed_pwd = security.get_password_hash(user.password)
-    new_user = models.User(email=user.email, hashed_password=hashed_pwd, role=user.role)
+    new_user = models.User(email=user.email, hashed_password=hashed_pwd, role=role, company_id=company_id)
     db.add(new_user); db.commit(); db.refresh(new_user)
     return new_user
 
@@ -75,57 +87,22 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     token = security.create_access_token(data={"sub": user.email, "role": user.role})
     return {"access_token": token, "token_type": "bearer"}
 
-# --- OUTIL DE SECOURS : CRÉATION ADMIN ---
-@app.get("/create_admin")
-def create_admin_user(db: Session = Depends(get_db)):
-    email = "admin@conformeo.com"
-    password = "admin"
-    
-    # 1. Vérifier si l'utilisateur existe déjà
-    existing_user = db.query(models.User).filter(models.User.email == email).first()
-    if existing_user:
-        return {"message": "L'utilisateur existe déjà !", "email": email, "password": password}
-
-    # 2. Vérifier ou créer l'entreprise
-    company = db.query(models.Company).first()
-    if not company:
-        company = models.Company(name="Ma Super Entreprise BTP", subscription_plan="pro")
-        db.add(company)
-        db.commit()
-        db.refresh(company)
-
-    # 3. Créer l'utilisateur
-    hashed_pwd = security.get_password_hash(password)
-    new_user = models.User(
-        email=email,
-        hashed_password=hashed_pwd,
-        role="admin",
-        company_id=company.id
-    )
-    
-    db.add(new_user)
-    db.commit()
-    
-    return {
-        "status": "Succès ✅",
-        "message": "Utilisateur Admin créé !",
-        "login": email,
-        "password": password
-    }
+@app.get("/users/me", response_model=schemas.UserOut)
+def read_users_me(current_user: models.User = Depends(security.get_current_user)):
+    return current_user
 
 # ==========================================
-# 2. DASHBOARD (LA VERSION INTELLIGENTE)
+# 2. DASHBOARD
 # ==========================================
 @app.get("/dashboard/stats")
 def get_stats(db: Session = Depends(get_db)):
-    # 1. KPIs
+    # Note: Pour le multi-tenant, il faudrait filtrer par company_id ici aussi
+    # Mais pour l'instant on garde global pour la démo
     total = db.query(models.Chantier).count()
     actifs = db.query(models.Chantier).filter(models.Chantier.est_actif == True).count()
     rap = db.query(models.Rapport).count()
     alert = db.query(models.Rapport).filter(models.Rapport.niveau_urgence.in_(['Critique', 'Moyen'])).count()
-    nb_materiel_sorti = db.query(models.Materiel).filter(models.Materiel.chantier_id != None).count()
-    
-    # 2. GRAPHIQUE
+
     today = datetime.now().date()
     labels, values = [], []
     for i in range(6, -1, -1):
@@ -136,140 +113,89 @@ def get_stats(db: Session = Depends(get_db)):
         cnt = db.query(models.Rapport).filter(models.Rapport.date_creation >= start, models.Rapport.date_creation <= end).count()
         values.append(cnt)
 
-    # 3. RECENTS
     recents = db.query(models.Rapport).order_by(models.Rapport.date_creation.desc()).limit(5).all()
-    rec_fmt = [{"titre": r.titre, "date": r.date_creation, "chantier": r.chantier.nom if r.chantier else "-", "urgence": r.niveau_urgence} for r in recents]
+    rec_fmt = []
+    for r in recents:
+        c_nom = r.chantier.nom if r.chantier else "Inconnu"
+        rec_fmt.append({"titre": r.titre, "date_creation": r.date_creation, "chantier_nom": c_nom, "niveau_urgence": r.niveau_urgence})
 
-    # 4. DONNÉES CARTE (NOUVEAU !)
-    # On récupère tous les chantiers qui ont des rapports géolocalisés
-    # (Ou on pourrait géolocaliser les chantiers eux-mêmes, mais utilisons les rapports pour l'instant)
     map_data = []
-    # Pour simplifier, on prend les chantiers actifs et on simule ou on prend le dernier rapport GPS
     chantiers = db.query(models.Chantier).filter(models.Chantier.est_actif == True).all()
     for c in chantiers:
-        # On cherche le dernier rapport avec GPS pour ce chantier
         last_gps = db.query(models.Rapport).filter(models.Rapport.chantier_id == c.id, models.Rapport.latitude != None).first()
         if last_gps:
-            map_data.append({
-                "id": c.id,
-                "nom": c.nom,
-                "client": c.client,
-                "lat": last_gps.latitude,
-                "lng": last_gps.longitude,
-                "status": "OK"
-            })
+            map_data.append({"id": c.id, "nom": c.nom, "client": c.client, "lat": last_gps.latitude, "lng": last_gps.longitude})
 
     return {
-        "kpis": { "total_chantiers": total, "actifs": actifs, "rapports": rap, "alertes": alert, "materiel_sorti": nb_materiel_sorti },
+        "kpis": {
+            "total_chantiers": total, "actifs": actifs, 
+            "rapports": rap, "alertes": alert,
+            "materiel_sorti": db.query(models.Materiel).filter(models.Materiel.chantier_id != None).count()
+        },
         "chart": { "labels": labels, "values": values },
         "recents": rec_fmt,
-        "map": map_data # <--- NOUVEAU
+        "map": map_data
     }
-    
+
 # ==========================================
 # 3. CHANTIERS
 # ==========================================
 @app.post("/chantiers", response_model=schemas.ChantierOut)
-def create_chantier(chantier: schemas.ChantierCreate, db: Session = Depends(get_db)):
-    new_c = models.Chantier(nom=chantier.nom, adresse=chantier.adresse, client=chantier.client, cover_url=chantier.cover_url)
+def create_chantier(chantier: schemas.ChantierCreate, db: Session = Depends(get_db), current_user: models.User = Depends(security.get_current_user)):
+    new_c = models.Chantier(
+        nom=chantier.nom, adresse=chantier.adresse, client=chantier.client, cover_url=chantier.cover_url,
+        company_id=current_user.company_id,
+        # Dates pour le planning (défaut +30j)
+        date_debut=chantier.date_debut or datetime.now(),
+        date_fin=chantier.date_fin or (datetime.now() + timedelta(days=30))
+    )
     db.add(new_c); db.commit(); db.refresh(new_c)
     return new_c
 
-@app.put("/chantiers/{chantier_id}")
-def update_chantier(
-    chantier_id: int, 
-    chantier_update: schemas.ChantierCreate, 
-    db: Session = Depends(get_db)
-):
-    # 1. On récupère le chantier
-    c = db.query(models.Chantier).filter(models.Chantier.id == chantier_id).first()
-    if not c: raise HTTPException(status_code=404, detail="Chantier introuvable")
-    
-    # 2. On met à jour les infos
-    c.nom = chantier_update.nom
-    c.adresse = chantier_update.adresse
-    c.client = chantier_update.client
-    
-    # 3. Si une nouvelle photo est envoyée, on remplace l'ancienne
-    if chantier_update.cover_url:
-        c.cover_url = chantier_update.cover_url
-        
-    db.commit()
-    db.refresh(c)
+@app.put("/chantiers/{cid}")
+def update_chantier(cid: int, up: schemas.ChantierCreate, db: Session = Depends(get_db)):
+    c = db.query(models.Chantier).filter(models.Chantier.id == cid).first()
+    if not c: raise HTTPException(404)
+    c.nom = up.nom; c.adresse = up.adresse; c.client = up.client
+    if up.cover_url: c.cover_url = up.cover_url
+    if up.date_debut: c.date_debut = up.date_debut
+    if up.date_fin: c.date_fin = up.date_fin
+    db.commit(); db.refresh(c)
     return c
 
 @app.get("/chantiers", response_model=List[schemas.ChantierOut])
 def read_chantiers(db: Session = Depends(get_db)):
+    # Pour l'instant on retourne tout, en V2 on filtrera par current_user.company_id
     return db.query(models.Chantier).all()
 
 @app.post("/chantiers/import")
-async def import_chantiers_csv(
-    file: UploadFile = File(...), 
-    db: Session = Depends(get_db) 
-    # ⚠️ ATTENTION : Pas de 'current_user' ici !
-):
-    # Tolérance majuscule/minuscule pour l'extension
-    if not file.filename.lower().endswith('.csv'):
-        raise HTTPException(400, "Le fichier doit être un CSV")
-
+async def import_chantiers_csv(file: UploadFile = File(...), db: Session = Depends(get_db)):
+    if not file.filename.lower().endswith('.csv'): raise HTTPException(400, "Non CSV")
     try:
         content = await file.read()
-        
-        # Décodage robuste
-        try:
-            text_content = content.decode('utf-8')
-        except UnicodeDecodeError:
-            text_content = content.decode('latin-1')
-            
-        lines = text_content.splitlines()
-        if not lines: raise HTTPException(400, "Fichier vide")
-        
-        # Détection séparateur
+        try: text = content.decode('utf-8')
+        except: text = content.decode('latin-1')
+        lines = text.splitlines()
         delimiter = ';' if ';' in lines[0] else ','
         reader = csv.DictReader(lines, delimiter=delimiter)
-
-        # On prend une entreprise par défaut pour éviter le plantage
-        # Si la table companies est vide, on met None (le chantier sera orphelin mais créé)
-        default_company = db.query(models.Company).first()
-        cid = default_company.id if default_company else None
-
+        
+        company = db.query(models.Company).first()
+        cid = company.id if company else None
         count = 0
         for row in reader:
-            # Nettoyage des clés (enlève espaces et met en minuscule pour être sûr)
-            # Ex: "Nom " devient "nom"
             row = {k.strip(): v.strip() for k, v in row.items() if k}
-            
-            # Recherche des colonnes (tolérant)
-            # On cherche 'Nom', 'nom', 'NOM'...
-            keys_nom = [k for k in row.keys() if k.lower() == 'nom']
-            keys_client = [k for k in row.keys() if k.lower() == 'client']
-            keys_adresse = [k for k in row.keys() if k.lower() == 'adresse']
-
-            nom = row[keys_nom[0]] if keys_nom else None
-            
+            nom = row.get('Nom') or row.get('nom')
             if nom:
-                client = row[keys_client[0]] if keys_client else "Client Inconnu"
-                adresse = row[keys_adresse[0]] if keys_adresse else "Adresse Inconnue"
-                
-                new_c = models.Chantier(
-                    nom=nom,
-                    client=client,
-                    adresse=adresse,
-                    est_actif=True,
-                    company_id=cid,
-                    date_creation=datetime.now()
-                )
-                db.add(new_c)
+                db.add(models.Chantier(
+                    nom=nom, client=row.get('Client','-'), adresse=row.get('Adresse','-'),
+                    est_actif=True, company_id=cid, date_creation=datetime.now(),
+                    date_debut=datetime.now(), date_fin=datetime.now()+timedelta(days=30)
+                ))
                 count += 1
-        
         db.commit()
         return {"status": "success", "message": f"{count} chantiers importés !"}
-
     except Exception as e:
-        db.rollback()
-        # On renvoie l'erreur précise au frontend
-        raise HTTPException(500, f"Erreur Python : {str(e)}")
-        
+        db.rollback(); raise HTTPException(500, str(e))
 
 @app.put("/chantiers/{cid}/signature")
 def sign_chantier(cid: int, signature_url: str, db: Session = Depends(get_db)):
@@ -282,18 +208,13 @@ def sign_chantier(cid: int, signature_url: str, db: Session = Depends(get_db)):
 @app.delete("/chantiers/{cid}")
 def delete_chantier(cid: int, db: Session = Depends(get_db)):
     c = db.query(models.Chantier).filter(models.Chantier.id == cid).first()
-    if not c: raise HTTPException(404, "Introuvable")
-    
-    # Nettoyage en cascade
+    if not c: raise HTTPException(404)
     db.query(models.Materiel).filter(models.Materiel.chantier_id == cid).update({"chantier_id": None})
-    db.query(models.RapportImage).filter(models.RapportImage.rapport.has(chantier_id=cid)).delete(synchronize_session=False)
     db.query(models.Rapport).filter(models.Rapport.chantier_id == cid).delete()
     db.query(models.Inspection).filter(models.Inspection.chantier_id == cid).delete()
     db.query(models.PPSPS).filter(models.PPSPS.chantier_id == cid).delete()
     db.query(models.PIC).filter(models.PIC.chantier_id == cid).delete()
-    
-    db.delete(c)
-    db.commit()
+    db.delete(c); db.commit()
     return {"status": "deleted"}
 
 # ==========================================
@@ -302,8 +223,7 @@ def delete_chantier(cid: int, db: Session = Depends(get_db)):
 @app.post("/materiels", response_model=schemas.MaterielOut)
 def create_materiel(mat: schemas.MaterielCreate, db: Session = Depends(get_db)):
     new_m = models.Materiel(
-        nom=mat.nom, reference=mat.reference, etat=mat.etat, 
-        image_url=mat.image_url # Avec Image !
+        nom=mat.nom, reference=mat.reference, etat=mat.etat, image_url=mat.image_url
     )
     db.add(new_m); db.commit(); db.refresh(new_m)
     return new_m
@@ -312,68 +232,32 @@ def create_materiel(mat: schemas.MaterielCreate, db: Session = Depends(get_db)):
 def read_materiels(db: Session = Depends(get_db)):
     return db.query(models.Materiel).all()
 
-
 @app.post("/materiels/import")
-async def import_materiels_csv(
-    file: UploadFile = File(...), 
-    db: Session = Depends(get_db)
-    # On a retiré 'current_user' pour l'instant pour éviter l'erreur 401
-):
-    if not file.filename.endswith('.csv'):
-        raise HTTPException(400, "Le fichier doit être un CSV")
-
+async def import_materiels_csv(file: UploadFile = File(...), db: Session = Depends(get_db)):
+    if not file.filename.lower().endswith('.csv'): raise HTTPException(400, "Non CSV")
     try:
         content = await file.read()
-        
-        # Décodage robuste (UTF-8 ou Latin-1 pour Excel)
-        try:
-            text_content = content.decode('utf-8')
-        except UnicodeDecodeError:
-            text_content = content.decode('latin-1')
-            
-        lines = text_content.splitlines()
-        if not lines: raise HTTPException(400, "Fichier vide")
-        
-        # Détection du séparateur (; ou ,)
+        try: text = content.decode('utf-8')
+        except: text = content.decode('latin-1')
+        lines = text.splitlines()
         delimiter = ';' if ';' in lines[0] else ','
         reader = csv.DictReader(lines, delimiter=delimiter)
-
-        # On cherche une entreprise par défaut (ou null)
-        # Idéalement, on prendrait celle du user, mais ici on fait simple
-        default_company = db.query(models.Company).first()
-        cid = default_company.id if default_company else None
-
+        
+        company = db.query(models.Company).first()
+        cid = company.id if company else None
         count = 0
         for row in reader:
-            # Nettoyage des clés (espaces, majuscules...)
-            row_clean = {k.strip().lower(): v.strip() for k, v in row.items() if k}
-            
-            # Recherche des colonnes (tolérant)
-            nom = row_clean.get('nom') or row_clean.get('name')
-            ref = row_clean.get('reference') or row_clean.get('ref')
-            etat = row_clean.get('etat') or 'Bon'
-            
+            row = {k.strip(): v.strip() for k, v in row.items() if k}
+            nom = row.get('Nom') or row.get('nom')
+            ref = row.get('Reference') or row.get('reference')
             if nom and ref:
-                # Vérifier doublon (optionnel)
-                existing = db.query(models.Materiel).filter(models.Materiel.reference == ref).first()
-                if not existing:
-                    new_mat = models.Materiel(
-                        nom=nom,
-                        reference=ref,
-                        etat=etat,
-                        company_id=cid, # On rattache à la boite par défaut
-                        chantier_id=None
-                    )
-                    db.add(new_mat)
-                    count += 1
-        
+                etat = row.get('Etat') or 'Bon'
+                db.add(models.Materiel(nom=nom, reference=ref, etat=etat, company_id=cid, chantier_id=None))
+                count += 1
         db.commit()
         return {"status": "success", "message": f"{count} équipements importés !"}
-
     except Exception as e:
-        print(f"Erreur CSV : {e}")
-        db.rollback()
-        raise HTTPException(500, f"Erreur technique : {str(e)}")
+        db.rollback(); raise HTTPException(500, str(e))
 
 @app.put("/materiels/{mid}/transfert")
 def transfer_materiel(mid: int, chantier_id: Optional[int] = None, db: Session = Depends(get_db)):
@@ -384,25 +268,13 @@ def transfer_materiel(mid: int, chantier_id: Optional[int] = None, db: Session =
     return {"status": "moved"}
 
 @app.put("/materiels/{materiel_id}")
-def update_materiel(
-    materiel_id: int, 
-    mat_update: schemas.MaterielCreate, 
-    db: Session = Depends(get_db)
-):
-    # 1. On cherche l'objet
+def update_materiel(materiel_id: int, mat_update: schemas.MaterielCreate, db: Session = Depends(get_db)):
     db_mat = db.query(models.Materiel).filter(models.Materiel.id == materiel_id).first()
-    if not db_mat:
-        raise HTTPException(status_code=404, detail="Matériel introuvable")
-    
-    # 2. On met à jour les champs
+    if not db_mat: raise HTTPException(404)
     db_mat.nom = mat_update.nom
     db_mat.reference = mat_update.reference
-    # On met à jour l'image SEULEMENT si une nouvelle URL est envoyée
-    if mat_update.image_url:
-        db_mat.image_url = mat_update.image_url
-        
-    db.commit()
-    db.refresh(db_mat)
+    if mat_update.image_url: db_mat.image_url = mat_update.image_url
+    db.commit(); db.refresh(db_mat)
     return db_mat
 
 @app.delete("/materiels/{mid}")
@@ -410,12 +282,10 @@ def delete_materiel(mid: int, db: Session = Depends(get_db)):
     m = db.query(models.Materiel).filter(models.Materiel.id == mid).first()
     if not m: raise HTTPException(404)
     db.delete(m); db.commit()
-    return {"status": "deleted"}
-
-    
+    return {"status": "success"}
 
 # ==========================================
-# 5. DOCS (Rapports, Audit, PPSPS, PIC)
+# 5. DOCS & EXPORTS
 # ==========================================
 @app.post("/upload")
 async def upload_image(file: UploadFile = File(...)):
@@ -453,6 +323,15 @@ def create_inspection(i: schemas.InspectionCreate, db: Session = Depends(get_db)
 def read_inspections(cid: int, db: Session = Depends(get_db)):
     return db.query(models.Inspection).filter(models.Inspection.chantier_id == cid).all()
 
+@app.get("/inspections/{iid}/pdf")
+def download_inspection_pdf(iid: int, db: Session = Depends(get_db)):
+    i = db.query(models.Inspection).filter(models.Inspection.id == iid).first()
+    if not i: raise HTTPException(404)
+    c = db.query(models.Chantier).filter(models.Chantier.id == i.chantier_id).first()
+    path = f"uploads/Audit_{iid}.pdf"
+    pdf_generator.generate_audit_pdf(c, i, path)
+    return FileResponse(path, media_type='application/pdf')
+
 @app.post("/ppsps", response_model=schemas.PPSPSOut)
 def create_ppsps(p: schemas.PPSPSCreate, db: Session = Depends(get_db)):
     new_p = models.PPSPS(
@@ -467,6 +346,15 @@ def create_ppsps(p: schemas.PPSPSCreate, db: Session = Depends(get_db)):
 @app.get("/chantiers/{cid}/ppsps", response_model=List[schemas.PPSPSOut])
 def read_ppsps(cid: int, db: Session = Depends(get_db)):
     return db.query(models.PPSPS).filter(models.PPSPS.chantier_id == cid).all()
+
+@app.get("/ppsps/{pid}/pdf")
+def download_ppsps_pdf(pid: int, db: Session = Depends(get_db)):
+    p = db.query(models.PPSPS).filter(models.PPSPS.id == pid).first()
+    if not p: raise HTTPException(404)
+    c = db.query(models.Chantier).filter(models.Chantier.id == p.chantier_id).first()
+    path = f"uploads/PPSPS_{pid}.pdf"
+    pdf_generator.generate_ppsps_pdf(c, p, path)
+    return FileResponse(path, media_type='application/pdf')
 
 @app.post("/pics", response_model=schemas.PICOut)
 def create_pic(p: schemas.PICCreate, db: Session = Depends(get_db)):
@@ -483,37 +371,15 @@ def create_pic(p: schemas.PICCreate, db: Session = Depends(get_db)):
 def read_pic(cid: int, db: Session = Depends(get_db)):
     return db.query(models.PIC).filter(models.PIC.chantier_id == cid).first()
 
-# ==========================================
-# 6. PDF & DOWNLOADS
-# ==========================================
-
 @app.get("/chantiers/{cid}/pdf")
 def download_pdf(cid: int, db: Session = Depends(get_db)):
     c = db.query(models.Chantier).filter(models.Chantier.id == cid).first()
     if not c: raise HTTPException(404)
     raps = db.query(models.Rapport).filter(models.Rapport.chantier_id == cid).all()
     inss = db.query(models.Inspection).filter(models.Inspection.chantier_id == cid).all()
-    path = f"uploads/Rapport_{cid}.pdf"
+    path = f"uploads/J_{cid}.pdf"
     pdf_generator.generate_pdf(c, raps, inss, path)
-    return FileResponse(path, filename=f"Journal_{c.nom}.pdf", media_type='application/pdf')
-
-@app.get("/inspections/{iid}/pdf")
-def download_audit_pdf(iid: int, db: Session = Depends(get_db)):
-    i = db.query(models.Inspection).filter(models.Inspection.id == iid).first()
-    if not i: raise HTTPException(404)
-    c = db.query(models.Chantier).filter(models.Chantier.id == i.chantier_id).first()
-    path = f"uploads/Audit_{iid}.pdf"
-    pdf_generator.generate_audit_pdf(c, i, path)
-    return FileResponse(path, filename=f"Audit_{i.type}.pdf", media_type='application/pdf')
-
-@app.get("/ppsps/{pid}/pdf")
-def download_ppsps_pdf(pid: int, db: Session = Depends(get_db)):
-    p = db.query(models.PPSPS).filter(models.PPSPS.id == pid).first()
-    if not p: raise HTTPException(404)
-    c = db.query(models.Chantier).filter(models.Chantier.id == p.chantier_id).first()
-    path = f"uploads/PPSPS_{pid}.pdf"
-    pdf_generator.generate_ppsps_pdf(c, p, path)
-    return FileResponse(path, filename=f"PPSPS_{c.nom}.pdf", media_type='application/pdf')
+    return FileResponse(path, media_type='application/pdf')
 
 @app.get("/chantiers/{cid}/doe")
 def download_doe(cid: int, db: Session = Depends(get_db)):
@@ -522,27 +388,23 @@ def download_doe(cid: int, db: Session = Depends(get_db)):
     
     zip_name = f"uploads/DOE_{c.id}.zip"
     with zipfile.ZipFile(zip_name, 'w') as z:
-        # Journal
         raps = db.query(models.Rapport).filter(models.Rapport.chantier_id == cid).all()
         inss = db.query(models.Inspection).filter(models.Inspection.chantier_id == cid).all()
         j_path = f"uploads/J_{c.id}.pdf"
         pdf_generator.generate_pdf(c, raps, inss, j_path)
         z.write(j_path, "1_Journal_Chantier.pdf")
         
-        # PPSPS
         ppsps = db.query(models.PPSPS).filter(models.PPSPS.chantier_id == cid).all()
         for idx, p in enumerate(ppsps):
             p_path = f"uploads/P_{p.id}.pdf"
             pdf_generator.generate_ppsps_pdf(c, p, p_path)
             z.write(p_path, f"2_PPSPS_{idx+1}.pdf")
 
-        # Audits
         for idx, i in enumerate(inss):
             a_path = f"uploads/A_{i.id}.pdf"
             pdf_generator.generate_audit_pdf(c, i, a_path)
             z.write(a_path, f"3_Audit_{i.type}_{idx+1}.pdf")
             
-        # PIC
         pic = db.query(models.PIC).filter(models.PIC.chantier_id == cid).first()
         if pic and pic.final_url:
             try:
@@ -556,145 +418,82 @@ def download_doe(cid: int, db: Session = Depends(get_db)):
     return FileResponse(zip_name, filename=f"DOE_{c.nom}.zip", media_type='application/zip')
 
 # ==========================================
-# 11. GESTION ENTREPRISE (BRANDING)
+# 10. GESTION EQUIPE & ENTREPRISE
 # ==========================================
 
 @app.get("/companies/me", response_model=schemas.CompanyOut)
-def read_my_company(
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(security.get_current_user)
-):
-    if not current_user.company_id: raise HTTPException(400, "Aucune entreprise liée")
+def read_my_company(db: Session = Depends(get_db), current_user: models.User = Depends(security.get_current_user)):
+    if not current_user.company_id: raise HTTPException(400)
     return db.query(models.Company).filter(models.Company.id == current_user.company_id).first()
 
 @app.put("/companies/me", response_model=schemas.CompanyOut)
-def update_my_company(
-    comp_update: schemas.CompanyUpdate,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(security.get_current_user)
-):
-    if not current_user.company_id: raise HTTPException(400, "Aucune entreprise liée")
-    
-    company = db.query(models.Company).filter(models.Company.id == current_user.company_id).first()
-    
-    if comp_update.name: company.name = comp_update.name
-    if comp_update.address: company.address = comp_update.address
-    if comp_update.contact_email: company.contact_email = comp_update.contact_email
-    if comp_update.phone: company.phone = comp_update.phone
-    if comp_update.logo_url: company.logo_url = comp_update.logo_url
-    
-    db.commit()
-    db.refresh(company)
-    return company
-
-# --- MIGRATION V8 (BRANDING) ---
-@app.get("/migrate_db_v8")
-def migrate_db_v8(db: Session = Depends(get_db)):
-    try:
-        cols = ["logo_url VARCHAR", "address VARCHAR", "contact_email VARCHAR", "phone VARCHAR"]
-        for c in cols:
-            try: db.execute(text(f"ALTER TABLE companies ADD COLUMN {c}"))
-            except: pass
-        db.commit()
-        return {"msg": "Migration V8 (Branding) OK"}
-    except Exception as e: return {"error": str(e)}
-
-# --- MIGRATIONS ---
-@app.get("/migrate_multi_tenant")
-def migrate_multi_tenant(db: Session = Depends(get_db)):
-    try:
-        models.Base.metadata.create_all(bind=engine)
-        tables = ["users", "chantiers", "materiels"]
-        for t in tables:
-            try: db.execute(text(f"ALTER TABLE {t} ADD COLUMN company_id INTEGER"))
-            except: pass
-        db.commit()
-        return {"msg": "Migration Multi-Tenant OK"}
-    except Exception as e: return {"error": str(e)}
-
-@app.get("/migrate_db_v5")
-def migrate_v5(db: Session = Depends(get_db)):
-    try:
-        cols = [
-            "secours_data JSON", "installations_data JSON", 
-            "taches_data JSON", "duree_travaux VARCHAR"
-        ]
-        for col in cols:
-            try: db.execute(text(f"ALTER TABLE ppsps ADD COLUMN {col}"))
-            except: pass
-        db.commit()
-        return {"msg": "Migration V5 OK"}
-    except Exception as e: return {"error": str(e)}
-
-@app.get("/migrate_db_v7")
-def migrate_v7(db: Session = Depends(get_db)):
-    try:
-        db.execute(text("ALTER TABLE materiels ADD COLUMN image_url VARCHAR"))
-        db.commit()
-        return {"msg": "Migration V7 OK"}
-    except: return {"msg": "Déjà fait"}
-
-# ==========================================
-# 10. GESTION D'ÉQUIPE (SaaS)
-# ==========================================
+def update_my_company(up: schemas.CompanyUpdate, db: Session = Depends(get_db), current_user: models.User = Depends(security.get_current_user)):
+    if not current_user.company_id: raise HTTPException(400)
+    c = db.query(models.Company).filter(models.Company.id == current_user.company_id).first()
+    if up.name: c.name = up.name
+    if up.address: c.address = up.address
+    if up.contact_email: c.contact_email = up.contact_email
+    if up.phone: c.phone = up.phone
+    if up.logo_url: c.logo_url = up.logo_url
+    db.commit(); db.refresh(c)
+    return c
 
 @app.get("/team", response_model=List[schemas.UserOut])
 def read_team(db: Session = Depends(get_db), current_user: models.User = Depends(security.get_current_user)):
-    # On renvoie tous les utilisateurs qui ont le même company_id que moi
     return db.query(models.User).filter(models.User.company_id == current_user.company_id).all()
 
 @app.post("/team", response_model=schemas.UserOut)
-def add_team_member(
-    user: schemas.UserCreate, 
-    db: Session = Depends(get_db), 
-    current_user: models.User = Depends(security.get_current_user)
-):
-    # 1. Vérif droits (Seul un admin peut ajouter ?) - On laisse ouvert pour l'instant
-    
-    # 2. Vérif Email
-    if db.query(models.User).filter(models.User.email == user.email).first():
-        raise HTTPException(status_code=400, detail="Cet email est déjà utilisé")
-    
-    # 3. Création du membre rattaché à l'entreprise
-    hashed_pwd = security.get_password_hash(user.password)
-    new_member = models.User(
-        email=user.email,
-        hashed_password=hashed_pwd,
-        role=user.role, # 'conducteur', 'ouvrier', etc.
-        company_id=current_user.company_id # <--- C'EST ICI QUE LA MAGIE OPERE
-    )
-    db.add(new_member)
-    db.commit()
-    db.refresh(new_member)
-    return new_member
+def add_team_member(u: schemas.UserCreate, db: Session = Depends(get_db), current_user: models.User = Depends(security.get_current_user)):
+    if db.query(models.User).filter(models.User.email == u.email).first(): raise HTTPException(400, "Email pris")
+    new_u = models.User(email=u.email, hashed_password=security.get_password_hash(u.password), role=u.role, company_id=current_user.company_id)
+    db.add(new_u); db.commit(); db.refresh(new_u)
+    return new_u
 
-# ...
+# ==========================================
+# 11. MIGRATIONS
+# ==========================================
+@app.get("/migrate_multi_tenant")
+def migrate_mt(db: Session = Depends(get_db)):
+    try:
+        models.Base.metadata.create_all(bind=engine)
+        for t in ["users", "chantiers", "materiels"]:
+            try: db.execute(text(f"ALTER TABLE {t} ADD COLUMN company_id INTEGER"))
+            except: pass
+        
+        # Création Entreprise Démo
+        demo = db.query(models.Company).filter(models.Company.id == 1).first()
+        if not demo:
+            demo = models.Company(name="Demo BTP", subscription_plan="pro")
+            db.add(demo); db.commit(); db.refresh(demo)
+        
+        cid = demo.id
+        db.execute(text(f"UPDATE users SET company_id = {cid} WHERE company_id IS NULL"))
+        db.execute(text(f"UPDATE chantiers SET company_id = {cid} WHERE company_id IS NULL"))
+        db.execute(text(f"UPDATE materiels SET company_id = {cid} WHERE company_id IS NULL"))
+        db.commit()
+        return {"msg": "Migration MT OK"}
+    except Exception as e: return {"error": str(e)}
 
-# --- MIGRATION V9 (PLANNING) ---
 @app.get("/migrate_db_v9")
-def migrate_db_v9(db: Session = Depends(get_db)):
+def migrate_v9(db: Session = Depends(get_db)):
     try:
         db.execute(text("ALTER TABLE chantiers ADD COLUMN IF NOT EXISTS date_debut TIMESTAMP"))
         db.execute(text("ALTER TABLE chantiers ADD COLUMN IF NOT EXISTS date_fin TIMESTAMP"))
         db.execute(text("ALTER TABLE chantiers ADD COLUMN IF NOT EXISTS statut_planning VARCHAR DEFAULT 'prevu'"))
         db.commit()
-        return {"message": "Migration V9 (Planning) réussie !"}
-    except Exception as e:
-        return {"status": "Erreur", "details": str(e)}
+        return {"msg": "Migration V9 OK"}
+    except Exception as e: return {"error": str(e)}
 
-@app.post("/chantiers", response_model=schemas.ChantierOut)
-def create_chantier(chantier: schemas.ChantierCreate, db: Session = Depends(get_db), current_user: models.User = Depends(security.get_current_user)):
-    new_chantier = models.Chantier(
-        nom=chantier.nom,
-        adresse=chantier.adresse,
-        client=chantier.client,
-        cover_url=chantier.cover_url,
-        company_id=current_user.company_id,
-        # 👇 AJOUT DATES (Par défaut aujourd'hui + 30 jours si vide)
-        date_debut=chantier.date_debut or datetime.now(),
-        date_fin=chantier.date_fin or (datetime.now() + timedelta(days=30))
-    )
-    db.add(new_chantier)
-    db.commit()
-    db.refresh(new_chantier)
-    return new_chantier
+@app.get("/create_admin")
+def create_admin(db: Session = Depends(get_db)):
+    email = "admin@conformeo.com"
+    if db.query(models.User).filter(models.User.email == email).first(): return {"msg": "Existe déjà"}
+    
+    comp = db.query(models.Company).first()
+    if not comp:
+        comp = models.Company(name="Admin Corp", subscription_plan="pro")
+        db.add(comp); db.commit(); db.refresh(comp)
+        
+    u = models.User(email=email, hashed_password=security.get_password_hash("admin"), role="admin", company_id=comp.id)
+    db.add(u); db.commit()
+    return {"msg": "Admin créé", "login": email, "pass": "admin"}
