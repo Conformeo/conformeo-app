@@ -55,15 +55,23 @@ def draw_footer(c, width, height, chantier, titre_doc):
     c.restoreState()
 
 def draw_cover_page(c, chantier, titre_principal, sous_titre):
-    """Page de garde sobre"""
     width, height = A4
     
-    # 1. Logo
-    logo = get_optimized_image("logo.png")
+    # 1. LOGO DYNAMIQUE (BRANDING)
+    # Par défaut, on cherche "logo.png" (votre logo Conforméo)
+    logo_source = "logo.png"
+    
+    # Si le chantier appartient à une entreprise qui a un logo, on le prend !
+    if chantier.company and chantier.company.logo_url:
+        logo_source = chantier.company.logo_url
+
+    logo = get_optimized_image(logo_source)
+    
     if logo:
         try:
             rl_logo = ImageReader(logo)
-            c.drawImage(rl_logo, 2*cm, height-5*cm, width=4*cm, height=2*cm, mask='auto', preserveAspectRatio=True)
+            # On affiche le logo de l'entreprise
+            c.drawImage(rl_logo, 2*cm, height-4*cm, width=5*cm, height=2.5*cm, mask='auto', preserveAspectRatio=True)
         except: pass
 
     # 2. Titres

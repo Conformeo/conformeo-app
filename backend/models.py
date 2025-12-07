@@ -8,10 +8,16 @@ class Company(Base):
     __tablename__ = "companies"
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, index=True)
-    subscription_plan = Column(String, default="free") # free, pro, enterprise
+    subscription_plan = Column(String, default="free")
+    
+    # 👇 NOUVEAUX CHAMPS
+    logo_url = Column(String, nullable=True)     # Le logo de l'entreprise
+    address = Column(String, nullable=True)      # Adresse du siège
+    contact_email = Column(String, nullable=True) # Email de contact (pied de page)
+    phone = Column(String, nullable=True)        # Téléphone
+    
     created_at = Column(DateTime, default=datetime.now)
 
-    # Relations Parents (Une entreprise a plusieurs...)
     users = relationship("User", back_populates="company")
     chantiers = relationship("Chantier", back_populates="company")
     materiels = relationship("Materiel", back_populates="company")

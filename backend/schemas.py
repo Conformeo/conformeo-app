@@ -6,9 +6,21 @@ from datetime import datetime
 class CompanyCreate(BaseModel):
     name: str
 
+class CompanyUpdate(BaseModel):
+    name: Optional[str] = None
+    address: Optional[str] = None
+    contact_email: Optional[str] = None
+    phone: Optional[str] = None
+    logo_url: Optional[str] = None
+
+# Mettez aussi à jour CompanyOut pour renvoyer ces infos
 class CompanyOut(BaseModel):
     id: int
     name: str
+    logo_url: Optional[str] = None
+    address: Optional[str] = None
+    contact_email: Optional[str] = None
+    phone: Optional[str] = None
     subscription_plan: str
     class Config:
         from_attributes = True
