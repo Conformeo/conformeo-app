@@ -1,0 +1,27 @@
+<ion-content class="login-content">
+  <div class="login-container">
+    <div class="logo">
+      <h1>Conforméo</h1>
+      <p>Pilotage BTP</p>
+    </div>
+
+    <ion-card>
+      <ion-card-content>
+        <ion-item>
+          <ion-label position="stacked">Email</ion-label>
+          <ion-input type="email" [(ngModel)]="credentials.email"></ion-input>
+        </ion-item>
+        <ion-item>
+          <ion-label position="stacked">Mot de passe</ion-label>
+          <ion-input type="password" [(ngModel)]="credentials.password"></ion-input>
+        </ion-item>
+
+        <ion-button expand="block" (click)="login()" class="ion-margin-top">
+          Se connecter
+        </ion-button>
+        
+        <p class="footer-text">Pas de compte ? Contactez votre admin.</p>
+      </ion-card-content>
+    </ion-card>
+  </div>
+</ion-content>

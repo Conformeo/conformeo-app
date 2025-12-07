@@ -1,4 +1,5 @@
 import { Routes } from '@angular/router';
+import { authGuard } from '../app/guards/auth-guard';
 
 export const routes: Routes = [
   {
@@ -8,38 +9,38 @@ export const routes: Routes = [
   },
   {
     path: 'home',
-    loadComponent: () => import('./home/home.page').then((m) => m.HomePage),
+    loadComponent: () => import('./home/home.page').then((m) => m.HomePage), canActivate: [authGuard]
   },
   {
     path: 'materiel',
-    loadComponent: () => import('./pages/materiel/materiel.page').then( m => m.MaterielPage)
+    loadComponent: () => import('./pages/materiel/materiel.page').then( m => m.MaterielPage), canActivate: [authGuard]
   },
   {
     path: 'dashboard',
-    loadComponent: () => import('./pages/dashboard/dashboard.page').then( m => m.DashboardPage)
+    loadComponent: () => import('./pages/dashboard/dashboard.page').then( m => m.DashboardPage), canActivate: [authGuard]
   },
   {
     path: 'chantier/:id',
-    loadComponent: () => import('./pages/chantier-details/chantier-details.page').then( m => m.ChantierDetailsPage)
+    loadComponent: () => import('./pages/chantier-details/chantier-details.page').then( m => m.ChantierDetailsPage), canActivate: [authGuard]
   },
   {
     path: 'qhse-form/:id',
-    loadComponent: () => import('./pages/qhse-form/qhse-form.page').then( m => m.QhseFormPage)
+    loadComponent: () => import('./pages/qhse-form/qhse-form.page').then( m => m.QhseFormPage), canActivate: [authGuard]
   },
   {
     path: 'ppsps-form/:id',
-    loadComponent: () => import('./pages/ppsps-form/ppsps-form.page').then( m => m.PpspsFormPage)
+    loadComponent: () => import('./pages/ppsps-form/ppsps-form.page').then( m => m.PpspsFormPage), canActivate: [authGuard]
   },
   {
     path: 'smart-scan/:id',
-    loadComponent: () => import('./pages/smart-scan/smart-scan.page').then( m => m.SmartScanPage)
+    loadComponent: () => import('./pages/smart-scan/smart-scan.page').then( m => m.SmartScanPage), canActivate: [authGuard]
   },
   {
     path: 'equipe',
-    loadComponent: () => import('./pages/equipe/equipe.page').then( m => m.EquipePage)
+    loadComponent: () => import('./pages/equipe/equipe.page').then( m => m.EquipePage), canActivate: [authGuard]
   },
   {
-    path: 'equipe',
-    loadComponent: () => import('./pages/equipe/equipe.page').then( m => m.EquipePage)
+    path: 'login',
+    loadComponent: () => import('./pages/login/login.page').then( m => m.LoginPage)
   },
 ];
