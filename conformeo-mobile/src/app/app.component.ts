@@ -36,7 +36,7 @@ export class AppComponent {
     { title: 'Mes Chantiers', url: '/home', icon: 'map-outline' },
     { title: 'Parc Matériel', url: '/materiel', icon: 'hammer-outline' },
     { title: 'Équipes', url: '/equipe', icon: 'people-outline' },
-    { title: 'Paramètres', url: '/home', icon: 'settings-outline' },
+    { title: 'Paramètres', url: '/parametres', icon: 'settings-outline' },
   ];
 
   currentUrl = '';
