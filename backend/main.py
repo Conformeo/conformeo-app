@@ -486,6 +486,50 @@ def download_doe(cid: int, db: Session = Depends(get_db)):
             
     return FileResponse(zip_name, filename=f"DOE_{c.nom}.zip", media_type='application/zip')
 
+# ==========================================
+# 11. GESTION ENTREPRISE (BRANDING)
+# ==========================================
+
+@app.get("/companies/me", response_model=schemas.CompanyOut)
+def read_my_company(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(security.get_current_user)
+):
+    if not current_user.company_id: raise HTTPException(400, "Aucune entreprise liée")
+    return db.query(models.Company).filter(models.Company.id == current_user.company_id).first()
+
+@app.put("/companies/me", response_model=schemas.CompanyOut)
+def update_my_company(
+    comp_update: schemas.CompanyUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(security.get_current_user)
+):
+    if not current_user.company_id: raise HTTPException(400, "Aucune entreprise liée")
+    
+    company = db.query(models.Company).filter(models.Company.id == current_user.company_id).first()
+    
+    if comp_update.name: company.name = comp_update.name
+    if comp_update.address: company.address = comp_update.address
+    if comp_update.contact_email: company.contact_email = comp_update.contact_email
+    if comp_update.phone: company.phone = comp_update.phone
+    if comp_update.logo_url: company.logo_url = comp_update.logo_url
+    
+    db.commit()
+    db.refresh(company)
+    return company
+
+# --- MIGRATION V8 (BRANDING) ---
+@app.get("/migrate_db_v8")
+def migrate_db_v8(db: Session = Depends(get_db)):
+    try:
+        cols = ["logo_url VARCHAR", "address VARCHAR", "contact_email VARCHAR", "phone VARCHAR"]
+        for c in cols:
+            try: db.execute(text(f"ALTER TABLE companies ADD COLUMN {c}"))
+            except: pass
+        db.commit()
+        return {"msg": "Migration V8 (Branding) OK"}
+    except Exception as e: return {"error": str(e)}
+
 # --- MIGRATIONS ---
 @app.get("/migrate_multi_tenant")
 def migrate_multi_tenant(db: Session = Depends(get_db)):
