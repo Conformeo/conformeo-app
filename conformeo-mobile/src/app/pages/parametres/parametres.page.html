@@ -1,0 +1,65 @@
+<ion-header class="ion-no-border">
+  <ion-toolbar style="--background: #f8f9fa;">
+    <ion-buttons slot="start">
+      <ion-menu-button color="dark"></ion-menu-button>
+    </ion-buttons>
+    <ion-title style="color: #333; font-weight: 800;">Paramètres Entreprise</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding" style="--background: #f8f9fa;">
+  
+  <div class="settings-container">
+    
+    <div class="section-card">
+      <h3>Identité Visuelle</h3>
+      <div class="logo-uploader" (click)="uploadLogo()">
+        <img *ngIf="company.logo_url" [src]="company.logo_url" />
+        <div *ngIf="!company.logo_url" class="placeholder">
+          <ion-icon name="cloud-upload-outline"></ion-icon>
+          <span>Ajouter un Logo</span>
+        </div>
+      </div>
+      <p class="hint">Ce logo apparaîtra sur tous vos rapports PDF.</p>
+    </div>
+
+    <div class="section-card">
+      <h3>Coordonnées</h3>
+      
+      <ion-list lines="full">
+        <ion-item>
+          <ion-icon name="business-outline" slot="start"></ion-icon>
+          <ion-label position="stacked">Nom de l'entreprise</ion-label>
+          <ion-input [(ngModel)]="company.name"></ion-input>
+        </ion-item>
+
+        <ion-item>
+          <ion-icon name="location-outline" slot="start"></ion-icon>
+          <ion-label position="stacked">Adresse du siège</ion-label>
+          <ion-input [(ngModel)]="company.address"></ion-input>
+        </ion-item>
+
+        <ion-item>
+          <ion-icon name="mail-outline" slot="start"></ion-icon>
+          <ion-label position="stacked">Email de contact</ion-label>
+          <ion-input [(ngModel)]="company.contact_email"></ion-input>
+        </ion-item>
+
+        <ion-item>
+          <ion-icon name="call-outline" slot="start"></ion-icon>
+          <ion-label position="stacked">Téléphone</ion-label>
+          <ion-input [(ngModel)]="company.phone"></ion-input>
+        </ion-item>
+      </ion-list>
+
+      <div class="ion-margin-top">
+        <ion-button expand="block" (click)="save()" [disabled]="isSaving">
+          <ion-spinner *ngIf="isSaving"></ion-spinner>
+          <span *ngIf="!isSaving">Enregistrer les modifications</span>
+        </ion-button>
+      </div>
+    </div>
+
+  </div>
+
+</ion-content>

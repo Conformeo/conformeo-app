@@ -265,6 +265,15 @@ export class ApiService {
     }
   }
 
+  // --- COMPANY ---
+  getMyCompany(): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/companies/me`, this.getOptions());
+  }
+
+  updateMyCompany(data: any): Observable<any> {
+    return this.http.put<any>(`${this.apiUrl}/companies/me`, data, this.getOptions());
+  }
+
   // --- MATERIEL ---
 
   getMateriels(): Observable<Materiel[]> {
