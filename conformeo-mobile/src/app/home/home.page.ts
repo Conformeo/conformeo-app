@@ -107,8 +107,7 @@ export class HomePage implements OnInit {
         },
         error: (err) => {
           loading.dismiss();
-          alert("Erreur Import : Vérifiez que le fichier est un CSV valide (Nom;Client;Adresse).");
-        }
+alert("Erreur Serveur : " + (err.error?.detail || err.message || JSON.stringify(err)));        }
       });
     }
   }

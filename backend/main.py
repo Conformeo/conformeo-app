@@ -205,16 +205,17 @@ def read_chantiers(db: Session = Depends(get_db)):
 @app.post("/chantiers/import")
 async def import_chantiers_csv(
     file: UploadFile = File(...), 
-    db: Session = Depends(get_db)
-    # On retire temporairement 'current_user' pour que ça marche sans login
+    db: Session = Depends(get_db) 
+    # ⚠️ ATTENTION : Pas de 'current_user' ici !
 ):
-    if not file.filename.endswith('.csv'):
+    # Tolérance majuscule/minuscule pour l'extension
+    if not file.filename.lower().endswith('.csv'):
         raise HTTPException(400, "Le fichier doit être un CSV")
 
     try:
         content = await file.read()
         
-        # Décodage robuste (UTF-8 ou Latin-1)
+        # Décodage robuste
         try:
             text_content = content.decode('utf-8')
         except UnicodeDecodeError:
@@ -223,31 +224,39 @@ async def import_chantiers_csv(
         lines = text_content.splitlines()
         if not lines: raise HTTPException(400, "Fichier vide")
         
-        # Détection automatique du séparateur (; ou ,)
+        # Détection séparateur
         delimiter = ';' if ';' in lines[0] else ','
         reader = csv.DictReader(lines, delimiter=delimiter)
 
-        # On cherche une entreprise par défaut pour rattacher les chantiers
+        # On prend une entreprise par défaut pour éviter le plantage
+        # Si la table companies est vide, on met None (le chantier sera orphelin mais créé)
         default_company = db.query(models.Company).first()
         cid = default_company.id if default_company else None
 
         count = 0
         for row in reader:
-            # Nettoyage des clés (enlève les espaces, met en minuscule)
-            row = {k.strip().lower(): v.strip() for k, v in row.items() if k}
+            # Nettoyage des clés (enlève espaces et met en minuscule pour être sûr)
+            # Ex: "Nom " devient "nom"
+            row = {k.strip(): v.strip() for k, v in row.items() if k}
             
-            # Recherche des colonnes (tolérant aux majuscules/minuscules)
-            nom = row.get('nom') or row.get('name')
-            client = row.get('client') or "Client Inconnu"
-            adresse = row.get('adresse') or row.get('address') or "Adresse Inconnue"
+            # Recherche des colonnes (tolérant)
+            # On cherche 'Nom', 'nom', 'NOM'...
+            keys_nom = [k for k in row.keys() if k.lower() == 'nom']
+            keys_client = [k for k in row.keys() if k.lower() == 'client']
+            keys_adresse = [k for k in row.keys() if k.lower() == 'adresse']
+
+            nom = row[keys_nom[0]] if keys_nom else None
             
             if nom:
+                client = row[keys_client[0]] if keys_client else "Client Inconnu"
+                adresse = row[keys_adresse[0]] if keys_adresse else "Adresse Inconnue"
+                
                 new_c = models.Chantier(
                     nom=nom,
                     client=client,
                     adresse=adresse,
                     est_actif=True,
-                    company_id=cid, # On rattache
+                    company_id=cid,
                     date_creation=datetime.now()
                 )
                 db.add(new_c)
@@ -258,8 +267,9 @@ async def import_chantiers_csv(
 
     except Exception as e:
         db.rollback()
-        print(f"Erreur Import : {e}")
-        raise HTTPException(500, f"Erreur technique : {str(e)}")
+        # On renvoie l'erreur précise au frontend
+        raise HTTPException(500, f"Erreur Python : {str(e)}")
+        
 
 @app.put("/chantiers/{cid}/signature")
 def sign_chantier(cid: int, signature_url: str, db: Session = Depends(get_db)):
