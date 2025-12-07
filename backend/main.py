@@ -75,6 +75,44 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     token = security.create_access_token(data={"sub": user.email, "role": user.role})
     return {"access_token": token, "token_type": "bearer"}
 
+# --- OUTIL DE SECOURS : CRÉATION ADMIN ---
+@app.get("/create_admin")
+def create_admin_user(db: Session = Depends(get_db)):
+    email = "admin@conformeo.com"
+    password = "admin"
+    
+    # 1. Vérifier si l'utilisateur existe déjà
+    existing_user = db.query(models.User).filter(models.User.email == email).first()
+    if existing_user:
+        return {"message": "L'utilisateur existe déjà !", "email": email, "password": password}
+
+    # 2. Vérifier ou créer l'entreprise
+    company = db.query(models.Company).first()
+    if not company:
+        company = models.Company(name="Ma Super Entreprise BTP", subscription_plan="pro")
+        db.add(company)
+        db.commit()
+        db.refresh(company)
+
+    # 3. Créer l'utilisateur
+    hashed_pwd = security.get_password_hash(password)
+    new_user = models.User(
+        email=email,
+        hashed_password=hashed_pwd,
+        role="admin",
+        company_id=company.id
+    )
+    
+    db.add(new_user)
+    db.commit()
+    
+    return {
+        "status": "Succès ✅",
+        "message": "Utilisateur Admin créé !",
+        "login": email,
+        "password": password
+    }
+
 # ==========================================
 # 2. DASHBOARD (LA VERSION INTELLIGENTE)
 # ==========================================
