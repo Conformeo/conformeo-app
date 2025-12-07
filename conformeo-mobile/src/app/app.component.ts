@@ -11,7 +11,8 @@ import {
 import { addIcons } from 'ionicons';
 import { 
   gridOutline, hammerOutline, mapOutline, peopleOutline, 
-  settingsOutline, logOutOutline, sync, checkmarkCircle, warning 
+  settingsOutline, logOutOutline, sync, checkmarkCircle, warning,
+  calendarOutline
 } from 'ionicons/icons';
 
 import { OfflineService } from './services/offline';
@@ -37,7 +38,7 @@ export class AppComponent {
     { title: 'Parc Matériel', url: '/materiel', icon: 'hammer-outline' },
     { title: 'Équipes', url: '/equipe', icon: 'people-outline' },
     { title: 'Paramètres', url: '/parametres', icon: 'settings-outline' },
-    { title: 'Plannigs', url: '/planning', icon: 'calendar-outline' }
+    { title: 'Planning', url: '/planning', icon: 'calendar-outline' }
   ];
 
   currentUrl = '';
@@ -51,7 +52,7 @@ export class AppComponent {
     private menuCtrl: MenuController, // Pour fermer le menu
     private navCtrl: NavController
   ) {
-    addIcons({ gridOutline, hammerOutline, mapOutline, peopleOutline, settingsOutline, logOutOutline, sync, checkmarkCircle, warning });
+    addIcons({ gridOutline, hammerOutline, mapOutline, peopleOutline, settingsOutline, logOutOutline, sync, checkmarkCircle, warning, calendarOutline });
     this.initializeApp();
     
     this.router.events.subscribe((event) => {
