@@ -213,7 +213,7 @@ async def import_chantiers_csv(file: UploadFile = File(...), db: Session = Depen
     except Exception as e:
         db.rollback()
         raise HTTPException(500, f"Erreur: {str(e)}")
-        
+
 @app.put("/chantiers/{cid}/signature")
 def sign_chantier(cid: int, signature_url: str, db: Session = Depends(get_db)):
     c = db.query(models.Chantier).filter(models.Chantier.id == cid).first()
@@ -541,3 +541,49 @@ def fix_database_columns(db: Session = Depends(get_db)):
             messages.append(f"ℹ️ Colonne '{col_name}' existe déjà (ou erreur: {e}).")
             
     return {"status": "Terminé", "details": messages}
+
+@app.get("/fix_everything")
+def fix_everything(db: Session = Depends(get_db)):
+    logs = []
+    
+    # Liste de TOUTES les colonnes susceptibles de manquer
+    corrections = [
+        # Table CHANTIERS
+        ("chantiers", "signature_url", "VARCHAR"),
+        ("chantiers", "cover_url", "VARCHAR"),
+        ("chantiers", "date_debut", "TIMESTAMP"),
+        ("chantiers", "date_fin", "TIMESTAMP"),
+        ("chantiers", "statut_planning", "VARCHAR DEFAULT 'prevu'"),
+        ("chantiers", "company_id", "INTEGER"),
+        
+        # Table MATERIELS
+        ("materiels", "image_url", "VARCHAR"),
+        ("materiels", "company_id", "INTEGER"),
+        
+        # Table USERS
+        ("users", "company_id", "INTEGER"),
+        
+        # Table COMPANIES (Branding)
+        ("companies", "logo_url", "VARCHAR"),
+        ("companies", "address", "VARCHAR"),
+        ("companies", "contact_email", "VARCHAR"),
+        ("companies", "phone", "VARCHAR"),
+
+        # Table PPSPS
+        ("ppsps", "secours_data", "JSON"),
+        ("ppsps", "installations_data", "JSON"),
+        ("ppsps", "taches_data", "JSON"),
+        ("ppsps", "duree_travaux", "VARCHAR"),
+    ]
+    
+    for table, col, type_col in corrections:
+        try:
+            db.execute(text(f"ALTER TABLE {table} ADD COLUMN {col} {type_col}"))
+            db.commit()
+            logs.append(f"✅ Ajout de {col} dans {table}")
+        except Exception as e:
+            db.rollback()
+            # L'erreur est normale si la colonne existe déjà
+            logs.append(f"ℹ️ {col} existe déjà dans {table}")
+
+    return {"status": "Terminé", "details": logs}
