@@ -200,6 +200,34 @@ export class ChantierDetailsPage implements OnInit {
     }
   }
 
+  async toggleStatus() {
+    if (!this.chantier) return;
+
+    const newStatus = !this.chantier.est_actif;
+    const action = newStatus ? 'Réactiver' : 'Clôturer';
+    
+    const alert = await this.alertCtrl.create({
+      header: `${action} le chantier ?`,
+      message: newStatus 
+        ? 'Le chantier reviendra dans la liste des actifs.' 
+        : 'Le chantier sera marqué comme terminé.',
+      buttons: [
+        { text: 'Annuler', role: 'cancel' },
+        {
+          text: 'Valider',
+          handler: () => {
+            // On envoie juste le champ à modifier
+            this.api.updateChantier(this.chantierId, { est_actif: newStatus }).subscribe(() => {
+              this.chantier!.est_actif = newStatus;
+              this.api.needsRefresh = true; // Pour mettre à jour l'accueil
+            });
+          }
+        }
+      ]
+    });
+    await alert.present();
+  }
+
   async uploadAndCreateRapport(blob: Blob, webPath: string) {
     const modal = await this.modalCtrl.create({
       component: NewRapportModalComponent,

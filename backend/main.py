@@ -160,6 +160,11 @@ def update_chantier(cid: int, up: schemas.ChantierCreate, db: Session = Depends(
     if up.cover_url: c.cover_url = up.cover_url
     if up.date_debut: c.date_debut = up.date_debut
     if up.date_fin: c.date_fin = up.date_fin
+
+    # 👇 AJOUT DE LA MISE A JOUR DU STATUT
+    if up.est_actif is not None: 
+        c.est_actif = up.est_actif
+
     db.commit(); db.refresh(c)
     return c
 
@@ -796,7 +801,7 @@ def migrate_v10(db: Session = Depends(get_db)):
         db.execute(text("ALTER TABLE chantiers ADD COLUMN IF NOT EXISTS latitude FLOAT"))
         db.execute(text("ALTER TABLE chantiers ADD COLUMN IF NOT EXISTS longitude FLOAT"))
         db.commit()
-        return {"msg": "Migration V10 (GPS) OK"}
+        re@turn {"msg": "Migration V10 (GPS) OK"}
     except Exception as e: return {"error": str(e)}
 
 # --- ROUTE DE RATTRAPAGE (Pour géolocaliser les anciens chantiers) ---

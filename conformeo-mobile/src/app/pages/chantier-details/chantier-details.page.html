@@ -45,12 +45,15 @@
           <label>Fin</label>
           <p>{{ chantier?.date_fin | date:'dd/MM/yy' }}</p>
         </div>
-        <div class="grid-item">
-          <label>Statut</label>
-          <p [style.color]="chantier?.est_actif ? '#2dd36f' : '#999'" style="font-weight: bold;">
+        <div class="grid-item" (click)="toggleStatus()" style="cursor: pointer;">
+        <label>Statut (Modifier)</label> <div style="display: flex; align-items: center; gap: 5px;">
+          <div class="status-dot" [class.active]="chantier?.est_actif"></div>
+          <p [style.color]="chantier?.est_actif ? '#2dd36f' : '#999'" style="font-weight: bold; margin: 0;">
             {{ chantier?.est_actif ? 'En cours' : 'Terminé' }}
           </p>
+          <ion-icon name="create-outline" style="font-size: 12px; color: #ccc;"></ion-icon>
         </div>
+      </div>
       </div>
       
       <div class="actions-row">
