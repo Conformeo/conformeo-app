@@ -46,6 +46,9 @@ class Chantier(Base):
     signature_url = Column(String, nullable=True)
     cover_url = Column(String, nullable=True)
 
+    latitude = Column(Float, nullable=True)
+    longitude = Column(Float, nullable=True)
+
     date_debut = Column(DateTime, nullable=True)
     date_fin = Column(DateTime, nullable=True)
     statut_planning = Column(String, default="prevu") # prevu, en_cours, termine, retard

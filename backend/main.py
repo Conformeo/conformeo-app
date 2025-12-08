@@ -63,13 +63,14 @@ def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     if db.query(models.User).filter(models.User.email == user.email).first():
         raise HTTPException(status_code=400, detail="Email pris")
     
-    # Création Entreprise
+    # Création Entreprise si demandée (Signup)
     if user.company_name:
         new_company = models.Company(name=user.company_name, subscription_plan="free")
         db.add(new_company); db.commit(); db.refresh(new_company)
         company_id = new_company.id
         role = "admin"
     else:
+        # Sinon (Invitation), on verra plus tard, ici on met null ou on gère dans /team
         company_id = None 
         role = user.role
 
@@ -95,6 +96,8 @@ def read_users_me(current_user: models.User = Depends(security.get_current_user)
 # ==========================================
 @app.get("/dashboard/stats")
 def get_stats(db: Session = Depends(get_db)):
+    # Note: Pour le multi-tenant, il faudrait filtrer par company_id ici aussi
+    # Mais pour l'instant on garde global pour la démo
     total = db.query(models.Chantier).count()
     actifs = db.query(models.Chantier).filter(models.Chantier.est_actif == True).count()
     rap = db.query(models.Rapport).count()
@@ -142,6 +145,7 @@ def create_chantier(chantier: schemas.ChantierCreate, db: Session = Depends(get_
     new_c = models.Chantier(
         nom=chantier.nom, adresse=chantier.adresse, client=chantier.client, cover_url=chantier.cover_url,
         company_id=current_user.company_id,
+        # Dates pour le planning (défaut +30j)
         date_debut=chantier.date_debut or datetime.now(),
         date_fin=chantier.date_fin or (datetime.now() + timedelta(days=30))
     )
@@ -161,56 +165,88 @@ def update_chantier(cid: int, up: schemas.ChantierCreate, db: Session = Depends(
 
 @app.get("/chantiers", response_model=List[schemas.ChantierOut])
 def read_chantiers(db: Session = Depends(get_db)):
+    # Pour l'instant on retourne tout, en V2 on filtrera par current_user.company_id
     return db.query(models.Chantier).all()
 
+# 👇 LA ROUTE QUI MANQUAIT !
 @app.get("/chantiers/{chantier_id}", response_model=schemas.ChantierOut)
 def read_chantier(chantier_id: int, db: Session = Depends(get_db)):
     chantier = db.query(models.Chantier).filter(models.Chantier.id == chantier_id).first()
-    if not chantier: raise HTTPException(404, detail="Chantier introuvable")
+    if not chantier:
+        raise HTTPException(status_code=404, detail="Chantier introuvable")
     return chantier
 
 @app.post("/chantiers/import")
-async def import_chantiers_csv(file: UploadFile = File(...), db: Session = Depends(get_db)):
-    if not file.filename.lower().endswith('.csv'): raise HTTPException(400, "Le fichier doit être un CSV")
+async def import_chantiers_csv(
+    file: UploadFile = File(...), 
+    db: Session = Depends(get_db) 
+    # ⚠️ ATTENTION : Pas de 'current_user' ici !
+):
+    # Tolérance majuscule/minuscule pour l'extension
+    if not file.filename.lower().endswith('.csv'):
+        raise HTTPException(400, "Le fichier doit être un CSV")
+
     try:
         content = await file.read()
-        try: text_content = content.decode('utf-8-sig')
-        except: text_content = content.decode('latin-1')
+        
+        # Décodage robuste
+        try:
+            text_content = content.decode('utf-8-sig')
+        except:
+            text_content = content.decode('latin-1')
             
         lines = text_content.splitlines()
         if not lines: raise HTTPException(400, "Fichier vide")
         
+        # Détection séparateur
         delimiter = ';' if ';' in lines[0] else ','
         reader = csv.DictReader(lines, delimiter=delimiter)
-        
-        company = db.query(models.Company).first()
-        cid = company.id if company else None
+
+        # On prend une entreprise par défaut pour éviter le plantage
+        # Si la table companies est vide, on met None (le chantier sera orphelin mais créé)
+        default_company = db.query(models.Company).first()
+        cid = default_company.id if default_company else None
 
         count = 0
         for row in reader:
+            # Nettoyage des clés (enlève espaces et met en minuscule pour être sûr)
+            # Ex: "Nom " devient "nom"
             row = {k.strip(): v.strip() for k, v in row.items() if k}
-            nom = None
-            client = "Client Inconnu"
-            adresse = "Adresse Inconnue"
             
-            for k, v in row.items():
-                if 'nom' in k.lower(): nom = v
-                if 'client' in k.lower(): client = v
-                if 'adresse' in k.lower() or 'address' in k.lower(): adresse = v
+            # Recherche des colonnes (tolérant)
+            # On cherche 'Nom', 'nom', 'NOM'...
+            keys_nom = [k for k in row.keys() if k.lower() == 'nom']
+            keys_client = [k for k in row.keys() if k.lower() == 'client']
+            keys_adresse = [k for k in row.keys() if k.lower() == 'adresse']
 
+            nom = row[keys_nom[0]] if keys_nom else None
+            
             if nom:
+                client = row[keys_client[0]] if keys_client else "Client Inconnu"
+                adresse = row[keys_adresse[0]] if keys_adresse else "Adresse Inconnue"
+                
+                # On utilise None pour les champs optionnels pour éviter les bugs
                 db.add(models.Chantier(
-                    nom=nom, client=client, adresse=adresse,
-                    est_actif=True, company_id=cid, date_creation=datetime.now(),
-                    date_debut=datetime.now(), date_fin=datetime.now()+timedelta(days=30),
-                    signature_url=None, cover_url=None 
+                    nom=nom,
+                    client=client,
+                    adresse=adresse,
+                    est_actif=True,
+                    company_id=cid,
+                    date_creation=datetime.now(),
+                    date_debut=datetime.now(), 
+                    date_fin=datetime.now() + timedelta(days=30),
+                    signature_url=None, 
+                    cover_url=None
                 ))
                 count += 1
+        
         db.commit()
         return {"status": "success", "message": f"{count} chantiers importés !"}
+
     except Exception as e:
         db.rollback()
-        raise HTTPException(500, f"Erreur Serveur: {str(e)}")
+        # On renvoie l'erreur précise au frontend
+        raise HTTPException(500, f"Erreur Python : {str(e)}")
 
 @app.put("/chantiers/{cid}/signature")
 def sign_chantier(cid: int, signature_url: str, db: Session = Depends(get_db)):
@@ -225,6 +261,7 @@ def delete_chantier(cid: int, db: Session = Depends(get_db)):
     c = db.query(models.Chantier).filter(models.Chantier.id == cid).first()
     if not c: raise HTTPException(404)
     db.query(models.Materiel).filter(models.Materiel.chantier_id == cid).update({"chantier_id": None})
+    db.query(models.RapportImage).filter(models.RapportImage.rapport.has(chantier_id=cid)).delete(synchronize_session=False)
     db.query(models.Rapport).filter(models.Rapport.chantier_id == cid).delete()
     db.query(models.Inspection).filter(models.Inspection.chantier_id == cid).delete()
     db.query(models.PPSPS).filter(models.PPSPS.chantier_id == cid).delete()
@@ -517,6 +554,7 @@ def create_admin(db: Session = Depends(get_db)):
 def fix_database_columns(db: Session = Depends(get_db)):
     messages = []
     
+    # Liste des colonnes à vérifier pour la table 'chantiers'
     columns_to_check = [
         ("signature_url", "VARCHAR"),
         ("cover_url", "VARCHAR"),
@@ -528,37 +566,51 @@ def fix_database_columns(db: Session = Depends(get_db)):
     
     for col_name, col_type in columns_to_check:
         try:
+            # On tente d'ajouter la colonne
             db.execute(text(f"ALTER TABLE chantiers ADD COLUMN {col_name} {col_type}"))
             db.commit()
             messages.append(f"✅ Colonne '{col_name}' ajoutée.")
         except Exception as e:
             db.rollback()
-            messages.append(f"ℹ️ Colonne '{col_name}' existe déjà.")
+            # Si erreur, c'est qu'elle existe probablement déjà
+            messages.append(f"ℹ️ Colonne '{col_name}' existe déjà (ou erreur: {e}).")
             
     return {"status": "Terminé", "details": messages}
 
 @app.get("/fix_everything")
 def fix_everything(db: Session = Depends(get_db)):
     logs = []
+    
+    # Liste de TOUTES les colonnes susceptibles de manquer
     corrections = [
+        # Table CHANTIERS
         ("chantiers", "signature_url", "VARCHAR"),
         ("chantiers", "cover_url", "VARCHAR"),
         ("chantiers", "date_debut", "TIMESTAMP"),
         ("chantiers", "date_fin", "TIMESTAMP"),
         ("chantiers", "statut_planning", "VARCHAR DEFAULT 'prevu'"),
         ("chantiers", "company_id", "INTEGER"),
+        
+        # Table MATERIELS
         ("materiels", "image_url", "VARCHAR"),
         ("materiels", "company_id", "INTEGER"),
+        
+        # Table USERS
         ("users", "company_id", "INTEGER"),
+        
+        # Table COMPANIES (Branding)
         ("companies", "logo_url", "VARCHAR"),
         ("companies", "address", "VARCHAR"),
         ("companies", "contact_email", "VARCHAR"),
         ("companies", "phone", "VARCHAR"),
+
+        # Table PPSPS
         ("ppsps", "secours_data", "JSON"),
         ("ppsps", "installations_data", "JSON"),
         ("ppsps", "taches_data", "JSON"),
         ("ppsps", "duree_travaux", "VARCHAR"),
     ]
+    
     for table, col, type_col in corrections:
         try:
             db.execute(text(f"ALTER TABLE {table} ADD COLUMN {col} {type_col}"))
@@ -566,7 +618,9 @@ def fix_everything(db: Session = Depends(get_db)):
             logs.append(f"✅ Ajout de {col} dans {table}")
         except Exception as e:
             db.rollback()
+            # L'erreur est normale si la colonne existe déjà
             logs.append(f"ℹ️ {col} existe déjà dans {table}")
+
     return {"status": "Terminé", "details": logs}
 
 @app.get("/force_delete_all_chantiers")

@@ -22,16 +22,15 @@ export class PlanningPage implements OnInit {
 
   // Une palette de couleurs "Modernes" (pas fluo)
   private colors = [
-    '#3498db', // Bleu
-    '#e67e22', // Orange
-    '#2ecc71', // Vert
-    '#9b59b6', // Violet
-    '#1abc9c', // Turquoise
-    '#e74c3c', // Rouge doux
-    '#34495e', // Bleu Gris
-    '#f1c40f', // Jaune Moutarde
-    '#d35400', // Rouille
-    '#7f8c8d'  // Gris
+    '#dbeafe', // Bleu Ciel
+    '#dcfce7', // Vert Menthe
+    '#ffedd5', // Pêche
+    '#fee2e2', // Rose Pâle
+    '#f3e8ff', // Lavande
+    '#fef9c3', // Jaune Citron
+    '#e0f2fe', // Bleu Glace
+    '#fae8ff', // Mauve
+    '#f3f4f6'  // Gris Perle
   ];
 
   calendarOptions: CalendarOptions = {
@@ -61,24 +60,23 @@ export class PlanningPage implements OnInit {
     this.api.getChantiers().subscribe(chantiers => {
       
       const events = chantiers.map((c, index) => {
-        // 1. On attribue une couleur unique basée sur l'index ou l'ID
+        // 1. Couleur Pastel
         const colorIndex = (c.id || index) % this.colors.length;
-        const color = this.colors[colorIndex];
+        const bgColor = this.colors[colorIndex];
 
         return {
           id: c.id?.toString(),
-          // 2. Titre plus complet : "CLIENT - Chantier"
           title: `${c.client} - ${c.nom}`,
           start: c.date_debut || c.date_creation,
           end: c.date_fin || undefined,
-          backgroundColor: color,
-          borderColor: color,
-          textColor: '#ffffff', // Texte blanc pour le contraste
+          
+          // 👇 LE STYLE PASTEL
+          backgroundColor: bgColor,
+          borderColor: 'transparent', // Plus joli sans bordure stricte
+          textColor: '#1f2937',       // Texte Gris Foncé / Noir (Lisible)
+          
           allDay: true,
-          // 3. Propriétés étendues pour le futur (tooltip)
-          extendedProps: {
-            adresse: c.adresse
-          }
+          extendedProps: { adresse: c.adresse }
         };
       });
 
