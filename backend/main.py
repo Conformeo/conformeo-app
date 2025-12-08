@@ -169,69 +169,51 @@ def read_chantiers(db: Session = Depends(get_db)):
     return db.query(models.Chantier).all()
 
 @app.post("/chantiers/import")
-async def import_chantiers_csv(
-    file: UploadFile = File(...), 
-    db: Session = Depends(get_db)
-):
+async def import_chantiers_csv(file: UploadFile = File(...), db: Session = Depends(get_db)):
     try:
         content = await file.read()
-        
-        # 1. Décodage qui gère le BOM Excel (utf-8-sig)
-        try:
-            text_content = content.decode('utf-8-sig')
-        except:
-            text_content = content.decode('latin-1')
+        try: text = content.decode('utf-8-sig') # Gère le BOM Excel
+        except: text = content.decode('latin-1')
             
-        lines = text_content.splitlines()
-        if not lines: raise HTTPException(400, "Fichier vide")
+        lines = text.splitlines()
+        if not lines: raise HTTPException(400, "Vide")
         
-        # 2. Détection séparateur
         delimiter = ';' if ';' in lines[0] else ','
         reader = csv.DictReader(lines, delimiter=delimiter)
-
-        # 3. Récupération Entreprise par défaut
+        
         company = db.query(models.Company).first()
         cid = company.id if company else None
 
         count = 0
         for row in reader:
-            # Nettoyage des clés et valeurs
+            # Nettoyage des clés (Espaces et BOM)
             row = {k.strip(): v.strip() for k, v in row.items() if k}
             
-            # Recherche des colonnes "Intelligente" (insensible à la casse)
+            # Recherche intelligente des colonnes
             nom = None
-            client = "Client Inconnu"
-            adresse = "Adresse Inconnue"
+            client = "-"
+            adresse = "-"
             
-            for key, value in row.items():
-                k_lower = key.lower()
-                if 'nom' in k_lower: nom = value
-                if 'client' in k_lower: client = value
-                if 'adresse' in k_lower or 'address' in k_lower: adresse = value
-            
-            if nom:
-                new_c = models.Chantier(
-                    nom=nom,
-                    client=client,
-                    adresse=adresse, # L'adresse sera bien prise cette fois !
-                    est_actif=True,
-                    company_id=cid,
-                    date_creation=datetime.now(),
-                    date_debut=datetime.now(),
-                    date_fin=datetime.now() + timedelta(days=30),
-                    cover_url=None # Pas d'image par défaut
-                )
-                db.add(new_c)
-                count += 1
-        
-        db.commit()
-        return {"status": "success", "message": f"{count} chantiers importés avec adresse !"}
+            for k, v in row.items():
+                if 'nom' in k.lower(): nom = v
+                if 'client' in k.lower(): client = v
+                if 'adresse' in k.lower(): adresse = v # <--- C'est ça qui va sauver les adresses !
 
+            if nom:
+                # On utilise None pour les champs optionnels pour éviter les bugs
+                db.add(models.Chantier(
+                    nom=nom, client=client, adresse=adresse,
+                    est_actif=True, company_id=cid, date_creation=datetime.now(),
+                    date_debut=datetime.now(), date_fin=datetime.now()+timedelta(days=30),
+                    signature_url=None, cover_url=None 
+                ))
+                count += 1
+        db.commit()
+        return {"status": "success", "message": f"{count} chantiers importés !"}
     except Exception as e:
         db.rollback()
-        print(f"Erreur Import : {e}")
-        raise HTTPException(500, f"Erreur : {str(e)}")
-
+        raise HTTPException(500, f"Erreur: {str(e)}")
+        
 @app.put("/chantiers/{cid}/signature")
 def sign_chantier(cid: int, signature_url: str, db: Session = Depends(get_db)):
     c = db.query(models.Chantier).filter(models.Chantier.id == cid).first()
@@ -532,3 +514,30 @@ def create_admin(db: Session = Depends(get_db)):
     u = models.User(email=email, hashed_password=security.get_password_hash("admin"), role="admin", company_id=comp.id)
     db.add(u); db.commit()
     return {"msg": "Admin créé", "login": email, "pass": "admin"}
+
+@app.get("/fix_database_columns")
+def fix_database_columns(db: Session = Depends(get_db)):
+    messages = []
+    
+    # Liste des colonnes à vérifier pour la table 'chantiers'
+    columns_to_check = [
+        ("signature_url", "VARCHAR"),
+        ("cover_url", "VARCHAR"),
+        ("date_debut", "TIMESTAMP"),
+        ("date_fin", "TIMESTAMP"),
+        ("statut_planning", "VARCHAR DEFAULT 'prevu'"),
+        ("company_id", "INTEGER")
+    ]
+    
+    for col_name, col_type in columns_to_check:
+        try:
+            # On tente d'ajouter la colonne
+            db.execute(text(f"ALTER TABLE chantiers ADD COLUMN {col_name} {col_type}"))
+            db.commit()
+            messages.append(f"✅ Colonne '{col_name}' ajoutée.")
+        except Exception as e:
+            db.rollback()
+            # Si erreur, c'est qu'elle existe probablement déjà
+            messages.append(f"ℹ️ Colonne '{col_name}' existe déjà (ou erreur: {e}).")
+            
+    return {"status": "Terminé", "details": messages}
