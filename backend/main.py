@@ -169,50 +169,73 @@ def read_chantiers(db: Session = Depends(get_db)):
     return db.query(models.Chantier).all()
 
 @app.post("/chantiers/import")
-async def import_chantiers_csv(file: UploadFile = File(...), db: Session = Depends(get_db)):
+async def import_chantiers_csv(
+    file: UploadFile = File(...), 
+    db: Session = Depends(get_db)
+):
+    # 1. Vérification extension
+    if not file.filename.lower().endswith('.csv'):
+        raise HTTPException(400, "Le fichier doit être un CSV")
+
     try:
         content = await file.read()
-        try: text = content.decode('utf-8-sig') # Gère le BOM Excel
-        except: text = content.decode('latin-1')
-            
-        lines = text.splitlines()
-        if not lines: raise HTTPException(400, "Vide")
         
+        # 2. Décodage Intelligent (Gère le BOM Excel automatiquement avec utf-8-sig)
+        try:
+            text_content = content.decode('utf-8-sig')
+        except:
+            text_content = content.decode('latin-1')
+            
+        lines = text_content.splitlines()
+        if not lines: raise HTTPException(400, "Fichier vide")
+        
+        # 3. Détection séparateur
         delimiter = ';' if ';' in lines[0] else ','
         reader = csv.DictReader(lines, delimiter=delimiter)
-        
+
+        # Entreprise par défaut
         company = db.query(models.Company).first()
         cid = company.id if company else None
 
         count = 0
         for row in reader:
-            # Nettoyage des clés (Espaces et BOM)
-            row = {k.strip(): v.strip() for k, v in row.items() if k}
+            # 4. Nettoyage des clés (Enlève les espaces et BOM résiduels)
+            row = {k.strip().replace('\ufeff', ''): v.strip() for k, v in row.items() if k}
             
-            # Recherche intelligente des colonnes
+            # 5. Recherche insensible à la casse (Nom, nom, NOM...)
             nom = None
-            client = "-"
-            adresse = "-"
-            
+            client = "Client Inconnu"
+            adresse = "Adresse Inconnue"
+
             for k, v in row.items():
                 if 'nom' in k.lower(): nom = v
                 if 'client' in k.lower(): client = v
-                if 'adresse' in k.lower(): adresse = v # <--- C'est ça qui va sauver les adresses !
-
+                if 'adresse' in k.lower() or 'address' in k.lower(): adresse = v
+            
             if nom:
-                # On utilise None pour les champs optionnels pour éviter les bugs
+                # 6. Création sécurisée (avec champs optionnels explicites)
                 db.add(models.Chantier(
-                    nom=nom, client=client, adresse=adresse,
-                    est_actif=True, company_id=cid, date_creation=datetime.now(),
-                    date_debut=datetime.now(), date_fin=datetime.now()+timedelta(days=30),
-                    signature_url=None, cover_url=None 
+                    nom=nom, 
+                    client=client, 
+                    adresse=adresse,
+                    est_actif=True, 
+                    company_id=cid, 
+                    date_creation=datetime.now(),
+                    date_debut=datetime.now(),
+                    date_fin=datetime.now() + timedelta(days=30),
+                    signature_url=None, # On force à None pour éviter les bugs
+                    cover_url=None
                 ))
                 count += 1
+        
         db.commit()
         return {"status": "success", "message": f"{count} chantiers importés !"}
+
     except Exception as e:
+        print(f"CRASH IMPORT : {e}")
         db.rollback()
-        raise HTTPException(500, f"Erreur: {str(e)}")
+        # On renvoie l'erreur précise pour le débogage
+        raise HTTPException(500, f"Erreur Serveur: {str(e)}")
 
 @app.put("/chantiers/{cid}/signature")
 def sign_chantier(cid: int, signature_url: str, db: Session = Depends(get_db)):
