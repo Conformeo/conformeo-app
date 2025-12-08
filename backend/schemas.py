@@ -65,6 +65,12 @@ class ChantierOut(ChantierBase):
     est_actif: bool
     signature_url: Optional[str] = None
     date_creation: datetime
+    
+    # 👇 CES LIGNES SONT INDISPENSABLES POUR L'AFFICHAGE !
+    date_debut: Optional[datetime] = None
+    date_fin: Optional[datetime] = None
+    statut_planning: Optional[str] = "prevu"
+    
     class Config:
         from_attributes = True
 
