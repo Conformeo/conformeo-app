@@ -1,11 +1,11 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
-import { Observable, from, of, Subject } from 'rxjs';
+import { Observable, from, of } from 'rxjs';
 import { map, switchMap, tap } from 'rxjs/operators';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Preferences } from '@capacitor/preferences';
 import { NavController } from '@ionic/angular';
-import { OfflineService } from './offline';
+import { OfflineService } from './offline'; // Vérifiez le chemin (.service)
 
 // --- INTERFACES ---
 export interface Chantier {
@@ -16,10 +16,8 @@ export interface Chantier {
   est_actif: boolean;
   signature_url?: string;
   cover_url?: string;
-  date_creation?: string;
-  company_id?: number; // Multi-Tenant
-
-  // 👇 AJOUTEZ CES 3 LIGNES (Champs Planning)
+  date_creation: string;
+  company_id?: number;
   date_debut?: string;
   date_fin?: string;
   statut_planning?: string;
@@ -69,6 +67,7 @@ export interface PPSPS {
   horaires: string;
   risques: any; 
   date_creation?: string;
+  // Autres champs PPSPS...
 }
 
 export interface PIC {
@@ -126,11 +125,17 @@ export class ApiService {
     this.navCtrl.navigateRoot('/login');
   }
 
-  isAuthenticated(): boolean {
-    return !!this.token;
+  // 👇 CORRECTION MAJEURE : ASYNC pour éviter le bug F5
+  async isAuthenticated(): Promise<boolean> {
+    if (this.token) return true;
+    const { value } = await Preferences.get({ key: 'auth_token' });
+    if (value) {
+      this.token = value;
+      return true;
+    }
+    return false;
   }
 
-  // Helper pour ajouter le Token
   private getOptions() {
     if (this.token) {
       return {
@@ -169,7 +174,8 @@ export class ApiService {
       path: fileName,
       directory: Directory.Data 
     });
-    const data = readFile.data instanceof Blob ? readFile.data : readFile.data;
+    const data = readFile.data;
+    // Conversion base64 -> blob
     const response = await fetch(`data:image/jpeg;base64,${data}`);
     return await response.blob();
   }
@@ -178,7 +184,6 @@ export class ApiService {
 
   getChantiers(): Observable<Chantier[]> {
     if (this.offline.isOnline.value) {
-      // 👇 AJOUT DE GETOPTIONS
       return this.http.get<Chantier[]>(`${this.apiUrl}/chantiers`, this.getOptions()).pipe(
         tap(data => this.offline.set('chantiers_cache', data))
       );
@@ -198,7 +203,6 @@ export class ApiService {
       this.offline.addToQueue('POST_CHANTIER', chantier);
       return of({ ...chantier, id: 9999, est_actif: true });
     }
-    // 👇 AJOUT DE GETOPTIONS
     return this.http.post<Chantier>(`${this.apiUrl}/chantiers`, chantier, this.getOptions());
   }
 
@@ -230,19 +234,17 @@ export class ApiService {
     if (!this.offline.isOnline.value) throw new Error("Offline");
     const formData = new FormData();
     formData.append('file', blob, 'photo.jpg');
-    // Upload reste public souvent, mais on peut le sécuriser si besoin
     return this.http.post<{url: string}>(`${this.apiUrl}/upload`, formData);
   }
 
   createRapport(rapport: Rapport, photoUrl?: string): Observable<Rapport> {
     let url = `${this.apiUrl}/rapports`;
     if (photoUrl) url += `?photo_url=${encodeURIComponent(photoUrl)}`;
-    
     if (!this.offline.isOnline.value) return of(rapport); 
-    
     return this.http.post<Rapport>(url, rapport, this.getOptions());
   }
 
+  // Fonction Tunnel (Multi Photos)
   async addRapportWithMultiplePhotos(rapport: Rapport, photoBlobs: Blob[]) {
     if (!this.offline.isOnline.value) {
       const localPaths: string[] = [];
@@ -258,6 +260,7 @@ export class ApiService {
       });
       return true;
     } else {
+      // Mode Online : On upload tout en //
       const uploadPromises = photoBlobs.map(blob => 
         new Promise<string>((resolve, reject) => {
           this.uploadPhoto(blob).subscribe({
@@ -269,7 +272,6 @@ export class ApiService {
       try {
         const urls = await Promise.all(uploadPromises);
         rapport.image_urls = urls;
-        // 👇 AJOUT DE GETOPTIONS
         this.http.post(`${this.apiUrl}/rapports`, rapport, this.getOptions()).subscribe();
         return true;
       } catch (err) { return false; }
@@ -286,7 +288,6 @@ export class ApiService {
   }
 
   // --- MATERIEL ---
-
   getMateriels(): Observable<Materiel[]> {
     if (this.offline.isOnline.value) {
       return this.http.get<Materiel[]>(`${this.apiUrl}/materiels`, this.getOptions()).pipe(
@@ -320,7 +321,6 @@ export class ApiService {
   }
 
   // --- DOCUMENTS ---
-
   createPPSPS(doc: any): Observable<any> {
     return this.http.post<any>(`${this.apiUrl}/ppsps`, doc, this.getOptions());
   }
@@ -346,7 +346,6 @@ export class ApiService {
   }
 
   // --- DASHBOARD & TEAM ---
-
   getStats(): Observable<any> {
     return this.http.get<any>(`${this.apiUrl}/dashboard/stats`, this.getOptions());
   }
@@ -358,8 +357,6 @@ export class ApiService {
   }
 
   downloadDOE(id: number) {
-    // Le téléchargement DOE reste public pour l'instant (GET simple)
-    // Pour le sécuriser, il faudrait générer un token temporaire ou utiliser blob
     const url = `${this.apiUrl}/chantiers/${id}/doe`;
     window.open(url, '_system');
   }

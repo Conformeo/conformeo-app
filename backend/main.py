@@ -171,7 +171,8 @@ def read_chantiers(db: Session = Depends(get_db)):
 @app.post("/chantiers/import")
 async def import_chantiers_csv(
     file: UploadFile = File(...), 
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(security.get_current_user) # Sécurisé
 ):
     # 1. Vérification extension
     if not file.filename.lower().endswith('.csv'):
@@ -180,7 +181,7 @@ async def import_chantiers_csv(
     try:
         content = await file.read()
         
-        # 2. Décodage Intelligent (Gère le BOM Excel automatiquement avec utf-8-sig)
+        # 2. Décodage Robuste (BOM Excel)
         try:
             text_content = content.decode('utf-8-sig')
         except:
@@ -193,37 +194,33 @@ async def import_chantiers_csv(
         delimiter = ';' if ';' in lines[0] else ','
         reader = csv.DictReader(lines, delimiter=delimiter)
 
-        # Entreprise par défaut
-        company = db.query(models.Company).first()
-        cid = company.id if company else None
-
         count = 0
         for row in reader:
-            # 4. Nettoyage des clés (Enlève les espaces et BOM résiduels)
+            # 4. Nettoyage des clés (Espaces et BOM)
             row = {k.strip().replace('\ufeff', ''): v.strip() for k, v in row.items() if k}
             
-            # 5. Recherche insensible à la casse (Nom, nom, NOM...)
+            # 5. Recherche insensible à la casse
             nom = None
             client = "Client Inconnu"
-            adresse = "Adresse Inconnue"
-
+            adresse = "-"
+            
             for k, v in row.items():
                 if 'nom' in k.lower(): nom = v
                 if 'client' in k.lower(): client = v
                 if 'adresse' in k.lower() or 'address' in k.lower(): adresse = v
-            
+
             if nom:
-                # 6. Création sécurisée (avec champs optionnels explicites)
+                # Création liée à l'entreprise de l'utilisateur (Multi-Tenant)
                 db.add(models.Chantier(
                     nom=nom, 
                     client=client, 
                     adresse=adresse,
                     est_actif=True, 
-                    company_id=cid, 
+                    company_id=current_user.company_id, # <--- ICI
                     date_creation=datetime.now(),
-                    date_debut=datetime.now(),
+                    date_debut=datetime.now(), 
                     date_fin=datetime.now() + timedelta(days=30),
-                    signature_url=None, # On force à None pour éviter les bugs
+                    signature_url=None, 
                     cover_url=None
                 ))
                 count += 1
@@ -234,7 +231,6 @@ async def import_chantiers_csv(
     except Exception as e:
         print(f"CRASH IMPORT : {e}")
         db.rollback()
-        # On renvoie l'erreur précise pour le débogage
         raise HTTPException(500, f"Erreur Serveur: {str(e)}")
 
 @app.put("/chantiers/{cid}/signature")
