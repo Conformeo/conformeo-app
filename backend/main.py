@@ -801,7 +801,7 @@ def migrate_v10(db: Session = Depends(get_db)):
         db.execute(text("ALTER TABLE chantiers ADD COLUMN IF NOT EXISTS latitude FLOAT"))
         db.execute(text("ALTER TABLE chantiers ADD COLUMN IF NOT EXISTS longitude FLOAT"))
         db.commit()
-        re@turn {"msg": "Migration V10 (GPS) OK"}
+        return {"msg": "Migration V10 (GPS) OK"}
     except Exception as e: return {"error": str(e)}
 
 # --- ROUTE DE RATTRAPAGE (Pour géolocaliser les anciens chantiers) ---
