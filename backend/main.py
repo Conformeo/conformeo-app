@@ -648,3 +648,175 @@ def force_delete_all_chantiers(db: Session = Depends(get_db)):
     except Exception as e:
         db.rollback()
         return {"status": "Erreur", "details": str(e)}
+
+# ... (Imports identiques, ajoutez juste 'time' si besoin pour des pauses)
+import time 
+
+# ... (Configuration Cloudinary, Models...)
+
+# 👇 1. FONCTION DE GÉOCODAGE (OPENSTREETMAP)
+def get_gps_from_address(address: str):
+    if not address or len(address) < 5: return None, None
+    try:
+        # On interroge l'API gratuite de Nominatim
+        url = "https://nominatim.openstreetmap.org/search"
+        params = {'q': address, 'format': 'json', 'limit': 1}
+        # Il faut un User-Agent pour être poli avec l'API
+        headers = {'User-Agent': 'ConformeoApp/1.0'}
+        
+        response = requests.get(url, params=params, headers=headers, timeout=5)
+        if response.status_code == 200 and len(response.json()) > 0:
+            data = response.json()[0]
+            return float(data['lat']), float(data['lon'])
+    except Exception as e:
+        print(f"Erreur GPS pour {address}: {e}")
+    return None, None
+
+# ... (Routes Users, Login... inchangées) ...
+
+# ==========================================
+# 2. DASHBOARD (Mise à jour CARTE)
+# ==========================================
+@app.get("/dashboard/stats")
+def get_stats(db: Session = Depends(get_db)):
+    # ... (KPIs et Graphiques inchangés) ...
+    # (Je remets le début pour contexte, gardez votre logique KPI/Chart)
+    total = db.query(models.Chantier).count()
+    actifs = db.query(models.Chantier).filter(models.Chantier.est_actif == True).count()
+    rap = db.query(models.Rapport).count()
+    alert = db.query(models.Rapport).filter(models.Rapport.niveau_urgence.in_(['Critique', 'Moyen'])).count()
+    
+    # ... (Graphique & Récents inchangés) ...
+    today = datetime.now().date()
+    labels, values = [], []
+    for i in range(6, -1, -1):
+        day = today - timedelta(days=i)
+        labels.append(day.strftime("%d/%m"))
+        start = datetime.combine(day, datetime.min.time())
+        end = datetime.combine(day, datetime.max.time())
+        cnt = db.query(models.Rapport).filter(models.Rapport.date_creation >= start, models.Rapport.date_creation <= end).count()
+        values.append(cnt)
+        
+    recents = db.query(models.Rapport).order_by(models.Rapport.date_creation.desc()).limit(5).all()
+    rec_fmt = [{"titre": r.titre, "date": r.date_creation, "chantier": r.chantier.nom if r.chantier else "-", "urgence": r.niveau_urgence} for r in recents]
+
+    # 👇 NOUVELLE LOGIQUE CARTE : On prend le GPS du chantier !
+    map_data = []
+    chantiers = db.query(models.Chantier).filter(models.Chantier.est_actif == True).all()
+    
+    for c in chantiers:
+        # Priorité 1 : Le GPS de l'adresse du chantier (si dispo)
+        lat, lng = c.latitude, c.longitude
+        
+        # Priorité 2 : Si pas d'adresse GPS, on cherche dans les rapports (fallback)
+        if not lat:
+            last_gps = db.query(models.Rapport).filter(models.Rapport.chantier_id == c.id, models.Rapport.latitude != None).first()
+            if last_gps:
+                lat, lng = last_gps.latitude, last_gps.longitude
+        
+        if lat and lng:
+            map_data.append({
+                "id": c.id, "nom": c.nom, "client": c.client, 
+                "lat": lat, "lng": lng
+            })
+
+    return {
+        "kpis": { "total_chantiers": total, "actifs": actifs, "rapports": rap, "alertes": alert, "materiel_sorti": 0 },
+        "chart": { "labels": labels, "values": values },
+        "recents": rec_fmt,
+        "map": map_data
+    }
+
+# ==========================================
+# 3. CHANTIERS & IMPORT INTELLIGENT
+# ==========================================
+
+# (Ajoutez lat/lon dans create_chantier si vous voulez, mais c'est surtout l'import qui compte)
+
+@app.post("/chantiers/import")
+async def import_chantiers_csv(
+    file: UploadFile = File(...), 
+    db: Session = Depends(get_db)
+):
+    # ... (Début identique : vérif extension, lecture contenu...)
+    if not file.filename.lower().endswith('.csv'): raise HTTPException(400, "Non CSV")
+    try:
+        content = await file.read()
+        try: text = content.decode('utf-8-sig')
+        except: text = content.decode('latin-1')
+        lines = text.splitlines()
+        delimiter = ';' if ';' in lines[0] else ','
+        reader = csv.DictReader(lines, delimiter=delimiter)
+        
+        company = db.query(models.Company).first()
+        cid = company.id if company else None
+
+        count = 0
+        for row in reader:
+            row = {k.strip(): v.strip() for k, v in row.items() if k}
+            nom = None
+            client = "-"
+            adresse = "-"
+            
+            for k, v in row.items():
+                if 'nom' in k.lower(): nom = v
+                if 'client' in k.lower(): client = v
+                if 'adresse' in k.lower(): adresse = v
+
+            if nom:
+                # 👇 C'EST ICI LA MAGIE : ON CALCULE LE GPS
+                lat, lng = None, None
+                if adresse and len(adresse) > 5:
+                    lat, lng = get_gps_from_address(adresse)
+                    # Petite pause pour ne pas spammer l'API gratuite (1 req/sec max conseillé)
+                    time.sleep(1) 
+
+                db.add(models.Chantier(
+                    nom=nom, client=client, adresse=adresse,
+                    est_actif=True, company_id=cid, date_creation=datetime.now(),
+                    date_debut=datetime.now(), date_fin=datetime.now()+timedelta(days=30),
+                    # On stocke le GPS trouvé !
+                    latitude=lat, longitude=lng 
+                ))
+                count += 1
+        
+        db.commit()
+        return {"status": "success", "message": f"{count} chantiers importés et géolocalisés !"}
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(500, f"Erreur: {str(e)}")
+
+# ... (Le reste du fichier reste identique) ...
+
+# --- MIGRATION V10 (GPS CHANTIER) ---
+@app.get("/migrate_db_v10")
+def migrate_v10(db: Session = Depends(get_db)):
+    try:
+        db.execute(text("ALTER TABLE chantiers ADD COLUMN IF NOT EXISTS latitude FLOAT"))
+        db.execute(text("ALTER TABLE chantiers ADD COLUMN IF NOT EXISTS longitude FLOAT"))
+        db.commit()
+        return {"msg": "Migration V10 (GPS) OK"}
+    except Exception as e: return {"error": str(e)}
+
+# --- ROUTE DE RATTRAPAGE (Pour géolocaliser les anciens chantiers) ---
+@app.get("/fix_geocoding")
+def fix_geocoding(db: Session = Depends(get_db)):
+    # On prend les chantiers qui ont une adresse mais pas de GPS
+    chantiers = db.query(models.Chantier).filter(
+        models.Chantier.adresse != None,
+        models.Chantier.latitude == None
+    ).all()
+    
+    count = 0
+    for c in chantiers:
+        if len(c.adresse) > 5:
+            lat, lng = get_gps_from_address(c.adresse)
+            if lat:
+                c.latitude = lat
+                c.longitude = lng
+                count += 1
+                time.sleep(1) # Pause politesse API
+    
+    db.commit()
+    return {"msg": f"{count} anciens chantiers ont été géolocalisés !"}
