@@ -233,16 +233,22 @@ export class ChantierDetailsPage implements OnInit {
       alert("Adresse du chantier introuvable.");
       return;
     }
+
     const destination = encodeURIComponent(this.chantier.adresse);
     let url = '';
 
-    if (this.platform.is('ios')) {
+    if (this.platform.is('ios') || this.platform.is('ipad') || this.platform.is('iphone')) {
+      // 📱 iOS : Ouvre Apple Maps
       url = `maps:?q=${destination}`;
     } else if (this.platform.is('android')) {
+      // 📱 Android : Ouvre le choix (Waze, Maps...)
       url = `geo:0,0?q=${destination}`;
     } else {
-      url = `http://googleusercontent.com/maps.google.com/maps?q=${destination}`;
+      // 💻 Desktop / Web : Ouvre Google Maps dans un nouvel onglet
+      // 👇 C'EST ICI LA CORRECTION
+      url = `https://www.google.com/maps/search/?api=1&query=${destination}`;
     }
+
     window.open(url, '_system');
   }
 

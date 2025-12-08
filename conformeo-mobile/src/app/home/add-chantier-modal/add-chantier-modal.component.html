@@ -1,6 +1,6 @@
 <ion-header>
-  <ion-toolbar>
-    <ion-title>Nouveau Chantier</ion-title>
+  <ion-toolbar color="primary">
+    <ion-title>{{ existingChantier ? 'Modifier' : 'Nouveau' }} Chantier</ion-title>
     <ion-buttons slot="end">
       <ion-button (click)="cancel()">Fermer</ion-button>
     </ion-buttons>
@@ -11,20 +11,26 @@
   
   <form (ngSubmit)="save()">
       
-      <div class="cover-photo-section" (click)="takeCoverPhoto()">
+      <div class="cover-photo-section" (click)="takeCoverPhoto()" [class.has-image]="coverPhotoWebPath">
         <img *ngIf="coverPhotoWebPath" [src]="coverPhotoWebPath" class="cover-preview" />
+        
         <div *ngIf="!coverPhotoWebPath" class="placeholder">
-          <ion-icon name="camera" size="large"></ion-icon>
-          <p>Ajouter une photo de couverture</p>
+          <div class="icon-circle">
+            <ion-icon name="camera"></ion-icon>
+          </div>
+          <p>Ajouter une photo</p>
         </div>
       </div>
       
-    <ion-list>
-      
+    <ion-list lines="full" class="ion-margin-bottom">
+      <ion-list-header>
+        <ion-label>Informations Générales</ion-label>
+      </ion-list-header>
+
       <ion-item>
         <ion-input 
           label="Nom du chantier" 
-          label-placement="stacked" 
+          labelPlacement="stacked" 
           [(ngModel)]="chantier.nom" 
           name="nom" 
           type="text"
@@ -34,8 +40,8 @@
 
       <ion-item>
         <ion-input 
-          label="Client" 
-          label-placement="stacked" 
+          label="Client / MOA" 
+          labelPlacement="stacked" 
           [(ngModel)]="chantier.client" 
           name="client" 
           type="text"
@@ -46,19 +52,35 @@
       <ion-item>
         <ion-input 
           label="Adresse" 
-          label-placement="stacked" 
+          labelPlacement="stacked" 
           [(ngModel)]="chantier.adresse" 
           name="adresse" 
           type="text"
           placeholder="Ex: 12 rue de la République">
         </ion-input>
       </ion-item>
+    </ion-list>
 
+    <ion-list lines="full">
+        <ion-list-header>
+          <ion-label>Planning Prévisionnel</ion-label>
+        </ion-list-header>
+    
+        <ion-item>
+          <ion-label position="stacked">Date de début</ion-label>
+          <ion-input type="date" [(ngModel)]="chantier.date_debut" name="date_debut"></ion-input>
+        </ion-item>
+    
+        <ion-item>
+          <ion-label position="stacked">Date de fin</ion-label>
+          <ion-input type="date" [(ngModel)]="chantier.date_fin" name="date_fin"></ion-input>
+        </ion-item>
     </ion-list>
 
     <div class="ion-padding-top">
-      <ion-button expand="block" type="submit" [disabled]="!chantier.nom">
-        Valider la création
+      <ion-button expand="block" type="submit" [disabled]="!chantier.nom || isSaving" size="large">
+        <ion-spinner *ngIf="isSaving" name="crescent"></ion-spinner>
+        <span *ngIf="!isSaving">Enregistrer</span>
       </ion-button>
     </div>
   </form>

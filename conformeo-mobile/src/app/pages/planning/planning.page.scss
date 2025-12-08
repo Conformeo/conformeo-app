@@ -4,12 +4,54 @@
   border-radius: 20px;
   box-shadow: 0 4px 20px rgba(0,0,0,0.05);
   min-height: 80vh;
+  margin-bottom: 30px;
 }
 
-/* Personnalisation FullCalendar pour faire SaaS */
+/* CUSTOMISATION FULLCALENDAR */
 ::ng-deep {
-  .fc-toolbar-title { font-size: 1.5em !important; font-weight: 700; color: #333; }
-  .fc-button-primary { background-color: #1e3c72 !important; border: none !important; border-radius: 8px !important; }
-  .fc-event { border-radius: 4px; padding: 2px 5px; font-size: 0.85em; cursor: pointer; }
-  .fc-day-today { background-color: rgba(30, 60, 114, 0.05) !important; }
+  /* Titre du mois */
+  .fc-toolbar-title { 
+    font-size: 1.5em !important; 
+    font-weight: 800; 
+    color: #1e3c72;
+    text-transform: capitalize;
+  }
+
+  /* Boutons */
+  .fc-button-primary { 
+    background-color: #f4f6f9 !important; 
+    color: #333 !important;
+    border: none !important; 
+    border-radius: 8px !important; 
+    font-weight: 600;
+    box-shadow: none !important;
+  }
+  .fc-button-active {
+    background-color: #1e3c72 !important;
+    color: white !important;
+  }
+
+  /* La grille */
+  .fc-day-today { background-color: rgba(30, 60, 114, 0.03) !important; }
+  .fc-scrollgrid { border: none !important; }
+  th { border: none !important; padding-bottom: 10px; color: #888; }
+  td { border: 1px solid #f0f0f0 !important; }
+
+  /* Les Événements (Les barres) */
+  .fc-event { 
+    border-radius: 6px; 
+    padding: 3px 6px; 
+    font-size: 0.85em; 
+    font-weight: 500;
+    cursor: pointer; 
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin-bottom: 2px !important;
+    border: none !important;
+  }
+  
+  .fc-event-title {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
 }

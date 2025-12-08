@@ -7,7 +7,7 @@ import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { 
   IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, 
   IonContent, IonList, IonItem, IonInput, ModalController,
-  IonIcon, IonSpinner 
+  IonIcon, IonSpinner, IonLabel, IonListHeader
 } from '@ionic/angular/standalone';
 
 import { ApiService, Chantier } from '../../services/api';
@@ -23,7 +23,8 @@ import { camera, cloudUpload, save, close } from 'ionicons/icons';
   imports: [
     CommonModule, FormsModule, 
     IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, 
-    IonContent, IonList, IonItem, IonInput, IonIcon, IonSpinner
+    IonContent, IonList, IonItem, IonInput, IonIcon, IonSpinner,
+    IonLabel, IonListHeader
   ]
 })
 export class AddChantierModalComponent implements OnInit{
@@ -34,7 +35,10 @@ export class AddChantierModalComponent implements OnInit{
     nom: '',
     client: '',
     adresse: '',
-    est_actif: true
+    est_actif: true,
+    // On initialise vide, le backend mettra les défauts si besoin
+    date_debut: undefined,
+    date_fin: undefined
   };
 
   coverPhotoWebPath: string | undefined;
@@ -49,10 +53,17 @@ export class AddChantierModalComponent implements OnInit{
   }
 
   ngOnInit() {
-    // SI MODIFICATION : On remplit les champs
     if (this.existingChantier) {
-      this.chantier = { ...this.existingChantier }; // Copie pour ne pas modifier l'original tout de suite
-      this.coverPhotoWebPath = this.chantier.cover_url; // Pour afficher l'image existante
+      this.chantier = { ...this.existingChantier };
+      this.coverPhotoWebPath = this.chantier.cover_url;
+      
+      // 👇 ASTUCE : On formatte la date pour l'input HTML (YYYY-MM-DD)
+      if (this.chantier.date_debut) {
+        this.chantier.date_debut = this.chantier.date_debut.split('T')[0];
+      }
+      if (this.chantier.date_fin) {
+        this.chantier.date_fin = this.chantier.date_fin.split('T')[0];
+      }
     }
   }
 
