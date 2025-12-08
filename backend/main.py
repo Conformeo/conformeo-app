@@ -568,3 +568,29 @@ def fix_everything(db: Session = Depends(get_db)):
             db.rollback()
             logs.append(f"ℹ️ {col} existe déjà dans {table}")
     return {"status": "Terminé", "details": logs}
+
+@app.get("/force_delete_all_chantiers")
+def force_delete_all_chantiers(db: Session = Depends(get_db)):
+    try:
+        # 1. On rapatrie tout le matériel au dépôt (Sécurité)
+        db.execute(text("UPDATE materiels SET chantier_id = NULL"))
+        
+        # 2. On supprime les dépendances en SQL pur (Plus robuste que l'ORM)
+        # Supprime les images des rapports liés à des chantiers
+        db.execute(text("DELETE FROM rapport_images WHERE rapport_id IN (SELECT id FROM rapports)"))
+        
+        # Supprime les documents
+        db.execute(text("DELETE FROM rapports"))
+        db.execute(text("DELETE FROM inspections"))
+        db.execute(text("DELETE FROM ppsps"))
+        db.execute(text("DELETE FROM pics"))
+        
+        # 3. Enfin, on supprime TOUS les chantiers
+        db.execute(text("DELETE FROM chantiers"))
+        
+        db.commit()
+        return {"status": "Succès 🧹", "message": "Tous les chantiers et documents ont été supprimés. Le matériel est conservé."}
+
+    except Exception as e:
+        db.rollback()
+        return {"status": "Erreur", "details": str(e)}
