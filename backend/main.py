@@ -792,7 +792,87 @@ async def import_chantiers_csv(
         db.rollback()
         raise HTTPException(500, f"Erreur: {str(e)}")
 
-# ... (Le reste du fichier reste identique) ...
+# ... (Gardez tout le code précédent) ...
+
+# ==========================================
+# 6. DOCUMENTS EXTERNES (PGC, DICT, PLANS...)
+# ==========================================
+
+# Ajoutez ce modèle dans la base (via SQL direct pour l'instant pour éviter de toucher models.py trop vite)
+@app.get("/migrate_documents_externes")
+def migrate_docs_ext(db: Session = Depends(get_db)):
+    try:
+        db.execute(text("""
+            CREATE TABLE IF NOT EXISTS documents_externes (
+                id SERIAL PRIMARY KEY,
+                titre VARCHAR NOT NULL,
+                categorie VARCHAR NOT NULL, -- 'PGC', 'DICT', 'PLAN', 'AUTRE'
+                url VARCHAR NOT NULL,
+                chantier_id INTEGER REFERENCES chantiers(id),
+                date_ajout TIMESTAMP DEFAULT NOW()
+            )
+        """))
+        db.commit()
+        return {"msg": "Table Documents Externes créée !"}
+    except Exception as e: return {"error": str(e)}
+
+# Modèle Pydantic pour l'API
+class DocExterneOut(pydantic.BaseModel):
+    id: int
+    titre: str
+    categorie: str
+    url: str
+    date_ajout: datetime
+    class Config: from_attributes = True
+
+# Route: Uploader un document (PGC, DICT...)
+@app.post("/chantiers/{cid}/documents", response_model=DocExterneOut)
+def upload_external_doc(
+    cid: int, 
+    titre: str, 
+    categorie: str, 
+    file: UploadFile = File(...), 
+    db: Session = Depends(get_db)
+):
+    # 1. Upload Cloudinary
+    try:
+        res = cloudinary.uploader.upload(file.file, folder="conformeo_docs", resource_type="auto")
+        url = res.get("secure_url")
+    except Exception as e: raise HTTPException(500, f"Erreur Upload: {e}")
+
+    # 2. Enregistrement en base (SQL Raw pour éviter de casser models.py maintenant)
+    sql = text("""
+        INSERT INTO documents_externes (titre, categorie, url, chantier_id, date_ajout)
+        VALUES (:t, :c, :u, :cid, :d) RETURNING id
+    """)
+    result = db.execute(sql, {"t": titre, "c": categorie, "u": url, "cid": cid, "d": datetime.now()})
+    new_id = result.fetchone()[0]
+    db.commit()
+
+    return {
+        "id": new_id, "titre": titre, "categorie": categorie, 
+        "url": url, "date_ajout": datetime.now()
+    }
+
+# Route: Lire les documents d'un chantier
+@app.get("/chantiers/{cid}/documents", response_model=List[DocExterneOut])
+def get_external_docs(cid: int, db: Session = Depends(get_db)):
+    sql = text("SELECT id, titre, categorie, url, date_ajout FROM documents_externes WHERE chantier_id = :cid")
+    result = db.execute(sql, {"cid": cid}).fetchall()
+    
+    return [
+        {"id": r[0], "titre": r[1], "categorie": r[2], "url": r[3], "date_ajout": r[4]} 
+        for r in result
+    ]
+
+# Ajoutons aussi la suppression pour être propre
+@app.delete("/documents/{did}")
+def delete_external_doc(did: int, db: Session = Depends(get_db)):
+    db.execute(text("DELETE FROM documents_externes WHERE id = :did"), {"did": did})
+    db.commit()
+    return {"status": "deleted"}
+
+# ... (Le reste du fichier migration et fix_everything reste à la fin)
 
 # --- MIGRATION V10 (GPS CHANTIER) ---
 @app.get("/migrate_db_v10")
@@ -825,3 +905,4 @@ def fix_geocoding(db: Session = Depends(get_db)):
     
     db.commit()
     return {"msg": f"{count} anciens chantiers ont été géolocalisés !"}
+

@@ -11,7 +11,8 @@ import {
 import { addIcons } from 'ionicons';
 import { 
   gridOutline, hammerOutline, mapOutline, peopleOutline, 
-  settingsOutline, logOutOutline, sync, checkmarkCircle, warning 
+  settingsOutline, logOutOutline, sync, checkmarkCircle, warning,
+  calendarOutline
 } from 'ionicons/icons';
 
 import { OfflineService } from './services/offline';
