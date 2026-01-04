@@ -7,6 +7,7 @@ import zipfile
 from datetime import datetime, timedelta, date
 import csv 
 import codecs
+from pydantic import BaseModel
 
 load_dotenv()
 
@@ -817,7 +818,7 @@ def migrate_docs_ext(db: Session = Depends(get_db)):
     except Exception as e: return {"error": str(e)}
 
 # Modèle Pydantic pour l'API
-class DocExterneOut(pydantic.BaseModel):
+class DocExterneOut(BaseModel):
     id: int
     titre: str
     categorie: str
