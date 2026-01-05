@@ -148,3 +148,66 @@
     display: none !important;
   }
 }
+
+/* ... votre CSS existant ... */
+
+.section-title h3 {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 10px 0;
+  padding-left: 5px;
+  border-left: 4px solid #3b82f6;
+  line-height: 1.2;
+}
+
+/* Défilement horizontal pour le matériel */
+.horizontal-scroll {
+  display: flex;
+  overflow-x: auto;
+  gap: 15px;
+  padding: 10px 5px;
+  
+  /* Masquer la barre de scroll tout en permettant le scroll */
+  -webkit-overflow-scrolling: touch;
+  &::-webkit-scrollbar { display: none; }
+}
+
+.materiel-card {
+  min-width: 140px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  overflow: hidden;
+  flex-shrink: 0;
+
+  .mat-img {
+    height: 90px;
+    background: #f1f5f9;
+    img { width: 100%; height: 100%; object-fit: cover; }
+  }
+
+  .mat-info {
+    padding: 8px;
+    h4 { margin: 0; font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    p { margin: 2px 0 5px; font-size: 12px; color: #64748b; }
+  }
+}
+
+.empty-state-small {
+  text-align: center;
+  padding: 20px;
+  background: #f8fafc;
+  border-radius: 12px;
+  border: 1px dashed #cbd5e1;
+  color: #94a3b8;
+  
+  ion-icon { font-size: 24px; margin-bottom: 5px; }
+  p { margin: 0; font-size: 13px; }
+}
+
+.divider {
+  height: 1px;
+  background: #e2e8f0;
+  margin: 20px 0;
+}

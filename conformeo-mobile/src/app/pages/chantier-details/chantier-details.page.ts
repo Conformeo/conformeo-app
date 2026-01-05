@@ -1,23 +1,23 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { IonicModule, ModalController, AlertController, NavController } from '@ionic/angular'; // Groupé les imports Ionic
+import { IonicModule, ModalController, AlertController, NavController } from '@ionic/angular';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { ApiService, Rapport, Chantier, PPSPS } from 'src/app/services/api';
+// 👇 AJOUT DE 'Materiel' DANS LES IMPORTS
+import { ApiService, Rapport, Chantier, PPSPS, Materiel } from '../../services/api';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { Platform } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
 import { IonBackButton, IonButtons } from '@ionic/angular/standalone';
 import { AddChantierModalComponent } from 'src/app/home/add-chantier-modal/add-chantier-modal.component';
 
-// 👇 TOUTES LES ICONES (Y compris trashOutline qui manquait)
 import { 
   camera, time, warning, documentText, create, navigate, 
-  location, arrowBack, createOutline, trashOutline, // <--- AJOUT trashOutline
+  location, arrowBack, createOutline, trashOutline,
   scanOutline, checkmarkCircle, shieldCheckmark, downloadOutline,
   shieldCheckmarkOutline, map, checkmarkDoneCircle,
   checkmarkDoneCircleOutline, 
-  documentTextOutline, archiveOutline, mapOutline
+  documentTextOutline, archiveOutline, mapOutline, hammerOutline // J'ajoute hammerOutline pour l'état vide
 } from 'ionicons/icons';
 
 import { PicModalComponent } from './pic-modal/pic-modal.component';
@@ -38,7 +38,10 @@ export class ChantierDetailsPage implements OnInit {
   chantier: Chantier | undefined; 
   rapports: Rapport[] = [];
   documentsList: any[] = [];
-  ppspsList: PPSPS[] = []; // Ajout variable manquante si utilisée
+  ppspsList: PPSPS[] = [];
+  
+  // 👇 LA VARIABLE MANQUANTE
+  materielsSurSite: Materiel[] = []; 
   
   constructor(
     private route: ActivatedRoute,
@@ -48,7 +51,6 @@ export class ChantierDetailsPage implements OnInit {
     private alertCtrl: AlertController,
     private navCtrl: NavController
   ) {
-    // 👇 ENREGISTREMENT EXPLICITE (Mapping Nom -> Variable)
     addIcons({ 
       'camera': camera, 
       'time': time, 
@@ -68,10 +70,10 @@ export class ChantierDetailsPage implements OnInit {
       'shield-checkmark-outline': shieldCheckmarkOutline, 
       'map': map, 
       'map-outline': mapOutline,
-      'trash-outline': trashOutline, // <--- AJOUT
-      // C'est ici que ça bloquait pour l'audit :
+      'trash-outline': trashOutline,
       'checkmark-done-circle': checkmarkDoneCircle,
-      'checkmark-done-circle-outline': checkmarkDoneCircleOutline
+      'checkmark-done-circle-outline': checkmarkDoneCircleOutline,
+      'hammer-outline': hammerOutline // Icône marteau pour l'équipement
     });
   }
 
@@ -92,16 +94,27 @@ export class ChantierDetailsPage implements OnInit {
   }
 
   loadData() {
+    // 1. Infos Chantier & Documents
     this.api.getChantierById(this.chantierId).subscribe(data => {
       this.chantier = data;
       this.buildDocumentsList(); 
     });
+
+    // 2. Rapports (Journal)
     this.loadRapports();
+
+    // 👇 3. CHARGEMENT DU MATÉRIEL (NOUVEAU)
+    this.api.getMateriels().subscribe(allMat => {
+      // On garde uniquement le matériel affecté à ce chantier
+      this.materielsSurSite = allMat.filter(m => m.chantier_id === this.chantierId);
+    });
   }
 
   loadRapports() {
     this.api.getRapports(this.chantierId).subscribe(data => {
-      this.rapports = data.reverse();
+      this.rapports = data.sort((a, b) => 
+        new Date(b.date_creation || 0).getTime() - new Date(a.date_creation || 0).getTime()
+      );
     });
   }
 
@@ -155,7 +168,7 @@ export class ChantierDetailsPage implements OnInit {
                 type: 'AUDIT',
                 titre: `Audit ${audit.type}`,
                 date: audit.date_creation,
-                icon: 'checkmark-done-circle-outline', // Icône explicitement mappée
+                icon: 'checkmark-done-circle-outline', 
                 color: 'success',
                 action: () => {
                     const url = `${this.api['apiUrl']}/inspections/${audit.id}/pdf`;
@@ -216,10 +229,9 @@ export class ChantierDetailsPage implements OnInit {
         {
           text: 'Valider',
           handler: () => {
-            // On envoie juste le champ à modifier
             this.api.updateChantier(this.chantierId, { est_actif: newStatus }).subscribe(() => {
               this.chantier!.est_actif = newStatus;
-              this.api.needsRefresh = true; // Pour mettre à jour l'accueil
+              this.api.needsRefresh = true;
             });
           }
         }
@@ -257,8 +269,8 @@ export class ChantierDetailsPage implements OnInit {
   }
 
   openItinerary() {
-    if (!this.chantier || !this.chantier.adresse) {
-      alert("Adresse du chantier introuvable.");
+    if (!this.chantier?.adresse) {
+      alert("Adresse introuvable.");
       return;
     }
 
@@ -266,15 +278,11 @@ export class ChantierDetailsPage implements OnInit {
     let url = '';
 
     if (this.platform.is('ios') || this.platform.is('ipad') || this.platform.is('iphone')) {
-      // 📱 iOS : Ouvre Apple Maps
       url = `maps:?q=${destination}`;
     } else if (this.platform.is('android')) {
-      // 📱 Android : Ouvre le choix (Waze, Maps...)
       url = `geo:0,0?q=${destination}`;
     } else {
-      // 💻 Desktop / Web : Ouvre Google Maps dans un nouvel onglet
-      // 👇 C'EST ICI LA CORRECTION
-      url = `https://www.google.com/maps/search/?api=1&query=${destination}`;
+      url = `https://www.google.com/maps/search/?api=1&query=$${destination}`;
     }
 
     window.open(url, '_system');
@@ -290,8 +298,8 @@ export class ChantierDetailsPage implements OnInit {
     const { role, data } = await modal.onWillDismiss();
     
     if (role === 'confirm' && data) {
-      this.chantier = data; // Mise à jour immédiate de l'affichage
-      this.api.needsRefresh = true; // Pour mettre à jour la liste d'accueil au retour
+      this.chantier = data; 
+      this.api.needsRefresh = true; 
     }
   }
   
@@ -345,7 +353,6 @@ export class ChantierDetailsPage implements OnInit {
     modal.present();
   }
 
-  // --- SUPPRESSION CHANTIER ---
   async deleteChantier() {
     const alert = await this.alertCtrl.create({
       header: 'Supprimer le chantier ?',
@@ -365,8 +372,6 @@ export class ChantierDetailsPage implements OnInit {
     });
     await alert.present();
   }
-
-  // --- HELPERS ---
 
   getFullUrl(path: string | undefined) {
     if (!path) return '';
