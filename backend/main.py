@@ -331,6 +331,8 @@ def update_materiel(materiel_id: int, mat_update: schemas.MaterielCreate, db: Se
     if not db_mat: raise HTTPException(404)
     db_mat.nom = mat_update.nom
     db_mat.reference = mat_update.reference
+    if mat_update.etat: db_mat.etat = mat_update.etat
+
     if mat_update.image_url: db_mat.image_url = mat_update.image_url
     db.commit(); db.refresh(db_mat)
     return db_mat

@@ -31,15 +31,25 @@
     <ion-item>
       <ion-input label="Nom" labelPlacement="stacked" [(ngModel)]="data.nom" placeholder="Ex: Perfo Hilti"></ion-input>
     </ion-item>
+    
     <ion-item>
       <ion-input label="Référence" labelPlacement="stacked" [(ngModel)]="data.reference" placeholder="Ex: TE-30"></ion-input>
+    </ion-item>
+
+    <ion-item>
+      <ion-select label="État" labelPlacement="stacked" [(ngModel)]="data.etat" placeholder="Sélectionner l'état">
+        <ion-select-option value="Bon">🟢 Bon état</ion-select-option>
+        <ion-select-option value="Moyen">🟠 État moyen</ion-select-option>
+        <ion-select-option value="Mauvais">🔴 Mauvais état</ion-select-option>
+        <ion-select-option value="Panne">⚫ En Panne</ion-select-option>
+      </ion-select>
     </ion-item>
   </ion-list>
 
   <div class="ion-padding">
     <ion-button expand="block" (click)="save()" [disabled]="!data.nom || isSaving" size="large">
       <span *ngIf="!isSaving">Enregistrer</span>
-      <ion-spinner *ngIf="isSaving"></ion-spinner>
+      <ion-spinner *ngIf="isSaving" name="crescent"></ion-spinner>
     </ion-button>
   </div>
 
