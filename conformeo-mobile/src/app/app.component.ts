@@ -38,7 +38,7 @@ export class AppComponent {
     { title: 'Mes Chantiers', url: '/home', icon: 'map-outline' },
     { title: 'Parc Matériel', url: '/materiel', icon: 'hammer-outline' },
     { title: 'Équipes', url: '/equipe', icon: 'people-outline' }, // Mis à jour
-    { title: 'Paramètres', url: '/parametres', icon: 'settings-outline' }, // Mis à jour
+    { title: 'Mon Compte', url: '/settings', icon: 'settings-outline' }, // Mis à jour
     { title: 'Planning', url: '/planning', icon: 'calendar-outline' }, // Mis à jour
   ];
 

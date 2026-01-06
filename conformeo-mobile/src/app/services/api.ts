@@ -5,9 +5,37 @@ import { map, switchMap, tap } from 'rxjs/operators';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Preferences } from '@capacitor/preferences';
 import { NavController } from '@ionic/angular';
-import { OfflineService } from './offline'; // Vérifiez le chemin (.service)
+import { OfflineService } from './offline'; // Assurez-vous du chemin
 
 // --- INTERFACES ---
+
+export interface Company {
+  id: number;
+  name: string;
+  address?: string;
+  contact_email?: string;
+  phone?: string;
+  logo_url?: string;
+  subscription_plan: string;
+}
+
+export interface CompanyDoc {
+  id: number;
+  titre: string;
+  type_doc: string; // 'Kbis', 'Assurance', 'DUERP', 'Autre'
+  url: string;
+  date_expiration?: string;
+  date_upload: string;
+}
+
+export interface DocExterne {
+  id: number;
+  titre: string;
+  categorie: string; // 'PGC', 'DICT', 'PLAN', 'AUTRE'
+  url: string;
+  date_ajout: string;
+}
+
 export interface Chantier {
   id?: number;
   nom: string;
@@ -21,7 +49,9 @@ export interface Chantier {
   date_debut?: string;
   date_fin?: string;
   statut_planning?: string;
-  soumis_sps: boolean
+  soumis_sps: boolean; // V11
+  latitude?: number;   // V10 (GPS)
+  longitude?: number;  // V10 (GPS)
 }
 
 export interface Rapport {
@@ -126,7 +156,6 @@ export class ApiService {
     this.navCtrl.navigateRoot('/login');
   }
 
-  // 👇 CORRECTION MAJEURE : ASYNC pour éviter le bug F5
   async isAuthenticated(): Promise<boolean> {
     if (this.token) return true;
     const { value } = await Preferences.get({ key: 'auth_token' });
@@ -176,12 +205,44 @@ export class ApiService {
       directory: Directory.Data 
     });
     const data = readFile.data;
-    // Conversion base64 -> blob
     const response = await fetch(`data:image/jpeg;base64,${data}`);
     return await response.blob();
   }
 
-  // --- CHANTIERS ---
+  // ==========================================
+  // 🏢 GESTION ENTREPRISE (MON ENTREPRISE)
+  // ==========================================
+
+  getMyCompany(): Observable<Company> {
+    return this.http.get<Company>(`${this.apiUrl}/companies/me`, this.getOptions());
+  }
+
+  updateCompany(data: any): Observable<Company> {
+    return this.http.put<Company>(`${this.apiUrl}/companies/me`, data, this.getOptions());
+  }
+
+  // --- COFFRE-FORT NUMÉRIQUE (DOCS TRANSVERSES) ---
+  getCompanyDocs(): Observable<CompanyDoc[]> {
+    return this.http.get<CompanyDoc[]>(`${this.apiUrl}/companies/me/documents`, this.getOptions());
+  }
+
+  uploadCompanyDoc(file: File, titre: string, type_doc: string, date_expiration?: string): Observable<CompanyDoc> {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('titre', titre);
+    formData.append('type_doc', type_doc);
+    if (date_expiration) formData.append('date_expiration', date_expiration);
+
+    return this.http.post<CompanyDoc>(`${this.apiUrl}/companies/me/documents`, formData, this.getOptions());
+  }
+
+  deleteCompanyDoc(docId: number): Observable<any> {
+    return this.http.delete(`${this.apiUrl}/companies/me/documents/${docId}`, this.getOptions());
+  }
+
+  // ==========================================
+  // 🏗️ CHANTIERS
+  // ==========================================
 
   getChantiers(): Observable<Chantier[]> {
     if (this.offline.isOnline.value) {
@@ -219,7 +280,30 @@ export class ApiService {
     return this.http.get<Chantier>(`${this.apiUrl}/chantiers/${id}`, this.getOptions());
   }
 
-  // --- RAPPORTS ---
+  // --- GED CHANTIER (DOCS EXTERNES) ---
+  
+  getChantierDocs(chantierId: number): Observable<DocExterne[]> {
+    return this.http.get<DocExterne[]>(`${this.apiUrl}/chantiers/${chantierId}/documents`, this.getOptions());
+  }
+
+  uploadChantierDoc(chantierId: number, file: File, titre: string, categorie: string): Observable<DocExterne> {
+    const formData = new FormData();
+    formData.append('file', file);
+    // On passe les infos en Query Params pour simplifier côté FastAPI ou en Form Data si le back le gère
+    // Ici votre back attend des query params pour titre/catégorie selon le code précédent, 
+    // ou alors on modifie l'appel URL.
+    // Pour être sûr, je les passe en Query Params comme dans le backend v11
+    const url = `${this.apiUrl}/chantiers/${chantierId}/documents?titre=${encodeURIComponent(titre)}&categorie=${encodeURIComponent(categorie)}`;
+    return this.http.post<DocExterne>(url, formData, this.getOptions());
+  }
+
+  deleteChantierDoc(docId: number): Observable<any> {
+    return this.http.delete(`${this.apiUrl}/documents/${docId}`, this.getOptions());
+  }
+
+  // ==========================================
+  // 📝 RAPPORTS
+  // ==========================================
 
   getRapports(chantierId: number): Observable<Rapport[]> {
     if (this.offline.isOnline.value) {
@@ -245,7 +329,6 @@ export class ApiService {
     return this.http.post<Rapport>(url, rapport, this.getOptions());
   }
 
-  // Fonction Tunnel (Multi Photos)
   async addRapportWithMultiplePhotos(rapport: Rapport, photoBlobs: Blob[]) {
     if (!this.offline.isOnline.value) {
       const localPaths: string[] = [];
@@ -261,7 +344,6 @@ export class ApiService {
       });
       return true;
     } else {
-      // Mode Online : On upload tout en //
       const uploadPromises = photoBlobs.map(blob => 
         new Promise<string>((resolve, reject) => {
           this.uploadPhoto(blob).subscribe({
@@ -279,16 +361,10 @@ export class ApiService {
     }
   }
 
-  // --- COMPANY ---
-  getMyCompany(): Observable<any> {
-    return this.http.get<any>(`${this.apiUrl}/companies/me`, this.getOptions());
-  }
+  // ==========================================
+  // 🛠️ MATERIEL
+  // ==========================================
 
-  updateMyCompany(data: any): Observable<any> {
-    return this.http.put<any>(`${this.apiUrl}/companies/me`, data, this.getOptions());
-  }
-
-  // --- MATERIEL ---
   getMateriels(): Observable<Materiel[]> {
     if (this.offline.isOnline.value) {
       return this.http.get<Materiel[]>(`${this.apiUrl}/materiels`, this.getOptions()).pipe(
@@ -321,7 +397,10 @@ export class ApiService {
     return this.http.post(`${this.apiUrl}/materiels/import`, formData, this.getOptions());
   }
 
-  // --- DOCUMENTS ---
+  // ==========================================
+  // 📑 DOCUMENTS (SPS, PIC, INSPECTIONS)
+  // ==========================================
+
   createPPSPS(doc: any): Observable<any> {
     return this.http.post<any>(`${this.apiUrl}/ppsps`, doc, this.getOptions());
   }
@@ -342,11 +421,20 @@ export class ApiService {
   getPIC(id: number): Observable<any> {
     return this.http.get<any>(`${this.apiUrl}/chantiers/${id}/pic`, this.getOptions());
   }
+  
   signChantier(chantierId: number, signatureUrl: string): Observable<any> {
     return this.http.put(`${this.apiUrl}/chantiers/${chantierId}/signature?signature_url=${encodeURIComponent(signatureUrl)}`, {}, this.getOptions());
   }
 
-  // --- DASHBOARD & TEAM ---
+  downloadDOE(id: number) {
+    const url = `${this.apiUrl}/chantiers/${id}/doe`;
+    window.open(url, '_system');
+  }
+
+  // ==========================================
+  // 📊 DASHBOARD & TEAM
+  // ==========================================
+  
   getStats(): Observable<any> {
     return this.http.get<any>(`${this.apiUrl}/dashboard/stats`, this.getOptions());
   }
@@ -356,9 +444,14 @@ export class ApiService {
   addTeamMember(user: any): Observable<any> {
     return this.http.post<any>(`${this.apiUrl}/team`, user, this.getOptions());
   }
+  
+  // Récupérer mon profil user
+  getMe() {
+    return this.http.get<any>(`${this.apiUrl}/users/me`);
+  }
 
-  downloadDOE(id: number) {
-    const url = `${this.apiUrl}/chantiers/${id}/doe`;
-    window.open(url, '_system');
+  // Mettre à jour mon profil user (NOUVEAU)
+  updateUser(data: any) {
+    return this.http.put(`${this.apiUrl}/users/me`, data);
   }
 }

@@ -25,11 +25,13 @@ def get_optimized_image(path_or_url):
         if path_or_url.startswith("http"):
             optimized_url = path_or_url
             if "cloudinary.com" in path_or_url and "/upload/" in path_or_url:
+                # On demande à Cloudinary une version JPG compressée et redimensionnée
                 optimized_url = path_or_url.replace("/upload/", "/upload/w_1000,q_auto,f_jpg/")
             response = requests.get(optimized_url, stream=True, timeout=10)
             if response.status_code == 200:
                 return Image.open(BytesIO(response.content))
         else:
+            # Gestion fichier local (dev)
             clean_path = path_or_url.replace("/static/", "")
             possible_paths = [os.path.join("uploads", clean_path), clean_path]
             for p in possible_paths:
@@ -54,23 +56,29 @@ def draw_footer(c, width, height, chantier, titre_doc):
 
     c.restoreState()
 
-def draw_cover_page(c, chantier, titre_principal, sous_titre):
+def draw_cover_page(c, chantier, titre_principal, sous_titre, company=None):
     width, height = A4
     
     # 1. LOGO DYNAMIQUE (BRANDING)
-    # Par défaut, on cherche "logo.png" (votre logo Conforméo)
-    logo_source = "logo.png"
+    logo_source = None
     
-    # Si le chantier appartient à une entreprise qui a un logo, on le prend !
-    if chantier.company and chantier.company.logo_url:
+    # Priorité 1 : L'objet company passé explicitement
+    if company and company.logo_url:
+        logo_source = company.logo_url
+    # Priorité 2 : Le logo lié au chantier
+    elif hasattr(chantier, 'company') and chantier.company and chantier.company.logo_url:
         logo_source = chantier.company.logo_url
+    # Priorité 3 : Fallback local
+    else:
+        logo_source = "logo.png"
 
     logo = get_optimized_image(logo_source)
     
     if logo:
         try:
+            # On utilise ImageReader pour compatibilité ReportLab
             rl_logo = ImageReader(logo)
-            # On affiche le logo de l'entreprise
+            # Affichage du logo en haut à gauche
             c.drawImage(rl_logo, 2*cm, height-4*cm, width=5*cm, height=2.5*cm, mask='auto', preserveAspectRatio=True)
         except: pass
 
@@ -90,7 +98,7 @@ def draw_cover_page(c, chantier, titre_principal, sous_titre):
     c.setStrokeColorRGB(0.8, 0.8, 0.8); c.setLineWidth(0.5)
     c.line(2*cm, y_center, width-2*cm, y_center)
 
-    # 3. Infos
+    # 3. Infos Chantier
     y_center -= 2*cm
     c.setFillColorRGB(0, 0, 0)
     c.setFont(FONT_TITLE, 14)
@@ -104,7 +112,19 @@ def draw_cover_page(c, chantier, titre_principal, sous_titre):
     c.setFont(FONT_TEXT, 14)
     c.drawString(5*cm, y_center, chantier.adresse or "Non définie")
 
-    # 4. Date
+    # 4. Info Entreprise (Si dispo)
+    if company:
+        y_center -= 2*cm
+        c.setFont(FONT_TITLE, 12); c.setFillColorRGB(*COLOR_SECONDARY)
+        c.drawString(2*cm, y_center, "RÉALISÉ PAR :")
+        c.setFont(FONT_TEXT, 12)
+        c.drawString(6*cm, y_center, company.name)
+        if company.contact_email:
+            y_center -= 0.6*cm
+            c.setFont(FONT_TEXT, 10)
+            c.drawString(6*cm, y_center, company.contact_email)
+
+    # 5. Date
     date_str = datetime.now().strftime('%d/%m/%Y')
     c.setFont(FONT_TEXT, 10); c.setFillColorRGB(0.5, 0.5, 0.5)
     c.drawRightString(width-2*cm, 3*cm, f"Édité le {date_str}")
@@ -114,12 +134,13 @@ def draw_cover_page(c, chantier, titre_principal, sous_titre):
 # ==========================================
 # 2. GENERATEUR JOURNAL DE BORD
 # ==========================================
-def generate_pdf(chantier, rapports, inspections, output_path):
+def generate_pdf(chantier, rapports, inspections, output_path, company=None):
     c = canvas.Canvas(output_path, pagesize=A4)
     width, height = A4
     margin = 2 * cm
     
-    draw_cover_page(c, chantier, "JOURNAL DE BORD", "Suivi d'exécution & Rapports")
+    # On passe 'company' à la page de garde
+    draw_cover_page(c, chantier, "JOURNAL DE BORD", "Suivi d'exécution & Rapports", company)
 
     y = height - 3 * cm
 
@@ -239,12 +260,12 @@ def generate_pdf(chantier, rapports, inspections, output_path):
 # ==========================================
 # 3. GENERATEUR PPSPS
 # ==========================================
-def generate_ppsps_pdf(chantier, ppsps, output_path):
+def generate_ppsps_pdf(chantier, ppsps, output_path, company=None):
     c = canvas.Canvas(output_path, pagesize=A4)
     width, height = A4
     margin = 2 * cm
     
-    draw_cover_page(c, chantier, "P.P.S.P.S", "Plan Particulier de Sécurité")
+    draw_cover_page(c, chantier, "P.P.S.P.S", "Plan Particulier de Sécurité", company)
 
     y = height - 3 * cm
 
@@ -309,14 +330,14 @@ def generate_ppsps_pdf(chantier, ppsps, output_path):
     return output_path
 
 # ==========================================
-# 4. GENERATEUR AUDIT UNIQUE (Ajouté ici pour être sûr)
+# 4. GENERATEUR AUDIT UNIQUE
 # ==========================================
-def generate_audit_pdf(chantier, inspection, output_path):
+def generate_audit_pdf(chantier, inspection, output_path, company=None):
     c = canvas.Canvas(output_path, pagesize=A4)
     width, height = A4
     margin = 2 * cm
     
-    draw_cover_page(c, chantier, "RAPPORT D'AUDIT", f"{inspection.titre} ({inspection.type})")
+    draw_cover_page(c, chantier, "RAPPORT D'AUDIT", f"{inspection.titre} ({inspection.type})", company)
     
     y = height - 3 * cm
     def check_space(needed):

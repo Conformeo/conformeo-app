@@ -1,0 +1,132 @@
+<ion-header>
+  <ion-toolbar color="primary">
+    <ion-buttons slot="start">
+      <ion-menu-button></ion-menu-button>
+    </ion-buttons>
+    <ion-title>Mon Entreprise</ion-title>
+  </ion-toolbar>
+  
+  <ion-toolbar color="primary">
+    <ion-segment [(ngModel)]="segment" value="infos" color="light">
+      <ion-segment-button value="infos">
+        <ion-label>Infos</ion-label>
+      </ion-segment-button>
+      <ion-segment-button value="docs">
+        <ion-label>Coffre-fort</ion-label>
+      </ion-segment-button>
+    </ion-segment>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding bg-light">
+
+  <div *ngIf="isLoading" class="ion-text-center ion-padding">
+    <ion-spinner></ion-spinner>
+  </div>
+
+  <div *ngIf="!isLoading && segment === 'infos' && company">
+    
+    <ion-card class="ios-card">
+      <ion-card-content>
+        <div class="logo-zone">
+          <img [src]="company.logo_url || 'assets/no-image.png'" class="company-logo"/>
+          </div>
+
+        <form (ngSubmit)="saveInfos()">
+          <ion-list lines="full">
+            
+            <ion-item>
+              <ion-input 
+                label="Nom Société" 
+                labelPlacement="stacked" 
+                [(ngModel)]="company.name" 
+                name="name">
+              </ion-input>
+            </ion-item>
+            
+            <ion-item>
+              <ion-input 
+                label="Adresse Siège" 
+                labelPlacement="stacked" 
+                [(ngModel)]="company.address" 
+                name="address">
+              </ion-input>
+            </ion-item>
+            
+            <ion-item>
+              <ion-input 
+                label="Email Contact" 
+                labelPlacement="stacked" 
+                [(ngModel)]="company.contact_email" 
+                name="email">
+              </ion-input>
+            </ion-item>
+            
+            <ion-item>
+              <ion-input 
+                label="Téléphone" 
+                labelPlacement="stacked" 
+                [(ngModel)]="company.phone" 
+                name="phone">
+              </ion-input>
+            </ion-item>
+
+          </ion-list>
+
+          <div class="ion-padding-top">
+            <ion-button expand="block" type="submit">Enregistrer les modifications</ion-button>
+          </div>
+        </form>
+      </ion-card-content>
+    </ion-card>
+
+    <p class="ion-text-center ion-text-muted" style="font-size: 12px; margin-top: 20px;">
+      Ces informations apparaîtront en en-tête de vos documents PDF.
+    </p>
+  </div>
+
+  <div *ngIf="!isLoading && segment === 'docs'">
+
+    <div class="header-doc">
+      <h3>Documents Transverses</h3>
+      <p>Kbis, Assurances, DUERP...</p>
+    </div>
+
+    <input type="file" #fileInput (change)="onFileSelected($event)" style="display: none" accept=".pdf,.jpg,.png,.jpeg">
+
+    <ion-button expand="block" class="upload-btn" (click)="triggerUpload()">
+      <ion-icon name="cloud-upload" slot="start"></ion-icon>
+      Ajouter un document
+    </ion-button>
+
+    <div *ngIf="docs.length === 0" class="empty-state">
+      <ion-icon name="folder-open-outline" size="large"></ion-icon>
+      <p>Aucun document pour l'instant.</p>
+    </div>
+
+    <div class="doc-grid">
+      <ion-card *ngFor="let d of docs" class="doc-card" (click)="openDoc(d.url)">
+        
+        <div class="doc-icon" [ngClass]="d.type_doc">
+          <ion-icon [name]="d.type_doc === 'Assurance' ? 'shield-checkmark' : (d.type_doc === 'Kbis' ? 'business' : 'document-text')"></ion-icon>
+        </div>
+        
+        <div class="doc-info">
+          <h4>{{ d.titre }}</h4>
+          <p>{{ d.type_doc }} • {{ d.date_upload | date:'dd/MM/yyyy' }}</p>
+          
+          <ion-badge *ngIf="d.date_expiration" [color]="isExpired(d.date_expiration) ? 'danger' : 'success'">
+            {{ isExpired(d.date_expiration) ? 'Expiré' : 'Valide' }}
+            <span *ngIf="!isExpired(d.date_expiration)">{{ d.date_expiration | date:'MM/yy' }}</span>
+          </ion-badge>
+        </div>
+
+        <ion-button fill="clear" color="medium" (click)="$event.stopPropagation(); deleteDoc(d)">
+          <ion-icon name="trash"></ion-icon>
+        </ion-button>
+      </ion-card>
+    </div>
+
+  </div>
+
+</ion-content>

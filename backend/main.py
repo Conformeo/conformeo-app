@@ -57,6 +57,14 @@ app.add_middleware(
 def root():
     return {"message": "Conforméo API Ready 🚀"}
 
+# 👇 Helper pour récupérer l'entreprise d'un chantier
+def get_company_for_chantier(db: Session, chantier_id: int):
+    chantier = db.query(models.Chantier).filter(models.Chantier.id == chantier_id).first()
+    if chantier and chantier.company_id:
+        return db.query(models.Company).filter(models.Company.id == chantier.company_id).first()
+    # Fallback : Entreprise démo ou admin
+    return db.query(models.Company).first()
+
 # ==========================================
 # UTILITAIRES (GPS)
 # ==========================================
@@ -106,9 +114,29 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     token = security.create_access_token(data={"sub": user.email, "role": user.role})
     return {"access_token": token, "token_type": "bearer"}
 
-@app.get("/users/me", response_model=schemas.UserOut)
-def read_users_me(current_user: models.User = Depends(security.get_current_user)):
+# 👇 1. Modèle pour la mise à jour (à mettre au début ou dans schemas)
+class UserUpdate(pydantic.BaseModel):
+    email: Optional[str] = None
+    password: Optional[str] = None
+    
+# 👇 2. La route pour modifier SON profil
+@app.put("/users/me", response_model=schemas.UserOut)
+def update_user_me(user_up: UserUpdate, db: Session = Depends(get_db), current_user: models.User = Depends(security.get_current_user)):
+    # 1. Mise à jour Email
+    if user_up.email and user_up.email != current_user.email:
+        # Vérifier si l'email est déjà pris
+        if db.query(models.User).filter(models.User.email == user_up.email).first():
+            raise HTTPException(400, "Cet email est déjà utilisé.")
+        current_user.email = user_up.email
+
+    # 2. Mise à jour Mot de Passe
+    if user_up.password:
+        current_user.hashed_password = security.get_password_hash(user_up.password)
+
+    db.commit()
+    db.refresh(current_user)
     return current_user
+
 
 # ==========================================
 # 2. DASHBOARD
@@ -387,8 +415,13 @@ def download_inspection_pdf(iid: int, db: Session = Depends(get_db)):
     i = db.query(models.Inspection).filter(models.Inspection.id == iid).first()
     if not i: raise HTTPException(404)
     c = db.query(models.Chantier).filter(models.Chantier.id == i.chantier_id).first()
+    
+    # Récupération de l'entreprise
+    comp = get_company_for_chantier(db, c.id)
+
     path = f"uploads/Audit_{iid}.pdf"
-    pdf_generator.generate_audit_pdf(c, i, path)
+    # 👇 On passe 'company=comp'
+    pdf_generator.generate_audit_pdf(c, i, path, company=comp)
     return FileResponse(path, media_type='application/pdf')
 
 @app.post("/ppsps", response_model=schemas.PPSPSOut)
@@ -411,8 +444,12 @@ def download_ppsps_pdf(pid: int, db: Session = Depends(get_db)):
     p = db.query(models.PPSPS).filter(models.PPSPS.id == pid).first()
     if not p: raise HTTPException(404)
     c = db.query(models.Chantier).filter(models.Chantier.id == p.chantier_id).first()
+    
+    comp = get_company_for_chantier(db, c.id)
+
     path = f"uploads/PPSPS_{pid}.pdf"
-    pdf_generator.generate_ppsps_pdf(c, p, path)
+    # 👇 On passe 'company=comp'
+    pdf_generator.generate_ppsps_pdf(c, p, path, company=comp)
     return FileResponse(path, media_type='application/pdf')
 
 @app.post("/pics", response_model=schemas.PICOut)
@@ -434,35 +471,47 @@ def read_pic(cid: int, db: Session = Depends(get_db)):
 def download_pdf(cid: int, db: Session = Depends(get_db)):
     c = db.query(models.Chantier).filter(models.Chantier.id == cid).first()
     if not c: raise HTTPException(404)
+    
     raps = db.query(models.Rapport).filter(models.Rapport.chantier_id == cid).all()
     inss = db.query(models.Inspection).filter(models.Inspection.chantier_id == cid).all()
+    
+    comp = get_company_for_chantier(db, cid)
+
     path = f"uploads/J_{cid}.pdf"
-    pdf_generator.generate_pdf(c, raps, inss, path)
+    # 👇 On passe 'company=comp'
+    pdf_generator.generate_pdf(c, raps, inss, path, company=comp)
     return FileResponse(path, media_type='application/pdf')
 
 @app.get("/chantiers/{cid}/doe")
 def download_doe(cid: int, db: Session = Depends(get_db)):
     c = db.query(models.Chantier).filter(models.Chantier.id == cid).first()
     if not c: raise HTTPException(404)
+    
+    comp = get_company_for_chantier(db, cid) # On récupère l'entreprise une fois
+
     zip_name = f"uploads/DOE_{c.id}.zip"
     with zipfile.ZipFile(zip_name, 'w') as z:
+        # Journal
         raps = db.query(models.Rapport).filter(models.Rapport.chantier_id == cid).all()
         inss = db.query(models.Inspection).filter(models.Inspection.chantier_id == cid).all()
         j_path = f"uploads/J_{c.id}.pdf"
-        pdf_generator.generate_pdf(c, raps, inss, j_path)
+        pdf_generator.generate_pdf(c, raps, inss, j_path, company=comp)
         z.write(j_path, "1_Journal_Chantier.pdf")
         
+        # PPSPS
         ppsps = db.query(models.PPSPS).filter(models.PPSPS.chantier_id == cid).all()
         for idx, p in enumerate(ppsps):
             p_path = f"uploads/P_{p.id}.pdf"
-            pdf_generator.generate_ppsps_pdf(c, p, p_path)
+            pdf_generator.generate_ppsps_pdf(c, p, p_path, company=comp)
             z.write(p_path, f"2_PPSPS_{idx+1}.pdf")
 
+        # Audits
         for idx, i in enumerate(inss):
             a_path = f"uploads/A_{i.id}.pdf"
-            pdf_generator.generate_audit_pdf(c, i, a_path)
+            pdf_generator.generate_audit_pdf(c, i, a_path, company=comp)
             z.write(a_path, f"3_Audit_{i.type}_{idx+1}.pdf")
             
+        # PIC (Image)
         pic = db.query(models.PIC).filter(models.PIC.chantier_id == cid).first()
         if pic and pic.final_url:
             try:
@@ -472,6 +521,7 @@ def download_doe(cid: int, db: Session = Depends(get_db)):
                     with open(pic_path, "wb") as f: f.write(r.content)
                     z.write(pic_path, "4_Plan_Installation.jpg")
             except: pass
+            
     return FileResponse(zip_name, filename=f"DOE_{c.nom}.zip", media_type='application/zip')
 
 # ==========================================

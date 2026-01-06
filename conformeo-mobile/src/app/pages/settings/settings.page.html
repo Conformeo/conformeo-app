@@ -1,0 +1,64 @@
+<ion-header class="ion-no-border">
+  <ion-toolbar color="light">
+    <ion-buttons slot="start">
+      <ion-menu-button color="primary"></ion-menu-button>
+    </ion-buttons>
+    <ion-title>Mon Profil</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding bg-light">
+
+  <div class="profile-header">
+    <div class="avatar-circle">
+      <span>{{ getInitials(user?.email) }}</span>
+    </div>
+    <h2>{{ user?.email }}</h2>
+    <ion-badge color="primary" style="margin-top: 5px;">{{ user?.role | uppercase }}</ion-badge>
+  </div>
+
+  <ion-card class="ios-card">
+    <ion-card-content>
+      <ion-list lines="full">
+        
+        <ion-item>
+          <ion-icon name="mail-outline" slot="start" color="medium"></ion-icon>
+          <ion-input 
+            label="Email" 
+            labelPlacement="stacked" 
+            [(ngModel)]="data.email" 
+            placeholder="Votre email">
+          </ion-input>
+        </ion-item>
+
+        <ion-item>
+          <ion-icon name="lock-closed-outline" slot="start" color="medium"></ion-icon>
+          <ion-input 
+            label="Nouveau Mot de passe" 
+            labelPlacement="stacked" 
+            type="password" 
+            [(ngModel)]="data.password" 
+            placeholder="Laisser vide si inchangé">
+          </ion-input>
+        </ion-item>
+
+      </ion-list>
+
+      <div class="ion-padding">
+        <ion-button expand="block" (click)="updateProfile()" [disabled]="!data.email">
+          Mettre à jour
+        </ion-button>
+      </div>
+    </ion-card-content>
+  </ion-card>
+
+  <div class="logout-zone">
+    <ion-button expand="block" fill="outline" color="danger" (click)="logout()">
+      <ion-icon name="log-out-outline" slot="start"></ion-icon>
+      Se déconnecter
+    </ion-button>
+    
+    <p class="version-text">Conforméo v1.2.0</p>
+  </div>
+
+</ion-content>
