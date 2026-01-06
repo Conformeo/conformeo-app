@@ -909,3 +909,56 @@ def fix_geocoding(db: Session = Depends(get_db)):
     db.commit()
     return {"msg": f"{count} anciens chantiers ont été géolocalisés !"}
 
+# backend/main.py
+
+# ... (Gardez le reste)
+
+@app.get("/migrate_v11_sps")
+def migrate_v11_sps(db: Session = Depends(get_db)):
+    try:
+        # On ajoute la colonne booléenne, par défaut FALSE (pas de PPSPS)
+        db.execute(text("ALTER TABLE chantiers ADD COLUMN IF NOT EXISTS soumis_sps BOOLEAN DEFAULT FALSE"))
+        db.commit()
+        return {"msg": "Migration V11 (SPS) OK : Colonne ajoutée !"}
+    except Exception as e:
+        return {"error": str(e)}
+
+# Mettez aussi à jour create_chantier et update_chantier pour gérer ce champ
+@app.post("/chantiers", response_model=schemas.ChantierOut)
+def create_chantier(chantier: schemas.ChantierCreate, db: Session = Depends(get_db), current_user: models.User = Depends(security.get_current_user)):
+    lat, lng = None, None
+    if chantier.adresse:
+        lat, lng = get_gps_from_address(chantier.adresse)
+
+    new_c = models.Chantier(
+        nom=chantier.nom, adresse=chantier.adresse, client=chantier.client, cover_url=chantier.cover_url,
+        company_id=current_user.company_id,
+        date_debut=chantier.date_debut or datetime.now(),
+        date_fin=chantier.date_fin or (datetime.now() + timedelta(days=30)),
+        latitude=lat, longitude=lng,
+        # 👇 AJOUT
+        soumis_sps=chantier.soumis_sps 
+    )
+    db.add(new_c); db.commit(); db.refresh(new_c)
+    return new_c
+
+@app.put("/chantiers/{cid}")
+def update_chantier(cid: int, up: schemas.ChantierCreate, db: Session = Depends(get_db)):
+    c = db.query(models.Chantier).filter(models.Chantier.id == cid).first()
+    if not c: raise HTTPException(404)
+    
+    if up.adresse and up.adresse != c.adresse:
+        lat, lng = get_gps_from_address(up.adresse)
+        c.latitude = lat; c.longitude = lng
+    
+    c.nom = up.nom; c.adresse = up.adresse; c.client = up.client
+    if up.cover_url: c.cover_url = up.cover_url
+    if up.date_debut: c.date_debut = up.date_debut
+    if up.date_fin: c.date_fin = up.date_fin
+    if up.est_actif is not None: c.est_actif = up.est_actif
+    
+    # 👇 AJOUT
+    if up.soumis_sps is not None: c.soumis_sps = up.soumis_sps
+        
+    db.commit(); db.refresh(c)
+    return c

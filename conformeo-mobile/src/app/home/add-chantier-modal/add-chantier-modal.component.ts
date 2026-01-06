@@ -38,7 +38,8 @@ export class AddChantierModalComponent implements OnInit{
     est_actif: true,
     // On initialise vide, le backend mettra les défauts si besoin
     date_debut: undefined,
-    date_fin: undefined
+    date_fin: undefined,
+    soumis_sps: false
   };
 
   coverPhotoWebPath: string | undefined;

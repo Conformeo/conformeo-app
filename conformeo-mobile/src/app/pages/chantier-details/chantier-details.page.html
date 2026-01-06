@@ -74,8 +74,12 @@
           <span>PIC</span>
         </div>
 
-        <div class="action-btn mobile-only-action" [routerLink]="['/ppsps-form', chantierId]">
-          <div class="icon-circle" style="color: #ffc409;"><ion-icon name="shield-checkmark-outline"></ion-icon></div>
+        <div class="action-btn mobile-only-action" 
+             *ngIf="chantier?.soumis_sps" 
+             [routerLink]="['/ppsps-form', chantierId]">
+          <div class="icon-circle" style="color: #ffc409;">
+            <ion-icon name="shield-checkmark-outline"></ion-icon>
+          </div>
           <span>PPSPS</span>
         </div>
 

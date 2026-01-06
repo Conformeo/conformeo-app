@@ -77,6 +77,21 @@
         </ion-item>
     </ion-list>
 
+    <div style="margin-top: 15px; background: #f8f9fa; padding: 10px; border-radius: 8px; border: 1px solid #e0e0e0;">
+      <ion-item lines="none" style="--background: transparent;">
+        <ion-icon name="shield-checkmark-outline" slot="start" color="warning"></ion-icon>
+        <ion-label class="ion-text-wrap">
+          <h3 style="font-weight: 600;">Coordination SPS</h3>
+          <p style="font-size: 12px; color: #666;">Ce chantier nécessite-t-il un PPSPS obligatoire ?</p>
+        </ion-label>
+        <ion-toggle [(ngModel)]="chantier.soumis_sps" color="warning"></ion-toggle>
+      </ion-item>
+    </div>
+
+    <div class="ion-padding-top">
+      <ion-button expand="block" (click)="save()">Enregistrer</ion-button>
+    </div>
+
     <div class="ion-padding-top">
       <ion-button expand="block" type="submit" [disabled]="!chantier.nom || isSaving" size="large">
         <ion-spinner *ngIf="isSaving" name="crescent"></ion-spinner>

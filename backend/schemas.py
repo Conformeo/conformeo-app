@@ -56,8 +56,9 @@ class ChantierBase(BaseModel):
     date_debut: Optional[datetime] = None
     date_fin: Optional[datetime] = None
     statut_planning: Optional[str] = "prevu"
-
     est_actif: Optional[bool] = True
+
+    soumis_sps: Optional[bool] = False
 
 class ChantierCreate(ChantierBase):
     pass

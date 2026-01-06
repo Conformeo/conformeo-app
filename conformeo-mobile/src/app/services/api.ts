@@ -21,6 +21,7 @@ export interface Chantier {
   date_debut?: string;
   date_fin?: string;
   statut_planning?: string;
+  soumis_sps: boolean
 }
 
 export interface Rapport {
