@@ -701,7 +701,7 @@ def download_pdp_pdf(pid: int, db: Session = Depends(get_db)):
     return FileResponse(path, media_type='application/pdf')
 
 # ==========================================
-# 10. GESTION EQUIPE & ENTREPRISE
+# 10. GESTION EQUIPE & ENTREPRISE 
 # ==========================================
 @app.get("/companies/me", response_model=schemas.CompanyOut)
 def read_my_company(db: Session = Depends(get_db), current_user: models.User = Depends(security.get_current_user)):

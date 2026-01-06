@@ -119,7 +119,7 @@ class RapportOut(RapportBase):
     class Config:
         from_attributes = True
 
-# --- INSPECTIONS ---
+# --- INSPECTIONS --- 
 class InspectionBase(BaseModel):
     titre: str
     type: str

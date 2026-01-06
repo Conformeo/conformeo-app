@@ -132,7 +132,7 @@ def draw_cover_page(c, chantier, titre_principal, sous_titre, company=None):
     c.showPage()
 
 # ==========================================
-# 2. GENERATEUR JOURNAL DE BORD
+# 2. GENERATEUR JOURNAL DE BORD 
 # ==========================================
 def generate_pdf(chantier, rapports, inspections, output_path, company=None):
     c = canvas.Canvas(output_path, pagesize=A4)
