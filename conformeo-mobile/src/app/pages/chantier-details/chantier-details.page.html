@@ -77,10 +77,19 @@
         <div class="action-btn mobile-only-action" 
              *ngIf="chantier?.soumis_sps" 
              [routerLink]="['/ppsps-form', chantierId]">
-          <div class="icon-circle" style="color: #ffc409;">
+          <div class="icon-circle" style="color: #ffc409; background: #fffbf0;">
             <ion-icon name="shield-checkmark-outline"></ion-icon>
           </div>
           <span>PPSPS</span>
+        </div>
+
+        <div class="action-btn mobile-only-action" 
+             *ngIf="!chantier?.soumis_sps" 
+             [routerLink]="['/pdp-form', chantierId]">
+          <div class="icon-circle" style="color: #5260ff; background: #f0f4ff;">
+            <ion-icon name="document-lock-outline"></ion-icon>
+          </div>
+          <span>PdP</span>
         </div>
 
         <div class="action-btn" (click)="openSignature()">

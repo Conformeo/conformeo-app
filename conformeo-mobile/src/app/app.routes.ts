@@ -56,4 +56,12 @@ export const routes: Routes = [
     path: 'company',
     loadComponent: () => import('./pages/company/company.page').then( m => m.CompanyPage)
   },
+  {
+    path: 'pdp-form',
+    loadComponent: () => import('./pages/pdp-form/pdp-form.page').then( m => m.PdpFormPage)
+  },
+  {
+    path: 'pdp-form/:id',
+    loadComponent: () => import('./pages/pdp-form/pdp-form.page').then( m => m.PdpFormPage)
+  },
 ];

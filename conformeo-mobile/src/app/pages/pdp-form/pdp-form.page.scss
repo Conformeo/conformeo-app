@@ -1,0 +1,25 @@
+.bg-light { --background: #f4f5f8; }
+
+.card-list {
+  border-radius: 12px; margin-bottom: 20px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.risk-card {
+  background: white; border-radius: 12px;
+  padding: 10px; margin-bottom: 15px;
+  border-left: 5px solid var(--ion-color-tertiary);
+  box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+
+  .risk-header {
+    display: flex; justify-content: space-between; align-items: center;
+    font-weight: bold; padding-bottom: 5px; margin-bottom: 5px;
+    border-bottom: 1px solid #eee; color: #555;
+  }
+  .input-item { --background: transparent; --padding-start: 0; }
+}
+
+.empty-risks {
+  text-align: center; color: #999; padding: 20px;
+  border: 2px dashed #ddd; border-radius: 12px;
+}

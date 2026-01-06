@@ -1,0 +1,94 @@
+<ion-header>
+  <ion-toolbar color="tertiary">
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/home"></ion-back-button>
+    </ion-buttons>
+    <ion-title>Plan de Prévention</ion-title>
+    <ion-buttons slot="end">
+      <ion-button (click)="downloadPdf()" *ngIf="isExisting">
+        <ion-icon name="download" slot="icon-only"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding bg-light">
+
+  <form (ngSubmit)="save()">
+    
+    <ion-list-header>
+      <ion-label>1. Intervenants & Inspection</ion-label>
+    </ion-list-header>
+    <ion-list class="card-list">
+      <ion-item>
+        <ion-input label="Entreprise Utilisatrice (Client)" labelPlacement="stacked" [(ngModel)]="pdp.entreprise_utilisatrice" name="eu" placeholder="Nom du client"></ion-input>
+      </ion-item>
+      <ion-item>
+        <ion-input label="Entreprise Extérieure (Nous)" labelPlacement="stacked" [(ngModel)]="pdp.entreprise_exterieure" name="ee" placeholder="Votre entreprise"></ion-input>
+      </ion-item>
+      <ion-item>
+        <ion-label position="stacked">Date Inspection Commune</ion-label>
+        <ion-datetime-button datetime="datetime"></ion-datetime-button>
+        <ion-modal [keepContentsMounted]="true">
+          <ng-template>
+            <ion-datetime id="datetime" presentation="date-time" [(ngModel)]="pdp.date_inspection_commune" name="dateInsp"></ion-datetime>
+          </ng-template>
+        </ion-modal>
+      </ion-item>
+    </ion-list>
+
+    <ion-list-header>
+      <ion-label>2. Consignes du Site</ion-label>
+    </ion-list-header>
+    <ion-list class="card-list">
+      <ion-item>
+        <ion-input label="🚑 Numéros d'urgence" labelPlacement="stacked" [(ngModel)]="pdp.consignes_securite.urgence" name="urg"></ion-input>
+      </ion-item>
+      <ion-item>
+        <ion-input label="📍 Point de Rassemblement" labelPlacement="stacked" [(ngModel)]="pdp.consignes_securite.rassemblement" name="rass"></ion-input>
+      </ion-item>
+      <ion-item>
+        <ion-select label="🔥 Permis de Feu requis ?" labelPlacement="stacked" [(ngModel)]="pdp.consignes_securite.permis_feu" name="feu">
+          <ion-select-option value="Oui">Oui (Obligatoire)</ion-select-option>
+          <ion-select-option value="Non">Non</ion-select-option>
+        </ion-select>
+      </ion-item>
+    </ion-list>
+
+    <ion-list-header>
+      <ion-label>3. Risques Interférents</ion-label>
+      <ion-button size="small" (click)="addRisk()">
+        <ion-icon name="add" slot="start"></ion-icon> Ajouter
+      </ion-button>
+    </ion-list-header>
+    
+    <div *ngFor="let r of pdp.risques_interferents; let i = index" class="risk-card">
+      <div class="risk-header">
+        <span>Risque #{{ i + 1 }}</span>
+        <ion-icon name="trash" color="danger" (click)="removeRisk(i)"></ion-icon>
+      </div>
+      
+      <ion-item lines="none" class="input-item">
+        <ion-input label="Tâche / Activité" labelPlacement="stacked" [(ngModel)]="r.tache" [name]="'tache'+i" placeholder="Ex: Soudure"></ion-input>
+      </ion-item>
+      <ion-item lines="none" class="input-item">
+        <ion-input label="Risque généré" labelPlacement="stacked" [(ngModel)]="r.risque" [name]="'risque'+i" placeholder="Ex: Départ de feu"></ion-input>
+      </ion-item>
+      <ion-item lines="none" class="input-item">
+        <ion-textarea label="Mesure de prévention" labelPlacement="stacked" [(ngModel)]="r.mesure" [name]="'mesure'+i" placeholder="Ex: Extincteur à proximité + Permis feu"></ion-textarea>
+      </ion-item>
+    </div>
+
+    <div *ngIf="pdp.risques_interferents.length === 0" class="empty-risks">
+      <p>Aucun risque spécifique ajouté.</p>
+    </div>
+
+    <div class="ion-padding">
+      <ion-button expand="block" type="submit" color="tertiary" size="large">
+        <ion-icon name="save" slot="start"></ion-icon>
+        Enregistrer le PdP
+      </ion-button>
+    </div>
+
+  </form>
+</ion-content>

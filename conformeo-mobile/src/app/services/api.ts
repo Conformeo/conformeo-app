@@ -110,6 +110,22 @@ export interface PIC {
   date_update?: string;
 }
 
+export interface PlanPrevention {
+  id?: number;
+  chantier_id: number;
+  entreprise_utilisatrice: string;
+  entreprise_exterieure: string;
+  date_inspection_commune: string; // ISO Date
+  risques_interferents: { tache: string; risque: string; mesure: string }[];
+  consignes_securite: {
+    urgence?: string;
+    rassemblement?: string;
+    sanitaires?: string;
+    fumeur?: string;
+    permis_feu?: string;
+  };
+}
+
 export interface UserLogin { email: string; password: string; }
 export interface Token { access_token: string; token_type: string; }
 
@@ -429,6 +445,19 @@ export class ApiService {
   downloadDOE(id: number) {
     const url = `${this.apiUrl}/chantiers/${id}/doe`;
     window.open(url, '_system');
+  }
+
+  createPdp(data: any) {
+    return this.http.post<PlanPrevention>(`${this.apiUrl}/plans-prevention`, data);
+  }
+
+  getPdp(chantierId: number) {
+    return this.http.get<PlanPrevention[]>(`${this.apiUrl}/chantiers/${chantierId}/plans-prevention`);
+  }
+
+  // URL pour télécharger le PDF
+  getPdpPdfUrl(pdpId: number) {
+    return `${this.apiUrl}/plans-prevention/${pdpId}/pdf`;
   }
 
   // ==========================================

@@ -16,7 +16,7 @@ import {
   location, arrowBack, createOutline, trashOutline,
   scanOutline, checkmarkCircle, shieldCheckmark, downloadOutline,
   shieldCheckmarkOutline, map, checkmarkDoneCircle,
-  checkmarkDoneCircleOutline, 
+  checkmarkDoneCircleOutline, documentLockOutline,
   documentTextOutline, archiveOutline, mapOutline, hammerOutline // J'ajoute hammerOutline pour l'état vide
 } from 'ionicons/icons';
 
@@ -73,7 +73,8 @@ export class ChantierDetailsPage implements OnInit {
       'trash-outline': trashOutline,
       'checkmark-done-circle': checkmarkDoneCircle,
       'checkmark-done-circle-outline': checkmarkDoneCircleOutline,
-      'hammer-outline': hammerOutline // Icône marteau pour l'équipement
+      'hammer-outline': hammerOutline,
+      'document-lock-outline': documentLockOutline
     });
   }
 
