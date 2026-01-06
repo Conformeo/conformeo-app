@@ -114,6 +114,7 @@
   align-items: center;
   box-shadow: 0 4px 10px rgba(0,0,0,0.03);
   transition: transform 0.1s;
+  position: relative; /* Important pour le bouton poubelle absolu */
 
   &:active { transform: scale(0.98); background: #fcfcfc; }
 }
@@ -239,8 +240,19 @@
   }
 
   .equip-image {
-    height: 120px; display: flex; align-items: center; justify-content: center;
+    height: 120px; 
+    display: flex; 
+    align-items: center; 
+    justify-content: center;
     margin-bottom: 20px;
+    background: #f9f9f9; 
+    border-radius: 12px;
+
+    img {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+    }
   }
 
   .equip-info {
@@ -258,27 +270,132 @@
   }
 }
 
-/* Si pas d'image, on centre l'icône */
-.equip-image {
-    display: flex; 
-    align-items: center; 
-    justify-content: center;
-    background: #f9f9f9; /* Fond gris léger */
-    border-radius: 12px;
-}
-
-.tool-card {
-  position: relative; /* Important pour que le bouton se place dedans */
-  /* ... */
-}
-
-/* Style du bouton poubelle */
+/* Style du bouton poubelle mobile */
 .delete-tool-btn {
   position: absolute;
   top: 5px;
   right: 5px;
-  z-index: 10; /* Au-dessus du reste */
+  z-index: 10;
   padding: 8px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.8); /* Petit fond blanc pour lisibilité */
+  background: rgba(255, 255, 255, 0.9);
+  color: #eb445a;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+/* ... (Gardez le début de votre fichier) ... */
+
+.list-container {
+  padding: 10px 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.tool-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-radius: 16px;
+  padding: 8px;
+  min-height: 80px;
+  position: relative;
+  overflow: hidden;
+  
+  /* --- GESTION DES COULEURS DE FOND (Opacité 15%) --- */
+  background: #fff; /* Fallback */
+  border-left: 5px solid #ccc; /* Bordure gauche colorée */
+
+  &.Bon {
+    background-color: rgba(34, 197, 94, 0.05); /* Vert clair */
+    border-left-color: #22c55e;
+  }
+  &.Moyen {
+    background-color: rgba(245, 158, 11, 0.05); /* Orange clair */
+    border-left-color: #f59e0b;
+  }
+  &.Mauvais {
+    background-color: rgba(239, 68, 68, 0.05); /* Rouge clair */
+    border-left-color: #ef4444;
+  }
+  &.Panne {
+    background-color: rgba(30, 41, 59, 0.10); /* Gris foncé clair */
+    border-left-color: #1e293b;
+  }
+
+  /* --- GAUCHE : CONTENU PRINCIPAL --- */
+  .card-main {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1; /* Prend toute la place disponible */
+    cursor: pointer; /* Indique qu'on peut cliquer */
+  }
+
+  .img-wrapper {
+    width: 60px;
+    height: 60px;
+    border-radius: 10px;
+    background: rgba(255,255,255,0.6); /* Un peu de blanc derrière l'image */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    flex-shrink: 0;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+
+    img { width: 100%; height: 100%; object-fit: cover; }
+    ion-icon { font-size: 28px; color: #64748b; }
+  }
+
+  .text-info {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    
+    .tool-name {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 700;
+      color: #1e293b;
+      line-height: 1.2;
+    }
+    
+    .tool-ref {
+      margin: 2px 0 4px 0;
+      font-size: 12px;
+      color: #64748b;
+      font-family: monospace;
+    }
+
+    .location-row {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #475569;
+      
+      ion-icon { font-size: 12px; color: #3b82f6; }
+    }
+  }
+
+  /* --- DROITE : BOUTONS D'ACTION --- */
+  .card-side-actions {
+    display: flex;
+    flex-direction: column; /* Boutons l'un sur l'autre pour gagner de la place */
+    justify-content: center;
+    align-items: center;
+    gap: 0px;
+    padding-left: 5px;
+    border-left: 1px solid rgba(0,0,0,0.05); /* Petite séparation subtile */
+
+    ion-button {
+      margin: 0;
+      height: 32px;
+      width: 40px;
+      --padding-start: 0;
+      --padding-end: 0;
+    }
+  }
 }

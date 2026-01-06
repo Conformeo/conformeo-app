@@ -6,13 +6,12 @@ import {
   IonApp, IonSplitPane, IonMenu, IonContent, IonList, 
   IonListHeader, IonNote, IonItem, IonLabel, 
   IonRouterOutlet, IonIcon, ToastController, MenuController,
-  NavController 
+  NavController, 
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
 import { 
   gridOutline, hammerOutline, mapOutline, peopleOutline, 
-  settingsOutline, logOutOutline, sync, checkmarkCircle, warning,
-  calendarOutline
+  settingsOutline, logOutOutline, sync, checkmarkCircle, warning, calendarOutline
 } from 'ionicons/icons';
 
 import { OfflineService } from './services/offline';
@@ -56,7 +55,7 @@ export class AppComponent {
   ) {
     addIcons({ 
       gridOutline, hammerOutline, mapOutline, peopleOutline, 
-      settingsOutline, logOutOutline, sync, checkmarkCircle, warning 
+      settingsOutline, logOutOutline, sync, checkmarkCircle, warning, calendarOutline
     });
     
     this.initializeApp();

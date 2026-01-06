@@ -55,47 +55,44 @@
         <p>Aucun matériel trouvé</p>
       </div>
 
-      <div 
-        *ngFor="let mat of filteredMateriels" 
-        class="tool-card" 
-        (click)="moveMateriel(mat)"
-      >
+      <div *ngFor="let mat of filteredMateriels" 
+           class="tool-card" 
+           [class]="mat.etat || 'Bon'">
 
-        <div class="delete-tool-btn" (click)="deleteMateriel($event, mat)">
-           <ion-icon name="trash-outline" color="danger"></ion-icon>
-        </div>
-
-        <div class="tool-icon" [class.out]="mat.chantier_id">
-
-          <img 
-            *ngIf="getImageUrl(mat)" 
-            [src]="getThumbUrl(getImageUrl(mat))"
-            crossorigin="anonymous"
-            style="width:100%; height:100%; object-fit: cover; display: block;"
-          >
-
-          <ion-icon 
-            *ngIf="!getImageUrl(mat)"
-            [name]="mat.chantier_id ? 'construct' : 'cube'"
-            style="margin: auto;">
-          </ion-icon>
-
-        </div>
-
-        <div class="tool-info">
-          <h3 class="tool-name">{{ mat.nom }}</h3>
-          <p class="tool-ref">REF: {{ mat.reference }}</p>
-        </div>
-
-        <div class="tool-status">
-          <div class="status-badge" [class.out]="mat.chantier_id">
-            <ion-icon [name]="mat.chantier_id ? 'location-outline' : 'home-outline'"></ion-icon>
-            <span>{{ mat.chantier_id ? 'Chantier' : 'Dépôt' }}</span>
+        <div class="card-main" (click)="openTransfer(mat)">
+          
+          <div class="img-wrapper">
+            <img 
+              *ngIf="getImageUrl(mat)" 
+              [src]="getThumbUrl(getImageUrl(mat))"
+              crossorigin="anonymous"
+            >
+            <ion-icon 
+              *ngIf="!getImageUrl(mat)"
+              [name]="mat.chantier_id ? 'construct' : 'cube'">
+            </ion-icon>
           </div>
 
-          <p class="chantier-name" *ngIf="mat.chantier_id">
-            {{ getChantierName(mat.chantier_id) }}
-          </p>
+          <div class="text-info">
+            <h3 class="tool-name">{{ mat.nom }}</h3>
+            <p class="tool-ref">{{ mat.reference }}</p>
+            
+            <div class="location-row">
+               <ion-icon [name]="mat.chantier_id ? 'location-outline' : 'home-outline'" size="small"></ion-icon>
+               <span>{{ mat.chantier_id ? getChantierName(mat.chantier_id) : 'Dépôt' }}</span>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="card-side-actions">
+          <ion-button fill="clear" color="dark" (click)="openEdit(mat)">
+            <ion-icon name="create-outline" slot="icon-only"></ion-icon>
+          </ion-button>
+          
+          <ion-button fill="clear" color="danger" (click)="deleteMateriel(mat)">
+            <ion-icon name="trash-outline" slot="icon-only"></ion-icon>
+          </ion-button>
         </div>
 
       </div>
@@ -108,7 +105,6 @@
       <h1>Parc Matériel</h1>
 
       <div class="actions">
-        
         <input type="file" #csvInput (change)="onCSVSelected($event)" accept=".csv" style="display: none;" />
         <ion-button (click)="csvInput.click()">Importer CSV</ion-button>
         <ion-searchbar 
@@ -124,16 +120,16 @@
       <div 
         *ngFor="let mat of filteredMateriels" 
         class="equip-card" 
-        (click)="moveMateriel(mat)"
+        (click)="openTransfer(mat)"
       >
 
        <div class="action-buttons" style="position: absolute; top: 10px; right: 10px; z-index: 10; display: flex; gap: 5px;">
            
-           <div (click)="editMateriel($event, mat)" style="background: white; padding: 6px; border-radius: 50%; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+           <div (click)="$event.stopPropagation(); openEdit(mat)" style="background: white; padding: 6px; border-radius: 50%; box-shadow: 0 2px 5px rgba(0,0,0,0.1); cursor: pointer;">
               <ion-icon name="create-outline" color="primary"></ion-icon>
            </div>
 
-           <div (click)="deleteMateriel($event, mat)" style="background: white; padding: 6px; border-radius: 50%; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+           <div (click)="$event.stopPropagation(); deleteMateriel(mat)" style="background: white; padding: 6px; border-radius: 50%; box-shadow: 0 2px 5px rgba(0,0,0,0.1); cursor: pointer;">
               <ion-icon name="trash-outline" color="danger"></ion-icon>
            </div>
 
@@ -144,20 +140,17 @@
         </div>
 
         <div class="equip-image">
-
           <img 
             *ngIf="getImageUrl(mat)" 
             [src]="getThumbUrl(getImageUrl(mat))"
             crossorigin="anonymous"
             style="width:100%; height:100%; object-fit:contain;"
           >
-
           <ion-icon 
             *ngIf="!getImageUrl(mat)"
             name="hammer" 
             style="font-size:64px; color:#333; opacity:0.1;">
           </ion-icon>
-
         </div>
 
         <div class="equip-info">
@@ -171,6 +164,10 @@
           <p class="chantier-name" *ngIf="mat.chantier_id">
             {{ getChantierName(mat.chantier_id) }}
           </p>
+          
+          <ion-badge [color]="mat.etat === 'Bon' ? 'success' : 'warning'" style="margin-top: 5px;">
+            {{ mat.etat || 'Bon' }}
+          </ion-badge>
         </div>
 
       </div>

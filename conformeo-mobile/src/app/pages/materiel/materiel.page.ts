@@ -6,7 +6,7 @@ import {
   IonHeader, IonToolbar, IonContent,
   IonButtons, IonButton, IonIcon, IonFab, IonFabButton, 
   AlertController, IonBackButton, IonSearchbar,
-  IonTitle, ModalController, LoadingController // <--- 1. IMPORT AJOUTÉ
+  IonTitle, ModalController, LoadingController, IonBadge 
 } from '@ionic/angular/standalone';
 import { Capacitor } from '@capacitor/core';
 import { addIcons } from 'ionicons';
@@ -14,10 +14,10 @@ import { addIcons } from 'ionicons';
 import { 
   add, hammer, construct, home, swapHorizontal, qrCodeOutline,
   searchOutline, cube, homeOutline, locationOutline, shieldCheckmark,
-  trashOutline, hammerOutline, cloudUploadOutline, createOutline // <--- 2. ICONE IMPORTÉE
+  trashOutline, hammerOutline, cloudUploadOutline, createOutline 
 } from 'ionicons/icons';
 
-import { ApiService, Materiel, Chantier } from 'src/app/services/api';
+import { ApiService, Materiel, Chantier } from '../../services/api'; // Correction du chemin
 import { AddMaterielModalComponent } from './add-materiel-modal/add-materiel-modal.component';
 import { BarcodeScanner, BarcodeFormat } from '@capacitor-mlkit/barcode-scanning';
 
@@ -30,7 +30,7 @@ import { BarcodeScanner, BarcodeFormat } from '@capacitor-mlkit/barcode-scanning
     CommonModule, FormsModule, IonHeader, IonSearchbar,
     IonToolbar, IonContent, IonTitle,
     IonButtons, IonButton, IonIcon, IonFab,
-    IonFabButton, IonBackButton
+    IonFabButton, IonBackButton, IonBadge
   ]
 })
 export class MaterielPage implements OnInit {
@@ -46,14 +46,14 @@ export class MaterielPage implements OnInit {
     private alertCtrl: AlertController,
     private platform: Platform,
     private modalCtrl: ModalController,
-    private loadingCtrl: LoadingController // <--- 3. INJECTION DU CONTROLEUR
+    private loadingCtrl: LoadingController 
   ) {
     addIcons({
       add, hammer, construct, home, swapHorizontal, qrCodeOutline,
       searchOutline, cube, homeOutline, locationOutline, shieldCheckmark, createOutline,
       'trash-outline': trashOutline,
       'hammer-outline': hammerOutline,
-      'cloud-upload-outline': cloudUploadOutline // <--- 4. ENREGISTREMENT ICONE
+      'cloud-upload-outline': cloudUploadOutline
     });
 
     this.checkScreen();
@@ -69,11 +69,14 @@ export class MaterielPage implements OnInit {
   }
 
   loadData(event?: any) {
+    // 1. Charger le matériel
     this.api.getMateriels().subscribe(mats => {
       this.materiels = mats;
-      this.filteredMateriels = mats;
+      this.filterMateriels(); // On applique le filtre (si recherche en cours)
       if (event) event.target.complete();
     });
+
+    // 2. Charger les chantiers (pour les noms dans les badges)
     this.api.getChantiers().subscribe(chantiers => {
       this.chantiers = chantiers;
     });
@@ -81,13 +84,17 @@ export class MaterielPage implements OnInit {
 
   filterMateriels() {
     const term = this.searchTerm.toLowerCase().trim();
-    this.filteredMateriels = this.materiels.filter(m =>
-      m.nom.toLowerCase().includes(term) ||
-      m.reference.toLowerCase().includes(term)
-    );
+    if (!term) {
+      this.filteredMateriels = this.materiels;
+    } else {
+      this.filteredMateriels = this.materiels.filter(m =>
+        m.nom.toLowerCase().includes(term) ||
+        m.reference.toLowerCase().includes(term)
+      );
+    }
   }
 
-  // --- IMPORT CSV (NOUVEAU) ---
+  // --- IMPORT CSV ---
   async onCSVSelected(event: any) {
     const file = event.target.files[0];
     if (file) {
@@ -133,11 +140,11 @@ export class MaterielPage implements OnInit {
 
   handleScanResult(code: string) {
     const mat = this.materiels.find(m => m.reference === code);
-    if (mat) this.moveMateriel(mat);
+    if (mat) this.openTransfer(mat); // On ouvre le transfert direct
     else alert(`Aucun matériel trouvé avec la référence : ${code}`);
   }
 
-  // --- AJOUT ---
+  // --- CRÉATION ---
   async addMateriel() {
     const modal = await this.modalCtrl.create({
       component: AddMaterielModalComponent
@@ -147,11 +154,11 @@ export class MaterielPage implements OnInit {
     if (role === 'confirm') this.loadData();
   }
 
-  async editMateriel(event: Event, mat: Materiel) {
-    event.stopPropagation();
+  // --- MODIFICATION ---
+  async openEdit(mat: Materiel) { // Retiré 'event' car géré par le HTML si bien séparé
     const modal = await this.modalCtrl.create({
       component: AddMaterielModalComponent,
-      componentProps: { existingItem: mat } // On passe l'objet à modifier
+      componentProps: { existingItem: mat } 
     });
     
     await modal.present();
@@ -159,8 +166,8 @@ export class MaterielPage implements OnInit {
     if (role === 'confirm') this.loadData();
   }
 
-  // --- DEPLACEMENT ---
-  async moveMateriel(mat: Materiel) {
+  // --- TRANSFERT (DEPLACEMENT) ---
+  async openTransfer(mat: Materiel) { // Retiré 'event'
     const inputs: any[] = [
       { type: 'radio', label: '🏠 Retour au Dépôt', value: null, checked: !mat.chantier_id }
     ];
@@ -178,6 +185,9 @@ export class MaterielPage implements OnInit {
         {
           text: 'Valider Transfert',
           handler: chantierId => {
+            // Si le chantier n'a pas changé, on ne fait rien
+            if (mat.chantier_id === chantierId && (chantierId !== null || mat.chantier_id !== null)) return;
+
             this.api.transferMateriel(mat.id!, chantierId).subscribe(() => {
               this.loadData();
             });
@@ -189,8 +199,7 @@ export class MaterielPage implements OnInit {
   }
 
   // --- SUPPRESSION ---
-  async deleteMateriel(event: Event, mat: Materiel) {
-    event.stopPropagation();
+  async deleteMateriel(mat: Materiel) { // Retiré 'event'
     const alert = await this.alertCtrl.create({
       header: 'Supprimer ?',
       message: `Voulez-vous supprimer ${mat.nom} ?`,
@@ -209,24 +218,44 @@ export class MaterielPage implements OnInit {
     await alert.present();
   }
 
-  // --- HELPERS IMAGES ---
+  // --- HELPERS VISUELS ---
+  
+  // Renvoie une URL d'image valide ou une placeholder
   getImageUrl(mat: Materiel): string {
-    return (mat.image_url && mat.image_url.trim() !== '') ? mat.image_url : '';
+    if (mat.image_url && mat.image_url.trim() !== '') {
+       // Optimisation Cloudinary (Thumbnails pour la liste)
+       if (mat.image_url.includes('cloudinary.com') && mat.image_url.includes('/upload/')) {
+          return mat.image_url.replace('/upload/', '/upload/w_200,h_200,c_fill,q_auto,f_auto/');
+       }
+       return mat.image_url;
+    }
+    return 'assets/no-image.png'; // Image par défaut
   }
 
-  getThumbUrl(url: string | undefined): string {
+  // 👇 AJOUTEZ CETTE FONCTION MANQUANTE
+  getThumbUrl(url: string): string {
     if (!url) return '';
+    // Sécurise l'URL
     if (url.startsWith('http:')) url = url.replace('http:', 'https:');
+    
+    // Optimisation Cloudinary (Miniature)
     if (url.includes('cloudinary.com') && url.includes('/upload/')) {
+      // Si l'URL a déjà été transformée par getImageUrl, on ne refait pas
+      if (url.includes('w_')) return url;
+      
       return url.replace('/upload/', '/upload/w_250,h_250,c_fit,q_auto,f_auto/');
     }
     return url;
   }
-
+  
   getChantierName(id: number | null | undefined): string {
     if (!id) return 'Au Dépôt';
     const c = this.chantiers.find(x => x.id === id);
     return c ? c.nom : 'Inconnu';
+  }
+  
+  getStatusColor(etat: string | undefined): string {
+    return etat || 'Bon'; // Retourne la classe CSS (Bon, Moyen, Mauvais...)
   }
 
   getMaterielsSortis(): number {
@@ -236,4 +265,6 @@ export class MaterielPage implements OnInit {
   getMaterielsDepot(): number {
     return this.materiels.filter(m => !m.chantier_id).length;
   }
+
+  
 }
