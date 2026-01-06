@@ -381,3 +381,120 @@ def generate_audit_pdf(chantier, inspection, output_path, company=None):
 
     draw_footer(c, width, height, chantier, "Rapport d'Audit")
     c.save()
+
+# ==========================================
+# 5. GENERATEUR PLAN DE PREVENTION (PdP)
+# ==========================================
+def generate_pdp_pdf(chantier, pdp, output_path, company=None):
+    c = canvas.Canvas(output_path, pagesize=A4)
+    width, height = A4
+    margin = 2 * cm
+    
+    # Page de garde
+    draw_cover_page(c, chantier, "PLAN DE PRÉVENTION", "Travaux en site occupé / Coactivité", company)
+
+    y = height - 3 * cm
+
+    def check_space(needed):
+        nonlocal y
+        if y < needed:
+            draw_footer(c, width, height, chantier, "Plan de Prévention")
+            c.showPage()
+            y = height - 3 * cm
+
+    def draw_section_title(title):
+        nonlocal y
+        check_space(2*cm)
+        c.setFillColorRGB(*COLOR_PRIMARY); c.setFont(FONT_TITLE, 14)
+        c.drawString(margin, y, title)
+        y -= 0.2*cm; c.setLineWidth(1); c.setStrokeColorRGB(*COLOR_PRIMARY)
+        c.line(margin, y, width-margin, y); c.setFillColorRGB(0,0,0); y -= 1*cm
+
+    # 1. ACTEURS & INSPECTION
+    draw_section_title("1. INTERVENANTS & INSPECTION COMMUNE")
+    
+    c.setFont(FONT_TEXT, 10)
+    date_insp = "Non réalisée"
+    if pdp.date_inspection_commune:
+        if isinstance(pdp.date_inspection_commune, datetime):
+            date_insp = pdp.date_inspection_commune.strftime('%d/%m/%Y à %H:%M')
+        else:
+            date_insp = str(pdp.date_inspection_commune)[:16]
+
+    c.drawString(margin, y, f"Date de l'inspection commune : {date_insp}")
+    y -= 0.8*cm
+    
+    # Tableau simple pour EU / EE
+    col_w = (width - 2*margin) / 2
+    c.setFont(FONT_TITLE, 11)
+    c.drawString(margin, y, "Entreprise Utilisatrice (Client)")
+    c.drawString(margin + col_w, y, "Entreprise Extérieure (Nous)")
+    y -= 0.5*cm
+    
+    c.setFont(FONT_TEXT, 10); c.setFillColorRGB(0.2, 0.2, 0.2)
+    c.drawString(margin, y, pdp.entreprise_utilisatrice or "Non défini")
+    c.drawString(margin + col_w, y, pdp.entreprise_exterieure or (company.name if company else "Nous"))
+    y -= 1.5*cm
+
+    # 2. CONSIGNES DE SÉCURITÉ
+    draw_section_title("2. CONSIGNES DU SITE & SECOURS")
+    cons = pdp.consignes_securite or {}
+    
+    items = [
+        f"🚑 Numéros d'urgence : {cons.get('urgence', '15 / 18')}",
+        f"📍 Point de Rassemblement : {cons.get('rassemblement', 'Parking Principal')}",
+        f"🚽 Accès Sanitaires/Eau : {cons.get('sanitaires', 'Oui, accès commun')}",
+        f"🚬 Zone Fumeur : {cons.get('fumeur', 'Zone dédiée uniquement')}",
+        f"🔥 Permis de Feu requis : {cons.get('permis_feu', 'Non')}"
+    ]
+    
+    for item in items:
+        check_space(0.8*cm)
+        c.setFont(FONT_TEXT, 10)
+        c.drawString(margin, y, f"• {item}")
+        y -= 0.6*cm
+    y -= 0.5*cm
+
+    # 3. ANALYSE DES RISQUES INTERFÉRENTS
+    draw_section_title("3. RISQUES LIÉS À LA COACTIVITÉ")
+    
+    risques = pdp.risques_interferents or []
+    if not risques:
+        c.setFont(FONT_TEXT, 10); c.drawString(margin, y, "Aucun risque d'interférence majeur identifié.")
+    else:
+        for r in risques:
+            check_space(2.5*cm)
+            # Cadre léger
+            c.setStrokeColorRGB(0.9, 0.9, 0.9); c.setLineWidth(0.5)
+            c.rect(margin, y-1.8*cm, width-2*margin, 1.8*cm)
+            
+            # Contenu
+            c.setFont(FONT_TITLE, 10); c.setFillColorRGB(0, 0, 0)
+            c.drawString(margin+0.2*cm, y-0.5*cm, f"Activité : {r.get('tache', '?')}")
+            
+            c.setFont(FONT_TEXT, 9); c.setFillColorRGB(0.8, 0, 0)
+            c.drawString(margin+0.2*cm, y-1.0*cm, f"Risque : {r.get('risque', '?')}")
+            
+            c.setFillColorRGB(0, 0.5, 0)
+            c.drawString(margin+0.2*cm, y-1.5*cm, f"Mesure : {r.get('mesure', '?')}")
+            
+            y -= 2.2*cm
+
+    # 4. SIGNATURES
+    check_space(4*cm)
+    y -= 1*cm
+    c.setStrokeColorRGB(0, 0, 0); c.setLineWidth(1)
+    c.line(margin, y, width-margin, y)
+    y -= 0.5*cm
+    
+    c.setFont(FONT_TITLE, 10); c.setFillColorRGB(0, 0, 0)
+    c.drawString(margin, y, "Pour l'Entreprise Utilisatrice :")
+    c.drawRightString(width-margin, y, "Pour l'Entreprise Extérieure :")
+    
+    y -= 2.5*cm
+    c.setFont(FONT_TEXT, 8); c.setFillColorRGB(0.5, 0.5, 0.5)
+    c.drawCentredString(width/2, y, "Document à conserver sur le chantier pendant toute la durée des travaux.")
+
+    draw_footer(c, width, height, chantier, "Plan de Prévention")
+    c.save()
+    return output_path

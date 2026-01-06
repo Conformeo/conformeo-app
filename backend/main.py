@@ -641,6 +641,66 @@ def delete_company_doc(doc_id: int, db: Session = Depends(get_db), current_user:
     return {"status": "deleted"}
 
 # ==========================================
+# 8. PLAN DE PREVENTION (PdP) - COACTIVITÉ
+# ==========================================
+
+# 1. Migration
+@app.get("/migrate_pdp")
+def migrate_pdp(db: Session = Depends(get_db)):
+    try:
+        db.execute(text("""
+            CREATE TABLE IF NOT EXISTS plans_prevention (
+                id SERIAL PRIMARY KEY,
+                chantier_id INTEGER REFERENCES chantiers(id),
+                entreprise_utilisatrice VARCHAR,
+                entreprise_exterieure VARCHAR,
+                date_inspection_commune TIMESTAMP,
+                risques_interferents JSON,
+                consignes_securite JSON,
+                date_creation TIMESTAMP DEFAULT NOW()
+            )
+        """))
+        db.commit()
+        return {"msg": "Table Plans de Prévention créée ! 🤝"}
+    except Exception as e: return {"error": str(e)}
+
+# 2. Créer un PdP
+@app.post("/plans-prevention", response_model=schemas.PlanPreventionOut)
+def create_pdp(p: schemas.PlanPreventionCreate, db: Session = Depends(get_db)):
+    # On vérifie si un PdP existe déjà pour ce chantier (optionnel, sinon on en crée un nouveau)
+    new_p = models.PlanPrevention(
+        chantier_id=p.chantier_id,
+        entreprise_utilisatrice=p.entreprise_utilisatrice,
+        entreprise_exterieure=p.entreprise_exterieure,
+        date_inspection_commune=p.date_inspection_commune,
+        risques_interferents=p.risques_interferents,
+        consignes_securite=p.consignes_securite
+    )
+    db.add(new_p); db.commit(); db.refresh(new_p)
+    return new_p
+
+# 3. Lire les PdP d'un chantier
+@app.get("/chantiers/{cid}/plans-prevention", response_model=List[schemas.PlanPreventionOut])
+def read_pdps(cid: int, db: Session = Depends(get_db)):
+    return db.query(models.PlanPrevention).filter(models.PlanPrevention.chantier_id == cid).all()
+
+# 4. Télécharger le PDF
+@app.get("/plans-prevention/{pid}/pdf")
+def download_pdp_pdf(pid: int, db: Session = Depends(get_db)):
+    p = db.query(models.PlanPrevention).filter(models.PlanPrevention.id == pid).first()
+    if not p: raise HTTPException(404)
+    c = db.query(models.Chantier).filter(models.Chantier.id == p.chantier_id).first()
+    
+    # On récupère l'entreprise pour le logo
+    comp = get_company_for_chantier(db, c.id)
+
+    path = f"uploads/PdP_{pid}.pdf"
+    # 👇 On appelle la nouvelle fonction du générateur
+    pdf_generator.generate_pdp_pdf(c, p, path, company=comp)
+    
+    return FileResponse(path, media_type='application/pdf')
+
+# ==========================================
 # 10. GESTION EQUIPE & ENTREPRISE
 # ==========================================
 @app.get("/companies/me", response_model=schemas.CompanyOut)
@@ -670,6 +730,8 @@ def add_team_member(u: schemas.UserCreate, db: Session = Depends(get_db), curren
     new_u = models.User(email=u.email, hashed_password=security.get_password_hash(u.password), role=u.role, company_id=current_user.company_id)
     db.add(new_u); db.commit(); db.refresh(new_u)
     return new_u
+
+
 
 # ==========================================
 # 11. MIGRATIONS

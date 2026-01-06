@@ -3,18 +3,20 @@ from sqlalchemy.orm import relationship
 from database import Base
 from datetime import datetime
 
-# 👇 NOUVELLE TABLE : L'ENTREPRISE (Le "Tenant")
+# ==========================
+# 1. ENTREPRISE & USERS
+# ==========================
 class Company(Base):
     __tablename__ = "companies"
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, index=True)
     subscription_plan = Column(String, default="free")
     
-    # 👇 NOUVEAUX CHAMPS
-    logo_url = Column(String, nullable=True)     # Le logo de l'entreprise
-    address = Column(String, nullable=True)      # Adresse du siège
-    contact_email = Column(String, nullable=True) # Email de contact (pied de page)
-    phone = Column(String, nullable=True)        # Téléphone
+    # Infos Branding
+    logo_url = Column(String, nullable=True)
+    address = Column(String, nullable=True)
+    contact_email = Column(String, nullable=True)
+    phone = Column(String, nullable=True)
     
     created_at = Column(DateTime, default=datetime.now)
 
@@ -30,10 +32,12 @@ class User(Base):
     role = Column(String, default="conducteur")
     is_active = Column(Boolean, default=True)
     
-    # 👇 LIEN VERS L'ENTREPRISE
     company_id = Column(Integer, ForeignKey("companies.id"), nullable=True)
     company = relationship("Company", back_populates="users")
 
+# ==========================
+# 2. CHANTIERS
+# ==========================
 class Chantier(Base):
     __tablename__ = "chantiers"
 
@@ -51,18 +55,30 @@ class Chantier(Base):
 
     date_debut = Column(DateTime, nullable=True)
     date_fin = Column(DateTime, nullable=True)
-    statut_planning = Column(String, default="prevu") # prevu, en_cours, termine, retard
+    statut_planning = Column(String, default="prevu")
+
+    # Champ ajouté pour filtrer PPSPS vs Plan de Prévention
+    soumis_sps = Column(Boolean, default=False)
     
-    # 👇 LIEN VERS L'ENTREPRISE
     company_id = Column(Integer, ForeignKey("companies.id"), nullable=True)
     company = relationship("Company", back_populates="chantiers")
 
+    # Relations Documents
     rapports = relationship("Rapport", back_populates="chantier")
     materiels = relationship("Materiel", back_populates="chantier")
     inspections = relationship("Inspection", back_populates="chantier")
+    
+    # Relation SPS
     ppsps_docs = relationship("PPSPS", back_populates="chantier")
+    
+    # Relation Plan de Prévention (NOUVEAU)
+    plans_prevention = relationship("PlanPrevention", back_populates="chantier")
+    
     pic = relationship("PIC", uselist=False, back_populates="chantier")
 
+# ==========================
+# 3. MATERIEL
+# ==========================
 class Materiel(Base):
     __tablename__ = "materiels"
 
@@ -72,13 +88,15 @@ class Materiel(Base):
     etat = Column(String, default="Bon")
     image_url = Column(String, nullable=True)
     
-    # 👇 LIEN VERS L'ENTREPRISE (Le stock appartient à la boîte)
     company_id = Column(Integer, ForeignKey("companies.id"), nullable=True)
     company = relationship("Company", back_populates="materiels")
     
     chantier_id = Column(Integer, ForeignKey("chantiers.id"), nullable=True)
     chantier = relationship("Chantier", back_populates="materiels")
 
+# ==========================
+# 4. RAPPORTS & IMAGES
+# ==========================
 class RapportImage(Base):
     __tablename__ = "rapport_images"
     
@@ -121,6 +139,9 @@ class Inspection(Base):
 
     chantier = relationship("Chantier", back_populates="inspections")
 
+# ==========================
+# 5. SÉCURITÉ & PREVENTION
+# ==========================
 class PPSPS(Base):
     __tablename__ = "ppsps"
 
@@ -142,6 +163,30 @@ class PPSPS(Base):
     date_creation = Column(DateTime, default=datetime.now)
 
     chantier = relationship("Chantier", back_populates="ppsps_docs")
+
+class PlanPrevention(Base):
+    __tablename__ = "plans_prevention"
+
+    id = Column(Integer, primary_key=True, index=True)
+    chantier_id = Column(Integer, ForeignKey("chantiers.id"))
+    
+    # 1. Acteurs
+    entreprise_utilisatrice = Column(String) # Le client (EU)
+    entreprise_exterieure = Column(String)   # Nous (EE)
+    date_inspection_commune = Column(DateTime, default=datetime.now)
+    
+    # 2. Risques Interférents (JSON)
+    # Ex: [{"tache": "Soudure", "risque": "Incendie", "mesure": "Permis de feu"}]
+    risques_interferents = Column(JSON)
+    
+    # 3. Consignes & Secours (JSON)
+    # Ex: {"point_rassemblement": "Parking Nord", "num_urgence": "18"}
+    consignes_securite = Column(JSON)
+    
+    date_creation = Column(DateTime, default=datetime.now)
+    
+    # Relation inverse
+    chantier = relationship("Chantier", back_populates="plans_prevention")
 
 class PIC(Base):
     __tablename__ = "pics"

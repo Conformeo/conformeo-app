@@ -119,7 +119,7 @@ class RapportOut(RapportBase):
     class Config:
         from_attributes = True
 
-# --- INSPECTIONS QHSE ---
+# --- INSPECTIONS ---
 class InspectionBase(BaseModel):
     titre: str
     type: str
@@ -174,5 +174,23 @@ class PICCreate(PICBase):
 class PICOut(PICBase):
     id: int
     date_update: datetime
+    class Config:
+        from_attributes = True
+
+# === PLAN PREVENTION ===
+class PlanPreventionBase(BaseModel):
+    entreprise_utilisatrice: Optional[str] = None
+    entreprise_exterieure: Optional[str] = None
+    date_inspection_commune: Optional[datetime] = None
+    risques_interferents: Optional[List[dict]] = []
+    consignes_securite: Optional[dict] = {}
+
+class PlanPreventionCreate(PlanPreventionBase):
+    chantier_id: int
+
+class PlanPreventionOut(PlanPreventionBase):
+    id: int
+    chantier_id: int
+    date_creation: datetime
     class Config:
         from_attributes = True
