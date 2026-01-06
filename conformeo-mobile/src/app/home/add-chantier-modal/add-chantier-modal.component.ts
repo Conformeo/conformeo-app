@@ -3,31 +3,34 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 
-// 👇 TOUS LES IMPORTS IONIC INDISPENSABLES
+// 👇 IMPORT DES COMPOSANTS IONIC (Ajout de IonToggle et IonNote)
 import { 
   IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, 
   IonContent, IonList, IonItem, IonInput, ModalController,
-  IonIcon, IonSpinner, IonLabel, IonListHeader
+  IonIcon, IonSpinner, IonLabel, IonListHeader, 
+  IonToggle, IonNote 
 } from '@ionic/angular/standalone';
 
-import { ApiService, Chantier } from '../../services/api';
+import { ApiService, Chantier } from '../../services/api' // Chemin standardisé
 import { addIcons } from 'ionicons';
-import { camera, cloudUpload, save, close } from 'ionicons/icons';
+
+// 👇 AJOUT DE L'ICONE BOUCLIER (shield-checkmark-outline)
+import { camera, cloudUpload, save, close, shieldCheckmarkOutline } from 'ionicons/icons';
 
 @Component({
   selector: 'app-add-chantier-modal',
   templateUrl: './add-chantier-modal.component.html',
   styleUrls: ['./add-chantier-modal.component.scss'],
   standalone: true,
-  // 👇 C'est ici que ça manquait !
+  // 👇 AJOUT DE IonToggle et IonNote DANS LES IMPORTS DU COMPOSANT
   imports: [
     CommonModule, FormsModule, 
     IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, 
     IonContent, IonList, IonItem, IonInput, IonIcon, IonSpinner,
-    IonLabel, IonListHeader
+    IonLabel, IonListHeader, IonToggle, IonNote
   ]
 })
-export class AddChantierModalComponent implements OnInit{
+export class AddChantierModalComponent implements OnInit {
 
   @Input() existingChantier: any = null;
 
@@ -36,10 +39,9 @@ export class AddChantierModalComponent implements OnInit{
     client: '',
     adresse: '',
     est_actif: true,
-    // On initialise vide, le backend mettra les défauts si besoin
-    date_debut: undefined,
-    date_fin: undefined,
-    soumis_sps: false
+    date_debut: new Date().toISOString(),
+    date_fin: new Date(new Date().setDate(new Date().getDate() + 30)).toISOString(),
+    soumis_sps: false // Par défaut NON
   };
 
   coverPhotoWebPath: string | undefined;
@@ -50,21 +52,34 @@ export class AddChantierModalComponent implements OnInit{
     private modalCtrl: ModalController,
     private api: ApiService
   ) {
-    addIcons({ camera, cloudUpload, save, close });
+    // 👇 ENREGISTREMENT DE L'ICONE SPS
+    addIcons({ camera, cloudUpload, save, close, shieldCheckmarkOutline });
   }
 
   ngOnInit() {
     if (this.existingChantier) {
+      // On copie l'objet pour ne pas modifier l'original tant qu'on n'a pas sauvegardé
       this.chantier = { ...this.existingChantier };
       this.coverPhotoWebPath = this.chantier.cover_url;
       
-      // 👇 ASTUCE : On formatte la date pour l'input HTML (YYYY-MM-DD)
+      // Formatage des dates pour les inputs HTML (YYYY-MM-DD)
       if (this.chantier.date_debut) {
-        this.chantier.date_debut = this.chantier.date_debut.split('T')[0];
+        // Gère le cas où c'est une string ou un objet Date
+        const d = new Date(this.chantier.date_debut);
+        this.chantier.date_debut = d.toISOString().split('T')[0];
       }
       if (this.chantier.date_fin) {
-        this.chantier.date_fin = this.chantier.date_fin.split('T')[0];
+        const d = new Date(this.chantier.date_fin);
+        this.chantier.date_fin = d.toISOString().split('T')[0];
       }
+    } else {
+      // Initialisation des dates par défaut (Aujourd'hui et +30 jours)
+      const today = new Date();
+      const nextMonth = new Date();
+      nextMonth.setDate(today.getDate() + 30);
+      
+      this.chantier.date_debut = today.toISOString().split('T')[0];
+      this.chantier.date_fin = nextMonth.toISOString().split('T')[0];
     }
   }
 
@@ -73,17 +88,21 @@ export class AddChantierModalComponent implements OnInit{
   }
 
   async takeCoverPhoto() {
-    const image = await Camera.getPhoto({
-      quality: 80,
-      allowEditing: false,
-      resultType: CameraResultType.Uri,
-      source: CameraSource.Camera // Ou Prompt
-    });
-    
-    if (image.webPath) {
-      this.coverPhotoWebPath = image.webPath;
-      const response = await fetch(image.webPath);
-      this.coverPhotoBlob = await response.blob();
+    try {
+      const image = await Camera.getPhoto({
+        quality: 80,
+        allowEditing: false,
+        resultType: CameraResultType.Uri,
+        source: CameraSource.Camera
+      });
+      
+      if (image.webPath) {
+        this.coverPhotoWebPath = image.webPath;
+        const response = await fetch(image.webPath);
+        this.coverPhotoBlob = await response.blob();
+      }
+    } catch (e) {
+      console.log('Prise de photo annulée');
     }
   }
 
@@ -98,27 +117,38 @@ export class AddChantierModalComponent implements OnInit{
            this.chantier.cover_url = res.url;
            this.finalizeSave();
         },
-        error: () => { this.isSaving = false; alert("Erreur upload photo"); }
+        error: () => { 
+          this.isSaving = false; 
+          alert("Erreur lors de l'envoi de la photo."); 
+        }
       });
     } 
-    // CAS 2 : Pas de nouvelle photo (ou on garde l'ancienne)
+    // CAS 2 : Pas de nouvelle photo
     else {
       this.finalizeSave();
     }
   }
 
   finalizeSave() {
+    // Petit nettoyage des dates si nécessaire (optionnel, l'API gère souvent)
+    
     if (this.existingChantier) {
       // MODE UPDATE
       this.api.updateChantier(this.existingChantier.id, this.chantier).subscribe({
         next: (updated) => this.modalCtrl.dismiss(updated, 'confirm'),
-        error: () => { this.isSaving = false; alert("Erreur modification"); }
+        error: () => { 
+          this.isSaving = false; 
+          alert("Erreur lors de la modification."); 
+        }
       });
     } else {
       // MODE CREATE
       this.api.createChantier(this.chantier).subscribe({
         next: (created) => this.modalCtrl.dismiss(created, 'confirm'),
-        error: () => { this.isSaving = false; alert("Erreur création"); }
+        error: () => { 
+          this.isSaving = false; 
+          alert("Erreur lors de la création."); 
+        }
       });
     }
   }
