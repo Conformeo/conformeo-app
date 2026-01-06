@@ -7,6 +7,7 @@ import zipfile
 from datetime import datetime, timedelta, date
 import csv 
 import codecs
+import time
 import pydantic
 
 load_dotenv()
@@ -57,6 +58,25 @@ def root():
     return {"message": "Conforméo API Ready 🚀"}
 
 # ==========================================
+# UTILITAIRES (GPS)
+# ==========================================
+def get_gps_from_address(address: str):
+    if not address or len(address) < 5: return None, None
+    try:
+        # On interroge l'API gratuite de Nominatim
+        url = "https://nominatim.openstreetmap.org/search"
+        params = {'q': address, 'format': 'json', 'limit': 1}
+        headers = {'User-Agent': 'ConformeoApp/1.0'}
+        
+        response = requests.get(url, params=params, headers=headers, timeout=5)
+        if response.status_code == 200 and len(response.json()) > 0:
+            data = response.json()[0]
+            return float(data['lat']), float(data['lon'])
+    except Exception as e:
+        print(f"Erreur GPS pour {address}: {e}")
+    return None, None
+
+# ==========================================
 # 1. UTILISATEURS
 # ==========================================
 @app.post("/users", response_model=schemas.UserOut)
@@ -64,14 +84,12 @@ def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     if db.query(models.User).filter(models.User.email == user.email).first():
         raise HTTPException(status_code=400, detail="Email pris")
     
-    # Création Entreprise si demandée (Signup)
     if user.company_name:
         new_company = models.Company(name=user.company_name, subscription_plan="free")
         db.add(new_company); db.commit(); db.refresh(new_company)
         company_id = new_company.id
         role = "admin"
     else:
-        # Sinon (Invitation), on verra plus tard, ici on met null ou on gère dans /team
         company_id = None 
         role = user.role
 
@@ -97,8 +115,6 @@ def read_users_me(current_user: models.User = Depends(security.get_current_user)
 # ==========================================
 @app.get("/dashboard/stats")
 def get_stats(db: Session = Depends(get_db)):
-    # Note: Pour le multi-tenant, il faudrait filtrer par company_id ici aussi
-    # Mais pour l'instant on garde global pour la démo
     total = db.query(models.Chantier).count()
     actifs = db.query(models.Chantier).filter(models.Chantier.est_actif == True).count()
     rap = db.query(models.Rapport).count()
@@ -120,12 +136,19 @@ def get_stats(db: Session = Depends(get_db)):
         c_nom = r.chantier.nom if r.chantier else "Inconnu"
         rec_fmt.append({"titre": r.titre, "date_creation": r.date_creation, "chantier_nom": c_nom, "niveau_urgence": r.niveau_urgence})
 
+    # Données Carte
     map_data = []
     chantiers = db.query(models.Chantier).filter(models.Chantier.est_actif == True).all()
     for c in chantiers:
-        last_gps = db.query(models.Rapport).filter(models.Rapport.chantier_id == c.id, models.Rapport.latitude != None).first()
-        if last_gps:
-            map_data.append({"id": c.id, "nom": c.nom, "client": c.client, "lat": last_gps.latitude, "lng": last_gps.longitude})
+        lat, lng = c.latitude, c.longitude
+        # Fallback GPS sur dernier rapport
+        if not lat:
+            last_gps = db.query(models.Rapport).filter(models.Rapport.chantier_id == c.id, models.Rapport.latitude != None).first()
+            if last_gps:
+                lat, lng = last_gps.latitude, last_gps.longitude
+        
+        if lat and lng:
+            map_data.append({"id": c.id, "nom": c.nom, "client": c.client, "lat": lat, "lng": lng})
 
     return {
         "kpis": {
@@ -143,12 +166,17 @@ def get_stats(db: Session = Depends(get_db)):
 # ==========================================
 @app.post("/chantiers", response_model=schemas.ChantierOut)
 def create_chantier(chantier: schemas.ChantierCreate, db: Session = Depends(get_db), current_user: models.User = Depends(security.get_current_user)):
+    lat, lng = None, None
+    if chantier.adresse:
+        lat, lng = get_gps_from_address(chantier.adresse)
+
     new_c = models.Chantier(
         nom=chantier.nom, adresse=chantier.adresse, client=chantier.client, cover_url=chantier.cover_url,
         company_id=current_user.company_id,
-        # Dates pour le planning (défaut +30j)
         date_debut=chantier.date_debut or datetime.now(),
-        date_fin=chantier.date_fin or (datetime.now() + timedelta(days=30))
+        date_fin=chantier.date_fin or (datetime.now() + timedelta(days=30)),
+        latitude=lat, longitude=lng,
+        soumis_sps=chantier.soumis_sps # V11
     )
     db.add(new_c); db.commit(); db.refresh(new_c)
     return new_c
@@ -157,102 +185,76 @@ def create_chantier(chantier: schemas.ChantierCreate, db: Session = Depends(get_
 def update_chantier(cid: int, up: schemas.ChantierCreate, db: Session = Depends(get_db)):
     c = db.query(models.Chantier).filter(models.Chantier.id == cid).first()
     if not c: raise HTTPException(404)
+    
+    # Recalcul GPS si adresse change
+    if up.adresse and up.adresse != c.adresse:
+        lat, lng = get_gps_from_address(up.adresse)
+        c.latitude = lat; c.longitude = lng
+    
     c.nom = up.nom; c.adresse = up.adresse; c.client = up.client
     if up.cover_url: c.cover_url = up.cover_url
     if up.date_debut: c.date_debut = up.date_debut
     if up.date_fin: c.date_fin = up.date_fin
-
-    # 👇 AJOUT DE LA MISE A JOUR DU STATUT
-    if up.est_actif is not None: 
-        c.est_actif = up.est_actif
+    
+    if up.est_actif is not None: c.est_actif = up.est_actif
+    if up.soumis_sps is not None: c.soumis_sps = up.soumis_sps # V11
 
     db.commit(); db.refresh(c)
     return c
 
 @app.get("/chantiers", response_model=List[schemas.ChantierOut])
 def read_chantiers(db: Session = Depends(get_db)):
-    # Pour l'instant on retourne tout, en V2 on filtrera par current_user.company_id
     return db.query(models.Chantier).all()
 
-# 👇 LA ROUTE QUI MANQUAIT !
 @app.get("/chantiers/{chantier_id}", response_model=schemas.ChantierOut)
 def read_chantier(chantier_id: int, db: Session = Depends(get_db)):
     chantier = db.query(models.Chantier).filter(models.Chantier.id == chantier_id).first()
-    if not chantier:
-        raise HTTPException(status_code=404, detail="Chantier introuvable")
+    if not chantier: raise HTTPException(status_code=404, detail="Chantier introuvable")
     return chantier
 
 @app.post("/chantiers/import")
-async def import_chantiers_csv(
-    file: UploadFile = File(...), 
-    db: Session = Depends(get_db) 
-    # ⚠️ ATTENTION : Pas de 'current_user' ici !
-):
-    # Tolérance majuscule/minuscule pour l'extension
-    if not file.filename.lower().endswith('.csv'):
-        raise HTTPException(400, "Le fichier doit être un CSV")
-
+async def import_chantiers_csv(file: UploadFile = File(...), db: Session = Depends(get_db)):
+    if not file.filename.lower().endswith('.csv'): raise HTTPException(400, "Non CSV")
     try:
         content = await file.read()
-        
-        # Décodage robuste
-        try:
-            text_content = content.decode('utf-8-sig')
-        except:
-            text_content = content.decode('latin-1')
-            
+        try: text_content = content.decode('utf-8-sig')
+        except: text_content = content.decode('latin-1')
         lines = text_content.splitlines()
-        if not lines: raise HTTPException(400, "Fichier vide")
-        
-        # Détection séparateur
         delimiter = ';' if ';' in lines[0] else ','
         reader = csv.DictReader(lines, delimiter=delimiter)
-
-        # On prend une entreprise par défaut pour éviter le plantage
-        # Si la table companies est vide, on met None (le chantier sera orphelin mais créé)
-        default_company = db.query(models.Company).first()
-        cid = default_company.id if default_company else None
-
+        
+        company = db.query(models.Company).first()
+        cid = company.id if company else None
         count = 0
+        
         for row in reader:
-            # Nettoyage des clés (enlève espaces et met en minuscule pour être sûr)
-            # Ex: "Nom " devient "nom"
             row = {k.strip(): v.strip() for k, v in row.items() if k}
-            
-            # Recherche des colonnes (tolérant)
-            # On cherche 'Nom', 'nom', 'NOM'...
-            keys_nom = [k for k in row.keys() if k.lower() == 'nom']
-            keys_client = [k for k in row.keys() if k.lower() == 'client']
-            keys_adresse = [k for k in row.keys() if k.lower() == 'adresse']
-
-            nom = row[keys_nom[0]] if keys_nom else None
+            nom = None
+            for k, v in row.items():
+                if 'nom' in k.lower(): nom = v
             
             if nom:
-                client = row[keys_client[0]] if keys_client else "Client Inconnu"
-                adresse = row[keys_adresse[0]] if keys_adresse else "Adresse Inconnue"
+                client = "Inconnu"; adresse = "-"
+                for k, v in row.items():
+                    if 'client' in k.lower(): client = v
+                    if 'adresse' in k.lower(): adresse = v
                 
-                # On utilise None pour les champs optionnels pour éviter les bugs
+                # GPS Auto
+                lat, lng = None, None
+                if len(adresse) > 5:
+                    lat, lng = get_gps_from_address(adresse)
+                    time.sleep(1) # Pause API
+
                 db.add(models.Chantier(
-                    nom=nom,
-                    client=client,
-                    adresse=adresse,
-                    est_actif=True,
-                    company_id=cid,
-                    date_creation=datetime.now(),
-                    date_debut=datetime.now(), 
-                    date_fin=datetime.now() + timedelta(days=30),
-                    signature_url=None, 
-                    cover_url=None
+                    nom=nom, client=client, adresse=adresse, est_actif=True, company_id=cid,
+                    date_creation=datetime.now(), date_debut=datetime.now(), date_fin=datetime.now()+timedelta(days=30),
+                    signature_url=None, cover_url=None, latitude=lat, longitude=lng, soumis_sps=False
                 ))
                 count += 1
-        
         db.commit()
         return {"status": "success", "message": f"{count} chantiers importés !"}
-
     except Exception as e:
-        db.rollback()
-        # On renvoie l'erreur précise au frontend
-        raise HTTPException(500, f"Erreur Python : {str(e)}")
+        db.rollback(); raise HTTPException(500, f"Erreur: {str(e)}")
 
 @app.put("/chantiers/{cid}/signature")
 def sign_chantier(cid: int, signature_url: str, db: Session = Depends(get_db)):
@@ -266,6 +268,7 @@ def sign_chantier(cid: int, signature_url: str, db: Session = Depends(get_db)):
 def delete_chantier(cid: int, db: Session = Depends(get_db)):
     c = db.query(models.Chantier).filter(models.Chantier.id == cid).first()
     if not c: raise HTTPException(404)
+    # Nettoyage dépendances
     db.query(models.Materiel).filter(models.Materiel.chantier_id == cid).update({"chantier_id": None})
     db.query(models.RapportImage).filter(models.RapportImage.rapport.has(chantier_id=cid)).delete(synchronize_session=False)
     db.query(models.Rapport).filter(models.Rapport.chantier_id == cid).delete()
@@ -280,9 +283,7 @@ def delete_chantier(cid: int, db: Session = Depends(get_db)):
 # ==========================================
 @app.post("/materiels", response_model=schemas.MaterielOut)
 def create_materiel(mat: schemas.MaterielCreate, db: Session = Depends(get_db)):
-    new_m = models.Materiel(
-        nom=mat.nom, reference=mat.reference, etat=mat.etat, image_url=mat.image_url
-    )
+    new_m = models.Materiel(nom=mat.nom, reference=mat.reference, etat=mat.etat, image_url=mat.image_url)
     db.add(new_m); db.commit(); db.refresh(new_m)
     return new_m
 
@@ -300,7 +301,6 @@ async def import_materiels_csv(file: UploadFile = File(...), db: Session = Depen
         lines = text.splitlines()
         delimiter = ';' if ';' in lines[0] else ','
         reader = csv.DictReader(lines, delimiter=delimiter)
-        
         company = db.query(models.Company).first()
         cid = company.id if company else None
         count = 0
@@ -331,8 +331,7 @@ def update_materiel(materiel_id: int, mat_update: schemas.MaterielCreate, db: Se
     if not db_mat: raise HTTPException(404)
     db_mat.nom = mat_update.nom
     db_mat.reference = mat_update.reference
-    if mat_update.etat: db_mat.etat = mat_update.etat
-
+    if mat_update.etat: db_mat.etat = mat_update.etat # MAJ ETAT
     if mat_update.image_url: db_mat.image_url = mat_update.image_url
     db.commit(); db.refresh(db_mat)
     return db_mat
@@ -445,7 +444,6 @@ def download_pdf(cid: int, db: Session = Depends(get_db)):
 def download_doe(cid: int, db: Session = Depends(get_db)):
     c = db.query(models.Chantier).filter(models.Chantier.id == cid).first()
     if not c: raise HTTPException(404)
-    
     zip_name = f"uploads/DOE_{c.id}.zip"
     with zipfile.ZipFile(zip_name, 'w') as z:
         raps = db.query(models.Rapport).filter(models.Rapport.chantier_id == cid).all()
@@ -474,13 +472,127 @@ def download_doe(cid: int, db: Session = Depends(get_db)):
                     with open(pic_path, "wb") as f: f.write(r.content)
                     z.write(pic_path, "4_Plan_Installation.jpg")
             except: pass
-            
     return FileResponse(zip_name, filename=f"DOE_{c.nom}.zip", media_type='application/zip')
+
+# ==========================================
+# 6. DOCUMENTS EXTERNES (GED CHANTIER)
+# ==========================================
+@app.get("/migrate_documents_externes")
+def migrate_docs_ext(db: Session = Depends(get_db)):
+    try:
+        db.execute(text("""
+            CREATE TABLE IF NOT EXISTS documents_externes (
+                id SERIAL PRIMARY KEY,
+                titre VARCHAR NOT NULL,
+                categorie VARCHAR NOT NULL,
+                url VARCHAR NOT NULL,
+                chantier_id INTEGER REFERENCES chantiers(id),
+                date_ajout TIMESTAMP DEFAULT NOW()
+            )
+        """))
+        db.commit()
+        return {"msg": "Table Documents Externes créée !"}
+    except Exception as e: return {"error": str(e)}
+
+class DocExterneOut(pydantic.BaseModel):
+    id: int
+    titre: str
+    categorie: str
+    url: str
+    date_ajout: datetime
+    class Config: from_attributes = True
+
+@app.post("/chantiers/{cid}/documents", response_model=DocExterneOut)
+def upload_external_doc(cid: int, titre: str, categorie: str, file: UploadFile = File(...), db: Session = Depends(get_db)):
+    try:
+        res = cloudinary.uploader.upload(file.file, folder="conformeo_docs", resource_type="auto")
+        url = res.get("secure_url")
+    except Exception as e: raise HTTPException(500, f"Erreur Upload: {e}")
+    sql = text("INSERT INTO documents_externes (titre, categorie, url, chantier_id, date_ajout) VALUES (:t, :c, :u, :cid, :d) RETURNING id")
+    result = db.execute(sql, {"t": titre, "c": categorie, "u": url, "cid": cid, "d": datetime.now()})
+    new_id = result.fetchone()[0]
+    db.commit()
+    return {"id": new_id, "titre": titre, "categorie": categorie, "url": url, "date_ajout": datetime.now()}
+
+@app.get("/chantiers/{cid}/documents", response_model=List[DocExterneOut])
+def get_external_docs(cid: int, db: Session = Depends(get_db)):
+    sql = text("SELECT id, titre, categorie, url, date_ajout FROM documents_externes WHERE chantier_id = :cid")
+    result = db.execute(sql, {"cid": cid}).fetchall()
+    return [{"id": r[0], "titre": r[1], "categorie": r[2], "url": r[3], "date_ajout": r[4]} for r in result]
+
+@app.delete("/documents/{did}")
+def delete_external_doc(did: int, db: Session = Depends(get_db)):
+    db.execute(text("DELETE FROM documents_externes WHERE id = :did"), {"did": did})
+    db.commit()
+    return {"status": "deleted"}
+
+# ==========================================
+# 7. DOCUMENTS ENTREPRISE (GED TRANSVERSE)
+# ==========================================
+@app.get("/migrate_company_docs")
+def migrate_company_docs(db: Session = Depends(get_db)):
+    try:
+        db.execute(text("""
+            CREATE TABLE IF NOT EXISTS company_documents (
+                id SERIAL PRIMARY KEY,
+                company_id INTEGER REFERENCES companies(id),
+                titre VARCHAR NOT NULL,
+                type_doc VARCHAR NOT NULL,
+                url VARCHAR NOT NULL,
+                date_expiration TIMESTAMP,
+                date_upload TIMESTAMP DEFAULT NOW()
+            )
+        """))
+        db.commit()
+        return {"msg": "Table Documents Entreprise créée ! 📂"}
+    except Exception as e: return {"error": str(e)}
+
+class CompanyDocOut(pydantic.BaseModel):
+    id: int
+    titre: str
+    type_doc: str
+    url: str
+    date_expiration: Optional[datetime]
+    date_upload: datetime
+    class Config: from_attributes = True
+
+@app.post("/companies/me/documents", response_model=CompanyDocOut)
+def upload_company_doc(
+    titre: str, type_doc: str, date_expiration: Optional[str] = None, 
+    file: UploadFile = File(...), db: Session = Depends(get_db), current_user: models.User = Depends(security.get_current_user)
+):
+    if not current_user.company_id: raise HTTPException(400, "Pas d'entreprise")
+    try:
+        res = cloudinary.uploader.upload(file.file, folder="conformeo_company_docs", resource_type="auto")
+        url = res.get("secure_url")
+    except Exception as e: raise HTTPException(500, f"Erreur Upload: {e}")
+    exp_date = None
+    if date_expiration:
+        try: exp_date = datetime.strptime(date_expiration, "%Y-%m-%d")
+        except: pass
+    sql = text("INSERT INTO company_documents (company_id, titre, type_doc, url, date_expiration, date_upload) VALUES (:cid, :t, :type, :u, :exp, :now) RETURNING id, date_upload")
+    res = db.execute(sql, {"cid": current_user.company_id, "t": titre, "type": type_doc, "u": url, "exp": exp_date, "now": datetime.now()}).fetchone()
+    db.commit()
+    return {"id": res[0], "titre": titre, "type_doc": type_doc, "url": url, "date_expiration": exp_date, "date_upload": res[1]}
+
+@app.get("/companies/me/documents", response_model=List[CompanyDocOut])
+def get_company_docs(db: Session = Depends(get_db), current_user: models.User = Depends(security.get_current_user)):
+    if not current_user.company_id: return []
+    sql = text("SELECT id, titre, type_doc, url, date_expiration, date_upload FROM company_documents WHERE company_id = :cid ORDER BY type_doc")
+    results = db.execute(sql, {"cid": current_user.company_id}).fetchall()
+    return [{"id": r[0], "titre": r[1], "type_doc": r[2], "url": r[3], "date_expiration": r[4], "date_upload": r[5]} for r in results]
+
+@app.delete("/companies/me/documents/{doc_id}")
+def delete_company_doc(doc_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(security.get_current_user)):
+    check = text("SELECT id FROM company_documents WHERE id = :did AND company_id = :cid")
+    if not db.execute(check, {"did": doc_id, "cid": current_user.company_id}).first(): raise HTTPException(404, "Introuvable")
+    db.execute(text("DELETE FROM company_documents WHERE id = :did"), {"did": doc_id})
+    db.commit()
+    return {"status": "deleted"}
 
 # ==========================================
 # 10. GESTION EQUIPE & ENTREPRISE
 # ==========================================
-
 @app.get("/companies/me", response_model=schemas.CompanyOut)
 def read_my_company(db: Session = Depends(get_db), current_user: models.User = Depends(security.get_current_user)):
     if not current_user.company_id: raise HTTPException(400)
@@ -519,13 +631,10 @@ def migrate_mt(db: Session = Depends(get_db)):
         for t in ["users", "chantiers", "materiels"]:
             try: db.execute(text(f"ALTER TABLE {t} ADD COLUMN company_id INTEGER"))
             except: pass
-        
-        # Création Entreprise Démo
         demo = db.query(models.Company).filter(models.Company.id == 1).first()
         if not demo:
             demo = models.Company(name="Demo BTP", subscription_plan="pro")
             db.add(demo); db.commit(); db.refresh(demo)
-        
         cid = demo.id
         db.execute(text(f"UPDATE users SET company_id = {cid} WHERE company_id IS NULL"))
         db.execute(text(f"UPDATE chantiers SET company_id = {cid} WHERE company_id IS NULL"))
@@ -544,340 +653,6 @@ def migrate_v9(db: Session = Depends(get_db)):
         return {"msg": "Migration V9 OK"}
     except Exception as e: return {"error": str(e)}
 
-@app.get("/create_admin")
-def create_admin(db: Session = Depends(get_db)):
-    email = "admin@conformeo.com"
-    if db.query(models.User).filter(models.User.email == email).first(): return {"msg": "Existe déjà"}
-    
-    comp = db.query(models.Company).first()
-    if not comp:
-        comp = models.Company(name="Admin Corp", subscription_plan="pro")
-        db.add(comp); db.commit(); db.refresh(comp)
-        
-    u = models.User(email=email, hashed_password=security.get_password_hash("admin"), role="admin", company_id=comp.id)
-    db.add(u); db.commit()
-    return {"msg": "Admin créé", "login": email, "pass": "admin"}
-
-@app.get("/fix_database_columns")
-def fix_database_columns(db: Session = Depends(get_db)):
-    messages = []
-    
-    # Liste des colonnes à vérifier pour la table 'chantiers'
-    columns_to_check = [
-        ("signature_url", "VARCHAR"),
-        ("cover_url", "VARCHAR"),
-        ("date_debut", "TIMESTAMP"),
-        ("date_fin", "TIMESTAMP"),
-        ("statut_planning", "VARCHAR DEFAULT 'prevu'"),
-        ("company_id", "INTEGER")
-    ]
-    
-    for col_name, col_type in columns_to_check:
-        try:
-            # On tente d'ajouter la colonne
-            db.execute(text(f"ALTER TABLE chantiers ADD COLUMN {col_name} {col_type}"))
-            db.commit()
-            messages.append(f"✅ Colonne '{col_name}' ajoutée.")
-        except Exception as e:
-            db.rollback()
-            # Si erreur, c'est qu'elle existe probablement déjà
-            messages.append(f"ℹ️ Colonne '{col_name}' existe déjà (ou erreur: {e}).")
-            
-    return {"status": "Terminé", "details": messages}
-
-@app.get("/fix_everything")
-def fix_everything(db: Session = Depends(get_db)):
-    logs = []
-    
-    # Liste de TOUTES les colonnes susceptibles de manquer
-    corrections = [
-        # Table CHANTIERS
-        ("chantiers", "signature_url", "VARCHAR"),
-        ("chantiers", "cover_url", "VARCHAR"),
-        ("chantiers", "date_debut", "TIMESTAMP"),
-        ("chantiers", "date_fin", "TIMESTAMP"),
-        ("chantiers", "statut_planning", "VARCHAR DEFAULT 'prevu'"),
-        ("chantiers", "company_id", "INTEGER"),
-        
-        # Table MATERIELS
-        ("materiels", "image_url", "VARCHAR"),
-        ("materiels", "company_id", "INTEGER"),
-        
-        # Table USERS
-        ("users", "company_id", "INTEGER"),
-        
-        # Table COMPANIES (Branding)
-        ("companies", "logo_url", "VARCHAR"),
-        ("companies", "address", "VARCHAR"),
-        ("companies", "contact_email", "VARCHAR"),
-        ("companies", "phone", "VARCHAR"),
-
-        # Table PPSPS
-        ("ppsps", "secours_data", "JSON"),
-        ("ppsps", "installations_data", "JSON"),
-        ("ppsps", "taches_data", "JSON"),
-        ("ppsps", "duree_travaux", "VARCHAR"),
-    ]
-    
-    for table, col, type_col in corrections:
-        try:
-            db.execute(text(f"ALTER TABLE {table} ADD COLUMN {col} {type_col}"))
-            db.commit()
-            logs.append(f"✅ Ajout de {col} dans {table}")
-        except Exception as e:
-            db.rollback()
-            # L'erreur est normale si la colonne existe déjà
-            logs.append(f"ℹ️ {col} existe déjà dans {table}")
-
-    return {"status": "Terminé", "details": logs}
-
-@app.get("/force_delete_all_chantiers")
-def force_delete_all_chantiers(db: Session = Depends(get_db)):
-    try:
-        # 1. On rapatrie tout le matériel au dépôt (Sécurité)
-        db.execute(text("UPDATE materiels SET chantier_id = NULL"))
-        
-        # 2. On supprime les dépendances en SQL pur (Plus robuste que l'ORM)
-        # Supprime les images des rapports liés à des chantiers
-        db.execute(text("DELETE FROM rapport_images WHERE rapport_id IN (SELECT id FROM rapports)"))
-        
-        # Supprime les documents
-        db.execute(text("DELETE FROM rapports"))
-        db.execute(text("DELETE FROM inspections"))
-        db.execute(text("DELETE FROM ppsps"))
-        db.execute(text("DELETE FROM pics"))
-        
-        # 3. Enfin, on supprime TOUS les chantiers
-        db.execute(text("DELETE FROM chantiers"))
-        
-        db.commit()
-        return {"status": "Succès 🧹", "message": "Tous les chantiers et documents ont été supprimés. Le matériel est conservé."}
-
-    except Exception as e:
-        db.rollback()
-        return {"status": "Erreur", "details": str(e)}
-
-# ... (Imports identiques, ajoutez juste 'time' si besoin pour des pauses)
-import time 
-
-# ... (Configuration Cloudinary, Models...)
-
-# 👇 1. FONCTION DE GÉOCODAGE (OPENSTREETMAP)
-def get_gps_from_address(address: str):
-    if not address or len(address) < 5: return None, None
-    try:
-        # On interroge l'API gratuite de Nominatim
-        url = "https://nominatim.openstreetmap.org/search"
-        params = {'q': address, 'format': 'json', 'limit': 1}
-        # Il faut un User-Agent pour être poli avec l'API
-        headers = {'User-Agent': 'ConformeoApp/1.0'}
-        
-        response = requests.get(url, params=params, headers=headers, timeout=5)
-        if response.status_code == 200 and len(response.json()) > 0:
-            data = response.json()[0]
-            return float(data['lat']), float(data['lon'])
-    except Exception as e:
-        print(f"Erreur GPS pour {address}: {e}")
-    return None, None
-
-# ... (Routes Users, Login... inchangées) ...
-
-# ==========================================
-# 2. DASHBOARD (Mise à jour CARTE)
-# ==========================================
-@app.get("/dashboard/stats")
-def get_stats(db: Session = Depends(get_db)):
-    # ... (KPIs et Graphiques inchangés) ...
-    # (Je remets le début pour contexte, gardez votre logique KPI/Chart)
-    total = db.query(models.Chantier).count()
-    actifs = db.query(models.Chantier).filter(models.Chantier.est_actif == True).count()
-    rap = db.query(models.Rapport).count()
-    alert = db.query(models.Rapport).filter(models.Rapport.niveau_urgence.in_(['Critique', 'Moyen'])).count()
-    
-    # ... (Graphique & Récents inchangés) ...
-    today = datetime.now().date()
-    labels, values = [], []
-    for i in range(6, -1, -1):
-        day = today - timedelta(days=i)
-        labels.append(day.strftime("%d/%m"))
-        start = datetime.combine(day, datetime.min.time())
-        end = datetime.combine(day, datetime.max.time())
-        cnt = db.query(models.Rapport).filter(models.Rapport.date_creation >= start, models.Rapport.date_creation <= end).count()
-        values.append(cnt)
-        
-    recents = db.query(models.Rapport).order_by(models.Rapport.date_creation.desc()).limit(5).all()
-    rec_fmt = [{"titre": r.titre, "date": r.date_creation, "chantier": r.chantier.nom if r.chantier else "-", "urgence": r.niveau_urgence} for r in recents]
-
-    # 👇 NOUVELLE LOGIQUE CARTE : On prend le GPS du chantier !
-    map_data = []
-    chantiers = db.query(models.Chantier).filter(models.Chantier.est_actif == True).all()
-    
-    for c in chantiers:
-        # Priorité 1 : Le GPS de l'adresse du chantier (si dispo)
-        lat, lng = c.latitude, c.longitude
-        
-        # Priorité 2 : Si pas d'adresse GPS, on cherche dans les rapports (fallback)
-        if not lat:
-            last_gps = db.query(models.Rapport).filter(models.Rapport.chantier_id == c.id, models.Rapport.latitude != None).first()
-            if last_gps:
-                lat, lng = last_gps.latitude, last_gps.longitude
-        
-        if lat and lng:
-            map_data.append({
-                "id": c.id, "nom": c.nom, "client": c.client, 
-                "lat": lat, "lng": lng
-            })
-
-    return {
-        "kpis": { "total_chantiers": total, "actifs": actifs, "rapports": rap, "alertes": alert, "materiel_sorti": 0 },
-        "chart": { "labels": labels, "values": values },
-        "recents": rec_fmt,
-        "map": map_data
-    }
-
-# ==========================================
-# 3. CHANTIERS & IMPORT INTELLIGENT
-# ==========================================
-
-# (Ajoutez lat/lon dans create_chantier si vous voulez, mais c'est surtout l'import qui compte)
-
-@app.post("/chantiers/import")
-async def import_chantiers_csv(
-    file: UploadFile = File(...), 
-    db: Session = Depends(get_db)
-):
-    # ... (Début identique : vérif extension, lecture contenu...)
-    if not file.filename.lower().endswith('.csv'): raise HTTPException(400, "Non CSV")
-    try:
-        content = await file.read()
-        try: text = content.decode('utf-8-sig')
-        except: text = content.decode('latin-1')
-        lines = text.splitlines()
-        delimiter = ';' if ';' in lines[0] else ','
-        reader = csv.DictReader(lines, delimiter=delimiter)
-        
-        company = db.query(models.Company).first()
-        cid = company.id if company else None
-
-        count = 0
-        for row in reader:
-            row = {k.strip(): v.strip() for k, v in row.items() if k}
-            nom = None
-            client = "-"
-            adresse = "-"
-            
-            for k, v in row.items():
-                if 'nom' in k.lower(): nom = v
-                if 'client' in k.lower(): client = v
-                if 'adresse' in k.lower(): adresse = v
-
-            if nom:
-                # 👇 C'EST ICI LA MAGIE : ON CALCULE LE GPS
-                lat, lng = None, None
-                if adresse and len(adresse) > 5:
-                    lat, lng = get_gps_from_address(adresse)
-                    # Petite pause pour ne pas spammer l'API gratuite (1 req/sec max conseillé)
-                    time.sleep(1) 
-
-                db.add(models.Chantier(
-                    nom=nom, client=client, adresse=adresse,
-                    est_actif=True, company_id=cid, date_creation=datetime.now(),
-                    date_debut=datetime.now(), date_fin=datetime.now()+timedelta(days=30),
-                    # On stocke le GPS trouvé !
-                    latitude=lat, longitude=lng 
-                ))
-                count += 1
-        
-        db.commit()
-        return {"status": "success", "message": f"{count} chantiers importés et géolocalisés !"}
-
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(500, f"Erreur: {str(e)}")
-
-# ... (Gardez tout le code précédent) ...
-
-# ==========================================
-# 6. DOCUMENTS EXTERNES (PGC, DICT, PLANS...)
-# ==========================================
-
-# Ajoutez ce modèle dans la base (via SQL direct pour l'instant pour éviter de toucher models.py trop vite)
-@app.get("/migrate_documents_externes")
-def migrate_docs_ext(db: Session = Depends(get_db)):
-    try:
-        db.execute(text("""
-            CREATE TABLE IF NOT EXISTS documents_externes (
-                id SERIAL PRIMARY KEY,
-                titre VARCHAR NOT NULL,
-                categorie VARCHAR NOT NULL, -- 'PGC', 'DICT', 'PLAN', 'AUTRE'
-                url VARCHAR NOT NULL,
-                chantier_id INTEGER REFERENCES chantiers(id),
-                date_ajout TIMESTAMP DEFAULT NOW()
-            )
-        """))
-        db.commit()
-        return {"msg": "Table Documents Externes créée !"}
-    except Exception as e: return {"error": str(e)}
-
-# Modèle Pydantic pour l'API
-class DocExterneOut(pydantic.BaseModel):
-    id: int
-    titre: str
-    categorie: str
-    url: str
-    date_ajout: datetime
-    class Config: from_attributes = True
-
-# Route: Uploader un document (PGC, DICT...)
-@app.post("/chantiers/{cid}/documents", response_model=DocExterneOut)
-def upload_external_doc(
-    cid: int, 
-    titre: str, 
-    categorie: str, 
-    file: UploadFile = File(...), 
-    db: Session = Depends(get_db)
-):
-    # 1. Upload Cloudinary
-    try:
-        res = cloudinary.uploader.upload(file.file, folder="conformeo_docs", resource_type="auto")
-        url = res.get("secure_url")
-    except Exception as e: raise HTTPException(500, f"Erreur Upload: {e}")
-
-    # 2. Enregistrement en base (SQL Raw pour éviter de casser models.py maintenant)
-    sql = text("""
-        INSERT INTO documents_externes (titre, categorie, url, chantier_id, date_ajout)
-        VALUES (:t, :c, :u, :cid, :d) RETURNING id
-    """)
-    result = db.execute(sql, {"t": titre, "c": categorie, "u": url, "cid": cid, "d": datetime.now()})
-    new_id = result.fetchone()[0]
-    db.commit()
-
-    return {
-        "id": new_id, "titre": titre, "categorie": categorie, 
-        "url": url, "date_ajout": datetime.now()
-    }
-
-# Route: Lire les documents d'un chantier
-@app.get("/chantiers/{cid}/documents", response_model=List[DocExterneOut])
-def get_external_docs(cid: int, db: Session = Depends(get_db)):
-    sql = text("SELECT id, titre, categorie, url, date_ajout FROM documents_externes WHERE chantier_id = :cid")
-    result = db.execute(sql, {"cid": cid}).fetchall()
-    
-    return [
-        {"id": r[0], "titre": r[1], "categorie": r[2], "url": r[3], "date_ajout": r[4]} 
-        for r in result
-    ]
-
-# Ajoutons aussi la suppression pour être propre
-@app.delete("/documents/{did}")
-def delete_external_doc(did: int, db: Session = Depends(get_db)):
-    db.execute(text("DELETE FROM documents_externes WHERE id = :did"), {"did": did})
-    db.commit()
-    return {"status": "deleted"}
-
-# ... (Le reste du fichier migration et fix_everything reste à la fin)
-
-# --- MIGRATION V10 (GPS CHANTIER) ---
 @app.get("/migrate_db_v10")
 def migrate_v10(db: Session = Depends(get_db)):
     try:
@@ -887,78 +662,93 @@ def migrate_v10(db: Session = Depends(get_db)):
         return {"msg": "Migration V10 (GPS) OK"}
     except Exception as e: return {"error": str(e)}
 
-# --- ROUTE DE RATTRAPAGE (Pour géolocaliser les anciens chantiers) ---
+@app.get("/migrate_v11_sps")
+def migrate_v11_sps(db: Session = Depends(get_db)):
+    try:
+        db.execute(text("ALTER TABLE chantiers ADD COLUMN IF NOT EXISTS soumis_sps BOOLEAN DEFAULT FALSE"))
+        db.commit()
+        return {"msg": "Migration V11 (SPS) OK"}
+    except Exception as e: return {"error": str(e)}
+
 @app.get("/fix_geocoding")
 def fix_geocoding(db: Session = Depends(get_db)):
-    # On prend les chantiers qui ont une adresse mais pas de GPS
-    chantiers = db.query(models.Chantier).filter(
-        models.Chantier.adresse != None,
-        models.Chantier.latitude == None
-    ).all()
-    
+    chantiers = db.query(models.Chantier).filter(models.Chantier.adresse != None, models.Chantier.latitude == None).all()
     count = 0
     for c in chantiers:
         if len(c.adresse) > 5:
             lat, lng = get_gps_from_address(c.adresse)
             if lat:
-                c.latitude = lat
-                c.longitude = lng
-                count += 1
-                time.sleep(1) # Pause politesse API
-    
+                c.latitude = lat; c.longitude = lng
+                count += 1; time.sleep(1)
     db.commit()
-    return {"msg": f"{count} anciens chantiers ont été géolocalisés !"}
+    return {"msg": f"{count} chantiers géolocalisés"}
 
-# backend/main.py
+@app.get("/create_admin")
+def create_admin(db: Session = Depends(get_db)):
+    email = "admin@conformeo.com"
+    if db.query(models.User).filter(models.User.email == email).first(): return {"msg": "Existe déjà"}
+    comp = db.query(models.Company).first()
+    if not comp:
+        comp = models.Company(name="Admin Corp", subscription_plan="pro")
+        db.add(comp); db.commit(); db.refresh(comp)
+    u = models.User(email=email, hashed_password=security.get_password_hash("admin"), role="admin", company_id=comp.id)
+    db.add(u); db.commit()
+    return {"msg": "Admin créé", "login": email, "pass": "admin"}
 
-# ... (Gardez le reste)
+@app.get("/fix_database_columns")
+def fix_database_columns(db: Session = Depends(get_db)):
+    messages = []
+    columns_to_check = [
+        ("signature_url", "VARCHAR"), ("cover_url", "VARCHAR"),
+        ("date_debut", "TIMESTAMP"), ("date_fin", "TIMESTAMP"),
+        ("statut_planning", "VARCHAR DEFAULT 'prevu'"), ("company_id", "INTEGER"),
+        ("latitude", "FLOAT"), ("longitude", "FLOAT"), ("soumis_sps", "BOOLEAN DEFAULT FALSE")
+    ]
+    for col_name, col_type in columns_to_check:
+        try:
+            db.execute(text(f"ALTER TABLE chantiers ADD COLUMN {col_name} {col_type}"))
+            db.commit(); messages.append(f"✅ Colonne '{col_name}' ajoutée.")
+        except Exception as e:
+            db.rollback(); messages.append(f"ℹ️ Colonne '{col_name}' existe déjà.")
+    return {"status": "Terminé", "details": messages}
 
-@app.get("/migrate_v11_sps")
-def migrate_v11_sps(db: Session = Depends(get_db)):
+@app.get("/fix_everything")
+def fix_everything(db: Session = Depends(get_db)):
+    logs = []
+    corrections = [
+        ("chantiers", "signature_url", "VARCHAR"), ("chantiers", "cover_url", "VARCHAR"),
+        ("chantiers", "date_debut", "TIMESTAMP"), ("chantiers", "date_fin", "TIMESTAMP"),
+        ("chantiers", "statut_planning", "VARCHAR DEFAULT 'prevu'"), ("chantiers", "company_id", "INTEGER"),
+        ("chantiers", "latitude", "FLOAT"), ("chantiers", "longitude", "FLOAT"), ("chantiers", "soumis_sps", "BOOLEAN DEFAULT FALSE"),
+        ("materiels", "image_url", "VARCHAR"), ("materiels", "company_id", "INTEGER"),
+        ("users", "company_id", "INTEGER"),
+        ("companies", "logo_url", "VARCHAR"), ("companies", "address", "VARCHAR"),
+        ("companies", "contact_email", "VARCHAR"), ("companies", "phone", "VARCHAR"),
+        ("ppsps", "secours_data", "JSON"), ("ppsps", "installations_data", "JSON"),
+        ("ppsps", "taches_data", "JSON"), ("ppsps", "duree_travaux", "VARCHAR"),
+        ("pics", "background_url", "VARCHAR"), ("pics", "final_url", "VARCHAR"),
+        ("pics", "elements_data", "JSON"), ("pics", "date_update", "TIMESTAMP"),
+    ]
+    for table, col, type_col in corrections:
+        try:
+            db.execute(text(f"ALTER TABLE {table} ADD COLUMN {col} {type_col}"))
+            db.commit(); logs.append(f"✅ {col} ajouté à {table}")
+        except Exception as e:
+            db.rollback(); logs.append(f"ℹ️ {col} existe déjà")
+    return {"status": "Terminé", "details": logs}
+
+@app.get("/force_delete_all_chantiers")
+def force_delete_all_chantiers(db: Session = Depends(get_db)):
     try:
-        # On ajoute la colonne booléenne, par défaut FALSE (pas de PPSPS)
-        db.execute(text("ALTER TABLE chantiers ADD COLUMN IF NOT EXISTS soumis_sps BOOLEAN DEFAULT FALSE"))
+        db.execute(text("UPDATE materiels SET chantier_id = NULL"))
+        db.execute(text("DELETE FROM rapport_images WHERE rapport_id IN (SELECT id FROM rapports)"))
+        db.execute(text("DELETE FROM rapports"))
+        db.execute(text("DELETE FROM inspections"))
+        db.execute(text("DELETE FROM ppsps"))
+        db.execute(text("DELETE FROM pics"))
+        db.execute(text("DELETE FROM chantiers"))
         db.commit()
-        return {"msg": "Migration V11 (SPS) OK : Colonne ajoutée !"}
+        return {"status": "Succès 🧹", "message": "Tous les chantiers et documents ont été supprimés."}
     except Exception as e:
-        return {"error": str(e)}
-
-# Mettez aussi à jour create_chantier et update_chantier pour gérer ce champ
-@app.post("/chantiers", response_model=schemas.ChantierOut)
-def create_chantier(chantier: schemas.ChantierCreate, db: Session = Depends(get_db), current_user: models.User = Depends(security.get_current_user)):
-    lat, lng = None, None
-    if chantier.adresse:
-        lat, lng = get_gps_from_address(chantier.adresse)
-
-    new_c = models.Chantier(
-        nom=chantier.nom, adresse=chantier.adresse, client=chantier.client, cover_url=chantier.cover_url,
-        company_id=current_user.company_id,
-        date_debut=chantier.date_debut or datetime.now(),
-        date_fin=chantier.date_fin or (datetime.now() + timedelta(days=30)),
-        latitude=lat, longitude=lng,
-        # 👇 AJOUT
-        soumis_sps=chantier.soumis_sps 
-    )
-    db.add(new_c); db.commit(); db.refresh(new_c)
-    return new_c
-
-@app.put("/chantiers/{cid}")
-def update_chantier(cid: int, up: schemas.ChantierCreate, db: Session = Depends(get_db)):
-    c = db.query(models.Chantier).filter(models.Chantier.id == cid).first()
-    if not c: raise HTTPException(404)
-    
-    if up.adresse and up.adresse != c.adresse:
-        lat, lng = get_gps_from_address(up.adresse)
-        c.latitude = lat; c.longitude = lng
-    
-    c.nom = up.nom; c.adresse = up.adresse; c.client = up.client
-    if up.cover_url: c.cover_url = up.cover_url
-    if up.date_debut: c.date_debut = up.date_debut
-    if up.date_fin: c.date_fin = up.date_fin
-    if up.est_actif is not None: c.est_actif = up.est_actif
-    
-    # 👇 AJOUT
-    if up.soumis_sps is not None: c.soumis_sps = up.soumis_sps
-        
-    db.commit(); db.refresh(c)
-    return c
+        db.rollback()
+        return {"status": "Erreur", "details": str(e)}
