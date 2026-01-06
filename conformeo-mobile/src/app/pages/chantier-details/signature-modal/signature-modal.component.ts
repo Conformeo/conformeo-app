@@ -1,4 +1,4 @@
-import { Component, ViewChild, ElementRef, AfterViewInit } from '@angular/core';
+import { Component, ViewChild, ElementRef, AfterViewInit, Input } from '@angular/core'; // 👈 Ajout de Input
 import { CommonModule } from '@angular/common';
 import { IonicModule, ModalController } from '@ionic/angular';
 import { addIcons } from 'ionicons';
@@ -16,7 +16,9 @@ import { ApiService } from '../../../services/api';
 export class SignatureModalComponent implements AfterViewInit {
   @ViewChild('canvas', { static: false }) canvasInfo!: ElementRef;
   signaturePad!: SignaturePad;
-  chantierId!: number;
+  
+  @Input() chantierId!: number; // 👈 Mettez @Input() pour être propre
+  @Input() type: 'chantier' | 'generic' = 'chantier'; // 👈 NOUVEAU : Par défaut c'est 'chantier'
 
   constructor(
     private modalCtrl: ModalController,
@@ -70,21 +72,27 @@ export class SignatureModalComponent implements AfterViewInit {
       return;
     }
 
-    // On réduit un peu la taille de l'image pour l'upload (optionnel mais mieux pour la perf)
+    // Réduction et conversion (inchangé)
     const dataUrl = this.signaturePad.toDataURL('image/png');
-    
-    // Conversion DataURL -> Blob
     const blob = await (await fetch(dataUrl)).blob();
 
-    // Upload
+    // Upload vers Cloudinary
     this.api.uploadPhoto(blob).subscribe({
       next: (res) => {
         const signatureUrl = res.url;
         
-        this.api.signChantier(this.chantierId, signatureUrl).subscribe(() => {
-          this.api.needsRefresh = true;
-          this.modalCtrl.dismiss(signatureUrl, 'confirm');
-        });
+        // 👇 C'EST ICI QUE CA CHANGE
+        if (this.type === 'chantier') {
+          // COMPORTEMENT D'ORIGINE (Journal de bord)
+          this.api.signChantier(this.chantierId, signatureUrl).subscribe(() => {
+            this.api.needsRefresh = true;
+            this.modalCtrl.dismiss(signatureUrl, 'confirm');
+          });
+        } else {
+          // NOUVEAU COMPORTEMENT (PdP, Bons, etc.)
+          // On ne sauvegarde rien en BDD ici, on renvoie juste l'URL au parent
+          this.modalCtrl.dismiss(signatureUrl, 'confirm'); 
+        }
       },
       error: (err) => alert("Erreur lors de l'envoi")
     });

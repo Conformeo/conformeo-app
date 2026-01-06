@@ -183,7 +183,10 @@ class PlanPrevention(Base):
     # Ex: {"point_rassemblement": "Parking Nord", "num_urgence": "18"}
     consignes_securite = Column(JSON)
     
-    date_creation = Column(DateTime, default=datetime.now)
+    signature_eu = Column(String) # Signature Client (Base64 ou URL)
+    signature_ee = Column(String) # Votre Signature (Base64 ou URL)
+
+    date_creation = Column(DateTime, default=datetime.utcnow)
     
     # Relation inverse
     chantier = relationship("Chantier", back_populates="plans_prevention")

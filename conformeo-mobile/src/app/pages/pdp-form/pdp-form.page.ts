@@ -1,12 +1,14 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { ModalController } from '@ionic/angular/standalone';
 import { 
   IonHeader, IonToolbar, IonTitle, IonButtons, IonBackButton, IonContent, 
   IonList, IonListHeader, IonItem, IonInput, IonLabel, IonTextarea, 
   IonButton, IonIcon, IonDatetime, IonDatetimeButton, IonModal, 
   IonSelect, IonSelectOption, LoadingController, ToastController 
 } from '@ionic/angular/standalone';
+import { SignatureModalComponent } from '../chantier-details/signature-modal/signature-modal.component';
 import { ActivatedRoute, Router } from '@angular/router';
 import { ApiService, PlanPrevention } from '../../services/api'
 import { addIcons } from 'ionicons';
@@ -22,7 +24,7 @@ import { add, trash, save, download } from 'ionicons/icons';
     IonHeader, IonToolbar, IonTitle, IonButtons, IonBackButton, IonContent,
     IonList, IonListHeader, IonItem, IonInput, IonLabel, IonTextarea,
     IonButton, IonIcon, IonDatetime, IonDatetimeButton, IonModal,
-    IonSelect, IonSelectOption
+    IonSelect, IonSelectOption, SignatureModalComponent
   ]
 })
 export class PdpFormPage implements OnInit {
@@ -52,7 +54,8 @@ export class PdpFormPage implements OnInit {
     private api: ApiService,
     private router: Router,
     private loadingCtrl: LoadingController,
-    private toastCtrl: ToastController
+    private toastCtrl: ToastController,
+    private modalCtrl: ModalController,
   ) {
     addIcons({ add, trash, save, download });
   }
@@ -92,6 +95,26 @@ export class PdpFormPage implements OnInit {
 
   removeRisk(index: number) {
     this.pdp.risques_interferents.splice(index, 1);
+  }
+
+  async openSignatureClient() {
+    const modal = await this.modalCtrl.create({
+      component: SignatureModalComponent,
+      componentProps: {
+        chantierId: this.chantierId,
+        type: 'generic' // 👈 On dit : "Renvoie-moi juste l'URL"
+      }
+    });
+
+    await modal.present();
+
+    const { data, role } = await modal.onWillDismiss();
+
+    if (role === 'confirm' && data) {
+      // 'data' contient l'URL Cloudinary de la signature
+      this.pdp.signature_eu = data;
+      this.presentToast('Signature Client enregistrée ✍️');
+    }
   }
 
   // --- SAUVEGARDE ---

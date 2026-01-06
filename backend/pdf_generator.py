@@ -480,20 +480,56 @@ def generate_pdp_pdf(chantier, pdp, output_path, company=None):
             
             y -= 2.2*cm
 
+    # ... (Dans generate_pdp_pdf) ...
+
     # 4. SIGNATURES
-    check_space(4*cm)
+    check_space(5*cm) # On s'assure d'avoir de la place
     y -= 1*cm
-    c.setStrokeColorRGB(0, 0, 0); c.setLineWidth(1)
+    
+    # Cadre de signature
+    c.setStrokeColorRGB(0.8, 0.8, 0.8); c.setLineWidth(1)
     c.line(margin, y, width-margin, y)
     y -= 0.5*cm
     
+    # En-têtes colonnes
+    col_w = (width - 2*margin) / 2
     c.setFont(FONT_TITLE, 10); c.setFillColorRGB(0, 0, 0)
-    c.drawString(margin, y, "Pour l'Entreprise Utilisatrice :")
-    c.drawRightString(width-margin, y, "Pour l'Entreprise Extérieure :")
     
-    y -= 2.5*cm
+    # Colonne Client (Gauche)
+    c.drawString(margin, y, "Pour l'Entreprise Utilisatrice (Client) :")
+    # Colonne Nous (Droite)
+    c.drawString(margin + col_w, y, "Pour l'Entreprise Extérieure (Nous) :")
+    
+    y_sig_start = y - 3.5*cm # Espace pour signer
+
+    # --- SIGNATURE CLIENT (EU) ---
+    if pdp.signature_eu:
+        sig_eu = get_optimized_image(pdp.signature_eu)
+        if sig_eu:
+            try:
+                # On dessine la signature Client
+                c.drawImage(ImageReader(sig_eu), margin, y_sig_start, width=5*cm, height=3*cm, mask='auto', preserveAspectRatio=True)
+                c.setFont(FONT_TEXT, 8); c.setFillColorRGB(0, 0.6, 0)
+                c.drawString(margin, y_sig_start - 0.3*cm, "Signé électroniquement")
+            except: pass
+
+    # --- SIGNATURE ENTREPRISE (EE) ---
+    # Logique : Si pas de signature spécifique au PdP, on prend celle du chantier (Automatique)
+    sig_ee_source = pdp.signature_ee or (chantier.signature_url if chantier.signature_url else None)
+    
+    if sig_ee_source:
+        sig_ee = get_optimized_image(sig_ee_source)
+        if sig_ee:
+            try:
+                c.drawImage(ImageReader(sig_ee), margin + col_w, y_sig_start, width=5*cm, height=3*cm, mask='auto', preserveAspectRatio=True)
+                c.setFont(FONT_TEXT, 8); c.setFillColorRGB(0, 0.6, 0)
+                c.drawString(margin + col_w, y_sig_start - 0.3*cm, "Signé électroniquement (Auto)")
+            except: pass
+
+    # Mention légale
+    y = y_sig_start - 1*cm
     c.setFont(FONT_TEXT, 8); c.setFillColorRGB(0.5, 0.5, 0.5)
-    c.drawCentredString(width/2, y, "Document à conserver sur le chantier pendant toute la durée des travaux.")
+    c.drawCentredString(width/2, y, "Document certifié conforme par Conforméo BTP.")
 
     draw_footer(c, width, height, chantier, "Plan de Prévention")
     c.save()

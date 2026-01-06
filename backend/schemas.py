@@ -185,6 +185,9 @@ class PlanPreventionBase(BaseModel):
     risques_interferents: Optional[List[dict]] = []
     consignes_securite: Optional[dict] = {}
 
+    signature_eu: Optional[str] = None
+    signature_ee: Optional[str] = None
+
 class PlanPreventionCreate(PlanPreventionBase):
     chantier_id: int
 
