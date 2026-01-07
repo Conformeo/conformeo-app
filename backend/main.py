@@ -51,7 +51,7 @@ if cloudinary_config["cloud_name"]:
 # ⚠️ REMPLACEZ PAR VOS INFOS RÉELLES POUR TESTER (Gmail ou autre)
 mail_conf = ConnectionConfig(
     MAIL_USERNAME = "michelgmv7@gmail.com", 
-    MAIL_PASSWORD = "Mich1987", 
+    MAIL_PASSWORD = "uidi ejws cbbf seoy", 
     MAIL_FROM = "michelgmv7@gmail.com", 
     MAIL_PORT = 587,
     MAIL_SERVER = "smtp.gmail.com",
