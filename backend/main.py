@@ -54,7 +54,7 @@ mail_conf = ConnectionConfig(
     MAIL_PASSWORD = pwd_ovh,
     MAIL_FROM = "contact@conformeo-app.fr",
     
-    MAIL_PORT = 587,
+    MAIL_PORT = 2525,
     MAIL_SERVER = "smtp-relay.brevo.com",
     
     MAIL_STARTTLS = True,   # Obligatoire pour le port 587
