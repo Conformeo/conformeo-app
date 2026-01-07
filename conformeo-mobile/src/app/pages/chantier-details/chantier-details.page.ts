@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { IonicModule, ModalController, AlertController, NavController } from '@ionic/angular';
+import { IonicModule, ModalController, AlertController, LoadingController, ToastController, NavController } from '@ionic/angular';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 // 👇 AJOUT DE 'Materiel' DANS LES IMPORTS
 import { ApiService, Rapport, Chantier, PPSPS, Materiel } from '../../services/api';
@@ -17,7 +17,7 @@ import {
   scanOutline, checkmarkCircle, shieldCheckmark, downloadOutline,
   shieldCheckmarkOutline, map, checkmarkDoneCircle,
   checkmarkDoneCircleOutline, documentLockOutline,
-  documentTextOutline, archiveOutline, mapOutline, hammerOutline // J'ajoute hammerOutline pour l'état vide
+  documentTextOutline, archiveOutline, mapOutline, hammerOutline, mail
 } from 'ionicons/icons';
 
 import { PicModalComponent } from './pic-modal/pic-modal.component';
@@ -48,7 +48,9 @@ export class ChantierDetailsPage implements OnInit {
     public api: ApiService,
     private modalCtrl: ModalController,
     private platform: Platform,
-    private alertCtrl: AlertController,
+    private alertCtrl: AlertController, // 👈 Ajout
+    private loadingCtrl: LoadingController,
+    private toastCtrl: ToastController,
     private navCtrl: NavController
   ) {
     addIcons({ 
@@ -74,7 +76,8 @@ export class ChantierDetailsPage implements OnInit {
       'checkmark-done-circle': checkmarkDoneCircle,
       'checkmark-done-circle-outline': checkmarkDoneCircleOutline,
       'hammer-outline': hammerOutline,
-      'document-lock-outline': documentLockOutline
+      'document-lock-outline': documentLockOutline,
+      'mail': mail
     });
   }
 
@@ -352,6 +355,59 @@ export class ChantierDetailsPage implements OnInit {
       componentProps: { rapport: rapport }
     });
     modal.present();
+  }
+
+  async presentToast(message: string) {
+    const toast = await this.toastCtrl.create({
+      message: message,
+      duration: 2000,
+      position: 'bottom',
+      color: 'dark'
+    });
+    toast.present();
+  }
+
+  // 👇 FONCTION D'ENVOI EMAIL
+  async sendJournal() {
+    const alert = await this.alertCtrl.create({
+      header: 'Envoyer le Rapport',
+      message: 'Email du destinataire :',
+      inputs: [
+        {
+          name: 'email',
+          type: 'email',
+          placeholder: 'client@chantier.com',
+          // Astuce : On pré-remplit avec le nom du client si c'est une adresse mail
+          value: this.chantier?.client?.includes('@') ? this.chantier.client : ''
+        }
+      ],
+      buttons: [
+        { text: 'Annuler', role: 'cancel' },
+        {
+          text: 'Envoyer',
+          handler: (data) => {
+            if (data.email) this.processEmail(data.email);
+          }
+        }
+      ]
+    });
+    await alert.present();
+  }
+
+  async processEmail(email: string) {
+    const load = await this.loadingCtrl.create({ message: 'Envoi en cours...' });
+    await load.present();
+
+    this.api.sendJournalEmail(this.chantierId, email).subscribe({
+      next: () => {
+        load.dismiss();
+        this.presentToast('Rapport envoyé avec succès ! 📧');
+      },
+      error: () => {
+        load.dismiss();
+        this.presentToast('Erreur lors de l\'envoi');
+      }
+    });
   }
 
   async deleteChantier() {

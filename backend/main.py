@@ -767,6 +767,51 @@ async def send_pdp_email(pid: int, email_dest: str, db: Session = Depends(get_db
         print(e)
         raise HTTPException(500, "Erreur lors de l'envoi de l'email")
 
+# ...
+
+@app.post("/chantiers/{cid}/send-email")
+async def send_journal_email(cid: int, email_dest: str, db: Session = Depends(get_db)):
+    # 1. Récupération des données
+    c = db.query(models.Chantier).filter(models.Chantier.id == cid).first()
+    if not c: raise HTTPException(404, "Chantier introuvable")
+    
+    raps = db.query(models.Rapport).filter(models.Rapport.chantier_id == cid).all()
+    inss = db.query(models.Inspection).filter(models.Inspection.chantier_id == cid).all()
+    
+    comp = get_company_for_chantier(db, c.id)
+
+    # 2. Génération du PDF
+    filename = f"Journal_{c.nom}_{datetime.now().strftime('%Y%m%d')}.pdf"
+    # Nettoyage du nom de fichier
+    filename = "".join([x for x in filename if x.isalpha() or x.isdigit() or x in (' ', '.', '_')]).strip()
+    path = f"uploads/{filename}"
+    
+    # 👇 On appelle le générateur du Journal
+    pdf_generator.generate_pdf(c, raps, inss, path, company=comp)
+
+    # 3. Email
+    html = f"""
+    <p>Bonjour,</p>
+    <p>Veuillez trouver ci-joint le <b>Journal de Bord</b> et le suivi d'avancement pour le chantier <b>{c.nom}</b>.</p>
+    <p>Cordialement,<br>{comp.name if comp else "L'équipe"}</p>
+    """
+
+    message = MessageSchema(
+        subject=f"Suivi Chantier - {c.nom}",
+        recipients=[email_dest],
+        body=html,
+        subtype=MessageType.html,
+        attachments=[path]
+    )
+
+    fm = FastMail(mail_conf)
+    try:
+        await fm.send_message(message)
+        return {"message": "Journal envoyé au client ! 🚀"}
+    except Exception as e:
+        print(e)
+        raise HTTPException(500, "Erreur envoi email")
+
 # ==========================================
 # 10. GESTION EQUIPE & ENTREPRISE 
 # ==========================================

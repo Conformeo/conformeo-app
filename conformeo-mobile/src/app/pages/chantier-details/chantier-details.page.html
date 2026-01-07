@@ -59,9 +59,17 @@
       </div>
       
       <div class="actions-row">
+        
         <div class="action-btn" (click)="downloadPdf()">
           <div class="icon-circle"><ion-icon name="document-text"></ion-icon></div>
           <span>PDF</span>
+        </div>
+
+        <div class="action-btn" (click)="sendJournal()">
+          <div class="icon-circle" style="background: #e0f2fe; color: #0284c7;">
+            <ion-icon name="mail"></ion-icon>
+          </div>
+          <span>Envoyer</span>
         </div>
 
         <div class="action-btn mobile-only-action" [routerLink]="['/qhse-form', chantierId]">

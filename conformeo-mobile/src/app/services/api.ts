@@ -473,6 +473,11 @@ export class ApiService {
     return this.http.post(`${this.apiUrl}/plans-prevention/${pdpId}/send-email?email_dest=${email}`, {});
   }
 
+  // Envoyer le Journal par email
+  sendJournalEmail(chantierId: number, email: string) {
+    return this.http.post(`${this.apiUrl}/chantiers/${chantierId}/send-email?email_dest=${email}`, {});
+  }
+
   // ==========================================
   // 📊 DASHBOARD, TEAM & PROFIL
   // ==========================================
