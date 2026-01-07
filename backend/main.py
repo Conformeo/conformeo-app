@@ -45,14 +45,16 @@ cloudinary_config = {
 if cloudinary_config["cloud_name"]:
     cloudinary.config(**cloudinary_config)
 
-# ... (après le bloc cloudinary)
+
 
 # --- CONFIGURATION EMAIL (SMTP) ---
+
+pwd_ovh = os.getenv("MAIL_PASSWORD")
 # ⚠️ REMPLACEZ PAR VOS INFOS RÉELLES POUR TESTER (Gmail ou autre)
 mail_conf = ConnectionConfig(
-    MAIL_USERNAME = "documents@xn--conformo-h1a.fr", 
-    MAIL_PASSWORD = "7VGnQG#$keZ!QNF", 
-    MAIL_FROM = "documents@xn--conformo-h1a.fr", 
+    MAIL_USERNAME = "documents@xn--conformo-h1a.fr",
+    MAIL_PASSWORD = pwd_ovh,
+    MAIL_FROM = "documents@xn--conformo-h1a.fr",
     MAIL_PORT = 465,
     MAIL_SERVER = "ssl0.ovh.net",
 
