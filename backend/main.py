@@ -51,14 +51,14 @@ if cloudinary_config["cloud_name"]:
 # ⚠️ REMPLACEZ PAR VOS INFOS RÉELLES POUR TESTER (Gmail ou autre)
 mail_conf = ConnectionConfig(
     MAIL_USERNAME = "michelgmv7@gmail.com", 
-    MAIL_PASSWORD = "uidi ejws cbbf seoy", 
+    MAIL_PASSWORD = "zrgn lzhl ldzk zife", 
     MAIL_FROM = "michelgmv7@gmail.com", 
-    MAIL_PORT = 465,
+    MAIL_PORT = 587,
     MAIL_SERVER = "smtp.gmail.com",
-    MAIL_STARTTLS = False,
-    MAIL_SSL_TLS = True,
+    MAIL_STARTTLS = True,
+    MAIL_SSL_TLS = False,
     USE_CREDENTIALS = True,
-    VALIDATE_CERTS = True
+    VALIDATE_CERTS = False
 )
 
 os.makedirs("uploads", exist_ok=True)
