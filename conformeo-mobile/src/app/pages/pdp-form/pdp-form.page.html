@@ -4,11 +4,7 @@
       <ion-back-button defaultHref="/home"></ion-back-button>
     </ion-buttons>
     <ion-title>Plan de Prévention</ion-title>
-    <ion-buttons slot="end">
-      <ion-button (click)="downloadPdf()" *ngIf="isExisting">
-        <ion-icon name="download" slot="icon-only"></ion-icon>
-      </ion-button>
-    </ion-buttons>
+    
     <ion-buttons slot="end">
       <ion-button (click)="sendEmail()" *ngIf="isExisting">
         <ion-icon name="mail" slot="icon-only"></ion-icon>
@@ -92,9 +88,32 @@
       <p>Aucun risque spécifique ajouté.</p>
     </div>
 
+    <ion-list-header>
+      <ion-label>4. Validation</ion-label>
+    </ion-list-header>
     
+    <div class="signature-section ion-padding-horizontal">
+        
+        <div *ngIf="pdp.signature_eu" class="signature-box success" style="text-align:center; padding:10px; border:1px solid #2dd36f; border-radius:8px; margin-bottom:10px; background:#f0fff4;">
+            <p style="color:#2dd36f; font-weight:bold; margin:0;">✅ Client a signé</p>
+            <img [src]="pdp.signature_eu" style="max-height: 60px; margin-top:5px;" />
+            <br>
+            <ion-button fill="clear" color="danger" size="small" (click)="pdp.signature_eu = null">
+                Supprimer
+            </ion-button>
+        </div>
 
-    
+        <ion-button *ngIf="!pdp.signature_eu" expand="block" fill="outline" (click)="openSignatureClient()">
+            <ion-icon name="pencil" slot="start"></ion-icon>
+            Faire signer le Client
+        </ion-button>
+
+        <p class="info-text ion-text-center ion-text-muted" style="font-size: 12px; margin-top: 5px;">
+            <ion-icon name="information-circle-outline"></ion-icon>
+            Votre signature sera ajoutée automatiquement.
+        </p>
+    </div>
+
     <div class="ion-padding">
       <ion-button expand="block" type="submit" color="tertiary" size="large">
         <ion-icon name="save" slot="start"></ion-icon>

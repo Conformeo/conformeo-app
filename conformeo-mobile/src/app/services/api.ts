@@ -116,8 +116,8 @@ export interface PlanPrevention {
   entreprise_utilisatrice: string;
   entreprise_exterieure: string;
   date_inspection_commune: string; // ISO Date
-  signature_eu?: string; // Signature Client
-  signature_ee?: string; // Signature Nous
+  signature_eu?: string | null; // Signature Client
+  signature_ee?: string | null; // Signature Nous
   risques_interferents: { tache: string; risque: string; mesure: string }[];
   consignes_securite: {
     urgence?: string;
