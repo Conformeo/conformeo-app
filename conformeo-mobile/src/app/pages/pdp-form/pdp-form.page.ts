@@ -10,9 +10,10 @@ import {
 } from '@ionic/angular/standalone';
 import { SignatureModalComponent } from '../chantier-details/signature-modal/signature-modal.component';
 import { ActivatedRoute, Router } from '@angular/router';
+import { AlertController } from '@ionic/angular/standalone';
 import { ApiService, PlanPrevention } from '../../services/api'
 import { addIcons } from 'ionicons';
-import { add, trash, save, download } from 'ionicons/icons';
+import { add, trash, save, download, mail } from 'ionicons/icons';
 
 @Component({
   selector: 'app-pdp-form',
@@ -56,8 +57,9 @@ export class PdpFormPage implements OnInit {
     private loadingCtrl: LoadingController,
     private toastCtrl: ToastController,
     private modalCtrl: ModalController,
+    private alertCtrl: AlertController
   ) {
-    addIcons({ add, trash, save, download });
+    addIcons({ add, trash, save, download, mail });
   }
 
   ngOnInit() {
@@ -133,6 +135,53 @@ export class PdpFormPage implements OnInit {
         console.error(err);
         load.dismiss();
         this.presentToast('Erreur lors de la sauvegarde');
+      }
+    });
+  }
+
+  // 👇 FONCTION D'ENVOI
+  async sendEmail() {
+    if (!this.pdp.id) return;
+
+    const alert = await this.alertCtrl.create({
+      header: 'Envoyer par Email',
+      message: 'Saisissez l\'adresse du destinataire (Client).',
+      inputs: [
+        {
+          name: 'email',
+          type: 'email',
+          placeholder: 'client@exemple.com',
+          // On essaie de pré-remplir avec l'email du client s'il est connu (optionnel)
+          value: '' 
+        }
+      ],
+      buttons: [
+        { text: 'Annuler', role: 'cancel' },
+        {
+          text: 'Envoyer',
+          handler: (data) => {
+            if (data.email) {
+              this.processSendEmail(data.email);
+            }
+          }
+        }
+      ]
+    });
+    await alert.present();
+  }
+
+  async processSendEmail(email: string) {
+    const load = await this.loadingCtrl.create({ message: 'Envoi en cours...' });
+    await load.present();
+
+    this.api.sendPdpEmail(this.pdp.id!, email).subscribe({
+      next: () => {
+        load.dismiss();
+        this.presentToast('Email envoyé avec succès ! 📧');
+      },
+      error: () => {
+        load.dismiss();
+        this.presentToast('Erreur lors de l\'envoi (Vérifiez la config SMTP)');
       }
     });
   }

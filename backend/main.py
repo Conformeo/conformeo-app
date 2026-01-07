@@ -20,6 +20,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from fastapi_mail import FastMail, MessageSchema, ConnectionConfig, MessageType
+from pydantic import EmailStr, BaseModel # Assurez-vous d'importer BaseModel depuis pydantic
 
 from sqlalchemy import text, func
 from sqlalchemy.orm import Session
@@ -27,6 +29,7 @@ from sqlalchemy.orm import Session
 import models, schemas, security
 import pdf_generator
 from database import engine, get_db
+
 
 models.Base.metadata.create_all(bind=engine)
 
@@ -41,6 +44,22 @@ cloudinary_config = {
 }
 if cloudinary_config["cloud_name"]:
     cloudinary.config(**cloudinary_config)
+
+# ... (après le bloc cloudinary)
+
+# --- CONFIGURATION EMAIL (SMTP) ---
+# ⚠️ REMPLACEZ PAR VOS INFOS RÉELLES POUR TESTER (Gmail ou autre)
+mail_conf = ConnectionConfig(
+    MAIL_USERNAME = "michelgmv7@gmail.com", 
+    MAIL_PASSWORD = "Mich1987", 
+    MAIL_FROM = "michelgmv7@gmail.com", 
+    MAIL_PORT = 587,
+    MAIL_SERVER = "smtp.gmail.com",
+    MAIL_STARTTLS = True,
+    MAIL_SSL_TLS = False,
+    USE_CREDENTIALS = True,
+    VALIDATE_CERTS = True
+)
 
 os.makedirs("uploads", exist_ok=True)
 app.mount("/static", StaticFiles(directory="uploads"), name="static")
@@ -699,6 +718,54 @@ def download_pdp_pdf(pid: int, db: Session = Depends(get_db)):
     pdf_generator.generate_pdp_pdf(c, p, path, company=comp)
     
     return FileResponse(path, media_type='application/pdf')
+
+# ==========================================
+# 9. ENVOI EMAIL
+# ==========================================
+
+class EmailSchema(BaseModel):
+    email: List[EmailStr]
+
+@app.post("/plans-prevention/{pid}/send-email")
+async def send_pdp_email(pid: int, email_dest: str, db: Session = Depends(get_db)):
+    # 1. Récupération des données
+    p = db.query(models.PlanPrevention).filter(models.PlanPrevention.id == pid).first()
+    if not p: raise HTTPException(404, "PdP introuvable")
+    
+    c = db.query(models.Chantier).filter(models.Chantier.id == p.chantier_id).first()
+    comp = get_company_for_chantier(db, c.id)
+
+    # 2. Génération du PDF temporaire
+    filename = f"PdP_{c.nom}_{datetime.now().strftime('%Y%m%d')}.pdf"
+    # On nettoie le nom de fichier pour éviter les erreurs d'encodage
+    filename = "".join([c for c in filename if c.isalpha() or c.isdigit() or c in (' ', '.', '_')]).strip()
+    path = f"uploads/{filename}"
+    
+    pdf_generator.generate_pdp_pdf(c, p, path, company=comp)
+
+    # 3. Préparation de l'email
+    html = f"""
+    <p>Bonjour,</p>
+    <p>Veuillez trouver ci-joint le <b>Plan de Prévention</b> concernant le chantier <b>{c.nom}</b>.</p>
+    <p>Cordialement,<br>{comp.name if comp else 'L\'équipe'}</p>
+    """
+
+    message = MessageSchema(
+        subject=f"Plan de Prévention - {c.nom}",
+        recipients=[email_dest],
+        body=html,
+        subtype=MessageType.html,
+        attachments=[path]
+    )
+
+    # 4. Envoi
+    fm = FastMail(mail_conf)
+    try:
+        await fm.send_message(message)
+        return {"message": "Email envoyé avec succès ! 📧"}
+    except Exception as e:
+        print(e)
+        raise HTTPException(500, "Erreur lors de l'envoi de l'email")
 
 # ==========================================
 # 10. GESTION EQUIPE & ENTREPRISE 

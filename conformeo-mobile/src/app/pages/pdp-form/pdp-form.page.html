@@ -83,6 +83,17 @@
       <p>Aucun risque spécifique ajouté.</p>
     </div>
 
+    <ion-buttons slot="end">
+      <ion-button (click)="sendEmail()" *ngIf="isExisting">
+        <ion-icon name="mail" slot="icon-only"></ion-icon>
+      </ion-button>
+      
+      <ion-button (click)="downloadPdf()" *ngIf="isExisting">
+        <ion-icon name="download" slot="icon-only"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+
+    
     <div class="ion-padding">
       <ion-button expand="block" type="submit" color="tertiary" size="large">
         <ion-icon name="save" slot="start"></ion-icon>

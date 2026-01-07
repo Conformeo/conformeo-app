@@ -36,10 +36,6 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/smart-scan/smart-scan.page').then( m => m.SmartScanPage), canActivate: [authGuard]
   },
   {
-    path: 'equipe',
-    loadComponent: () => import('./pages/equipe/equipe.page').then( m => m.EquipePage), canActivate: [authGuard]
-  },
-  {
     path: 'login',
     loadComponent: () => import('./pages/login/login.page').then( m => m.LoginPage)
   },
@@ -63,5 +59,9 @@ export const routes: Routes = [
   {
     path: 'pdp-form/:id',
     loadComponent: () => import('./pages/pdp-form/pdp-form.page').then( m => m.PdpFormPage)
+  },
+  {
+    path: 'team',
+    loadComponent: () => import('./pages/team/team.page').then( m => m.TeamPage)
   },
 ];

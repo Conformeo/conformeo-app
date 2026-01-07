@@ -5,7 +5,7 @@ import { map, switchMap, tap } from 'rxjs/operators';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Preferences } from '@capacitor/preferences';
 import { NavController } from '@ionic/angular';
-import { OfflineService } from './offline'; // Assurez-vous du chemin
+import { OfflineService } from './offline'; 
 
 // --- INTERFACES ---
 
@@ -22,7 +22,7 @@ export interface Company {
 export interface CompanyDoc {
   id: number;
   titre: string;
-  type_doc: string; // 'Kbis', 'Assurance', 'DUERP', 'Autre'
+  type_doc: string; 
   url: string;
   date_expiration?: string;
   date_upload: string;
@@ -31,7 +31,7 @@ export interface CompanyDoc {
 export interface DocExterne {
   id: number;
   titre: string;
-  categorie: string; // 'PGC', 'DICT', 'PLAN', 'AUTRE'
+  categorie: string;
   url: string;
   date_ajout: string;
 }
@@ -98,7 +98,6 @@ export interface PPSPS {
   horaires: string;
   risques: any; 
   date_creation?: string;
-  // Autres champs PPSPS...
 }
 
 export interface PIC {
@@ -110,14 +109,15 @@ export interface PIC {
   date_update?: string;
 }
 
+// Interface mise à jour avec les signatures
 export interface PlanPrevention {
   id?: number;
   chantier_id: number;
   entreprise_utilisatrice: string;
   entreprise_exterieure: string;
   date_inspection_commune: string; // ISO Date
-  signature_eu?: string; // Signature Client (Entreprise Utilisatrice)
-  signature_ee?: string; // Signature Nous (Entreprise Extérieure)
+  signature_eu?: string; // Signature Client
+  signature_ee?: string; // Signature Nous
   risques_interferents: { tache: string; risque: string; mesure: string }[];
   consignes_securite: {
     urgence?: string;
@@ -126,6 +126,13 @@ export interface PlanPrevention {
     fumeur?: string;
     permis_feu?: string;
   };
+}
+
+export interface User {
+  id: number;
+  email: string;
+  role: string;
+  company_id?: number;
 }
 
 export interface UserLogin { email: string; password: string; }
@@ -184,6 +191,7 @@ export class ApiService {
     return false;
   }
 
+  // Ajoute le Header "Authorization: Bearer ..."
   private getOptions() {
     if (this.token) {
       return {
@@ -239,7 +247,6 @@ export class ApiService {
     return this.http.put<Company>(`${this.apiUrl}/companies/me`, data, this.getOptions());
   }
 
-  // --- COFFRE-FORT NUMÉRIQUE (DOCS TRANSVERSES) ---
   getCompanyDocs(): Observable<CompanyDoc[]> {
     return this.http.get<CompanyDoc[]>(`${this.apiUrl}/companies/me/documents`, this.getOptions());
   }
@@ -307,10 +314,6 @@ export class ApiService {
   uploadChantierDoc(chantierId: number, file: File, titre: string, categorie: string): Observable<DocExterne> {
     const formData = new FormData();
     formData.append('file', file);
-    // On passe les infos en Query Params pour simplifier côté FastAPI ou en Form Data si le back le gère
-    // Ici votre back attend des query params pour titre/catégorie selon le code précédent, 
-    // ou alors on modifie l'appel URL.
-    // Pour être sûr, je les passe en Query Params comme dans le backend v11
     const url = `${this.apiUrl}/chantiers/${chantierId}/documents?titre=${encodeURIComponent(titre)}&categorie=${encodeURIComponent(categorie)}`;
     return this.http.post<DocExterne>(url, formData, this.getOptions());
   }
@@ -337,7 +340,8 @@ export class ApiService {
     if (!this.offline.isOnline.value) throw new Error("Offline");
     const formData = new FormData();
     formData.append('file', blob, 'photo.jpg');
-    return this.http.post<{url: string}>(`${this.apiUrl}/upload`, formData);
+    // Ajout de getOptions() ici par sécurité
+    return this.http.post<{url: string}>(`${this.apiUrl}/upload`, formData, this.getOptions());
   }
 
   createRapport(rapport: Rapport, photoUrl?: string): Observable<Rapport> {
@@ -416,7 +420,7 @@ export class ApiService {
   }
 
   // ==========================================
-  // 📑 DOCUMENTS (SPS, PIC, INSPECTIONS)
+  // 📑 DOCUMENTS (SPS, PIC, INSPECTIONS, PDP)
   // ==========================================
 
   createPPSPS(doc: any): Observable<any> {
@@ -449,40 +453,48 @@ export class ApiService {
     window.open(url, '_system');
   }
 
+  // 👇 AJOUT DE GETOPTIONS() SUR CES MÉTHODES
   createPdp(data: any) {
-    return this.http.post<PlanPrevention>(`${this.apiUrl}/plans-prevention`, data);
+    return this.http.post<PlanPrevention>(`${this.apiUrl}/plans-prevention`, data, this.getOptions());
   }
 
   getPdp(chantierId: number) {
-    return this.http.get<PlanPrevention[]>(`${this.apiUrl}/chantiers/${chantierId}/plans-prevention`);
+    return this.http.get<PlanPrevention[]>(`${this.apiUrl}/chantiers/${chantierId}/plans-prevention`, this.getOptions());
   }
 
-  // URL pour télécharger le PDF
   getPdpPdfUrl(pdpId: number) {
     return `${this.apiUrl}/plans-prevention/${pdpId}/pdf`;
   }
 
+  // ENVOI MAIL
+  // Envoyer le PdP par email
+  sendPdpEmail(pdpId: number, email: string) {
+    // Note: l'API attend un paramètre de requête (query param) pour l'email
+    return this.http.post(`${this.apiUrl}/plans-prevention/${pdpId}/send-email?email_dest=${email}`, {});
+  }
+
   // ==========================================
-  // 📊 DASHBOARD & TEAM
+  // 📊 DASHBOARD, TEAM & PROFIL
   // ==========================================
   
   getStats(): Observable<any> {
     return this.http.get<any>(`${this.apiUrl}/dashboard/stats`, this.getOptions());
   }
-  getTeam(): Observable<any[]> {
-    return this.http.get<any[]>(`${this.apiUrl}/team`, this.getOptions());
-  }
-  addTeamMember(user: any): Observable<any> {
-    return this.http.post<any>(`${this.apiUrl}/team`, user, this.getOptions());
+  
+  getTeam(): Observable<User[]> {
+    return this.http.get<User[]>(`${this.apiUrl}/team`, this.getOptions());
   }
   
-  // Récupérer mon profil user
+  addTeamMember(user: any): Observable<User> {
+    return this.http.post<User>(`${this.apiUrl}/team`, user, this.getOptions());
+  }
+  
+  // 👇 AJOUT DE GETOPTIONS() ICI AUSSI
   getMe() {
-    return this.http.get<any>(`${this.apiUrl}/users/me`);
+    return this.http.get<any>(`${this.apiUrl}/users/me`, this.getOptions());
   }
 
-  // Mettre à jour mon profil user (NOUVEAU)
   updateUser(data: any) {
-    return this.http.put(`${this.apiUrl}/users/me`, data);
+    return this.http.put(`${this.apiUrl}/users/me`, data, this.getOptions());
   }
 }
