@@ -48,9 +48,7 @@ if cloudinary_config["cloud_name"]:
 
 
 # --- CONFIGURATION EMAIL (SMTP) ---
-
-pwd_ovh = os.getenv("MAIL_PASSWORD")
-# ⚠️ REMPLACEZ PAR VOS INFOS RÉELLES POUR TESTER (Gmail ou autre)
+pwd_ovh = os.environ.get("MAIL_PASSWORD") # Récupère le mot de passe sécurisé
 mail_conf = ConnectionConfig(
     MAIL_USERNAME = "documents@xn--conformo-h1a.fr",
     MAIL_PASSWORD = pwd_ovh,
