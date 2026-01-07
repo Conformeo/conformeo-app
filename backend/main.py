@@ -53,14 +53,15 @@ mail_conf = ConnectionConfig(
     MAIL_USERNAME = "documents@xn--conformo-h1a.fr",
     MAIL_PASSWORD = pwd_ovh,
     MAIL_FROM = "documents@xn--conformo-h1a.fr",
-    MAIL_PORT = 465,
+    
+    MAIL_PORT = 587,
     MAIL_SERVER = "ssl0.ovh.net",
-
-    MAIL_STARTTLS = False,
-    MAIL_SSL_TLS = True,
-
+    
+    MAIL_STARTTLS = True,   # Obligatoire pour le port 587
+    MAIL_SSL_TLS = False,   # Obligatoire pour le port 587
+    
     USE_CREDENTIALS = True,
-    VALIDATE_CERTS = True
+    VALIDATE_CERTS = False  # On désactive la vérification stricte pour éviter les erreurs de certificat sur le Cloud
 )
 
 os.makedirs("uploads", exist_ok=True)
