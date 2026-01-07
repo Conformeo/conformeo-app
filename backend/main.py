@@ -50,12 +50,12 @@ if cloudinary_config["cloud_name"]:
 # --- CONFIGURATION EMAIL (SMTP) ---
 pwd_ovh = os.environ.get("MAIL_PASSWORD") # Récupère le mot de passe sécurisé
 mail_conf = ConnectionConfig(
-    MAIL_USERNAME = "documents@xn--conformo-h1a.fr",
+    MAIL_USERNAME = "michelgmv7@gmail.com",
     MAIL_PASSWORD = pwd_ovh,
-    MAIL_FROM = "documents@xn--conformo-h1a.fr",
+    MAIL_FROM = "contact@conformeo-app.fr",
     
     MAIL_PORT = 587,
-    MAIL_SERVER = "ssl0.ovh.net",
+    MAIL_SERVER = "smtp-relay.brevo.com",
     
     MAIL_STARTTLS = True,   # Obligatoire pour le port 587
     MAIL_SSL_TLS = False,   # Obligatoire pour le port 587
