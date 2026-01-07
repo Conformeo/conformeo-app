@@ -47,21 +47,32 @@ if cloudinary_config["cloud_name"]:
 
 
 
-# --- CONFIGURATION EMAIL (SMTP) ---
-pwd_ovh = os.environ.get("MAIL_PASSWORD") # Récupère le mot de passe sécurisé
+import os
+# ...
+
+# --- CONFIGURATION EMAIL (BREVO - PORT DE SECOURS 2525) ---
+# Le port 2525 est fait pour traverser les pare-feux comme celui de Render
+pwd_brevo = os.environ.get("MAIL_PASSWORD") 
+
 mail_conf = ConnectionConfig(
-    MAIL_USERNAME = "michelgmv7@gmail.com",
-    MAIL_PASSWORD = pwd_ovh,
-    MAIL_FROM = "contact@conformeo-app.fr",
+    # 👇 VOTRE LOGIN BREVO (L'email utilisé pour créer le compte)
+    MAIL_USERNAME = "michelgmv7@gmail.com", 
     
-    MAIL_PORT = 587,
+    # 👇 LA CLÉ API SMTP (Celle qui commence par xsmtps-...)
+    MAIL_PASSWORD = pwd_brevo,
+    
+    # 👇 L'EXPÉDITEUR (Validé dans Brevo > Expéditeurs)
+    MAIL_FROM = "contact@conformeo-app.fr", 
+    
+    # 👇 LE SECRET EST ICI : ON CHANGE LE PORT
+    MAIL_PORT = 2525,                
     MAIL_SERVER = "smtp-relay.brevo.com",
     
-    MAIL_STARTTLS = True,   # Obligatoire pour le port 587
-    MAIL_SSL_TLS = False,   # Obligatoire pour le port 587
+    MAIL_STARTTLS = True,            # Le port 2525 fonctionne comme le 587
+    MAIL_SSL_TLS = False,
     
-    USE_CREDENTIALS = True,
-    VALIDATE_CERTS = False  # On désactive la vérification stricte pour éviter les erreurs de certificat sur le Cloud
+    USE_CREDENTIALS = True,          # ⚠️ OBLIGATOIRE : TRUE
+    VALIDATE_CERTS = False 
 )
 
 os.makedirs("uploads", exist_ok=True)
