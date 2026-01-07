@@ -976,3 +976,17 @@ def force_delete_all_chantiers(db: Session = Depends(get_db)):
     except Exception as e:
         db.rollback()
         return {"status": "Erreur", "details": str(e)}
+
+# ... (Vos autres routes)
+
+# 👇 MIGRATION POUR AJOUTER LES COLONNES SIGNATURE
+@app.get("/fix_pdp_signatures")
+def fix_pdp_signatures(db: Session = Depends(get_db)):
+    try:
+        # On ajoute les colonnes si elles n'existent pas
+        db.execute(text("ALTER TABLE plans_prevention ADD COLUMN IF NOT EXISTS signature_eu VARCHAR;"))
+        db.execute(text("ALTER TABLE plans_prevention ADD COLUMN IF NOT EXISTS signature_ee VARCHAR;"))
+        db.commit()
+        return {"message": "Colonnes signatures ajoutées avec succès ! ✍️✅"}
+    except Exception as e:
+        return {"error": str(e)}
