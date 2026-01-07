@@ -52,7 +52,7 @@ pwd_ovh = os.environ.get("MAIL_PASSWORD") # Récupère le mot de passe sécuris�
 mail_conf = ConnectionConfig(
     MAIL_USERNAME = "michelgmv7@gmail.com",
     MAIL_PASSWORD = pwd_ovh,
-    MAIL_FROM = "contact@conformeo-app.fr",
+    MAIL_FROM = "michelgmv7@gmail.com",
     
     MAIL_PORT = 2525,
     MAIL_SERVER = "smtp-relay.brevo.com",
