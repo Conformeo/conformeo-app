@@ -747,7 +747,7 @@ async def send_pdp_email(pid: int, email_dest: str, db: Session = Depends(get_db
     html = f"""
     <p>Bonjour,</p>
     <p>Veuillez trouver ci-joint le <b>Plan de Prévention</b> concernant le chantier <b>{c.nom}</b>.</p>
-    <p>Cordialement,<br>{comp.name if comp else 'L\'équipe'}</p>
+    <p>Cordialement,<br>{comp.name if comp else "L'équipe"}</p>
     """
 
     message = MessageSchema(
