@@ -60,7 +60,7 @@ mail_conf = ConnectionConfig(
     MAIL_STARTTLS = True,   # Obligatoire pour le port 587
     MAIL_SSL_TLS = False,   # Obligatoire pour le port 587
     
-    USE_CREDENTIALS = True,
+    USE_CREDENTIALS = False,
     VALIDATE_CERTS = False  # On désactive la vérification stricte pour éviter les erreurs de certificat sur le Cloud
 )
 
