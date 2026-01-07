@@ -191,16 +191,30 @@ class PlanPrevention(Base):
     # Relation inverse
     chantier = relationship("Chantier", back_populates="plans_prevention")
 
+# ... (Vos autres classes)
+
 class PIC(Base):
     __tablename__ = "pics"
 
     id = Column(Integer, primary_key=True, index=True)
     chantier_id = Column(Integer, ForeignKey("chantiers.id"))
     
-    background_url = Column(String)
-    final_url = Column(String)
-    elements_data = Column(JSON)
-    
-    date_update = Column(DateTime, default=datetime.now)
+    # Les 9 Éléments du PIC
+    acces = Column(String, nullable=True)          # 1. Véhicules et piétons
+    clotures = Column(String, nullable=True)       # 2. Clôtures et sécurité
+    base_vie = Column(String, nullable=True)       # 3. Base vie et sanitaires
+    stockage = Column(String, nullable=True)       # 4. Stockage matériaux
+    dechets = Column(String, nullable=True)        # 5. Tri des déchets
+    levage = Column(String, nullable=True)         # 6. Engins de levage
+    reseaux = Column(String, nullable=True)        # 7. Réseaux provisoires
+    circulations = Column(String, nullable=True)   # 8. Voies internes
+    signalisation = Column(String, nullable=True)  # 9. Espaces vie & Panneaux
 
+    # Méta-données
+    date_creation = Column(DateTime, default=datetime.utcnow)
+    
+    # Relation
     chantier = relationship("Chantier", back_populates="pic")
+
+# N'oubliez pas d'ajouter la relation inverse dans la classe Chantier :
+# pic = relationship("PIC", uselist=False, back_populates="chantier")

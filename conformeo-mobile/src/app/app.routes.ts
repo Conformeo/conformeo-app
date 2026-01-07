@@ -64,4 +64,8 @@ export const routes: Routes = [
     path: 'team',
     loadComponent: () => import('./pages/team/team.page').then( m => m.TeamPage)
   },
+  {
+    path: 'pic-form',
+    loadComponent: () => import('./pages/pic-form/pic-form.page').then( m => m.PicFormPage)
+  },
 ];

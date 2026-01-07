@@ -1,0 +1,36 @@
+<ion-header>
+  <ion-toolbar color="tertiary">
+    <ion-buttons slot="start"><ion-back-button defaultHref="/home"></ion-back-button></ion-buttons>
+    <ion-title>Plan & Notice PIC</ion-title>
+    <ion-buttons slot="end">
+      <ion-button (click)="savePic()"><ion-icon name="save" slot="icon-only"></ion-icon></ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding bg-light">
+
+  <ion-card class="pic-preview-card">
+    
+    <div *ngIf="pic.final_url" class="preview-image" [style.backgroundImage]="'url(' + pic.final_url + ')'"></div>
+    
+    <div *ngIf="!pic.final_url" class="empty-state">
+      <ion-icon name="image" size="large"></ion-icon>
+      <p>Aucun plan défini</p>
+    </div>
+
+    <ion-button expand="block" (click)="openPicStudio()" color="secondary" class="ion-margin">
+      <ion-icon name="map" slot="start"></ion-icon>
+      {{ pic.final_url ? 'Modifier le Plan' : 'Créer le Plan Graphique' }}
+    </ion-button>
+  </ion-card>
+
+
+  <div class="section-title">Notice d'installation</div>
+  
+  <ion-accordion-group expand="inset">
+    <ion-accordion value="1">
+       </ion-accordion>
+    </ion-accordion-group>
+
+</ion-content>

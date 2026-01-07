@@ -21,7 +21,7 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi_mail import FastMail, MessageSchema, ConnectionConfig, MessageType
-from pydantic import EmailStr, BaseModel # Assurez-vous d'importer BaseModel depuis pydantic
+from pydantic import EmailStr, BaseModel 
 
 from sqlalchemy import text, func
 from sqlalchemy.orm import Session
@@ -30,12 +30,12 @@ import models, schemas, security
 import pdf_generator
 from database import engine, get_db
 
-
+# Création des tables
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Conforméo API")
 
-# --- CONFIGURATION ---
+# --- CONFIGURATION CLOUDINARY ---
 cloudinary_config = {
     "cloud_name": os.getenv("CLOUDINARY_CLOUD_NAME"),
     "api_key": os.getenv("CLOUDINARY_API_KEY"),
@@ -46,32 +46,28 @@ if cloudinary_config["cloud_name"]:
     cloudinary.config(**cloudinary_config)
 
 
-
-import os
-# ...
-
 # --- CONFIGURATION EMAIL (BREVO - PORT DE SECOURS 2525) ---
 # Le port 2525 est fait pour traverser les pare-feux comme celui de Render
 pwd_brevo = os.environ.get("MAIL_PASSWORD") 
 
 mail_conf = ConnectionConfig(
-    # 👇 VOTRE LOGIN BREVO (L'email utilisé pour créer le compte)
+    # 👇 VOTRE LOGIN BREVO
     MAIL_USERNAME = "michelgmv7@gmail.com", 
     
-    # 👇 LA CLÉ API SMTP (Celle qui commence par xsmtps-...)
+    # 👇 LA CLÉ API SMTP (Dans Render)
     MAIL_PASSWORD = pwd_brevo,
     
-    # 👇 L'EXPÉDITEUR (Validé dans Brevo > Expéditeurs)
+    # 👇 L'EXPÉDITEUR
     MAIL_FROM = "contact@conformeo-app.fr", 
     
-    # 👇 LE SECRET EST ICI : ON CHANGE LE PORT
+    # 👇 CONFIGURATION SPECIALE RENDER
     MAIL_PORT = 2525,                
     MAIL_SERVER = "smtp-relay.brevo.com",
     
-    MAIL_STARTTLS = True,            # Le port 2525 fonctionne comme le 587
+    MAIL_STARTTLS = True,
     MAIL_SSL_TLS = False,
     
-    USE_CREDENTIALS = True,          # ⚠️ OBLIGATOIRE : TRUE
+    USE_CREDENTIALS = True,
     VALIDATE_CERTS = False 
 )
 
@@ -95,7 +91,6 @@ def get_company_for_chantier(db: Session, chantier_id: int):
     chantier = db.query(models.Chantier).filter(models.Chantier.id == chantier_id).first()
     if chantier and chantier.company_id:
         return db.query(models.Company).filter(models.Company.id == chantier.company_id).first()
-    # Fallback : Entreprise démo ou admin
     return db.query(models.Company).first()
 
 # ==========================================
@@ -104,7 +99,6 @@ def get_company_for_chantier(db: Session, chantier_id: int):
 def get_gps_from_address(address: str):
     if not address or len(address) < 5: return None, None
     try:
-        # On interroge l'API gratuite de Nominatim
         url = "https://nominatim.openstreetmap.org/search"
         params = {'q': address, 'format': 'json', 'limit': 1}
         headers = {'User-Agent': 'ConformeoApp/1.0'}
@@ -147,22 +141,17 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     token = security.create_access_token(data={"sub": user.email, "role": user.role})
     return {"access_token": token, "token_type": "bearer"}
 
-# 👇 1. Modèle pour la mise à jour (à mettre au début ou dans schemas)
 class UserUpdate(pydantic.BaseModel):
     email: Optional[str] = None
     password: Optional[str] = None
     
-# 👇 2. La route pour modifier SON profil
 @app.put("/users/me", response_model=schemas.UserOut)
 def update_user_me(user_up: UserUpdate, db: Session = Depends(get_db), current_user: models.User = Depends(security.get_current_user)):
-    # 1. Mise à jour Email
     if user_up.email and user_up.email != current_user.email:
-        # Vérifier si l'email est déjà pris
         if db.query(models.User).filter(models.User.email == user_up.email).first():
             raise HTTPException(400, "Cet email est déjà utilisé.")
         current_user.email = user_up.email
 
-    # 2. Mise à jour Mot de Passe
     if user_up.password:
         current_user.hashed_password = security.get_password_hash(user_up.password)
 
@@ -197,12 +186,10 @@ def get_stats(db: Session = Depends(get_db)):
         c_nom = r.chantier.nom if r.chantier else "Inconnu"
         rec_fmt.append({"titre": r.titre, "date_creation": r.date_creation, "chantier_nom": c_nom, "niveau_urgence": r.niveau_urgence})
 
-    # Données Carte
     map_data = []
     chantiers = db.query(models.Chantier).filter(models.Chantier.est_actif == True).all()
     for c in chantiers:
         lat, lng = c.latitude, c.longitude
-        # Fallback GPS sur dernier rapport
         if not lat:
             last_gps = db.query(models.Rapport).filter(models.Rapport.chantier_id == c.id, models.Rapport.latitude != None).first()
             if last_gps:
@@ -237,7 +224,7 @@ def create_chantier(chantier: schemas.ChantierCreate, db: Session = Depends(get_
         date_debut=chantier.date_debut or datetime.now(),
         date_fin=chantier.date_fin or (datetime.now() + timedelta(days=30)),
         latitude=lat, longitude=lng,
-        soumis_sps=chantier.soumis_sps # V11
+        soumis_sps=chantier.soumis_sps
     )
     db.add(new_c); db.commit(); db.refresh(new_c)
     return new_c
@@ -247,7 +234,6 @@ def update_chantier(cid: int, up: schemas.ChantierCreate, db: Session = Depends(
     c = db.query(models.Chantier).filter(models.Chantier.id == cid).first()
     if not c: raise HTTPException(404)
     
-    # Recalcul GPS si adresse change
     if up.adresse and up.adresse != c.adresse:
         lat, lng = get_gps_from_address(up.adresse)
         c.latitude = lat; c.longitude = lng
@@ -258,7 +244,7 @@ def update_chantier(cid: int, up: schemas.ChantierCreate, db: Session = Depends(
     if up.date_fin: c.date_fin = up.date_fin
     
     if up.est_actif is not None: c.est_actif = up.est_actif
-    if up.soumis_sps is not None: c.soumis_sps = up.soumis_sps # V11
+    if up.soumis_sps is not None: c.soumis_sps = up.soumis_sps
 
     db.commit(); db.refresh(c)
     return c
@@ -300,11 +286,10 @@ async def import_chantiers_csv(file: UploadFile = File(...), db: Session = Depen
                     if 'client' in k.lower(): client = v
                     if 'adresse' in k.lower(): adresse = v
                 
-                # GPS Auto
                 lat, lng = None, None
                 if len(adresse) > 5:
                     lat, lng = get_gps_from_address(adresse)
-                    time.sleep(1) # Pause API
+                    time.sleep(1) 
 
                 db.add(models.Chantier(
                     nom=nom, client=client, adresse=adresse, est_actif=True, company_id=cid,
@@ -329,13 +314,13 @@ def sign_chantier(cid: int, signature_url: str, db: Session = Depends(get_db)):
 def delete_chantier(cid: int, db: Session = Depends(get_db)):
     c = db.query(models.Chantier).filter(models.Chantier.id == cid).first()
     if not c: raise HTTPException(404)
-    # Nettoyage dépendances
     db.query(models.Materiel).filter(models.Materiel.chantier_id == cid).update({"chantier_id": None})
     db.query(models.RapportImage).filter(models.RapportImage.rapport.has(chantier_id=cid)).delete(synchronize_session=False)
     db.query(models.Rapport).filter(models.Rapport.chantier_id == cid).delete()
     db.query(models.Inspection).filter(models.Inspection.chantier_id == cid).delete()
     db.query(models.PPSPS).filter(models.PPSPS.chantier_id == cid).delete()
     db.query(models.PIC).filter(models.PIC.chantier_id == cid).delete()
+    db.query(models.PlanPrevention).filter(models.PlanPrevention.chantier_id == cid).delete()
     db.delete(c); db.commit()
     return {"status": "deleted"}
 
@@ -392,7 +377,7 @@ def update_materiel(materiel_id: int, mat_update: schemas.MaterielCreate, db: Se
     if not db_mat: raise HTTPException(404)
     db_mat.nom = mat_update.nom
     db_mat.reference = mat_update.reference
-    if mat_update.etat: db_mat.etat = mat_update.etat # MAJ ETAT
+    if mat_update.etat: db_mat.etat = mat_update.etat 
     if mat_update.image_url: db_mat.image_url = mat_update.image_url
     db.commit(); db.refresh(db_mat)
     return db_mat
@@ -405,7 +390,7 @@ def delete_materiel(mid: int, db: Session = Depends(get_db)):
     return {"status": "success"}
 
 # ==========================================
-# 5. DOCS & EXPORTS
+# 5. DOCUMENTS & EXPORTS
 # ==========================================
 @app.post("/upload")
 async def upload_image(file: UploadFile = File(...)):
@@ -448,12 +433,8 @@ def download_inspection_pdf(iid: int, db: Session = Depends(get_db)):
     i = db.query(models.Inspection).filter(models.Inspection.id == iid).first()
     if not i: raise HTTPException(404)
     c = db.query(models.Chantier).filter(models.Chantier.id == i.chantier_id).first()
-    
-    # Récupération de l'entreprise
     comp = get_company_for_chantier(db, c.id)
-
     path = f"uploads/Audit_{iid}.pdf"
-    # 👇 On passe 'company=comp'
     pdf_generator.generate_audit_pdf(c, i, path, company=comp)
     return FileResponse(path, media_type='application/pdf')
 
@@ -477,41 +458,62 @@ def download_ppsps_pdf(pid: int, db: Session = Depends(get_db)):
     p = db.query(models.PPSPS).filter(models.PPSPS.id == pid).first()
     if not p: raise HTTPException(404)
     c = db.query(models.Chantier).filter(models.Chantier.id == p.chantier_id).first()
-    
     comp = get_company_for_chantier(db, c.id)
-
     path = f"uploads/PPSPS_{pid}.pdf"
-    # 👇 On passe 'company=comp'
     pdf_generator.generate_ppsps_pdf(c, p, path, company=comp)
     return FileResponse(path, media_type='application/pdf')
 
-@app.post("/pics", response_model=schemas.PICOut)
-def create_pic(p: schemas.PICCreate, db: Session = Depends(get_db)):
-    ex = db.query(models.PIC).filter(models.PIC.chantier_id == p.chantier_id).first()
-    if ex:
-        ex.background_url = p.background_url; ex.final_url = p.final_url
-        ex.elements_data = p.elements_data; ex.date_update = datetime.now()
-        db.commit(); db.refresh(ex); return ex
+# ==========================================
+# 6. NOTICE PIC (NOUVEAU - V2 AVEC 9 CHAMPS)
+# ==========================================
+
+class PicSchema(BaseModel):
+    acces: str = ""
+    clotures: str = ""
+    base_vie: str = ""
+    stockage: str = ""
+    dechets: str = ""
+    levage: str = ""
+    reseaux: str = ""
+    circulations: str = ""
+    signalisation: str = ""
+
+    background_url: Optional[str] = None
+    final_url: Optional[str] = None
+    elements_data: Optional[list] = None
+
+@app.get("/chantiers/{cid}/pic")
+def get_pic(cid: int, db: Session = Depends(get_db)):
+    pic = db.query(models.PIC).filter(models.PIC.chantier_id == cid).first()
+    if not pic:
+        return {} 
+    return pic
+
+@app.post("/chantiers/{cid}/pic")
+def save_pic(cid: int, pic_data: PicSchema, db: Session = Depends(get_db)):
+    existing_pic = db.query(models.PIC).filter(models.PIC.chantier_id == cid).first()
+    
+    if existing_pic:
+        for key, value in pic_data.dict().items():
+            setattr(existing_pic, key, value)
     else:
-        new_pic = models.PIC(chantier_id=p.chantier_id, background_url=p.background_url, final_url=p.final_url, elements_data=p.elements_data)
-        db.add(new_pic); db.commit(); db.refresh(new_pic); return new_pic
+        new_pic = models.PIC(**pic_data.dict(), chantier_id=cid)
+        db.add(new_pic)
+    
+    db.commit()
+    return {"message": "PIC sauvegardé avec succès ! 🏗️"}
 
-@app.get("/chantiers/{cid}/pic", response_model=Optional[schemas.PICOut])
-def read_pic(cid: int, db: Session = Depends(get_db)):
-    return db.query(models.PIC).filter(models.PIC.chantier_id == cid).first()
-
+# ==========================================
+# 7. TELECHARGEMENT GLOBAL (DOE)
+# ==========================================
 @app.get("/chantiers/{cid}/pdf")
 def download_pdf(cid: int, db: Session = Depends(get_db)):
     c = db.query(models.Chantier).filter(models.Chantier.id == cid).first()
     if not c: raise HTTPException(404)
-    
     raps = db.query(models.Rapport).filter(models.Rapport.chantier_id == cid).all()
     inss = db.query(models.Inspection).filter(models.Inspection.chantier_id == cid).all()
-    
     comp = get_company_for_chantier(db, cid)
-
     path = f"uploads/J_{cid}.pdf"
-    # 👇 On passe 'company=comp'
     pdf_generator.generate_pdf(c, raps, inss, path, company=comp)
     return FileResponse(path, media_type='application/pdf')
 
@@ -519,8 +521,7 @@ def download_pdf(cid: int, db: Session = Depends(get_db)):
 def download_doe(cid: int, db: Session = Depends(get_db)):
     c = db.query(models.Chantier).filter(models.Chantier.id == cid).first()
     if not c: raise HTTPException(404)
-    
-    comp = get_company_for_chantier(db, cid) # On récupère l'entreprise une fois
+    comp = get_company_for_chantier(db, cid) 
 
     zip_name = f"uploads/DOE_{c.id}.zip"
     with zipfile.ZipFile(zip_name, 'w') as z:
@@ -558,7 +559,7 @@ def download_doe(cid: int, db: Session = Depends(get_db)):
     return FileResponse(zip_name, filename=f"DOE_{c.nom}.zip", media_type='application/zip')
 
 # ==========================================
-# 6. DOCUMENTS EXTERNES (GED CHANTIER)
+# 8. DOCUMENTS EXTERNES & ENTREPRISE
 # ==========================================
 @app.get("/migrate_documents_externes")
 def migrate_docs_ext(db: Session = Depends(get_db)):
@@ -609,9 +610,6 @@ def delete_external_doc(did: int, db: Session = Depends(get_db)):
     db.commit()
     return {"status": "deleted"}
 
-# ==========================================
-# 7. DOCUMENTS ENTREPRISE (GED TRANSVERSE)
-# ==========================================
 @app.get("/migrate_company_docs")
 def migrate_company_docs(db: Session = Depends(get_db)):
     try:
@@ -674,10 +672,8 @@ def delete_company_doc(doc_id: int, db: Session = Depends(get_db), current_user:
     return {"status": "deleted"}
 
 # ==========================================
-# 8. PLAN DE PREVENTION (PdP) - COACTIVITÉ
+# 9. PLAN DE PREVENTION (PdP)
 # ==========================================
-
-# 1. Migration
 @app.get("/migrate_pdp")
 def migrate_pdp(db: Session = Depends(get_db)):
     try:
@@ -697,10 +693,8 @@ def migrate_pdp(db: Session = Depends(get_db)):
         return {"msg": "Table Plans de Prévention créée ! 🤝"}
     except Exception as e: return {"error": str(e)}
 
-# 2. Créer un PdP
 @app.post("/plans-prevention", response_model=schemas.PlanPreventionOut)
 def create_pdp(p: schemas.PlanPreventionCreate, db: Session = Depends(get_db)):
-    # On vérifie si un PdP existe déjà pour ce chantier (optionnel, sinon on en crée un nouveau)
     new_p = models.PlanPrevention(
         chantier_id=p.chantier_id,
         entreprise_utilisatrice=p.entreprise_utilisatrice,
@@ -712,29 +706,22 @@ def create_pdp(p: schemas.PlanPreventionCreate, db: Session = Depends(get_db)):
     db.add(new_p); db.commit(); db.refresh(new_p)
     return new_p
 
-# 3. Lire les PdP d'un chantier
 @app.get("/chantiers/{cid}/plans-prevention", response_model=List[schemas.PlanPreventionOut])
 def read_pdps(cid: int, db: Session = Depends(get_db)):
     return db.query(models.PlanPrevention).filter(models.PlanPrevention.chantier_id == cid).all()
 
-# 4. Télécharger le PDF
 @app.get("/plans-prevention/{pid}/pdf")
 def download_pdp_pdf(pid: int, db: Session = Depends(get_db)):
     p = db.query(models.PlanPrevention).filter(models.PlanPrevention.id == pid).first()
     if not p: raise HTTPException(404)
     c = db.query(models.Chantier).filter(models.Chantier.id == p.chantier_id).first()
-    
-    # On récupère l'entreprise pour le logo
     comp = get_company_for_chantier(db, c.id)
-
     path = f"uploads/PdP_{pid}.pdf"
-    # 👇 On appelle la nouvelle fonction du générateur
     pdf_generator.generate_pdp_pdf(c, p, path, company=comp)
-    
     return FileResponse(path, media_type='application/pdf')
 
 # ==========================================
-# 9. ENVOI EMAIL
+# 10. ENVOI EMAIL
 # ==========================================
 
 class EmailSchema(BaseModel):
@@ -742,92 +729,57 @@ class EmailSchema(BaseModel):
 
 @app.post("/plans-prevention/{pid}/send-email")
 async def send_pdp_email(pid: int, email_dest: str, db: Session = Depends(get_db)):
-    # 1. Récupération des données
     p = db.query(models.PlanPrevention).filter(models.PlanPrevention.id == pid).first()
     if not p: raise HTTPException(404, "PdP introuvable")
-    
     c = db.query(models.Chantier).filter(models.Chantier.id == p.chantier_id).first()
     comp = get_company_for_chantier(db, c.id)
 
-    # 2. Génération du PDF temporaire
     filename = f"PdP_{c.nom}_{datetime.now().strftime('%Y%m%d')}.pdf"
-    # On nettoie le nom de fichier pour éviter les erreurs d'encodage
     filename = "".join([c for c in filename if c.isalpha() or c.isdigit() or c in (' ', '.', '_')]).strip()
     path = f"uploads/{filename}"
-    
     pdf_generator.generate_pdp_pdf(c, p, path, company=comp)
 
-    # 3. Préparation de l'email
     html = f"""
     <p>Bonjour,</p>
     <p>Veuillez trouver ci-joint le <b>Plan de Prévention</b> concernant le chantier <b>{c.nom}</b>.</p>
     <p>Cordialement,<br>{comp.name if comp else "L'équipe"}</p>
     """
-
-    message = MessageSchema(
-        subject=f"Plan de Prévention - {c.nom}",
-        recipients=[email_dest],
-        body=html,
-        subtype=MessageType.html,
-        attachments=[path]
-    )
-
-    # 4. Envoi
+    message = MessageSchema(subject=f"Plan de Prévention - {c.nom}", recipients=[email_dest], body=html, subtype=MessageType.html, attachments=[path])
     fm = FastMail(mail_conf)
     try:
         await fm.send_message(message)
         return {"message": "Email envoyé avec succès ! 📧"}
     except Exception as e:
-        print(e)
-        raise HTTPException(500, "Erreur lors de l'envoi de l'email")
-
-# ...
+        print(e); raise HTTPException(500, "Erreur lors de l'envoi de l'email")
 
 @app.post("/chantiers/{cid}/send-email")
 async def send_journal_email(cid: int, email_dest: str, db: Session = Depends(get_db)):
-    # 1. Récupération des données
     c = db.query(models.Chantier).filter(models.Chantier.id == cid).first()
     if not c: raise HTTPException(404, "Chantier introuvable")
-    
     raps = db.query(models.Rapport).filter(models.Rapport.chantier_id == cid).all()
     inss = db.query(models.Inspection).filter(models.Inspection.chantier_id == cid).all()
-    
     comp = get_company_for_chantier(db, c.id)
 
-    # 2. Génération du PDF
     filename = f"Journal_{c.nom}_{datetime.now().strftime('%Y%m%d')}.pdf"
-    # Nettoyage du nom de fichier
     filename = "".join([x for x in filename if x.isalpha() or x.isdigit() or x in (' ', '.', '_')]).strip()
     path = f"uploads/{filename}"
-    
-    # 👇 On appelle le générateur du Journal
     pdf_generator.generate_pdf(c, raps, inss, path, company=comp)
 
-    # 3. Email
     html = f"""
     <p>Bonjour,</p>
     <p>Veuillez trouver ci-joint le <b>Journal de Bord</b> et le suivi d'avancement pour le chantier <b>{c.nom}</b>.</p>
     <p>Cordialement,<br>{comp.name if comp else "L'équipe"}</p>
     """
-
-    message = MessageSchema(
-        subject=f"Suivi Chantier - {c.nom}",
-        recipients=[email_dest],
-        body=html,
-        subtype=MessageType.html,
-        attachments=[path]
-    )
-
+    message = MessageSchema(subject=f"Suivi Chantier - {c.nom}", recipients=[email_dest], body=html, subtype=MessageType.html, attachments=[path])
     fm = FastMail(mail_conf)
     try:
         await fm.send_message(message)
         return {"message": "Journal envoyé au client ! 🚀"}
     except Exception as e:
-        print(e)
-        raise HTTPException(500, "Erreur envoi email")
+        print(e); raise HTTPException(500, "Erreur envoi email")
 
 # ==========================================
-# 10. GESTION EQUIPE & ENTREPRISE 
+# 11. GESTION EQUIPE
 # ==========================================
 @app.get("/companies/me", response_model=schemas.CompanyOut)
 def read_my_company(db: Session = Depends(get_db), current_user: models.User = Depends(security.get_current_user)):
@@ -857,11 +809,10 @@ def add_team_member(u: schemas.UserCreate, db: Session = Depends(get_db), curren
     db.add(new_u); db.commit(); db.refresh(new_u)
     return new_u
 
-
-
 # ==========================================
-# 11. MIGRATIONS
+# 12. MIGRATIONS & FIX
 # ==========================================
+
 @app.get("/migrate_multi_tenant")
 def migrate_mt(db: Session = Depends(get_db)):
     try:
@@ -950,28 +901,49 @@ def fix_database_columns(db: Session = Depends(get_db)):
             db.rollback(); messages.append(f"ℹ️ Colonne '{col_name}' existe déjà.")
     return {"status": "Terminé", "details": messages}
 
+@app.get("/fix_pic_v2")
+def fix_pic_v2(db: Session = Depends(get_db)):
+    """Ajoute les 9 colonnes spécifiques pour la Notice PIC V2"""
+    colonnes = [
+        "acces", "clotures", "base_vie", "stockage", 
+        "dechets", "levage", "reseaux", "circulations", "signalisation"
+    ]
+    logs = []
+    for col in colonnes:
+        try:
+            db.execute(text(f"ALTER TABLE pics ADD COLUMN {col} VARCHAR DEFAULT ''"))
+            logs.append(f"✅ Colonne {col} ajoutée")
+        except Exception:
+            logs.append(f"ℹ️ Colonne {col} existe déjà")
+    db.commit()
+    return {"status": "Migration PIC V2 Terminée", "details": logs}
+
 @app.get("/fix_everything")
 def fix_everything(db: Session = Depends(get_db)):
     logs = []
+    # On ajoute la migration PIC ici aussi
     corrections = [
-        ("chantiers", "signature_url", "VARCHAR"), ("chantiers", "cover_url", "VARCHAR"),
-        ("chantiers", "date_debut", "TIMESTAMP"), ("chantiers", "date_fin", "TIMESTAMP"),
-        ("chantiers", "statut_planning", "VARCHAR DEFAULT 'prevu'"), ("chantiers", "company_id", "INTEGER"),
-        ("chantiers", "latitude", "FLOAT"), ("chantiers", "longitude", "FLOAT"), ("chantiers", "soumis_sps", "BOOLEAN DEFAULT FALSE"),
-        ("materiels", "image_url", "VARCHAR"), ("materiels", "company_id", "INTEGER"),
-        ("users", "company_id", "INTEGER"),
-        ("companies", "logo_url", "VARCHAR"), ("companies", "address", "VARCHAR"),
-        ("companies", "contact_email", "VARCHAR"), ("companies", "phone", "VARCHAR"),
-        ("ppsps", "secours_data", "JSON"), ("ppsps", "installations_data", "JSON"),
-        ("ppsps", "taches_data", "JSON"), ("ppsps", "duree_travaux", "VARCHAR"),
-        ("pics", "background_url", "VARCHAR"), ("pics", "final_url", "VARCHAR"),
-        ("pics", "elements_data", "JSON"), ("pics", "date_update", "TIMESTAMP"),
+        ("chantiers", "signature_url", "VARCHAR"),
+        ("chantiers", "cover_url", "VARCHAR"),
+        ("chantiers", "latitude", "FLOAT"), ("chantiers", "longitude", "FLOAT"),
+        ("chantiers", "soumis_sps", "BOOLEAN DEFAULT FALSE"),
+        ("plans_prevention", "signature_eu", "VARCHAR"), ("plans_prevention", "signature_ee", "VARCHAR"),
+        # PIC V2
+        ("pics", "acces", "VARCHAR DEFAULT ''"),
+        ("pics", "clotures", "VARCHAR DEFAULT ''"),
+        ("pics", "base_vie", "VARCHAR DEFAULT ''"),
+        ("pics", "stockage", "VARCHAR DEFAULT ''"),
+        ("pics", "dechets", "VARCHAR DEFAULT ''"),
+        ("pics", "levage", "VARCHAR DEFAULT ''"),
+        ("pics", "reseaux", "VARCHAR DEFAULT ''"),
+        ("pics", "circulations", "VARCHAR DEFAULT ''"),
+        ("pics", "signalisation", "VARCHAR DEFAULT ''"),
     ]
     for table, col, type_col in corrections:
         try:
             db.execute(text(f"ALTER TABLE {table} ADD COLUMN {col} {type_col}"))
             db.commit(); logs.append(f"✅ {col} ajouté à {table}")
-        except Exception as e:
+        except Exception:
             db.rollback(); logs.append(f"ℹ️ {col} existe déjà")
     return {"status": "Terminé", "details": logs}
 
@@ -991,13 +963,9 @@ def force_delete_all_chantiers(db: Session = Depends(get_db)):
         db.rollback()
         return {"status": "Erreur", "details": str(e)}
 
-# ... (Vos autres routes)
-
-# 👇 MIGRATION POUR AJOUTER LES COLONNES SIGNATURE
 @app.get("/fix_pdp_signatures")
 def fix_pdp_signatures(db: Session = Depends(get_db)):
     try:
-        # On ajoute les colonnes si elles n'existent pas
         db.execute(text("ALTER TABLE plans_prevention ADD COLUMN IF NOT EXISTS signature_eu VARCHAR;"))
         db.execute(text("ALTER TABLE plans_prevention ADD COLUMN IF NOT EXISTS signature_ee VARCHAR;"))
         db.commit()

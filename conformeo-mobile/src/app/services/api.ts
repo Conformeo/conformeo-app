@@ -142,13 +142,13 @@ export interface Token { access_token: string; token_type: string; }
   providedIn: 'root'
 })
 export class ApiService {
-  private apiUrl = 'https://conformeo-api.onrender.com'; 
+  public apiUrl = 'https://conformeo-api.onrender.com'; 
   
   public needsRefresh = false;
   private token: string | null = null;
 
   constructor(
-    private http: HttpClient,
+    public http: HttpClient,
     private offline: OfflineService,
     private navCtrl: NavController
   ) { 
