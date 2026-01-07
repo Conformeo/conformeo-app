@@ -50,15 +50,17 @@ if cloudinary_config["cloud_name"]:
 # --- CONFIGURATION EMAIL (SMTP) ---
 # ⚠️ REMPLACEZ PAR VOS INFOS RÉELLES POUR TESTER (Gmail ou autre)
 mail_conf = ConnectionConfig(
-    MAIL_USERNAME = "michelgmv7@gmail.com", 
-    MAIL_PASSWORD = "zrgn lzhl ldzk zife", 
-    MAIL_FROM = "michelgmv7@gmail.com", 
-    MAIL_PORT = 587,
-    MAIL_SERVER = "smtp.gmail.com",
-    MAIL_STARTTLS = True,
-    MAIL_SSL_TLS = False,
+    MAIL_USERNAME = "documents@xn--conformo-h1a.fr", 
+    MAIL_PASSWORD = "7VGnQG#$keZ!QNF", 
+    MAIL_FROM = "documents@xn--conformo-h1a.fr", 
+    MAIL_PORT = 465,
+    MAIL_SERVER = "ssl0.ovh.net",
+
+    MAIL_STARTTLS = False,
+    MAIL_SSL_TLS = True,
+
     USE_CREDENTIALS = True,
-    VALIDATE_CERTS = False
+    VALIDATE_CERTS = True
 )
 
 os.makedirs("uploads", exist_ok=True)
