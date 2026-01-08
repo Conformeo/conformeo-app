@@ -11,10 +11,12 @@ class Company(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, index=True)
     subscription_plan = Column(String, default="free")
+    
     logo_url = Column(String, nullable=True)
     address = Column(String, nullable=True)
     contact_email = Column(String, nullable=True)
     phone = Column(String, nullable=True)
+    
     created_at = Column(DateTime, default=datetime.now)
 
     users = relationship("User", back_populates="company")
@@ -25,9 +27,9 @@ class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, unique=True, index=True)
-    nom = Column(String, nullable=True) # Added for Team feature
     hashed_password = Column(String)
     role = Column(String, default="conducteur")
+    nom = Column(String, nullable=True) # Ajouté pour la gestion d'équipe
     is_active = Column(Boolean, default=True)
     
     company_id = Column(Integer, ForeignKey("companies.id"), nullable=True)
@@ -85,17 +87,20 @@ class Materiel(Base):
     chantier = relationship("Chantier", back_populates="materiels")
 
 # ==========================
-# 4. RAPPORTS
+# 4. RAPPORTS & IMAGES
 # ==========================
 class RapportImage(Base):
     __tablename__ = "rapport_images"
+    
     id = Column(Integer, primary_key=True, index=True)
     url = Column(String)
     rapport_id = Column(Integer, ForeignKey("rapports.id"))
+    
     rapport = relationship("Rapport", back_populates="images")
 
 class Rapport(Base):
     __tablename__ = "rapports"
+
     id = Column(Integer, primary_key=True, index=True)
     titre = Column(String)
     description = Column(String)
@@ -105,11 +110,13 @@ class Rapport(Base):
     niveau_urgence = Column(String, default="Faible")
     latitude = Column(Float, nullable=True)
     longitude = Column(Float, nullable=True)
+
     chantier = relationship("Chantier", back_populates="rapports")
     images = relationship("RapportImage", back_populates="rapport")
 
 class Inspection(Base):
     __tablename__ = "inspections"
+
     id = Column(Integer, primary_key=True, index=True)
     titre = Column(String)
     type = Column(String)
@@ -117,13 +124,15 @@ class Inspection(Base):
     chantier_id = Column(Integer, ForeignKey("chantiers.id"))
     date_creation = Column(DateTime, default=datetime.now)
     createur = Column(String)
+
     chantier = relationship("Chantier", back_populates="inspections")
 
 # ==========================
-# 5. SÉCURITÉ
+# 5. SÉCURITÉ & PREVENTION
 # ==========================
 class PPSPS(Base):
     __tablename__ = "ppsps"
+
     id = Column(Integer, primary_key=True, index=True)
     chantier_id = Column(Integer, ForeignKey("chantiers.id"))
     maitre_ouvrage = Column(String)
@@ -137,37 +146,44 @@ class PPSPS(Base):
     installations_data = Column(JSON)
     taches_data = Column(JSON)
     date_creation = Column(DateTime, default=datetime.now)
+
     chantier = relationship("Chantier", back_populates="ppsps_docs")
 
 class PlanPrevention(Base):
     __tablename__ = "plans_prevention"
+
     id = Column(Integer, primary_key=True, index=True)
     chantier_id = Column(Integer, ForeignKey("chantiers.id"))
-    entreprise_utilisatrice = Column(String)
-    entreprise_exterieure = Column(String)
+    entreprise_utilisatrice = Column(String) 
+    entreprise_exterieure = Column(String)   
     date_inspection_commune = Column(DateTime, default=datetime.now)
     risques_interferents = Column(JSON)
     consignes_securite = Column(JSON)
-    signature_eu = Column(String)
-    signature_ee = Column(String)
+    signature_eu = Column(String) 
+    signature_ee = Column(String) 
     date_creation = Column(DateTime, default=datetime.utcnow)
+    
     chantier = relationship("Chantier", back_populates="plans_prevention")
 
 class PIC(Base):
     __tablename__ = "pics"
+
     id = Column(Integer, primary_key=True, index=True)
     chantier_id = Column(Integer, ForeignKey("chantiers.id"))
-    acces = Column(String, nullable=True)
-    clotures = Column(String, nullable=True)
-    base_vie = Column(String, nullable=True)
-    stockage = Column(String, nullable=True)
-    dechets = Column(String, nullable=True)
-    levage = Column(String, nullable=True)
-    reseaux = Column(String, nullable=True)
-    circulations = Column(String, nullable=True)
-    signalisation = Column(String, nullable=True)
-    background_url = Column(String, nullable=True)
-    final_url = Column(String, nullable=True)
-    elements_data = Column(String, nullable=True)
+    
+    acces = Column(String, nullable=True)          
+    clotures = Column(String, nullable=True)       
+    base_vie = Column(String, nullable=True)       
+    stockage = Column(String, nullable=True)       
+    dechets = Column(String, nullable=True)        
+    levage = Column(String, nullable=True)         
+    reseaux = Column(String, nullable=True)        
+    circulations = Column(String, nullable=True)   
+    signalisation = Column(String, nullable=True)  
+
+    background_url = Column(String, nullable=True) 
+    final_url = Column(String, nullable=True)      
+    elements_data = Column(String, nullable=True)  
     date_creation = Column(DateTime, default=datetime.now)
+    
     chantier = relationship("Chantier", back_populates="pic")

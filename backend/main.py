@@ -23,14 +23,14 @@ from fastapi_mail import FastMail, MessageSchema, ConnectionConfig, MessageType
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-# 👇 IMPORTATIONS CRITIQUES : On importe depuis vos nouveaux fichiers
+# 👇 ON IMPORTE TOUT DEPUIS SCHEMAS MAINTENANT
 import models
-import schemas
+import schemas 
 import security
 import pdf_generator
 from database import engine, get_db
 
-# Création des tables au démarrage
+# Création des tables
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Conforméo API")
@@ -45,7 +45,7 @@ cloudinary_config = {
 if cloudinary_config["cloud_name"]:
     cloudinary.config(**cloudinary_config)
 
-# --- CONFIGURATION EMAIL (BREVO) ---
+# --- CONFIGURATION EMAIL ---
 mail_conf = ConnectionConfig(
     MAIL_USERNAME = "michelgmv7@gmail.com",
     MAIL_PASSWORD = os.environ.get("MAIL_PASSWORD"),
@@ -74,7 +74,6 @@ def root():
     return {"message": "Conforméo API Ready 🚀"}
 
 # --- HELPER FUNCTIONS ---
-
 def get_company_for_chantier(db: Session, chantier_id: int):
     chantier = db.query(models.Chantier).filter(models.Chantier.id == chantier_id).first()
     if chantier and chantier.company_id:
@@ -96,7 +95,7 @@ def get_gps_from_address(address: str):
     return None, None
 
 # ==========================================
-# 1. AUTHENTIFICATION & UTILISATEURS
+# 1. UTILISATEURS / AUTH
 # ==========================================
 
 @app.post("/users", response_model=schemas.UserOut)
@@ -104,14 +103,14 @@ def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     if db.query(models.User).filter(models.User.email == user.email).first():
         raise HTTPException(status_code=400, detail="Email pris")
     
+    company_id = None
+    role = user.role
+    
     if user.company_name:
         new_company = models.Company(name=user.company_name, subscription_plan="free")
         db.add(new_company); db.commit(); db.refresh(new_company)
         company_id = new_company.id
-        role = "admin"
-    else:
-        company_id = None 
-        role = user.role
+        role = "admin" # Le créateur de l'entreprise est admin
 
     hashed_pwd = security.get_password_hash(user.password)
     new_user = models.User(email=user.email, hashed_password=hashed_pwd, role=role, company_id=company_id)
@@ -126,6 +125,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     token = security.create_access_token(data={"sub": user.email, "role": user.role})
     return {"access_token": token, "token_type": "bearer"}
 
+# 👇 ICI LE FIX: on utilise schemas.UserOut, pas UserOut tout court
 @app.get("/users/me", response_model=schemas.UserOut)
 def read_users_me(current_user: models.User = Depends(security.get_current_user)):
     return current_user
@@ -145,7 +145,7 @@ def update_user_me(user_up: schemas.UserUpdate, db: Session = Depends(get_db), c
     return current_user
 
 # ==========================================
-# 2. GESTION D'ÉQUIPE (TEAM)
+# 2. GESTION EQUIPE
 # ==========================================
 
 @app.get("/team", response_model=List[schemas.UserOut])
@@ -188,57 +188,20 @@ def remove_member(user_id: int, db: Session = Depends(get_db), current_user: mod
 # ==========================================
 # 3. DASHBOARD
 # ==========================================
-
 @app.get("/dashboard/stats")
 def get_stats(db: Session = Depends(get_db)):
     total = db.query(models.Chantier).count()
     actifs = db.query(models.Chantier).filter(models.Chantier.est_actif == True).count()
     rap = db.query(models.Rapport).count()
     alert = db.query(models.Rapport).filter(models.Rapport.niveau_urgence.in_(['Critique', 'Moyen'])).count()
-
-    today = datetime.now().date()
-    labels, values = [], []
-    for i in range(6, -1, -1):
-        day = today - timedelta(days=i)
-        labels.append(day.strftime("%d/%m"))
-        start = datetime.combine(day, datetime.min.time())
-        end = datetime.combine(day, datetime.max.time())
-        cnt = db.query(models.Rapport).filter(models.Rapport.date_creation >= start, models.Rapport.date_creation <= end).count()
-        values.append(cnt)
-
-    recents = db.query(models.Rapport).order_by(models.Rapport.date_creation.desc()).limit(5).all()
-    rec_fmt = []
-    for r in recents:
-        c_nom = r.chantier.nom if r.chantier else "Inconnu"
-        rec_fmt.append({"titre": r.titre, "date_creation": r.date_creation, "chantier_nom": c_nom, "niveau_urgence": r.niveau_urgence})
-
-    map_data = []
-    chantiers = db.query(models.Chantier).filter(models.Chantier.est_actif == True).all()
-    for c in chantiers:
-        lat, lng = c.latitude, c.longitude
-        if not lat:
-            last_gps = db.query(models.Rapport).filter(models.Rapport.chantier_id == c.id, models.Rapport.latitude != None).first()
-            if last_gps:
-                lat, lng = last_gps.latitude, last_gps.longitude
-        
-        if lat and lng:
-            map_data.append({"id": c.id, "nom": c.nom, "client": c.client, "lat": lat, "lng": lng})
-
     return {
-        "kpis": {
-            "total_chantiers": total, "actifs": actifs, 
-            "rapports": rap, "alertes": alert,
-            "materiel_sorti": db.query(models.Materiel).filter(models.Materiel.chantier_id != None).count()
-        },
-        "chart": { "labels": labels, "values": values },
-        "recents": rec_fmt,
-        "map": map_data
+        "kpis": {"total_chantiers": total, "actifs": actifs, "rapports": rap, "alertes": alert},
+        "chart": {"labels": [], "values": []}, "recents": [], "map": []
     }
 
 # ==========================================
-# 4. GESTION CHANTIERS
+# 4. CHANTIERS
 # ==========================================
-
 @app.post("/chantiers", response_model=schemas.ChantierOut)
 def create_chantier(chantier: schemas.ChantierCreate, db: Session = Depends(get_db), current_user: models.User = Depends(security.get_current_user)):
     lat, lng = None, None
@@ -270,19 +233,15 @@ def read_chantier(chantier_id: int, db: Session = Depends(get_db)):
 def update_chantier(cid: int, up: schemas.ChantierCreate, db: Session = Depends(get_db)):
     c = db.query(models.Chantier).filter(models.Chantier.id == cid).first()
     if not c: raise HTTPException(404)
-    
     if up.adresse and up.adresse != c.adresse:
         lat, lng = get_gps_from_address(up.adresse)
         c.latitude = lat; c.longitude = lng
-    
     c.nom = up.nom; c.adresse = up.adresse; c.client = up.client
     if up.cover_url: c.cover_url = up.cover_url
     if up.date_debut: c.date_debut = up.date_debut
     if up.date_fin: c.date_fin = up.date_fin
-    
     if up.est_actif is not None: c.est_actif = up.est_actif
     if up.soumis_sps is not None: c.soumis_sps = up.soumis_sps
-
     db.commit(); db.refresh(c)
     return c
 
@@ -290,7 +249,6 @@ def update_chantier(cid: int, up: schemas.ChantierCreate, db: Session = Depends(
 def delete_chantier(cid: int, db: Session = Depends(get_db)):
     c = db.query(models.Chantier).filter(models.Chantier.id == cid).first()
     if not c: raise HTTPException(404)
-    # Nettoyage des relations
     db.query(models.Materiel).filter(models.Materiel.chantier_id == cid).update({"chantier_id": None})
     db.query(models.RapportImage).filter(models.RapportImage.rapport.has(chantier_id=cid)).delete(synchronize_session=False)
     db.query(models.Rapport).filter(models.Rapport.chantier_id == cid).delete()
@@ -298,7 +256,6 @@ def delete_chantier(cid: int, db: Session = Depends(get_db)):
     db.query(models.PPSPS).filter(models.PPSPS.chantier_id == cid).delete()
     db.query(models.PIC).filter(models.PIC.chantier_id == cid).delete()
     db.query(models.PlanPrevention).filter(models.PlanPrevention.chantier_id == cid).delete()
-    
     db.delete(c); db.commit()
     return {"status": "deleted"}
 
@@ -356,7 +313,6 @@ async def import_chantiers_csv(file: UploadFile = File(...), db: Session = Depen
 # ==========================================
 # 5. MATERIEL
 # ==========================================
-
 @app.post("/materiels", response_model=schemas.MaterielOut)
 def create_materiel(mat: schemas.MaterielCreate, db: Session = Depends(get_db)):
     new_m = models.Materiel(nom=mat.nom, reference=mat.reference, etat=mat.etat, image_url=mat.image_url)
@@ -422,7 +378,6 @@ async def import_materiels_csv(file: UploadFile = File(...), db: Session = Depen
 # ==========================================
 # 6. RAPPORTS & IMAGES
 # ==========================================
-
 @app.post("/upload")
 async def upload_image(file: UploadFile = File(...)):
     try:
@@ -448,9 +403,8 @@ def read_rapports_chantier(cid: int, db: Session = Depends(get_db)):
     return db.query(models.Rapport).filter(models.Rapport.chantier_id == cid).all()
 
 # ==========================================
-# 7. INSPECTIONS / PPSPS / PDP
+# 7. INSPECTIONS / PPSPS / PDP / PIC
 # ==========================================
-
 @app.post("/inspections", response_model=schemas.InspectionOut)
 def create_inspection(i: schemas.InspectionCreate, db: Session = Depends(get_db)):
     new_i = models.Inspection(
@@ -498,6 +452,10 @@ def download_ppsps_pdf(pid: int, db: Session = Depends(get_db)):
     pdf_generator.generate_ppsps_pdf(c, p, path, company=comp)
     return FileResponse(path, media_type='application/pdf')
 
+@app.get("/chantiers/{cid}/plans-prevention", response_model=List[schemas.PlanPreventionOut])
+def read_pdps(cid: int, db: Session = Depends(get_db)):
+    return db.query(models.PlanPrevention).filter(models.PlanPrevention.chantier_id == cid).all()
+
 @app.post("/plans-prevention", response_model=schemas.PlanPreventionOut)
 def create_pdp(p: schemas.PlanPreventionCreate, db: Session = Depends(get_db)):
     new_p = models.PlanPrevention(
@@ -511,10 +469,6 @@ def create_pdp(p: schemas.PlanPreventionCreate, db: Session = Depends(get_db)):
     db.add(new_p); db.commit(); db.refresh(new_p)
     return new_p
 
-@app.get("/chantiers/{cid}/plans-prevention", response_model=List[schemas.PlanPreventionOut])
-def read_pdps(cid: int, db: Session = Depends(get_db)):
-    return db.query(models.PlanPrevention).filter(models.PlanPrevention.chantier_id == cid).all()
-
 @app.get("/plans-prevention/{pid}/pdf")
 def download_pdp_pdf(pid: int, db: Session = Depends(get_db)):
     p = db.query(models.PlanPrevention).filter(models.PlanPrevention.id == pid).first()
@@ -525,10 +479,7 @@ def download_pdp_pdf(pid: int, db: Session = Depends(get_db)):
     pdf_generator.generate_pdp_pdf(c, p, path, company=comp)
     return FileResponse(path, media_type='application/pdf')
 
-# ==========================================
-# 8. PIC (PLAN D'INSTALLATION)
-# ==========================================
-
+# PIC
 @app.get("/chantiers/{cid}/pic")
 def get_pic(cid: int, db: Session = Depends(get_db)):
     pic = db.query(models.PIC).filter(models.PIC.chantier_id == cid).first()
@@ -538,8 +489,6 @@ def get_pic(cid: int, db: Session = Depends(get_db)):
 @app.post("/chantiers/{cid}/pic")
 def save_pic(cid: int, pic: schemas.PicSchema, db: Session = Depends(get_db)):
     existing_pic = db.query(models.PIC).filter(models.PIC.chantier_id == cid).first()
-    
-    # Fix pour convertir la liste en string avant stockage SQL
     elements_str = None
     if pic.elements_data is not None:
         if isinstance(pic.elements_data, (list, dict)):
@@ -577,9 +526,8 @@ def save_pic(cid: int, pic: schemas.PicSchema, db: Session = Depends(get_db)):
     return {"message": "PIC sauvegardé avec succès !"}
 
 # ==========================================
-# 9. DOCUMENTS EXTERNES & ENTREPRISE & DOE
+# 8. DOCUMENTS EXTERNES, ENTREPRISE & DOE
 # ==========================================
-
 @app.post("/chantiers/{cid}/documents", response_model=schemas.DocExterneOut)
 def upload_external_doc(cid: int, titre: str, categorie: str, file: UploadFile = File(...), db: Session = Depends(get_db)):
     try:
@@ -692,10 +640,6 @@ def download_doe(cid: int, db: Session = Depends(get_db)):
 
     return FileResponse(zip_name, filename=f"DOE_{c.nom}.zip", media_type='application/zip')
 
-# ==========================================
-# 10. ENVOI EMAIL
-# ==========================================
-
 @app.post("/chantiers/{cid}/send-email")
 async def send_journal_email(cid: int, email_dest: str, db: Session = Depends(get_db)):
     c = db.query(models.Chantier).filter(models.Chantier.id == cid).first()
@@ -747,10 +691,6 @@ async def send_pdp_email(pid: int, email_dest: str, db: Session = Depends(get_db
     except Exception as e:
         print(e); raise HTTPException(500, "Erreur lors de l'envoi de l'email")
 
-# ==========================================
-# 11. COMPANY
-# ==========================================
-
 @app.get("/companies/me", response_model=schemas.CompanyOut)
 def read_my_company(db: Session = Depends(get_db), current_user: models.User = Depends(security.get_current_user)):
     if not current_user.company_id: raise HTTPException(400)
@@ -769,36 +709,36 @@ def update_my_company(up: schemas.CompanyUpdate, db: Session = Depends(get_db), 
     return c
 
 # ==========================================
-# 12. TOOLS / MIGRATIONS
+# 9. FIX & MIGRATIONS
 # ==========================================
+@app.get("/force_add_pic_date")
+def force_add_pic_date(db: Session = Depends(get_db)):
+    try:
+        db.execute(text("ALTER TABLE pics ADD COLUMN IF NOT EXISTS date_creation TIMESTAMP DEFAULT NOW()"))
+        db.commit()
+        return {"msg": "✅ Colonne date_creation ajoutée avec succès !"}
+    except Exception as e:
+        return {"error": str(e)}
 
-@app.get("/fix_everything")
-def fix_everything(db: Session = Depends(get_db)):
-    logs = []
-    # 1. MIGRATION TABLES & COLONNES
-    corrections = [
-        ("chantiers", "signature_url", "VARCHAR"),
-        ("chantiers", "cover_url", "VARCHAR"),
-        ("chantiers", "latitude", "FLOAT"), ("chantiers", "longitude", "FLOAT"),
-        ("chantiers", "soumis_sps", "BOOLEAN DEFAULT FALSE"),
-        ("plans_prevention", "signature_eu", "VARCHAR"), ("plans_prevention", "signature_ee", "VARCHAR"),
-        # PIC V2
-        ("pics", "acces", "VARCHAR DEFAULT ''"), ("pics", "clotures", "VARCHAR DEFAULT ''"),
-        ("pics", "base_vie", "VARCHAR DEFAULT ''"), ("pics", "stockage", "VARCHAR DEFAULT ''"),
-        ("pics", "dechets", "VARCHAR DEFAULT ''"), ("pics", "levage", "VARCHAR DEFAULT ''"),
-        ("pics", "reseaux", "VARCHAR DEFAULT ''"), ("pics", "circulations", "VARCHAR DEFAULT ''"),
-        ("pics", "signalisation", "VARCHAR DEFAULT ''"),
-        # PIC DESSIN
-        ("pics", "background_url", "VARCHAR"), ("pics", "final_url", "VARCHAR"), ("pics", "elements_data", "JSON")
-    ]
-    for table, col, type_col in corrections:
-        try:
-            db.execute(text(f"ALTER TABLE {table} ADD COLUMN {col} {type_col}"))
-            db.commit(); logs.append(f"✅ {col} ajouté à {table}")
-        except Exception:
-            db.rollback(); logs.append(f"ℹ️ {col} existe déjà")
+@app.get("/migrate_documents_externes")
+def migrate_docs_ext(db: Session = Depends(get_db)):
+    try:
+        db.execute(text("""
+            CREATE TABLE IF NOT EXISTS documents_externes (
+                id SERIAL PRIMARY KEY,
+                titre VARCHAR NOT NULL,
+                categorie VARCHAR NOT NULL,
+                url VARCHAR NOT NULL,
+                chantier_id INTEGER REFERENCES chantiers(id),
+                date_ajout TIMESTAMP DEFAULT NOW()
+            )
+        """))
+        db.commit()
+        return {"msg": "Table Documents Externes créée !"}
+    except Exception as e: return {"error": str(e)}
 
-    # 2. CREATION TABLE COMPANY_DOCUMENTS (GED)
+@app.get("/migrate_company_docs")
+def migrate_company_docs(db: Session = Depends(get_db)):
     try:
         db.execute(text("""
             CREATE TABLE IF NOT EXISTS company_documents (
@@ -812,28 +752,8 @@ def fix_everything(db: Session = Depends(get_db)):
             )
         """))
         db.commit()
-        logs.append("✅ Table company_documents vérifiée")
-    except Exception as e:
-        logs.append(f"⚠️ Erreur company_documents: {str(e)}")
-        
-    # 3. CREATION TABLE DOCS EXTERNES (DOE)
-    try:
-        db.execute(text("""
-            CREATE TABLE IF NOT EXISTS documents_externes (
-                id SERIAL PRIMARY KEY,
-                titre VARCHAR NOT NULL,
-                categorie VARCHAR NOT NULL,
-                url VARCHAR NOT NULL,
-                chantier_id INTEGER REFERENCES chantiers(id),
-                date_ajout TIMESTAMP DEFAULT NOW()
-            )
-        """))
-        db.commit()
-        logs.append("✅ Table documents_externes vérifiée")
-    except Exception as e:
-        logs.append(f"⚠️ Erreur documents_externes: {str(e)}")
-
-    return {"status": "Terminé", "details": logs}
+        return {"msg": "Table Documents Entreprise créée !"}
+    except Exception as e: return {"error": str(e)}
 
 @app.get("/debug_fix_pic")
 def debug_fix_pic(db: Session = Depends(get_db)):
@@ -843,12 +763,13 @@ def debug_fix_pic(db: Session = Depends(get_db)):
         status.append("✅ Table 'pics' trouvée.")
     except Exception:
         return {"error": "La table 'pics' n'existe pas ! Lancez /fix_everything d'abord."}
-
+    
+    # Check date_creation
     try:
         db.execute(text("SELECT date_creation FROM pics LIMIT 1"))
         status.append("✅ Colonne 'date_creation' existe déjà.")
     except Exception:
-        db.rollback() 
+        db.rollback()
         try:
             db.execute(text("ALTER TABLE pics ADD COLUMN date_creation TIMESTAMP DEFAULT NOW()"))
             db.commit()
@@ -858,7 +779,26 @@ def debug_fix_pic(db: Session = Depends(get_db)):
             
     return {"rapport": status}
 
-@app.get("/migrate_multi_tenant")
-def migrate_mt(db: Session = Depends(get_db)):
-    # Legacy migration script kept for reference
-    return {"msg": "Use /fix_everything instead"}
+@app.get("/fix_everything")
+def fix_everything(db: Session = Depends(get_db)):
+    logs = []
+    corrections = [
+        ("chantiers", "signature_url", "VARCHAR"),
+        ("chantiers", "cover_url", "VARCHAR"),
+        ("chantiers", "latitude", "FLOAT"), ("chantiers", "longitude", "FLOAT"),
+        ("chantiers", "soumis_sps", "BOOLEAN DEFAULT FALSE"),
+        ("pics", "acces", "VARCHAR DEFAULT ''"), ("pics", "clotures", "VARCHAR DEFAULT ''"),
+        ("pics", "base_vie", "VARCHAR DEFAULT ''"), ("pics", "stockage", "VARCHAR DEFAULT ''"),
+        ("pics", "dechets", "VARCHAR DEFAULT ''"), ("pics", "levage", "VARCHAR DEFAULT ''"),
+        ("pics", "reseaux", "VARCHAR DEFAULT ''"), ("pics", "circulations", "VARCHAR DEFAULT ''"),
+        ("pics", "signalisation", "VARCHAR DEFAULT ''"),
+        ("pics", "background_url", "VARCHAR"), ("pics", "final_url", "VARCHAR"), ("pics", "elements_data", "JSON")
+    ]
+    for table, col, type_col in corrections:
+        try:
+            db.execute(text(f"ALTER TABLE {table} ADD COLUMN {col} {type_col}"))
+            db.commit(); logs.append(f"✅ {col} ajouté à {table}")
+        except Exception:
+            db.rollback(); logs.append(f"ℹ️ {col} existe déjà")
+            
+    return {"status": "Terminé", "details": logs}
