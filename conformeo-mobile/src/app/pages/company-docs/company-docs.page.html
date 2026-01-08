@@ -9,10 +9,11 @@
 
   <div class="alert-banner" *ngIf="hasExpiredDocs">
     <ion-icon name="warning" color="danger"></ion-icon>
-    <span>Attention, certains documents sont périmés !</span>
+    <span>Attention, certains documents obligatoires sont périmés !</span>
   </div>
 
   <ion-list class="doc-list">
+    
     <ion-item-sliding *ngFor="let doc of documents">
       <ion-item lines="none" class="doc-item">
         
@@ -30,22 +31,33 @@
           </div>
         </ion-label>
 
-        <ion-button fill="clear" slot="end" (click)="openDoc(doc.url)">
-          <ion-icon name="eye" slot="icon-only"></ion-icon>
-        </ion-button>
+        <div slot="end" class="actions-wrapper">
+          <ion-button fill="clear" color="dark" (click)="signDocument(doc)">
+            <ion-icon name="pencil" slot="icon-only"></ion-icon>
+          </ion-button>
+          
+          <ion-button fill="clear" color="primary" (click)="openDoc(doc.url)">
+            <ion-icon name="eye" slot="icon-only"></ion-icon>
+          </ion-button>
+        </div>
+
       </ion-item>
 
       <ion-item-options side="end">
         <ion-item-option color="danger" (click)="deleteDoc(doc.id)">
-          <ion-icon name="trash"></ion-icon>
+          <ion-icon name="trash" slot="icon-only"></ion-icon>
         </ion-item-option>
       </ion-item-options>
     </ion-item-sliding>
+
   </ion-list>
 
   <div *ngIf="documents.length === 0" class="empty-state">
-    <ion-icon name="folder-open-outline"></ion-icon>
-    <p>Aucun document administratif (DUERP, Kbis...).</p>
+    <div class="empty-icon-circle">
+      <ion-icon name="folder-open"></ion-icon>
+    </div>
+    <h3>Aucun document</h3>
+    <p>Ajoutez votre DUERP, Assurances, Kbis pour suivre leur validité.</p>
   </div>
 
   <ion-fab vertical="bottom" horizontal="end" slot="fixed">
@@ -54,24 +66,25 @@
     </ion-fab-button>
   </ion-fab>
 
-  <ion-modal [isOpen]="isModalOpen" (didDismiss)="isModalOpen = false" [initialBreakpoint]="0.6" [breakpoints]="[0, 0.6]">
+  <ion-modal [isOpen]="isModalOpen" (didDismiss)="isModalOpen = false" [initialBreakpoint]="0.75" [breakpoints]="[0, 0.75]">
     <ng-template>
       <ion-header>
         <ion-toolbar>
-          <ion-title>Ajouter un Document</ion-title>
+          <ion-title>Nouveau Document</ion-title>
           <ion-buttons slot="end"><ion-button (click)="isModalOpen = false">Fermer</ion-button></ion-buttons>
         </ion-toolbar>
       </ion-header>
+      
       <ion-content class="ion-padding">
         
-        <ion-item fill="outline" class="ion-margin-bottom">
+        <ion-item fill="outline" class="input-item">
           <ion-label position="floating">Titre du document</ion-label>
           <ion-input [(ngModel)]="newDoc.titre" placeholder="Ex: DUERP 2024"></ion-input>
         </ion-item>
 
-        <ion-item fill="outline" class="ion-margin-bottom">
-          <ion-label>Type</ion-label>
-          <ion-select [(ngModel)]="newDoc.type_doc" interface="popover">
+        <ion-item fill="outline" class="input-item">
+          <ion-label>Type de document</ion-label>
+          <ion-select [(ngModel)]="newDoc.type_doc" interface="popover" placeholder="Choisir...">
             <ion-select-option value="DUERP">🛡️ DUERP (Doc Unique)</ion-select-option>
             <ion-select-option value="ASSURANCE">📄 Assurance (RC/Décennale)</ion-select-option>
             <ion-select-option value="KBIS">🏢 Kbis / SIRET</ion-select-option>
@@ -79,8 +92,8 @@
           </ion-select>
         </ion-item>
 
-        <ion-item fill="outline" class="ion-margin-bottom">
-          <ion-label>Date d'expiration (Optionnel)</ion-label>
+        <ion-item fill="outline" class="input-item">
+          <ion-label>Date d'expiration (Important)</ion-label>
           <ion-datetime-button datetime="datetime"></ion-datetime-button>
           <ion-modal [keepContentsMounted]="true">
             <ng-template>
@@ -89,14 +102,15 @@
           </ion-modal>
         </ion-item>
 
-        <div class="file-upload-box" (click)="fileInput.click()">
-          <input #fileInput type="file" (change)="onFileSelected($event)" hidden accept=".pdf,.jpg,.png">
-          <ion-icon name="cloud-upload-outline" size="large"></ion-icon>
-          <p>{{ selectedFile ? selectedFile.name : 'Cliquez pour choisir un fichier' }}</p>
+        <div class="file-upload-box" (click)="fileInput.click()" [class.has-file]="selectedFile">
+          <input #fileInput type="file" (change)="onFileSelected($event)" hidden accept=".pdf,.jpg,.png,.jpeg">
+          <ion-icon [name]="selectedFile ? 'checkmark-circle' : 'cloud-upload-outline'" size="large"></ion-icon>
+          <p class="main-text">{{ selectedFile ? selectedFile.name : 'Toucher pour choisir un fichier' }}</p>
+          <p class="sub-text" *ngIf="!selectedFile">PDF ou Photo</p>
         </div>
 
-        <ion-button expand="block" class="ion-margin-top" (click)="uploadDoc()" [disabled]="!selectedFile || !newDoc.titre">
-          Enregistrer
+        <ion-button expand="block" class="ion-margin-top action-btn" (click)="uploadDoc()" [disabled]="!selectedFile || !newDoc.titre">
+          Enregistrer le document
         </ion-button>
 
       </ion-content>

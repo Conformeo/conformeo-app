@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ViewChild, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { IonicModule, ModalController, AlertController, LoadingController, ToastController, NavController } from '@ionic/angular';
@@ -17,7 +17,8 @@ import {
   scanOutline, checkmarkCircle, shieldCheckmark, downloadOutline,
   shieldCheckmarkOutline, map, checkmarkDoneCircle,
   checkmarkDoneCircleOutline, documentLockOutline,
-  documentTextOutline, archiveOutline, mapOutline, hammerOutline, mail
+  documentTextOutline, archiveOutline, mapOutline, hammerOutline, mail,
+  cloudUpload, trash, ribbon, book, construct, download
 } from 'ionicons/icons';
 
 import { PicModalComponent } from './pic-modal/pic-modal.component';
@@ -42,42 +43,38 @@ export class ChantierDetailsPage implements OnInit {
   
   // 👇 LA VARIABLE MANQUANTE
   materielsSurSite: Materiel[] = []; 
+
+  // 👇 GESTION DOE
+  segment = 'suivi'; // Par défaut 'suivi', peut être 'doe'
+  doeDocs: any[] = [];
+  selectedCategory = '';
+  tempTitle = '';
+  
+  @ViewChild('doeFileInput') fileInput!: ElementRef;
   
   constructor(
     private route: ActivatedRoute,
     public api: ApiService,
     private modalCtrl: ModalController,
     private platform: Platform,
-    private alertCtrl: AlertController, // 👈 Ajout
+    private alertCtrl: AlertController,
     private loadingCtrl: LoadingController,
     private toastCtrl: ToastController,
     private navCtrl: NavController
   ) {
     addIcons({ 
-      'camera': camera, 
-      'time': time, 
-      'warning': warning, 
-      'document-text': documentText, 
-      'create': create, 
-      'navigate': navigate, 
-      'location': location, 
-      'arrow-back': arrowBack, 
-      'document-text-outline': documentTextOutline, 
-      'create-outline': createOutline, 
-      'scan-outline': scanOutline, 
-      'checkmark-circle': checkmarkCircle, 
-      'shield-checkmark': shieldCheckmark, 
-      'download-outline': downloadOutline, 
-      'archive-outline': archiveOutline, 
-      'shield-checkmark-outline': shieldCheckmarkOutline, 
-      'map': map, 
-      'map-outline': mapOutline,
-      'trash-outline': trashOutline,
-      'checkmark-done-circle': checkmarkDoneCircle,
-      'checkmark-done-circle-outline': checkmarkDoneCircleOutline,
-      'hammer-outline': hammerOutline,
-      'document-lock-outline': documentLockOutline,
-      'mail': mail
+      'camera': camera, 'time': time, 'warning': warning, 
+      'document-text': documentText, 'create': create, 'navigate': navigate, 
+      'location': location, 'arrow-back': arrowBack, 
+      'document-text-outline': documentTextOutline, 'create-outline': createOutline, 
+      'scan-outline': scanOutline, 'checkmark-circle': checkmarkCircle, 
+      'shield-checkmark': shieldCheckmark, 'download-outline': downloadOutline, 
+      'archive-outline': archiveOutline, 'shield-checkmark-outline': shieldCheckmarkOutline, 
+      'map': map, 'map-outline': mapOutline, 'trash-outline': trashOutline,
+      'checkmark-done-circle': checkmarkDoneCircle, 'checkmark-done-circle-outline': checkmarkDoneCircleOutline,
+      'hammer-outline': hammerOutline, 'document-lock-outline': documentLockOutline,
+      'mail': mail, 'cloud-upload': cloudUpload, 'trash': trash,
+      'ribbon': ribbon, 'book': book, 'construct': construct, 'download': download
     });
   }
 
@@ -107,11 +104,13 @@ export class ChantierDetailsPage implements OnInit {
     // 2. Rapports (Journal)
     this.loadRapports();
 
-    // 👇 3. CHARGEMENT DU MATÉRIEL (NOUVEAU)
+    // 3. Matériel
     this.api.getMateriels().subscribe(allMat => {
-      // On garde uniquement le matériel affecté à ce chantier
       this.materielsSurSite = allMat.filter(m => m.chantier_id === this.chantierId);
     });
+
+    // 4. Documents DOE
+    this.loadDoeDocs();
   }
 
   loadRapports() {
@@ -120,6 +119,74 @@ export class ChantierDetailsPage implements OnInit {
         new Date(b.date_creation || 0).getTime() - new Date(a.date_creation || 0).getTime()
       );
     });
+  }
+
+  // --- GESTION DOE ---
+  loadDoeDocs() {
+    // On réutilise la route documents externes (si elle existe dans ton service)
+    // Sinon, tu dois ajouter cette méthode dans api.service.ts :
+    // getExternalDocs(cid: number) { return this.http.get<any[]>(`${this.apiUrl}/chantiers/${cid}/documents`); }
+    
+    // Ici, j'assume que tu peux faire l'appel HTTP direct si besoin ou ajouter la méthode au service
+    this.api.http.get<any[]>(`${this.api.apiUrl}/chantiers/${this.chantierId}/documents`).subscribe(data => {
+      this.doeDocs = data;
+    });
+  }
+
+  getDocs(cat: string) {
+    return this.doeDocs.filter(d => d.categorie === cat);
+  }
+  
+  getCount(cat: string) {
+    return this.getDocs(cat).length;
+  }
+
+  async uploadDoeDoc(category: string) {
+    this.selectedCategory = category;
+    
+    const alert = await this.alertCtrl.create({
+      header: 'Nouveau Document',
+      inputs: [ { name: 'titre', type: 'text', placeholder: 'Nom du fichier (ex: Plan RDC)' } ],
+      buttons: [
+        { text: 'Annuler', role: 'cancel' },
+        { text: 'Choisir Fichier', handler: (data) => {
+            if(!data.titre) return false;
+            this.tempTitle = data.titre;
+            this.fileInput.nativeElement.click(); // Déclenche le clic sur l'input caché
+            return true;
+        }}
+      ]
+    });
+    await alert.present();
+  }
+
+  onDoeFileSelected(event: any) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    // Appel direct (à adapter si tu mets la méthode dans api.service)
+    const url = `${this.api.apiUrl}/chantiers/${this.chantierId}/documents?titre=${this.tempTitle}&categorie=${this.selectedCategory}`;
+    
+    this.api.http.post(url, formData).subscribe(() => {
+      this.loadDoeDocs(); 
+      event.target.value = null; // Reset
+      this.presentToast('Document ajouté au DOE !');
+    });
+  }
+
+  deleteDoc(id: number) {
+      this.api.http.delete(`${this.api.apiUrl}/documents/${id}`).subscribe(() => {
+        this.loadDoeDocs();
+        this.presentToast('Document supprimé.');
+      });
+  }
+
+  downloadFullDoe() {
+    const url = `${this.api.apiUrl}/chantiers/${this.chantierId}/doe`;
+    window.open(url, '_system');
   }
 
   // --- CONSTRUCTION LISTE DOCUMENTS ---
@@ -377,7 +444,6 @@ export class ChantierDetailsPage implements OnInit {
           name: 'email',
           type: 'email',
           placeholder: 'client@chantier.com',
-          // Astuce : On pré-remplit avec le nom du client si c'est une adresse mail
           value: this.chantier?.client?.includes('@') ? this.chantier.client : ''
         }
       ],

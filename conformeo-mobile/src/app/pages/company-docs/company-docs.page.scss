@@ -1,0 +1,80 @@
+.alert-banner {
+  background: #ffebee; color: #c62828;
+  padding: 12px 15px; border-radius: 8px;
+  display: flex; align-items: center; gap: 10px; margin-bottom: 20px;
+  font-weight: 600; font-size: 14px;
+  border: 1px solid #ffcdd2;
+}
+
+.doc-list {
+    background: transparent;
+}
+
+.doc-item {
+  --background: white; 
+  margin-bottom: 12px; 
+  border-radius: 12px;
+  --padding-start: 10px;
+  --inner-padding-end: 10px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+}
+
+.doc-icon {
+  width: 45px; height: 45px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  margin-right: 15px; font-size: 22px;
+}
+
+.doc-icon.DUERP { background: #e3f2fd; color: #1565c0; }
+.doc-icon.ASSURANCE { background: #e8f5e9; color: #2e7d32; }
+.doc-icon.KBIS { background: #fff3e0; color: #ef6c00; }
+.doc-icon.AUTRE { background: #f5f5f5; color: #616161; }
+
+.expiration-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 8px; border-radius: 4px; font-size: 11px; margin-top: 5px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.5px;
+}
+.success-badge { background: #e8f5e9; color: #1b5e20; }
+.warning-badge { background: #fff8e1; color: #e65100; }
+.danger-badge { background: #ffebee; color: #b71c1c; }
+.neutral-badge { background: #f5f5f5; color: #757575; }
+
+.actions-wrapper {
+    display: flex;
+    align-items: center;
+}
+
+.empty-state {
+    text-align: center; margin-top: 60px; color: #888;
+    .empty-icon-circle {
+        width: 80px; height: 80px; background: #eee; border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        margin: 0 auto 20px; font-size: 32px; color: #bbb;
+    }
+}
+
+.input-item {
+    margin-bottom: 15px;
+    --border-radius: 8px;
+}
+
+.file-upload-box {
+  border: 2px dashed #ccc; border-radius: 12px; padding: 30px;
+  text-align: center; color: #666; margin-top: 20px; transition: 0.3s;
+  
+  &.has-file {
+      border-color: var(--ion-color-success);
+      background: #f1f8e9;
+      color: var(--ion-color-success);
+  }
+
+  .main-text { font-weight: 600; font-size: 16px; margin: 10px 0 5px; }
+  .sub-text { font-size: 12px; color: #999; margin: 0; }
+}
+
+.action-btn {
+    margin-top: 30px;
+    height: 50px;
+    font-weight: 600;
+}

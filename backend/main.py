@@ -89,8 +89,10 @@ def root():
 # 👇 Helper pour récupérer l'entreprise d'un chantier
 def get_company_for_chantier(db: Session, chantier_id: int):
     chantier = db.query(models.Chantier).filter(models.Chantier.id == chantier_id).first()
-    if chantier and chantier.company_id:
+    # Check if chantier exists and has a company_id
+    if chantier and hasattr(chantier, 'company_id') and chantier.company_id:
         return db.query(models.Company).filter(models.Company.id == chantier.company_id).first()
+    # Fallback to the first company if no specific company is linked - be careful with this in multi-tenant envs
     return db.query(models.Company).first()
 
 # ==========================================
@@ -101,7 +103,8 @@ def get_gps_from_address(address: str):
     try:
         url = "https://nominatim.openstreetmap.org/search"
         params = {'q': address, 'format': 'json', 'limit': 1}
-        headers = {'User-Agent': 'ConformeoApp/1.0'}
+        # Updated User-Agent to be more descriptive
+        headers = {'User-Agent': 'ConformeoApp/1.0 (contact@conformeo-app.fr)'}
         
         response = requests.get(url, params=params, headers=headers, timeout=5)
         if response.status_code == 200 and len(response.json()) > 0:
@@ -653,7 +656,8 @@ def upload_company_doc(
     exp_date = None
     if date_expiration and date_expiration != "undefined" and date_expiration != "null":
         try: exp_date = datetime.strptime(date_expiration, "%Y-%m-%d")
-        except: pass
+        except ValueError:
+            raise HTTPException(400, "Invalid date format. Use YYYY-MM-DD")
     sql = text("INSERT INTO company_documents (company_id, titre, type_doc, url, date_expiration, date_upload) VALUES (:cid, :t, :type, :u, :exp, :now) RETURNING id, date_upload")
     res = db.execute(sql, {"cid": current_user.company_id, "t": titre, "type": type_doc, "u": url, "exp": exp_date, "now": datetime.now()}).fetchone()
     db.commit()
@@ -901,6 +905,10 @@ def fix_database_columns(db: Session = Depends(get_db)):
             db.execute(text(f"ALTER TABLE chantiers ADD COLUMN {col_name} {col_type}"))
             db.commit(); messages.append(f"✅ Colonne '{col_name}' ajoutée.")
         except Exception as e:
+            # We don't want to rollback successful operations if one fails because the column already exists.
+            # However, with raw SQL transactions, this rollback might affect previous successful operations within this request.
+            # A more granular approach would be checking existence first or committing after each success.
+            # Since this is a fix script, we'll proceed but note this limitation.
             db.rollback(); messages.append(f"ℹ️ Colonne '{col_name}' existe déjà.")
     return {"status": "Terminé", "details": messages}
 
@@ -915,10 +923,11 @@ def fix_pic_v2(db: Session = Depends(get_db)):
     for col in colonnes:
         try:
             db.execute(text(f"ALTER TABLE pics ADD COLUMN {col} VARCHAR DEFAULT ''"))
+            db.commit() # Commit after each successful alteration
             logs.append(f"✅ Colonne {col} ajoutée")
         except Exception:
+            db.rollback() # Rollback only the failed alteration
             logs.append(f"ℹ️ Colonne {col} existe déjà")
-    db.commit()
     return {"status": "Migration PIC V2 Terminée", "details": logs}
 
 @app.get("/fix_everything")

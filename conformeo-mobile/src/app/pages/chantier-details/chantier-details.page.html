@@ -27,184 +27,309 @@
     </div>
   </div>
 
+  <div style="background: white; padding: 10px 10px 0;">
+    <ion-segment [(ngModel)]="segment" mode="ios">
+      <ion-segment-button value="suivi">
+        <ion-label>Suivi Chantier</ion-label>
+      </ion-segment-button>
+      <ion-segment-button value="doe">
+        <ion-label>DOE & Clôture</ion-label>
+      </ion-segment-button>
+    </ion-segment>
+  </div>
+
   <div class="body-container">
     
-    <div class="info-card">
-      <div class="location-row" (click)="openItinerary()">
-        <ion-icon name="location" color="primary"></ion-icon>
-        <span>{{ chantier?.adresse }}</span>
-        <ion-icon name="navigate" color="medium" style="margin-left: auto; font-size: 18px;"></ion-icon>
-      </div>
+    <div *ngIf="segment === 'suivi'">
 
-      <div class="info-grid">
-        <div class="grid-item">
-          <label>Début</label>
-          <p>{{ chantier?.date_debut | date:'dd/MM/yy' }}</p>
+      <div class="info-card">
+        <div class="location-row" (click)="openItinerary()">
+          <ion-icon name="location" color="primary"></ion-icon>
+          <span>{{ chantier?.adresse }}</span>
+          <ion-icon name="navigate" color="medium" style="margin-left: auto; font-size: 18px;"></ion-icon>
         </div>
-        <div class="grid-item">
-          <label>Fin</label>
-          <p>{{ chantier?.date_fin | date:'dd/MM/yy' }}</p>
-        </div>
-        
-        <div class="grid-item" (click)="toggleStatus()" style="cursor: pointer;">
-          <label>Statut (Modifier)</label> 
-          <div style="display: flex; align-items: center; gap: 5px;">
-            <div class="status-dot" [class.active]="chantier?.est_actif"></div>
-            <p [style.color]="chantier?.est_actif ? '#2dd36f' : '#999'" style="font-weight: bold; margin: 0;">
-              {{ chantier?.est_actif ? 'En cours' : 'Terminé' }}
-            </p>
-            <ion-icon name="create-outline" style="font-size: 12px; color: #ccc;"></ion-icon>
+
+        <div class="info-grid">
+          <div class="grid-item">
+            <label>Début</label>
+            <p>{{ chantier?.date_debut | date:'dd/MM/yy' }}</p>
           </div>
-        </div>
-      </div>
-      
-      <div class="actions-row">
-        
-        <div class="action-btn" (click)="downloadPdf()">
-          <div class="icon-circle"><ion-icon name="document-text"></ion-icon></div>
-          <span>PDF</span>
-        </div>
-
-        <div class="action-btn" (click)="sendJournal()">
-          <div class="icon-circle" style="background: #e0f2fe; color: #0284c7;">
-            <ion-icon name="mail"></ion-icon>
+          <div class="grid-item">
+            <label>Fin</label>
+            <p>{{ chantier?.date_fin | date:'dd/MM/yy' }}</p>
           </div>
-          <span>Envoyer</span>
-        </div>
-
-        <div class="action-btn mobile-only-action" [routerLink]="['/qhse-form', chantierId]">
-          <div class="icon-circle" style="color: #2dd36f;"><ion-icon name="checkmark-done-circle-outline"></ion-icon></div>
-          <span>Audit</span>
-        </div>
-
-        <div class="action-btn" (click)="openPIC()">
-          <div class="icon-circle" style="color: #9c27b0;"><ion-icon name="map-outline"></ion-icon></div>
-          <span>PIC</span>
-        </div>
-
-        <div class="action-btn mobile-only-action" 
-             *ngIf="chantier?.soumis_sps" 
-             [routerLink]="['/ppsps-form', chantierId]">
-          <div class="icon-circle" style="color: #ffc409; background: #fffbf0;">
-            <ion-icon name="shield-checkmark-outline"></ion-icon>
-          </div>
-          <span>PPSPS</span>
-        </div>
-
-        <div class="action-btn mobile-only-action" 
-             *ngIf="!chantier?.soumis_sps" 
-             [routerLink]="['/pdp-form', chantierId]">
-          <div class="icon-circle" style="color: #5260ff; background: #f0f4ff;">
-            <ion-icon name="document-lock-outline"></ion-icon>
-          </div>
-          <span>PdP</span>
-        </div>
-
-        <div class="action-btn" (click)="openSignature()">
-          <div class="icon-circle"><ion-icon name="create-outline"></ion-icon></div>
-          <span>Signer</span>
-        </div>
-      </div>
-    </div>
-    
-    <div style="margin-top: 20px;">
-      <h3 class="section-title">Matériel sur place ({{ materielsSurSite.length }})</h3>
-      
-      <div class="horizontal-scroll" *ngIf="materielsSurSite.length > 0">
-        
-        <div class="materiel-card" *ngFor="let m of materielsSurSite">
-          <div class="mat-img-container">
-            <img 
-              [src]="m.image_url || 'assets/no-image.png'" 
-              alt="Matériel" 
-              onerror="this.src='assets/no-image.png'"
-            />
-          </div>
-          <div class="mat-info">
-            <h4>{{ m.nom }}</h4>
-            <p>{{ m.reference }}</p>
-            
-            <ion-badge [color]="m.etat === 'Bon' ? 'success' : (m.etat === 'Panne' ? 'dark' : 'warning')">
-              {{ m.etat || 'Inconnu' }}
-            </ion-badge>
-          </div>
-        </div>
-
-      </div>
-
-      <div *ngIf="materielsSurSite.length === 0" style="text-align: center; padding: 20px; background: #f8fafc; border-radius: 12px; border: 1px dashed #cbd5e1; color: #94a3b8;">
-        <ion-icon name="hammer-outline" style="font-size: 24px; margin-bottom: 5px;"></ion-icon>
-        <p style="margin: 0; font-size: 13px;">Aucun matériel affecté.</p>
-      </div>
-    </div>
-    
-    <div style="margin: 20px 0;">
-      <h3 class="section-title">Documents</h3>
-      <ion-card style="border-radius: 12px; margin: 0; box-shadow: 0 4px 10px rgba(0,0,0,0.05);">
-        <ion-list lines="none">
-          <ion-item button *ngFor="let doc of documentsList" (click)="doc.action()">
-            <div slot="start" [style.background]="'var(--ion-color-' + doc.color + ')'" style="width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white;">
-              <ion-icon [name]="doc.icon"></ion-icon>
+          
+          <div class="grid-item" (click)="toggleStatus()" style="cursor: pointer;">
+            <label>Statut (Modifier)</label> 
+            <div style="display: flex; align-items: center; gap: 5px;">
+              <div class="status-dot" [class.active]="chantier?.est_actif"></div>
+              <p [style.color]="chantier?.est_actif ? '#2dd36f' : '#999'" style="font-weight: bold; margin: 0;">
+                {{ chantier?.est_actif ? 'En cours' : 'Terminé' }}
+              </p>
+              <ion-icon name="create-outline" style="font-size: 12px; color: #ccc;"></ion-icon>
             </div>
-            <ion-label>
-              <h2>{{ doc.titre }}</h2>
-              <p>Édité le {{ doc.date | date:'dd/MM/yyyy' }}</p>
-            </ion-label>
-            <ion-icon name="download-outline" slot="end" color="medium"></ion-icon>
-          </ion-item>
-        </ion-list>
-      </ion-card>
-    </div>
-
-    <h3 class="section-title">Journal de bord</h3>
-    <div class="feed-list">
-      <div *ngIf="rapports.length === 0" class="empty-state">
-        <p>Aucune observation. Commencez par prendre une photo !</p>
-      </div>
-
-      <div *ngFor="let rap of rapports" class="feed-card" (click)="openRapportDetails(rap)">
-        <div class="feed-image" 
-             [style.background-image]="'url(' + getFirstImage(rap) + ')'"
-             *ngIf="hasImage(rap)">
-        </div>
-        <div class="feed-content">
-          <div class="feed-header">
-            <span class="feed-date">{{ rap.date_creation | date:'dd MMM HH:mm' }}</span>
-            <span class="feed-badge" [class]="rap.niveau_urgence">{{ rap.niveau_urgence }}</span>
           </div>
-          <h4 class="feed-title">{{ rap.titre }}</h4>
-          <p class="feed-desc">{{ rap.description }}</p>
+        </div>
+        
+        <div class="actions-row">
+          
+          <div class="action-btn" (click)="downloadPdf()">
+            <div class="icon-circle"><ion-icon name="document-text"></ion-icon></div>
+            <span>PDF</span>
+          </div>
+
+          <div class="action-btn" (click)="sendJournal()">
+            <div class="icon-circle" style="background: #e0f2fe; color: #0284c7;">
+              <ion-icon name="mail"></ion-icon>
+            </div>
+            <span>Envoyer</span>
+          </div>
+
+          <div class="action-btn mobile-only-action" [routerLink]="['/qhse-form', chantierId]">
+            <div class="icon-circle" style="color: #2dd36f;"><ion-icon name="checkmark-done-circle-outline"></ion-icon></div>
+            <span>Audit</span>
+          </div>
+
+          <div class="action-btn" (click)="openPIC()">
+            <div class="icon-circle" style="color: #9c27b0;"><ion-icon name="map-outline"></ion-icon></div>
+            <span>PIC</span>
+          </div>
+
+          <div class="action-btn mobile-only-action" 
+               *ngIf="chantier?.soumis_sps" 
+               [routerLink]="['/ppsps-form', chantierId]">
+            <div class="icon-circle" style="color: #ffc409; background: #fffbf0;">
+              <ion-icon name="shield-checkmark-outline"></ion-icon>
+            </div>
+            <span>PPSPS</span>
+          </div>
+
+          <div class="action-btn mobile-only-action" 
+               *ngIf="!chantier?.soumis_sps" 
+               [routerLink]="['/pdp-form', chantierId]">
+            <div class="icon-circle" style="color: #5260ff; background: #f0f4ff;">
+              <ion-icon name="document-lock-outline"></ion-icon>
+            </div>
+            <span>PdP</span>
+          </div>
+
+          <div class="action-btn" (click)="openSignature()">
+            <div class="icon-circle"><ion-icon name="create-outline"></ion-icon></div>
+            <span>Signer</span>
+          </div>
         </div>
       </div>
+      
+      <div style="margin-top: 20px;">
+        <h3 class="section-title">Matériel sur place ({{ materielsSurSite.length }})</h3>
+        
+        <div class="horizontal-scroll" *ngIf="materielsSurSite.length > 0">
+          
+          <div class="materiel-card" *ngFor="let m of materielsSurSite">
+            <div class="mat-img-container">
+              <img 
+                [src]="m.image_url || 'assets/no-image.png'" 
+                alt="Matériel" 
+                onerror="this.src='assets/no-image.png'"
+              />
+            </div>
+            <div class="mat-info">
+              <h4>{{ m.nom }}</h4>
+              <p>{{ m.reference }}</p>
+              
+              <ion-badge [color]="m.etat === 'Bon' ? 'success' : (m.etat === 'Panne' ? 'dark' : 'warning')">
+                {{ m.etat || 'Inconnu' }}
+              </ion-badge>
+            </div>
+          </div>
+
+        </div>
+
+        <div *ngIf="materielsSurSite.length === 0" style="text-align: center; padding: 20px; background: #f8fafc; border-radius: 12px; border: 1px dashed #cbd5e1; color: #94a3b8;">
+          <ion-icon name="hammer-outline" style="font-size: 24px; margin-bottom: 5px;"></ion-icon>
+          <p style="margin: 0; font-size: 13px;">Aucun matériel affecté.</p>
+        </div>
+      </div>
+      
+      <div style="margin: 20px 0;">
+        <h3 class="section-title">Documents</h3>
+        <ion-card style="border-radius: 12px; margin: 0; box-shadow: 0 4px 10px rgba(0,0,0,0.05);">
+          <ion-list lines="none">
+            <ion-item button *ngFor="let doc of documentsList" (click)="doc.action()">
+              <div slot="start" [style.background]="'var(--ion-color-' + doc.color + ')'" style="width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white;">
+                <ion-icon [name]="doc.icon"></ion-icon>
+              </div>
+              <ion-label>
+                <h2>{{ doc.titre }}</h2>
+                <p>Édité le {{ doc.date | date:'dd/MM/yyyy' }}</p>
+              </ion-label>
+              <ion-icon name="download-outline" slot="end" color="medium"></ion-icon>
+            </ion-item>
+          </ion-list>
+        </ion-card>
+      </div>
+
+      <h3 class="section-title">Journal de bord</h3>
+      <div class="feed-list">
+        <div *ngIf="rapports.length === 0" class="empty-state">
+          <p>Aucune observation. Commencez par prendre une photo !</p>
+        </div>
+
+        <div *ngFor="let rap of rapports" class="feed-card" (click)="openRapportDetails(rap)">
+          <div class="feed-image" 
+               [style.background-image]="'url(' + getFirstImage(rap) + ')'"
+               *ngIf="hasImage(rap)">
+          </div>
+          <div class="feed-content">
+            <div class="feed-header">
+              <span class="feed-date">{{ rap.date_creation | date:'dd MMM HH:mm' }}</span>
+              <span class="feed-badge" [class]="rap.niveau_urgence">{{ rap.niveau_urgence }}</span>
+            </div>
+            <h4 class="feed-title">{{ rap.titre }}</h4>
+            <p class="feed-desc">{{ rap.description }}</p>
+          </div>
+        </div>
+      </div>
+
+      <ion-fab vertical="bottom" horizontal="end" slot="fixed" style="margin-bottom: calc(20px + var(--ion-safe-area-bottom, 0));">
+        <ion-fab-button (click)="takePhoto()" color="primary" style="margin-bottom: 10px;">
+          <ion-icon name="camera"></ion-icon>
+        </ion-fab-button>
+        <ion-fab-button color="success" [routerLink]="['/smart-scan', chantierId]">
+          <ion-icon name="scan-outline"></ion-icon>
+        </ion-fab-button>
+      </ion-fab>
+      
+      <div style="margin: 40px 20px 80px 20px;">
+        <ion-button expand="block" color="danger" fill="outline" (click)="deleteChantier()">
+          <ion-icon name="trash-outline" slot="start"></ion-icon>
+          Supprimer ce chantier
+        </ion-button>
+      </div>
+
+    </div>
+
+    <div *ngIf="segment === 'doe'" class="fade-in">
+      
+      <div class="doe-header" style="text-align: center; margin-bottom: 20px; color: #333;">
+        <h2 style="font-weight: 800; font-size: 22px; margin-bottom: 5px;">Constitution du DOE</h2>
+        <p style="color: #666; font-size: 14px; margin: 0;">Déposez les pièces obligatoires pour la réception.</p>
+      </div>
+
+      <ion-accordion-group expand="inset" class="doe-accordion">
+        
+        <ion-accordion value="PLANS">
+          <ion-item slot="header" color="light">
+            <ion-icon name="map" slot="start" color="primary"></ion-icon>
+            <ion-label>Plans Conformes (As-Built)</ion-label>
+            <ion-badge slot="end">{{ getCount('PLANS') }}</ion-badge>
+          </ion-item>
+          <div class="ion-padding" slot="content">
+            <ion-button expand="block" fill="outline" class="dashed-btn" (click)="uploadDoeDoc('PLANS')">
+              <ion-icon name="cloud-upload" slot="start"></ion-icon> Ajouter un Plan
+            </ion-button>
+            <ion-list>
+              <ion-item *ngFor="let d of getDocs('PLANS')">
+                <ion-label class="ion-text-wrap">{{ d.titre }}</ion-label>
+                <ion-button fill="clear" color="danger" (click)="deleteDoc(d.id)"><ion-icon name="trash"></ion-icon></ion-button>
+              </ion-item>
+            </ion-list>
+          </div>
+        </ion-accordion>
+
+        <ion-accordion value="NOTICES">
+          <ion-item slot="header" color="light">
+            <ion-icon name="book" slot="start" color="secondary"></ion-icon>
+            <ion-label>Notices Fonctionnement</ion-label>
+            <ion-badge slot="end" color="secondary">{{ getCount('NOTICES') }}</ion-badge>
+          </ion-item>
+          <div class="ion-padding" slot="content">
+            <ion-button expand="block" fill="outline" class="dashed-btn" (click)="uploadDoeDoc('NOTICES')">
+              <ion-icon name="cloud-upload" slot="start"></ion-icon> Ajouter Notice
+            </ion-button>
+            <ion-list>
+              <ion-item *ngFor="let d of getDocs('NOTICES')">
+                  <ion-label class="ion-text-wrap">{{ d.titre }}</ion-label>
+                  <ion-button fill="clear" color="danger" (click)="deleteDoc(d.id)"><ion-icon name="trash"></ion-icon></ion-button>
+              </ion-item>
+            </ion-list>
+          </div>
+        </ion-accordion>
+
+        <ion-accordion value="MAINTENANCE">
+          <ion-item slot="header" color="light">
+            <ion-icon name="construct" slot="start" color="warning"></ion-icon>
+            <ion-label>Maintenance & Entretien</ion-label>
+            <ion-badge slot="end" color="warning">{{ getCount('MAINTENANCE') }}</ion-badge>
+          </ion-item>
+          <div class="ion-padding" slot="content">
+            <ion-button expand="block" fill="outline" class="dashed-btn" (click)="uploadDoeDoc('MAINTENANCE')">
+               <ion-icon name="cloud-upload" slot="start"></ion-icon> Ajouter Consigne
+            </ion-button>
+            <ion-list>
+              <ion-item *ngFor="let d of getDocs('MAINTENANCE')">
+                  <ion-label class="ion-text-wrap">{{ d.titre }}</ion-label>
+                  <ion-button fill="clear" color="danger" (click)="deleteDoc(d.id)"><ion-icon name="trash"></ion-icon></ion-button>
+              </ion-item>
+            </ion-list>
+          </div>
+        </ion-accordion>
+
+        <ion-accordion value="GARANTIES">
+          <ion-item slot="header" color="light">
+            <ion-icon name="ribbon" slot="start" color="success"></ion-icon>
+            <ion-label>Fiches Tech & Garanties</ion-label>
+            <ion-badge slot="end" color="success">{{ getCount('GARANTIES') }}</ion-badge>
+          </ion-item>
+          <div class="ion-padding" slot="content">
+            <ion-button expand="block" fill="outline" class="dashed-btn" (click)="uploadDoeDoc('GARANTIES')">
+               <ion-icon name="cloud-upload" slot="start"></ion-icon> Ajouter Fiche/Garantie
+            </ion-button>
+            <ion-list>
+              <ion-item *ngFor="let d of getDocs('GARANTIES')">
+                  <ion-label class="ion-text-wrap">{{ d.titre }}</ion-label>
+                  <ion-button fill="clear" color="danger" (click)="deleteDoc(d.id)"><ion-icon name="trash"></ion-icon></ion-button>
+              </ion-item>
+            </ion-list>
+          </div>
+        </ion-accordion>
+
+        <ion-accordion value="DECHETS">
+          <ion-item slot="header" color="light">
+            <ion-icon name="trash" slot="start" color="medium"></ion-icon>
+            <ion-label>Déchets (BSD) & DIUO</ion-label>
+            <ion-badge slot="end" color="medium">{{ getCount('DECHETS') }}</ion-badge>
+          </ion-item>
+          <div class="ion-padding" slot="content">
+            <ion-button expand="block" fill="outline" class="dashed-btn" (click)="uploadDoeDoc('DECHETS')">
+               <ion-icon name="cloud-upload" slot="start"></ion-icon> Ajouter BSD/DIUO
+            </ion-button>
+            <ion-list>
+              <ion-item *ngFor="let d of getDocs('DECHETS')">
+                  <ion-label class="ion-text-wrap">{{ d.titre }}</ion-label>
+                  <ion-button fill="clear" color="danger" (click)="deleteDoc(d.id)"><ion-icon name="trash"></ion-icon></ion-button>
+              </ion-item>
+            </ion-list>
+          </div>
+        </ion-accordion>
+
+      </ion-accordion-group>
+
+      <div class="ion-padding ion-margin-top" style="margin-bottom: 50px;">
+        <ion-button expand="block" size="large" color="dark" (click)="downloadFullDoe()" class="glow-btn">
+          <ion-icon name="download" slot="start"></ion-icon>
+          Générer et Télécharger le DOE (.zip)
+        </ion-button>
+        <p style="text-align: center; color: #888; font-size: 12px; margin-top: 10px;">
+          <ion-icon name="information-circle"></ion-icon>
+          Inclut automatiquement le Journal de bord, PIC, PPSPS et tous les documents ci-dessus organisés par dossier.
+        </p>
+      </div>
+
     </div>
 
   </div>
 
-  <ion-fab vertical="bottom" horizontal="end" slot="fixed" style="margin-bottom: calc(20px + var(--ion-safe-area-bottom, 0));">
-    <ion-fab-button (click)="takePhoto()" color="primary" style="margin-bottom: 10px;">
-      <ion-icon name="camera"></ion-icon>
-    </ion-fab-button>
-    <ion-fab-button color="success" [routerLink]="['/smart-scan', chantierId]">
-      <ion-icon name="scan-outline"></ion-icon>
-    </ion-fab-button>
-  </ion-fab>
-
-  <div style="margin: 40px 0 80px 0; text-align: center;">
-      <ion-note>Fin de chantier ?</ion-note>
-      <ion-button expand="block" color="tertiary" (click)="downloadDOE()" style="margin-top: 10px;">
-        <ion-icon name="archive-outline" slot="start"></ion-icon>
-        Télécharger le DOE Complet
-      </ion-button>
-      <p style="font-size: 12px; color: #888; margin-top: 10px;">
-        Contient : Journal de bord, Photos, Audits, PPSPS.
-      </p>
-  </div>
-
-  <div style="margin: 40px 20px 80px 20px;">
-    <ion-button expand="block" color="danger" fill="outline" (click)="deleteChantier()">
-      <ion-icon name="trash-outline" slot="start"></ion-icon>
-      Supprimer ce chantier
-    </ion-button>
-  </div>
+  <input #doeFileInput type="file" (change)="onDoeFileSelected($event)" hidden accept=".pdf,.jpg,.png,.jpeg">
 
 </ion-content>
