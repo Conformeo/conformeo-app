@@ -9,7 +9,7 @@ import csv
 import codecs
 import time
 import json
-import pydantic
+import pydantic import BaseModel
 
 load_dotenv()
 
@@ -166,48 +166,54 @@ def update_user_me(user_up: UserUpdate, db: Session = Depends(get_db), current_u
 @app.get("/users/me", response_model=UserOut)
 def read_users_me(current_user: models.User = Depends(security.get_current_user)):
     return current_user
-    
+
 # ==========================================
-# GESTION ÉQUIPE - À INSÉRER APRES LES IMPORTS
-# ET AVANT LES AUTRES ROUTES
+# 2. LES MODÈLES (AVANT LES ROUTES !!)
 # ==========================================
 
-from typing import List, Optional  # Vérifiez que c'est importé en haut
-
-# 1. D'ABORD LES MODÈLES (Indispensable ici !)
+# Modèle pour inviter quelqu'un
 class UserInvite(BaseModel):
     email: str
     nom: str
     role: str = "Conducteur"
     password: str
 
-class UserOut(BaseModel):  # C'est celui-ci qui bloquait le serveur !
+# Modèle pour afficher un utilisateur (CELUI QUI BLOQUAIT)
+class UserOut(BaseModel):
     id: int
     email: str
     nom: Optional[str] = None
     role: str
+    
     class Config:
         from_attributes = True
 
-# 2. ENSUITE LES ROUTES
+
+# ==========================================
+# 3. LES ROUTES (MAINTENANT ÇA VA MARCHER)
+# ==========================================
+
+# Route pour récupérer son propre profil (Pour l'appli mobile)
+@app.get("/users/me", response_model=UserOut)
+def read_users_me(current_user: models.User = Depends(security.get_current_user)):
+    return current_user
+
+# Route pour voir l'équipe
 @app.get("/team", response_model=List[UserOut])
 def get_my_team(db: Session = Depends(get_db), current_user: models.User = Depends(security.get_current_user)):
-    # Retourne la liste de l'équipe
     if not current_user.company_id:
         return [current_user]
     return db.query(models.User).filter(models.User.company_id == current_user.company_id).all()
 
+# Route pour inviter
 @app.post("/team/invite")
 def invite_member(invite: UserInvite, db: Session = Depends(get_db), current_user: models.User = Depends(security.get_current_user)):
-    # Vérifie les droits
     if not current_user.company_id:
         raise HTTPException(status_code=400, detail="Vous devez avoir une entreprise.")
     
-    # Vérifie l'email unique
     if db.query(models.User).filter(models.User.email == invite.email).first():
         raise HTTPException(status_code=400, detail="Cet email est déjà utilisé.")
 
-    # Crée le membre
     hashed_pw = security.get_password_hash(invite.password)
     new_user = models.User(
         email=invite.email,
@@ -220,11 +226,15 @@ def invite_member(invite: UserInvite, db: Session = Depends(get_db), current_use
     db.commit()
     return {"message": "Membre ajouté"}
 
+# Route pour supprimer
 @app.delete("/team/{user_id}")
 def remove_member(user_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(security.get_current_user)):
     user = db.query(models.User).filter(models.User.id == user_id, models.User.company_id == current_user.company_id).first()
     if not user:
-        raise HTTPException(status_code=404, detail="Utilisateur introuvable")
+        raise HTTPException(status_code=404, detail="Introuvable")
+    if user.id == current_user.id:
+        raise HTTPException(status_code=400, detail="Impossible de se supprimer soi-même")
+        
     db.delete(user)
     db.commit()
     return {"message": "Supprimé"}
