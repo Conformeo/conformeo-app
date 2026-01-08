@@ -35,6 +35,28 @@ class User(Base):
     company_id = Column(Integer, ForeignKey("companies.id"), nullable=True)
     company = relationship("Company", back_populates="users")
 
+# Modèle pour inviter un membre (Validation des données reçues)
+class UserInvite(BaseModel):
+    email: str
+    nom: str
+    role: str = "Conducteur"
+    password: str
+
+# Modèle pour envoyer les infos utilisateur (Validation de la réponse)
+class UserOut(BaseModel):
+    id: int
+    email: str
+    nom: Optional[str] = None # 'Optional' nécessite : from typing import Optional
+    role: str
+    
+    class Config:
+        from_attributes = True
+
+class UserUpdate(pydantic.BaseModel):
+    email: Optional[str] = None
+    password: Optional[str] = None
+    
+
 # ==========================
 # 2. CHANTIERS
 # ==========================
@@ -221,3 +243,38 @@ class PIC(Base):
 
 # N'oubliez pas d'ajouter la relation inverse dans la classe Chantier :
 # pic = relationship("PIC", uselist=False, back_populates="chantier")
+class PicSchema(BaseModel):
+    acces: str = ""
+    clotures: str = ""
+    base_vie: str = ""
+    stockage: str = ""
+    dechets: str = ""
+    levage: str = ""
+    reseaux: str = ""
+    circulations: str = ""
+    signalisation: str = ""
+    
+    # 🎨 Données pour le dessin
+    background_url: Optional[str] = None
+    final_url: Optional[str] = None
+    elements_data: Optional[list] = None
+
+class DocExterneOut(pydantic.BaseModel):
+    id: int
+    titre: str
+    categorie: str
+    url: str
+    date_ajout: datetime
+    class Config: from_attributes = True
+
+class CompanyDocOut(pydantic.BaseModel):
+    id: int
+    titre: str
+    type_doc: str
+    url: str
+    date_expiration: Optional[datetime]
+    date_upload: datetime
+    class Config: from_attributes = True
+
+class EmailSchema(BaseModel):
+    email: List[EmailStr]

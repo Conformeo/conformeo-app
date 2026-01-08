@@ -145,10 +145,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     token = security.create_access_token(data={"sub": user.email, "role": user.role})
     return {"access_token": token, "token_type": "bearer"}
 
-class UserUpdate(pydantic.BaseModel):
-    email: Optional[str] = None
-    password: Optional[str] = None
-    
+
 @app.put("/users/me", response_model=schemas.UserOut)
 def update_user_me(user_up: UserUpdate, db: Session = Depends(get_db), current_user: models.User = Depends(security.get_current_user)):
     if user_up.email and user_up.email != current_user.email:
@@ -525,21 +522,7 @@ def download_ppsps_pdf(pid: int, db: Session = Depends(get_db)):
 # 6. NOTICE PIC (AVEC DESSIN & 9 CHAMPS)
 # ==========================================
 
-class PicSchema(BaseModel):
-    acces: str = ""
-    clotures: str = ""
-    base_vie: str = ""
-    stockage: str = ""
-    dechets: str = ""
-    levage: str = ""
-    reseaux: str = ""
-    circulations: str = ""
-    signalisation: str = ""
-    
-    # 🎨 Données pour le dessin
-    background_url: Optional[str] = None
-    final_url: Optional[str] = None
-    elements_data: Optional[list] = None
+
 
 @app.get("/chantiers/{cid}/pic")
 def get_pic(cid: int, db: Session = Depends(get_db)):
@@ -688,13 +671,7 @@ def migrate_docs_ext(db: Session = Depends(get_db)):
         return {"msg": "Table Documents Externes créée !"}
     except Exception as e: return {"error": str(e)}
 
-class DocExterneOut(pydantic.BaseModel):
-    id: int
-    titre: str
-    categorie: str
-    url: str
-    date_ajout: datetime
-    class Config: from_attributes = True
+
 
 @app.post("/chantiers/{cid}/documents", response_model=DocExterneOut)
 def upload_external_doc(cid: int, titre: str, categorie: str, file: UploadFile = File(...), db: Session = Depends(get_db)):
@@ -740,14 +717,7 @@ def migrate_company_docs(db: Session = Depends(get_db)):
         return {"msg": "Table Documents Entreprise créée ! 📂"}
     except Exception as e: return {"error": str(e)}
 
-class CompanyDocOut(pydantic.BaseModel):
-    id: int
-    titre: str
-    type_doc: str
-    url: str
-    date_expiration: Optional[datetime]
-    date_upload: datetime
-    class Config: from_attributes = True
+
 
 @app.post("/companies/me/documents", response_model=CompanyDocOut)
 def upload_company_doc(
@@ -837,8 +807,7 @@ def download_pdp_pdf(pid: int, db: Session = Depends(get_db)):
 # 10. ENVOI EMAIL
 # ==========================================
 
-class EmailSchema(BaseModel):
-    email: List[EmailStr]
+
 
 @app.post("/plans-prevention/{pid}/send-email")
 async def send_pdp_email(pid: int, email_dest: str, db: Session = Depends(get_db)):
