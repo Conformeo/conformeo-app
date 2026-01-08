@@ -167,30 +167,9 @@ def update_user_me(user_up: UserUpdate, db: Session = Depends(get_db), current_u
 def read_users_me(current_user: models.User = Depends(security.get_current_user)):
     return current_user
 
-# ==========================================
-# 2. LES MODÈLES (AVANT LES ROUTES !!)
-# ==========================================
-
-# Modèle pour inviter quelqu'un
-class UserInvite(BaseModel):
-    email: str
-    nom: str
-    role: str = "Conducteur"
-    password: str
-
-# Modèle pour afficher un utilisateur (CELUI QUI BLOQUAIT)
-class UserOut(BaseModel):
-    id: int
-    email: str
-    nom: Optional[str] = None
-    role: str
-    
-    class Config:
-        from_attributes = True
-
 
 # ==========================================
-# 3. LES ROUTES (MAINTENANT ÇA VA MARCHER)
+# 2. LES ROUTES
 # ==========================================
 
 # Route pour récupérer son propre profil (Pour l'appli mobile)
