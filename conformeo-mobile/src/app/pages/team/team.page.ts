@@ -1,14 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { IonicModule } from '@ionic/angular'; 
-import { 
-  IonHeader, IonToolbar, IonTitle, IonButtons, IonMenuButton, IonContent, 
-  IonList, IonItem, IonLabel, IonNote, IonFab, IonFabButton, IonIcon, 
-  IonBadge, IonAvatar, AlertController, ToastController, LoadingController,
-  IonItemSliding, IonItemOptions, IonItemOption, IonModal, IonSelect, IonSelectOption,
-  IonInput 
-} from '@ionic/angular/standalone';
+import { IonicModule, AlertController, ToastController, LoadingController } from '@ionic/angular'; 
 import { addIcons } from 'ionicons';
 import { add, person, shieldCheckmark, trash, personAdd, mail, key, business } from 'ionicons/icons';
 import { ApiService } from '../../services/api';
@@ -18,20 +11,13 @@ import { ApiService } from '../../services/api';
   templateUrl: './team.page.html',
   styleUrls: ['./team.page.scss'],
   standalone: true,
-  imports: [
-    CommonModule, FormsModule, IonicModule,
-    IonHeader, IonToolbar, IonTitle, IonButtons, IonMenuButton, IonContent,
-    IonList, IonItem, IonLabel, IonNote, IonFab, IonFabButton, IonIcon,
-    IonBadge, IonAvatar, IonItemSliding, IonItemOptions, IonItemOption,
-    IonModal, IonSelect, IonSelectOption, IonInput
-  ]
+  imports: [CommonModule, FormsModule, IonicModule]
 })
 export class TeamPage implements OnInit {
 
   users: any[] = []; 
   currentUserEmail: string = '';
   
-  // Pour la Modale d'ajout
   isModalOpen = false;
   newUser = { nom: '', email: '', password: '', role: 'Conducteur' };
 
@@ -53,14 +39,14 @@ export class TeamPage implements OnInit {
   }
 
   loadTeam() {
-    this.api.http.get<any[]>(`${this.api.apiUrl}/team`).subscribe(data => {
-      this.users = data;
+    // 👇 UTILISATION DE LA MÉTHODE SÉCURISÉE DU SERVICE
+    this.api.getTeam().subscribe({
+      next: (data) => this.users = data,
+      error: (err) => console.error("Erreur chargement équipe", err)
     });
   }
 
-  // --- 1. DEMANDE DE CONFIRMATION ---
   async confirmSave() {
-    // Validation basique
     if (!this.newUser.email || !this.newUser.password || !this.newUser.nom) {
       this.presentToast('Veuillez remplir tous les champs', 'warning');
       return;
@@ -68,64 +54,50 @@ export class TeamPage implements OnInit {
 
     const alert = await this.alertCtrl.create({
       header: 'Enregistrer le membre',
-      message: 'Souhaitez-vous envoyer une notification d\'invitation à cette personne ?',
+      message: 'Souhaitez-vous envoyer une notification d\'invitation ?',
       buttons: [
-        {
-          text: 'Annuler',
-          role: 'cancel'
-        },
-        {
-          text: 'Non, juste enregistrer',
-          handler: () => this.processSave(false) // false = on n'envoie pas d'invit (simulation)
-        },
-        {
-          text: 'Oui, envoyer',
-          handler: () => this.processSave(true) // true = on confirme l'envoi
-        }
+        { text: 'Annuler', role: 'cancel' },
+        { text: 'Non, juste enregistrer', handler: () => this.processSave(false) },
+        { text: 'Oui, envoyer', handler: () => this.processSave(true) }
       ]
     });
     await alert.present();
   }
 
-  // --- 2. EXECUTION API ---
   async processSave(sendInvite: boolean) {
     const load = await this.loadingCtrl.create({ message: 'Création en cours...' });
     await load.present();
 
-    this.api.http.post(`${this.api.apiUrl}/team/invite`, this.newUser).subscribe({
+    // 👇 APPEL SÉCURISÉ
+    this.api.inviteMember(this.newUser).subscribe({
       next: () => {
         load.dismiss();
-        
-        // Feedback visuel adapté au choix
-        if (sendInvite) {
-          this.presentToast('Membre créé et invitation envoyée ! 📩', 'success');
-        } else {
-          this.presentToast('Membre enregistré avec succès. ✅', 'medium');
-        }
-
+        this.presentToast(sendInvite ? 'Invité et notifié ! 📩' : 'Enregistré avec succès. ✅', 'success');
         this.isModalOpen = false;
-        this.newUser = { nom: '', email: '', password: '', role: 'Conducteur' }; // Reset
-        this.loadTeam(); // Rafraîchir la liste
+        this.newUser = { nom: '', email: '', password: '', role: 'Conducteur' };
+        this.loadTeam();
       },
       error: (err) => {
         load.dismiss();
-        this.presentToast(err.error.detail || 'Erreur lors de l\'ajout', 'danger');
+        // Gestion propre de l'erreur (Email déjà pris, etc.)
+        const msg = err.error?.detail || 'Erreur lors de l\'ajout';
+        this.presentToast(msg, 'danger');
       }
     });
   }
 
-  // --- SUPPRIMER UN MEMBRE ---
   async deleteUser(user: any) {
     const alert = await this.alertCtrl.create({
       header: 'Supprimer ?',
-      message: `Voulez-vous retirer ${user.nom || user.email} de l'équipe ?`,
+      message: `Retirer ${user.nom || user.email} de l'équipe ?`,
       buttons: [
         { text: 'Annuler', role: 'cancel' },
         { 
           text: 'Supprimer', 
           role: 'destructive',
           handler: () => {
-            this.api.http.delete(`${this.api.apiUrl}/team/${user.id}`).subscribe({
+            // 👇 APPEL SÉCURISÉ
+            this.api.deleteMember(user.id).subscribe({
               next: () => {
                 this.users = this.users.filter(u => u.id !== user.id);
                 this.presentToast('Membre supprimé', 'dark');
@@ -139,7 +111,6 @@ export class TeamPage implements OnInit {
     await alert.present();
   }
 
-  // Helpers
   getInitials(user: any) {
     const name = user.nom || user.email;
     return name ? name.charAt(0).toUpperCase() : '?';

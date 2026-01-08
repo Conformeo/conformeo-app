@@ -486,12 +486,30 @@ export class ApiService {
     return this.http.get<any>(`${this.apiUrl}/dashboard/stats`, this.getOptions());
   }
   
-  getTeam(): Observable<User[]> {
-    return this.http.get<User[]>(`${this.apiUrl}/team`, this.getOptions());
-  }
-  
   addTeamMember(user: any): Observable<User> {
     return this.http.post<User>(`${this.apiUrl}/team`, user, this.getOptions());
+  }
+
+  // --- GESTION ÉQUIPE (Avec sécurité) ---
+
+  getTeam() {
+    return this.http.get<any[]>(`${this.apiUrl}/team`, this.getHeaders());
+  }
+
+  inviteMember(data: any) {
+    return this.http.post(`${this.apiUrl}/team/invite`, data, this.getHeaders());
+  }
+
+  deleteMember(userId: number) {
+    return this.http.delete(`${this.apiUrl}/team/${userId}`, this.getHeaders());
+  }
+
+  // Petit helper pour récupérer le token stocké
+  private getHeaders() {
+    const token = localStorage.getItem('token');
+    return {
+      headers: { 'Authorization': `Bearer ${token}` }
+    };
   }
   
   // 👇 AJOUT DE GETOPTIONS() ICI AUSSI
