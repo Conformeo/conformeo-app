@@ -163,68 +163,67 @@ def update_user_me(user_up: UserUpdate, db: Session = Depends(get_db), current_u
     db.refresh(current_user)
     return current_user
 
-# --- GESTION ÉQUIPE (TEAM) ---
-class UserOut(BaseModel):
-    id: int
-    email: str
-    nom: str | None = None
-    role: str
-    # company_id: int | None = None # Optionnel si vous voulez renvoyer l'ID entreprise
+# ==========================================
+# GESTION ÉQUIPE - À INSÉRER APRES LES IMPORTS
+# ET AVANT LES AUTRES ROUTES
+# ==========================================
 
-    class Config:
-        from_attributes = True # Indispensable pour lire les objets SQLAlchemy
+from typing import List, Optional  # Vérifiez que c'est importé en haut
 
+# 1. D'ABORD LES MODÈLES (Indispensable ici !)
 class UserInvite(BaseModel):
     email: str
     nom: str
-    role: str = "Conducteur" # 'Admin', 'Conducteur', 'Chef'
-    password: str # Pour faire simple en V1
+    role: str = "Conducteur"
+    password: str
 
+class UserOut(BaseModel):  # C'est celui-ci qui bloquait le serveur !
+    id: int
+    email: str
+    nom: Optional[str] = None
+    role: str
+    class Config:
+        from_attributes = True
+
+# 2. ENSUITE LES ROUTES
 @app.get("/team", response_model=List[UserOut])
 def get_my_team(db: Session = Depends(get_db), current_user: models.User = Depends(security.get_current_user)):
-    # Retourne tous les utilisateurs de la même entreprise
+    # Retourne la liste de l'équipe
     if not current_user.company_id:
-        return [current_user] # Si pas d'entreprise, retourne juste soi-même
-    
-    users = db.query(models.User).filter(models.User.company_id == current_user.company_id).all()
-    return users
+        return [current_user]
+    return db.query(models.User).filter(models.User.company_id == current_user.company_id).all()
 
 @app.post("/team/invite")
 def invite_member(invite: UserInvite, db: Session = Depends(get_db), current_user: models.User = Depends(security.get_current_user)):
-    # 1. Vérif droits
+    # Vérifie les droits
     if not current_user.company_id:
-        raise HTTPException(400, "Vous devez avoir une entreprise pour inviter.")
+        raise HTTPException(status_code=400, detail="Vous devez avoir une entreprise.")
     
-    # 2. Vérif email unique
+    # Vérifie l'email unique
     if db.query(models.User).filter(models.User.email == invite.email).first():
-        raise HTTPException(400, "Cet email est déjà utilisé.")
+        raise HTTPException(status_code=400, detail="Cet email est déjà utilisé.")
 
-    # 3. Création membre
+    # Crée le membre
     hashed_pw = security.get_password_hash(invite.password)
     new_user = models.User(
         email=invite.email,
         nom=invite.nom,
         hashed_password=hashed_pw,
-        company_id=current_user.company_id, # Rejoint l'entreprise de l'invitant
+        company_id=current_user.company_id,
         role=invite.role
     )
     db.add(new_user)
     db.commit()
-    db.refresh(new_user)
-    return {"message": f"{invite.nom} a rejoint l'équipe !"}
+    return {"message": "Membre ajouté"}
 
 @app.delete("/team/{user_id}")
 def remove_member(user_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(security.get_current_user)):
     user = db.query(models.User).filter(models.User.id == user_id, models.User.company_id == current_user.company_id).first()
     if not user:
-        raise HTTPException(404, "Utilisateur introuvable")
-    
-    if user.id == current_user.id:
-        raise HTTPException(400, "Vous ne pouvez pas vous supprimer vous-même.")
-
+        raise HTTPException(status_code=404, detail="Utilisateur introuvable")
     db.delete(user)
     db.commit()
-    return {"message": "Membre supprimé."}
+    return {"message": "Supprimé"}
 
 # ==========================================
 # 2. DASHBOARD
