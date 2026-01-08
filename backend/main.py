@@ -163,6 +163,59 @@ def update_user_me(user_up: UserUpdate, db: Session = Depends(get_db), current_u
     db.refresh(current_user)
     return current_user
 
+# --- GESTION ÉQUIPE (TEAM) ---
+
+class UserInvite(BaseModel):
+    email: str
+    nom: str
+    role: str = "Conducteur" # 'Admin', 'Conducteur', 'Chef'
+    password: str # Pour faire simple en V1
+
+@app.get("/team", response_model=List[UserOut])
+def get_my_team(db: Session = Depends(get_db), current_user: models.User = Depends(security.get_current_user)):
+    # Retourne tous les utilisateurs de la même entreprise
+    if not current_user.company_id:
+        return [current_user] # Si pas d'entreprise, retourne juste soi-même
+    
+    users = db.query(models.User).filter(models.User.company_id == current_user.company_id).all()
+    return users
+
+@app.post("/team/invite")
+def invite_member(invite: UserInvite, db: Session = Depends(get_db), current_user: models.User = Depends(security.get_current_user)):
+    # 1. Vérif droits
+    if not current_user.company_id:
+        raise HTTPException(400, "Vous devez avoir une entreprise pour inviter.")
+    
+    # 2. Vérif email unique
+    if db.query(models.User).filter(models.User.email == invite.email).first():
+        raise HTTPException(400, "Cet email est déjà utilisé.")
+
+    # 3. Création membre
+    hashed_pw = security.get_password_hash(invite.password)
+    new_user = models.User(
+        email=invite.email,
+        nom=invite.nom,
+        hashed_password=hashed_pw,
+        company_id=current_user.company_id, # Rejoint l'entreprise de l'invitant
+        role=invite.role
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    return {"message": f"{invite.nom} a rejoint l'équipe !"}
+
+@app.delete("/team/{user_id}")
+def remove_member(user_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(security.get_current_user)):
+    user = db.query(models.User).filter(models.User.id == user_id, models.User.company_id == current_user.company_id).first()
+    if not user:
+        raise HTTPException(404, "Utilisateur introuvable")
+    
+    if user.id == current_user.id:
+        raise HTTPException(400, "Vous ne pouvez pas vous supprimer vous-même.")
+
+    db.delete(user)
+    db.commit()
+    return {"message": "Membre supprimé."}
 
 # ==========================================
 # 2. DASHBOARD
