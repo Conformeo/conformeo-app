@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, date
 import csv 
 import codecs
 import time
+import json
 import pydantic
 
 load_dotenv()
@@ -494,18 +495,51 @@ def get_pic(cid: int, db: Session = Depends(get_db)):
     return pic
 
 @app.post("/chantiers/{cid}/pic")
-def save_pic(cid: int, pic_data: PicSchema, db: Session = Depends(get_db)):
+def save_pic(cid: int, pic: PicSchema, db: Session = Depends(get_db)):
+    # 1. On cherche si un PIC existe déjà
     existing_pic = db.query(models.PIC).filter(models.PIC.chantier_id == cid).first()
     
+    # 2. PRÉPARATION DES DONNÉES (CORRECTION DU BUG 'dict')
+    # On transforme la liste d'objets en une simple chaîne de caractères JSON
+    elements_str = None
+    if pic.elements_data is not None:
+        if isinstance(pic.elements_data, list) or isinstance(pic.elements_data, dict):
+            elements_str = json.dumps(pic.elements_data) # <--- C'est ça qui résout le crash !
+        else:
+            elements_str = str(pic.elements_data)
+
     if existing_pic:
-        for key, value in pic_data.dict().items():
-            setattr(existing_pic, key, value)
+        # Mise à jour
+        existing_pic.background_url = pic.background_url
+        existing_pic.final_url = pic.final_url
+        existing_pic.elements_data = elements_str # On enregistre la version texte
+        # On met à jour les champs textes optionnels si présents
+        if pic.acces: existing_pic.acces = pic.acces
+        if pic.base_vie: existing_pic.base_vie = pic.base_vie
+        # ... (ajoutez les autres si besoin)
     else:
-        new_pic = models.PIC(**pic_data.dict(), chantier_id=cid)
+        # Création
+        new_pic = models.PIC(
+            chantier_id=cid,
+            background_url=pic.background_url,
+            final_url=pic.final_url,
+            elements_data=elements_str, # On enregistre la version texte
+            date_creation=datetime.now(),
+            # Champs textes
+            acces=pic.acces,
+            clotures=pic.clotures,
+            base_vie=pic.base_vie,
+            stockage=pic.stockage,
+            dechets=pic.dechets,
+            levage=pic.levage,
+            reseaux=pic.reseaux,
+            circulations=pic.circulations,
+            signalisation=pic.signalisation
+        )
         db.add(new_pic)
     
     db.commit()
-    return {"message": "PIC sauvegardé avec succès ! 🏗️"}
+    return {"message": "PIC sauvegardé avec succès !"}
 
 # ==========================================
 # 7. TELECHARGEMENT GLOBAL (DOE)

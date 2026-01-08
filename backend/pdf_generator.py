@@ -208,7 +208,7 @@ def generate_pdf(chantier, rapports, inspections, output_path, company=None):
     if inspections:
         check_space(4*cm)
         c.setFillColorRGB(*COLOR_PRIMARY); c.setFont(FONT_TITLE, 14)
-        c.drawString(margin, y, "2. CONTRÔLES QHSE")
+        c.drawString(margin, y, "2. INSPECTIONS")
         y -= 0.2*cm; c.setLineWidth(1); c.setStrokeColorRGB(*COLOR_PRIMARY)
         c.line(margin, y, width-margin, y)
         y -= 1 * cm
