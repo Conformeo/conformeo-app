@@ -204,7 +204,7 @@ def generate_pdf(chantier, rapports, inspections, output_path, company=None):
                 y -= (img_h + 0.5*cm)
             y -= 0.5*cm
 
-    # --- QHSE ---
+    # --- INSPECTIONS ---
     if inspections:
         check_space(4*cm)
         c.setFillColorRGB(*COLOR_PRIMARY); c.setFont(FONT_TITLE, 14)
