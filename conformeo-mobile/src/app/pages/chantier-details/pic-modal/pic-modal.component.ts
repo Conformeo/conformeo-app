@@ -329,53 +329,94 @@ export class PicModalComponent implements OnInit {
     }
   }
 
+  // --- MOTEUR DE DESSIN (Mise à jour pour gestion des calques) ---
+
   draw() {
     if (!this.ctx || !this.backgroundImg) return;
     const cw = parseInt(this.canvas.style.width);
     const ch = parseInt(this.canvas.style.height);
+    
+    // 1. Nettoyage
     this.ctx.clearRect(0, 0, cw, ch);
+    
+    // 2. Fond (Plan de masse)
     this.ctx.drawImage(this.backgroundImg, 0, 0, cw, ch);
     
+    // 3. CALQUE 1 : Les ZONES (Polygones)
+    // On dessine d'abord toutes les formes colorées pour qu'elles soient en dessous
     for (let el of this.elements) {
-      const isSelected = el.id === this.selectedId;
-
       if (el.type === 'polygon' && el.points) {
+        const isSelected = el.id === this.selectedId;
+
         this.ctx.beginPath();
         this.ctx.moveTo(el.points[0].x, el.points[0].y);
         for (let i = 1; i < el.points.length; i++) this.ctx.lineTo(el.points[i].x, el.points[i].y);
         this.ctx.closePath();
+        
+        // Couleur de remplissage
         this.ctx.fillStyle = el.color || 'rgba(255,0,0,0.5)';
         this.ctx.fill();
+        
+        // Bordure
         this.ctx.strokeStyle = isSelected ? 'white' : 'rgba(255,255,255,0.5)';
         this.ctx.lineWidth = isSelected ? 3 : 1;
         this.ctx.stroke();
 
+        // Poignées si sélectionné
         if (isSelected) {
            this.ctx.fillStyle = 'white';
            for (let p of el.points) {
-             this.ctx.beginPath(); this.ctx.arc(p.x, p.y, 6, 0, Math.PI * 2); this.ctx.fill(); this.ctx.stroke();
+             this.ctx.beginPath(); 
+             this.ctx.arc(p.x, p.y, 6, 0, Math.PI * 2); 
+             this.ctx.fill(); 
+             this.ctx.stroke();
            }
         }
       }
-      else if (el.type === 'icon' && el.x !== undefined && el.y !== undefined) {
+    }
+
+    // 4. CALQUE 2 : Les ICONES
+    // On dessine ensuite les icônes pour qu'elles apparaissent TOUJOURS au-dessus des zones
+    for (let el of this.elements) {
+      if (el.type === 'icon' && el.x !== undefined && el.y !== undefined) {
+        const isSelected = el.id === this.selectedId;
+
+        // Cercle de fond pour l'icône (si sélectionné)
         if (isSelected) {
-           this.ctx.beginPath(); this.ctx.arc(el.x!, el.y!, 25, 0, Math.PI*2);
-           this.ctx.fillStyle = 'rgba(255,255,255,0.4)'; this.ctx.fill();
-           this.ctx.lineWidth = 2; this.ctx.strokeStyle = 'white'; this.ctx.stroke();
+           this.ctx.beginPath(); 
+           this.ctx.arc(el.x!, el.y!, 25, 0, Math.PI*2);
+           this.ctx.fillStyle = 'rgba(255,255,255,0.4)'; 
+           this.ctx.fill();
+           this.ctx.lineWidth = 2; 
+           this.ctx.strokeStyle = 'white'; 
+           this.ctx.stroke();
         }
-        this.ctx.font = "35px Arial"; this.ctx.textAlign = "center"; this.ctx.textBaseline = "middle";
+
+        // Dessin de l'émoji
+        this.ctx.font = "35px Arial"; 
+        this.ctx.textAlign = "center"; 
+        this.ctx.textBaseline = "middle";
+        this.ctx.fillStyle = "black"; // Force la couleur de l'emoji si besoin
         this.ctx.fillText(el.icon || '?', el.x!, el.y!);
       }
     }
 
+    // 5. CALQUE 3 : Dessin en cours (Le tracé que l'utilisateur est en train de faire)
     if (this.mode === 'DRAWING' && this.currentPoints.length > 0) {
       this.ctx.beginPath();
       this.ctx.moveTo(this.currentPoints[0].x, this.currentPoints[0].y);
       for (let p of this.currentPoints) this.ctx.lineTo(p.x, p.y);
-      this.ctx.strokeStyle = this.drawingColor; this.ctx.lineWidth = 2; this.ctx.stroke();
+      
+      this.ctx.strokeStyle = this.drawingColor; 
+      this.ctx.lineWidth = 2; 
+      this.ctx.stroke();
+      
+      // Points guides
       this.ctx.fillStyle = 'white';
       for (let p of this.currentPoints) {
-        this.ctx.beginPath(); this.ctx.arc(p.x, p.y, 4, 0, Math.PI*2); this.ctx.fill();
+        this.ctx.beginPath(); 
+        this.ctx.arc(p.x, p.y, 4, 0, Math.PI*2); 
+        this.ctx.fill();
       }
     }
   }

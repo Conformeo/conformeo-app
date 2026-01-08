@@ -464,7 +464,7 @@ def download_ppsps_pdf(pid: int, db: Session = Depends(get_db)):
     return FileResponse(path, media_type='application/pdf')
 
 # ==========================================
-# 6. NOTICE PIC (NOUVEAU - V2 AVEC 9 CHAMPS)
+# 6. NOTICE PIC (AVEC DESSIN & 9 CHAMPS)
 # ==========================================
 
 class PicSchema(BaseModel):
@@ -478,7 +478,7 @@ class PicSchema(BaseModel):
     circulations: str = ""
     signalisation: str = ""
     
-    # 👇 AJOUTEZ CES 3 LIGNES OBLIGATOIREMENT
+    # 🎨 Données pour le dessin
     background_url: Optional[str] = None
     final_url: Optional[str] = None
     elements_data: Optional[list] = None
@@ -611,6 +611,8 @@ def delete_external_doc(did: int, db: Session = Depends(get_db)):
     db.commit()
     return {"status": "deleted"}
 
+# --- GED ENTREPRISE (DUERP / KBIS) ---
+
 @app.get("/migrate_company_docs")
 def migrate_company_docs(db: Session = Depends(get_db)):
     try:
@@ -649,7 +651,7 @@ def upload_company_doc(
         url = res.get("secure_url")
     except Exception as e: raise HTTPException(500, f"Erreur Upload: {e}")
     exp_date = None
-    if date_expiration:
+    if date_expiration and date_expiration != "undefined" and date_expiration != "null":
         try: exp_date = datetime.strptime(date_expiration, "%Y-%m-%d")
         except: pass
     sql = text("INSERT INTO company_documents (company_id, titre, type_doc, url, date_expiration, date_upload) VALUES (:cid, :t, :type, :u, :exp, :now) RETURNING id, date_upload")
@@ -922,7 +924,7 @@ def fix_pic_v2(db: Session = Depends(get_db)):
 @app.get("/fix_everything")
 def fix_everything(db: Session = Depends(get_db)):
     logs = []
-    # On ajoute la migration PIC ici aussi
+    # 1. MIGRATION TABLES & COLONNES
     corrections = [
         ("chantiers", "signature_url", "VARCHAR"),
         ("chantiers", "cover_url", "VARCHAR"),
@@ -930,15 +932,13 @@ def fix_everything(db: Session = Depends(get_db)):
         ("chantiers", "soumis_sps", "BOOLEAN DEFAULT FALSE"),
         ("plans_prevention", "signature_eu", "VARCHAR"), ("plans_prevention", "signature_ee", "VARCHAR"),
         # PIC V2
-        ("pics", "acces", "VARCHAR DEFAULT ''"),
-        ("pics", "clotures", "VARCHAR DEFAULT ''"),
-        ("pics", "base_vie", "VARCHAR DEFAULT ''"),
-        ("pics", "stockage", "VARCHAR DEFAULT ''"),
-        ("pics", "dechets", "VARCHAR DEFAULT ''"),
-        ("pics", "levage", "VARCHAR DEFAULT ''"),
-        ("pics", "reseaux", "VARCHAR DEFAULT ''"),
-        ("pics", "circulations", "VARCHAR DEFAULT ''"),
+        ("pics", "acces", "VARCHAR DEFAULT ''"), ("pics", "clotures", "VARCHAR DEFAULT ''"),
+        ("pics", "base_vie", "VARCHAR DEFAULT ''"), ("pics", "stockage", "VARCHAR DEFAULT ''"),
+        ("pics", "dechets", "VARCHAR DEFAULT ''"), ("pics", "levage", "VARCHAR DEFAULT ''"),
+        ("pics", "reseaux", "VARCHAR DEFAULT ''"), ("pics", "circulations", "VARCHAR DEFAULT ''"),
         ("pics", "signalisation", "VARCHAR DEFAULT ''"),
+        # PIC DESSIN
+        ("pics", "background_url", "VARCHAR"), ("pics", "final_url", "VARCHAR"), ("pics", "elements_data", "JSON")
     ]
     for table, col, type_col in corrections:
         try:
@@ -946,6 +946,25 @@ def fix_everything(db: Session = Depends(get_db)):
             db.commit(); logs.append(f"✅ {col} ajouté à {table}")
         except Exception:
             db.rollback(); logs.append(f"ℹ️ {col} existe déjà")
+
+    # 2. CREATION TABLE COMPANY_DOCUMENTS (GED)
+    try:
+        db.execute(text("""
+            CREATE TABLE IF NOT EXISTS company_documents (
+                id SERIAL PRIMARY KEY,
+                company_id INTEGER REFERENCES companies(id),
+                titre VARCHAR NOT NULL,
+                type_doc VARCHAR NOT NULL,
+                url VARCHAR NOT NULL,
+                date_expiration TIMESTAMP,
+                date_upload TIMESTAMP DEFAULT NOW()
+            )
+        """))
+        db.commit()
+        logs.append("✅ Table company_documents vérifiée")
+    except Exception as e:
+        logs.append(f"⚠️ Erreur company_documents: {str(e)}")
+
     return {"status": "Terminé", "details": logs}
 
 @app.get("/force_delete_all_chantiers")
