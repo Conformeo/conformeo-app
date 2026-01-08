@@ -28,6 +28,12 @@ class UserOut(UserBase):
     company_id: Optional[int] = None
     class Config:
         from_attributes = True
+        
+class UserUpdateAdmin(BaseModel):
+    nom: Optional[str] = None
+    email: Optional[str] = None
+    role: Optional[str] = None
+    password: Optional[str] = None # Pour reset le mot de passe
 
 class Token(BaseModel):
     access_token: str

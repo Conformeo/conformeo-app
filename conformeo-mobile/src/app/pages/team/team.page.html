@@ -18,6 +18,7 @@
   </div>
 
   <ion-list class="team-list">
+    
     <ion-item-sliding *ngFor="let u of users">
       
       <ion-item lines="full" [detail]="false">
@@ -32,12 +33,16 @@
           </h2>
           <p>{{ u.email }}</p>
           <p class="role-tag" [class.admin-text]="u.role === 'Admin'">
-            {{ u.role === 'Admin' ? '👑 Administrateur' : '👷 Conducteur' }}
+            {{ u.role === 'Admin' ? '👑 Administrateur' : '👷 ' + u.role }}
           </p>
         </ion-label>
       </ion-item>
 
       <ion-item-options side="end">
+        <ion-item-option color="primary" (click)="openEditModal(u)">
+          <ion-icon slot="icon-only" name="create"></ion-icon>
+        </ion-item-option>
+        
         <ion-item-option color="danger" (click)="deleteUser(u)" *ngIf="u.email !== currentUserEmail">
           <ion-icon slot="icon-only" name="trash"></ion-icon>
         </ion-item-option>
@@ -47,7 +52,7 @@
   </ion-list>
 
   <ion-fab vertical="bottom" horizontal="end" slot="fixed">
-    <ion-fab-button (click)="isModalOpen = true">
+    <ion-fab-button (click)="openAddModal()">
       <ion-icon name="add"></ion-icon>
     </ion-fab-button>
   </ion-fab>
@@ -56,7 +61,7 @@
     <ng-template>
       <ion-header>
         <ion-toolbar>
-          <ion-title>Inviter un membre</ion-title>
+          <ion-title>{{ isEditing ? 'Modifier le membre' : 'Inviter un membre' }}</ion-title>
           <ion-buttons slot="end"><ion-button (click)="isModalOpen = false">Fermer</ion-button></ion-buttons>
         </ion-toolbar>
       </ion-header>
@@ -65,25 +70,27 @@
         
         <ion-item fill="outline" class="mb-15">
           <ion-label position="floating">Nom Complet</ion-label>
-          <ion-input [(ngModel)]="newUser.nom" placeholder="Ex: Michel Durand"></ion-input>
+          <ion-input [(ngModel)]="userData.nom" placeholder="Ex: Michel Durand"></ion-input>
           <ion-icon name="person" slot="start"></ion-icon>
         </ion-item>
 
         <ion-item fill="outline" class="mb-15">
           <ion-label position="floating">Email Pro</ion-label>
-          <ion-input type="email" [(ngModel)]="newUser.email" placeholder="michel@btp.com"></ion-input>
+          <ion-input type="email" [(ngModel)]="userData.email" placeholder="michel@btp.com"></ion-input>
           <ion-icon name="mail" slot="start"></ion-icon>
         </ion-item>
 
         <ion-item fill="outline" class="mb-15">
-          <ion-label position="floating">Mot de passe provisoire</ion-label>
-          <ion-input [(ngModel)]="newUser.password" placeholder="123456"></ion-input>
+          <ion-label position="floating">
+            {{ isEditing ? 'Nouveau mot de passe (optionnel)' : 'Mot de passe provisoire' }}
+          </ion-label>
+          <ion-input [(ngModel)]="userData.password" placeholder="***"></ion-input>
           <ion-icon name="key" slot="start"></ion-icon>
         </ion-item>
 
         <ion-item fill="outline" class="mb-15">
           <ion-label>Rôle</ion-label>
-          <ion-select [(ngModel)]="newUser.role" interface="popover">
+          <ion-select [(ngModel)]="userData.role" interface="popover">
             <ion-select-option value="Conducteur">Conducteur de Travaux</ion-select-option>
             <ion-select-option value="Chef">Chef de Chantier</ion-select-option>
             <ion-select-option value="Admin">Administrateur</ion-select-option>
@@ -91,8 +98,8 @@
           <ion-icon name="business" slot="start"></ion-icon>
         </ion-item>
 
-        <ion-button expand="block" size="large" class="ion-margin-top" (click)="confirmSave()">
-          Enregistrer
+        <ion-button expand="block" size="large" class="ion-margin-top" (click)="saveUser()">
+          {{ isEditing ? 'Enregistrer les modifications' : 'Envoyer l\'invitation' }}
         </ion-button>
 
       </ion-content>

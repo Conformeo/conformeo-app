@@ -185,6 +185,38 @@ def remove_member(user_id: int, db: Session = Depends(get_db), current_user: mod
     db.commit()
     return {"message": "Supprimé"}
 
+@app.put("/team/{user_id}")
+def update_team_member(
+    user_id: int, 
+    user_up: schemas.UserUpdateAdmin, 
+    db: Session = Depends(get_db), 
+    current_user: models.User = Depends(security.get_current_user)
+):
+    # 1. Vérif Admin
+    if not current_user.company_id:
+        raise HTTPException(400, "Pas d'entreprise")
+    
+    # 2. Trouver le membre dans la MÊME entreprise
+    user_to_edit = db.query(models.User).filter(
+        models.User.id == user_id, 
+        models.User.company_id == current_user.company_id
+    ).first()
+    
+    if not user_to_edit:
+        raise HTTPException(404, "Utilisateur introuvable")
+
+    # 3. Mise à jour des champs
+    if user_up.nom: user_to_edit.nom = user_up.nom
+    if user_up.email: user_to_edit.email = user_up.email
+    if user_up.role: user_to_edit.role = user_up.role
+    
+    # 4. Reset mot de passe (optionnel)
+    if user_up.password and len(user_up.password) > 0:
+        user_to_edit.hashed_password = security.get_password_hash(user_up.password)
+
+    db.commit()
+    return {"message": "Profil mis à jour avec succès ✅"}
+
 # ==========================================
 # 3. DASHBOARD
 # ==========================================

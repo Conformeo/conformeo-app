@@ -132,6 +132,7 @@ export interface User {
   id: number;
   email: string;
   role: string;
+  nom?: string;
   company_id?: number;
 }
 
@@ -142,6 +143,8 @@ export interface Token { access_token: string; token_type: string; }
   providedIn: 'root'
 })
 export class ApiService {
+  
+  // 👇 MODIFIEZ CECI SI VOTRE URL A CHANGÉ
   public apiUrl = 'https://conformeo-api.onrender.com'; 
   
   public needsRefresh = false;
@@ -192,6 +195,7 @@ export class ApiService {
   }
 
   // Ajoute le Header "Authorization: Bearer ..."
+  // Cette méthode est utilisée par la majorité des fonctions
   private getOptions() {
     if (this.token) {
       return {
@@ -199,6 +203,13 @@ export class ApiService {
           'Authorization': `Bearer ${this.token}`
         })
       };
+    }
+    // Tentative de récupération synchrone si token est null (cas rare)
+    const storedToken = localStorage.getItem('token'); 
+    // Note: localStorage est moins sécurisé que Capacitor Preferences mais plus rapide pour du synchrone ici
+    // Idéalement, on charge tout au démarrage.
+    if (storedToken) {
+       return { headers: new HttpHeaders({ 'Authorization': `Bearer ${storedToken}` }) };
     }
     return {};
   }
@@ -314,6 +325,7 @@ export class ApiService {
   uploadChantierDoc(chantierId: number, file: File, titre: string, categorie: string): Observable<DocExterne> {
     const formData = new FormData();
     formData.append('file', file);
+    // Envoi des métadonnées en Query Params (simple et efficace avec FastAPI)
     const url = `${this.apiUrl}/chantiers/${chantierId}/documents?titre=${encodeURIComponent(titre)}&categorie=${encodeURIComponent(categorie)}`;
     return this.http.post<DocExterne>(url, formData, this.getOptions());
   }
@@ -340,7 +352,6 @@ export class ApiService {
     if (!this.offline.isOnline.value) throw new Error("Offline");
     const formData = new FormData();
     formData.append('file', blob, 'photo.jpg');
-    // Ajout de getOptions() ici par sécurité
     return this.http.post<{url: string}>(`${this.apiUrl}/upload`, formData, this.getOptions());
   }
 
@@ -437,11 +448,16 @@ export class ApiService {
     return this.http.get<any[]>(`${this.apiUrl}/chantiers/${id}/inspections`, this.getOptions());
   }
   
+  // PIC
   savePIC(doc: any): Observable<any> {
-    return this.http.post<any>(`${this.apiUrl}/pics`, doc, this.getOptions());
+    // Attention : l'URL dans le backend est /chantiers/{cid}/pic (POST)
+    // Assurez-vous que 'doc' contient chantier_id
+    if (!doc.chantier_id) throw new Error("Chantier ID manquant pour le PIC");
+    return this.http.post<any>(`${this.apiUrl}/chantiers/${doc.chantier_id}/pic`, doc, this.getOptions());
   }
-  getPIC(id: number): Observable<any> {
-    return this.http.get<any>(`${this.apiUrl}/chantiers/${id}/pic`, this.getOptions());
+  
+  getPIC(chantierId: number): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/chantiers/${chantierId}/pic`, this.getOptions());
   }
   
   signChantier(chantierId: number, signatureUrl: string): Observable<any> {
@@ -453,7 +469,7 @@ export class ApiService {
     window.open(url, '_system');
   }
 
-  // 👇 AJOUT DE GETOPTIONS() SUR CES MÉTHODES
+  // PLAN PREVENTION
   createPdp(data: any) {
     return this.http.post<PlanPrevention>(`${this.apiUrl}/plans-prevention`, data, this.getOptions());
   }
@@ -466,16 +482,16 @@ export class ApiService {
     return `${this.apiUrl}/plans-prevention/${pdpId}/pdf`;
   }
 
-  // ENVOI MAIL
-  // Envoyer le PdP par email
+  // ==========================================
+  // 📧 ENVOI EMAILS
+  // ==========================================
+
   sendPdpEmail(pdpId: number, email: string) {
-    // Note: l'API attend un paramètre de requête (query param) pour l'email
-    return this.http.post(`${this.apiUrl}/plans-prevention/${pdpId}/send-email?email_dest=${email}`, {});
+    return this.http.post(`${this.apiUrl}/plans-prevention/${pdpId}/send-email?email_dest=${email}`, {}, this.getOptions());
   }
 
-  // Envoyer le Journal par email
   sendJournalEmail(chantierId: number, email: string) {
-    return this.http.post(`${this.apiUrl}/chantiers/${chantierId}/send-email?email_dest=${email}`, {});
+    return this.http.post(`${this.apiUrl}/chantiers/${chantierId}/send-email?email_dest=${email}`, {}, this.getOptions());
   }
 
   // ==========================================
@@ -486,38 +502,35 @@ export class ApiService {
     return this.http.get<any>(`${this.apiUrl}/dashboard/stats`, this.getOptions());
   }
   
+  getMe(): Observable<User> {
+    return this.http.get<User>(`${this.apiUrl}/users/me`, this.getOptions());
+  }
+
+  updateUser(data: any): Observable<User> {
+    return this.http.put<User>(`${this.apiUrl}/users/me`, data, this.getOptions());
+  }
+
+  // --- GESTION ÉQUIPE (Team) ---
+
+  getTeam(): Observable<User[]> {
+    return this.http.get<User[]>(`${this.apiUrl}/team`, this.getOptions());
+  }
+
+  inviteMember(data: any): Observable<any> {
+    return this.http.post(`${this.apiUrl}/team/invite`, data, this.getOptions());
+  }
+
+  // 👇 C'EST CETTE MÉTHODE QUI MANQUAIT
+  updateTeamMember(userId: number, data: any): Observable<any> {
+    return this.http.put(`${this.apiUrl}/team/${userId}`, data, this.getOptions());
+  }
+
+  // Alias pour la compatibilité (si utilisé ailleurs)
   addTeamMember(user: any): Observable<User> {
-    return this.http.post<User>(`${this.apiUrl}/team`, user, this.getOptions());
+    return this.inviteMember(user);
   }
 
-  // --- GESTION ÉQUIPE (Avec sécurité) ---
-
-  getTeam() {
-    return this.http.get<any[]>(`${this.apiUrl}/team`, this.getHeaders());
-  }
-
-  inviteMember(data: any) {
-    return this.http.post(`${this.apiUrl}/team/invite`, data, this.getHeaders());
-  }
-
-  deleteMember(userId: number) {
-    return this.http.delete(`${this.apiUrl}/team/${userId}`, this.getHeaders());
-  }
-
-  // Petit helper pour récupérer le token stocké
-  private getHeaders() {
-    const token = localStorage.getItem('token');
-    return {
-      headers: { 'Authorization': `Bearer ${token}` }
-    };
-  }
-  
-  // 👇 AJOUT DE GETOPTIONS() ICI AUSSI
-  getMe() {
-    return this.http.get<any>(`${this.apiUrl}/users/me`, this.getOptions());
-  }
-
-  updateUser(data: any) {
-    return this.http.put(`${this.apiUrl}/users/me`, data, this.getOptions());
+  deleteMember(userId: number): Observable<any> {
+    return this.http.delete(`${this.apiUrl}/team/${userId}`, this.getOptions());
   }
 }

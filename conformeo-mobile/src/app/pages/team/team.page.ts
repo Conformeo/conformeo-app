@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { IonicModule, AlertController, ToastController, LoadingController } from '@ionic/angular'; 
 import { addIcons } from 'ionicons';
-import { add, person, shieldCheckmark, trash, personAdd, mail, key, business } from 'ionicons/icons';
+import { add, person, trash, mail, key, business, create } from 'ionicons/icons';
 import { ApiService } from '../../services/api';
 
 @Component({
@@ -19,7 +19,11 @@ export class TeamPage implements OnInit {
   currentUserEmail: string = '';
   
   isModalOpen = false;
-  newUser = { nom: '', email: '', password: '', role: 'Conducteur' };
+  isEditing = false; // Pour savoir si on modifie ou crée
+  selectedUserId: number | null = null;
+
+  // Modèle du formulaire
+  userData = { nom: '', email: '', password: '', role: 'Conducteur' };
 
   constructor(
     public api: ApiService, 
@@ -27,7 +31,7 @@ export class TeamPage implements OnInit {
     private toastCtrl: ToastController,
     private loadingCtrl: LoadingController
   ) {
-    addIcons({ add, person, shieldCheckmark, trash, personAdd, mail, key, business });
+    addIcons({ add, person, trash, mail, key, business, create });
   }
 
   ngOnInit() {
@@ -39,53 +43,82 @@ export class TeamPage implements OnInit {
   }
 
   loadTeam() {
-    // 👇 UTILISATION DE LA MÉTHODE SÉCURISÉE DU SERVICE
     this.api.getTeam().subscribe({
       next: (data) => this.users = data,
       error: (err) => console.error("Erreur chargement équipe", err)
     });
   }
 
-  async confirmSave() {
-    if (!this.newUser.email || !this.newUser.password || !this.newUser.nom) {
-      this.presentToast('Veuillez remplir tous les champs', 'warning');
+  // --- OUVERTURE MODALE ---
+  
+  openAddModal() {
+    this.isEditing = false;
+    this.userData = { nom: '', email: '', password: '', role: 'Conducteur' };
+    this.isModalOpen = true;
+  }
+
+  openEditModal(user: any) {
+    this.isEditing = true;
+    this.selectedUserId = user.id;
+    // On copie les données existantes (sans le mot de passe bien sûr)
+    this.userData = { 
+      nom: user.nom || '', 
+      email: user.email, 
+      role: user.role, 
+      password: '' // On laisse vide, si rempli = changement de MDP
+    };
+    this.isModalOpen = true;
+  }
+
+  // --- SAUVEGARDE ---
+
+  async saveUser() {
+    if (!this.userData.email || !this.userData.nom) {
+      this.presentToast('Nom et Email obligatoires', 'warning');
+      return;
+    }
+    // Si création, mot de passe obligatoire
+    if (!this.isEditing && !this.userData.password) {
+      this.presentToast('Mot de passe obligatoire pour la création', 'warning');
       return;
     }
 
-    const alert = await this.alertCtrl.create({
-      header: 'Enregistrer le membre',
-      message: 'Souhaitez-vous envoyer une notification d\'invitation ?',
-      buttons: [
-        { text: 'Annuler', role: 'cancel' },
-        { text: 'Non, juste enregistrer', handler: () => this.processSave(false) },
-        { text: 'Oui, envoyer', handler: () => this.processSave(true) }
-      ]
-    });
-    await alert.present();
-  }
-
-  async processSave(sendInvite: boolean) {
-    const load = await this.loadingCtrl.create({ message: 'Création en cours...' });
+    const load = await this.loadingCtrl.create({ message: 'Sauvegarde...' });
     await load.present();
 
-    // 👇 APPEL SÉCURISÉ
-    this.api.inviteMember(this.newUser).subscribe({
-      next: () => {
-        load.dismiss();
-        this.presentToast(sendInvite ? 'Invité et notifié ! 📩' : 'Enregistré avec succès. ✅', 'success');
-        this.isModalOpen = false;
-        this.newUser = { nom: '', email: '', password: '', role: 'Conducteur' };
-        this.loadTeam();
-      },
-      error: (err) => {
-        load.dismiss();
-        // Gestion propre de l'erreur (Email déjà pris, etc.)
-        const msg = err.error?.detail || 'Erreur lors de l\'ajout';
-        this.presentToast(msg, 'danger');
-      }
-    });
+    if (this.isEditing && this.selectedUserId) {
+      // MODE MODIFICATION
+      this.api.updateTeamMember(this.selectedUserId, this.userData).subscribe({
+        next: () => {
+          load.dismiss();
+          this.presentToast('Utilisateur modifié ! ✅', 'success');
+          this.isModalOpen = false;
+          this.loadTeam();
+        },
+        error: (err) => {
+          load.dismiss();
+          this.presentToast('Erreur modification', 'danger');
+        }
+      });
+    } else {
+      // MODE CRÉATION
+      this.api.inviteMember(this.userData).subscribe({
+        next: () => {
+          load.dismiss();
+          this.presentToast('Invitation envoyée ! 📩', 'success');
+          this.isModalOpen = false;
+          this.loadTeam();
+        },
+        error: (err) => {
+          load.dismiss();
+          this.presentToast(err.error?.detail || 'Erreur création', 'danger');
+        }
+      });
+    }
   }
 
+  // --- SUPPRESSION ---
+  
   async deleteUser(user: any) {
     const alert = await this.alertCtrl.create({
       header: 'Supprimer ?',
@@ -96,7 +129,6 @@ export class TeamPage implements OnInit {
           text: 'Supprimer', 
           role: 'destructive',
           handler: () => {
-            // 👇 APPEL SÉCURISÉ
             this.api.deleteMember(user.id).subscribe({
               next: () => {
                 this.users = this.users.filter(u => u.id !== user.id);
