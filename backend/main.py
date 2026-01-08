@@ -477,7 +477,8 @@ class PicSchema(BaseModel):
     reseaux: str = ""
     circulations: str = ""
     signalisation: str = ""
-
+    
+    # 👇 AJOUTEZ CES 3 LIGNES OBLIGATOIREMENT
     background_url: Optional[str] = None
     final_url: Optional[str] = None
     elements_data: Optional[list] = None

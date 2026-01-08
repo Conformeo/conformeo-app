@@ -1,11 +1,10 @@
 import { Component, Input, ViewChild, ElementRef, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { IonicModule, ModalController, LoadingController, ToastController } from '@ionic/angular';
+import { IonicModule, ModalController, LoadingController, ToastController, ActionSheetController } from '@ionic/angular';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
-// 👇 Chemin corrigé selon ta demande
-import { ApiService } from 'src/app/services/api'; 
+import { ApiService } from 'src/app/services/api'; // Vérifiez le chemin
 import { addIcons } from 'ionicons';
-import { close, save, add, trash, checkmarkCircle, arrowUndo, shapes, move } from 'ionicons/icons';
+import { close, save, add, trash, checkmarkCircle, arrowUndo, shapes, move, camera, image } from 'ionicons/icons';
 
 interface Point { x: number; y: number; }
 
@@ -24,9 +23,9 @@ export interface PicElement {
   selector: 'app-pic-modal',
   template: `
     <ion-header>
-      <ion-toolbar color="dark">
+      <ion-toolbar color="light">
         <ion-buttons slot="start">
-          <ion-button (click)="close()"><ion-icon name="close"></ion-icon></ion-button>
+          <ion-button (click)="close()" color="dark"><ion-icon name="close"></ion-icon></ion-button>
         </ion-buttons>
         <ion-title>Plan d'Installation</ion-title>
         <ion-buttons slot="end">
@@ -62,7 +61,7 @@ export interface PicElement {
           (mouseup)="handleEnd()">
         </canvas>
         
-        <div *ngIf="!backgroundImg" class="empty-placeholder" (click)="chooseBackground()">
+        <div *ngIf="!backgroundImg" class="empty-placeholder" (click)="presentPhotoActionSheet()">
           <div class="dashed-box">
             <ion-icon name="add" size="large"></ion-icon>
             <p>Charger le Plan de Masse</p>
@@ -73,11 +72,18 @@ export interface PicElement {
       <div class="toolbar" *ngIf="backgroundImg && mode === 'IDLE'">
         
         <div class="tools-scroll">
+          
           <div class="tool-group">
             <span class="group-label">Zones</span>
             <div class="sticker zone green" (click)="startDrawing('rgba(46, 204, 113, 0.5)')"></div>
             <div class="sticker zone yellow" (click)="startDrawing('rgba(241, 196, 15, 0.5)')"></div>
             <div class="sticker zone red" (click)="startDrawing('rgba(231, 76, 60, 0.5)')"></div>
+            <div class="sticker zone blue" (click)="startDrawing('rgba(52, 152, 219, 0.5)')"></div>
+            <div class="sticker zone orange" (click)="startDrawing('rgba(230, 126, 34, 0.5)')"></div>
+            <div class="sticker zone purple" (click)="startDrawing('rgba(155, 89, 182, 0.5)')"></div>
+            <div class="sticker zone cyan" (click)="startDrawing('rgba(26, 188, 156, 0.5)')"></div>
+            <div class="sticker zone pink" (click)="startDrawing('rgba(255, 105, 180, 0.5)')"></div>
+            <div class="sticker zone grey" (click)="startDrawing('rgba(149, 165, 166, 0.5)')"></div>
           </div>
 
           <div class="separator"></div>
@@ -87,12 +93,14 @@ export interface PicElement {
             <div class="sticker" (click)="addIcon('🏗️')">🏗️</div>
             <div class="sticker" (click)="addIcon('🏠')">🏠</div>
             <div class="sticker" (click)="addIcon('⚡')">⚡</div>
-            <div class="sticker" (click)="addIcon('💦')">💦</div>
+            <div class="sticker" (click)="addIcon('💧')">💧</div>
             <div class="sticker" (click)="addIcon('🚽')">🚽</div>
             <div class="sticker" (click)="addIcon('🚧')">🚧</div>
             <div class="sticker" (click)="addIcon('♻️')">♻️</div>
-            <div class="sticker" (click)="addIcon('🚑')">🚑</div>
+            <div class="sticker" (click)="addIcon('🔥')">🔥</div>
             <div class="sticker" (click)="addIcon('🅿️')">🅿️</div>
+            <div class="sticker" (click)="addIcon('⛔')">⛔</div>
+            <div class="sticker" (click)="addIcon('⬇️')">⬇️</div>
           </div>
         </div>
 
@@ -122,7 +130,7 @@ export interface PicElement {
 
     .empty-placeholder {
       width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;
-      color: #888;
+      color: #888; cursor: pointer;
     }
     .dashed-box {
       border: 2px dashed #666; padding: 40px; border-radius: 20px; text-align: center;
@@ -139,7 +147,7 @@ export interface PicElement {
     }
 
     .tool-group {
-      display: flex; align-items: center; gap: 10px; margin-right: 15px;
+      display: flex; align-items: center; gap: 8px; margin-right: 15px;
     }
     .group-label {
       font-size: 9px; color: #666; writing-mode: vertical-rl; transform: rotate(180deg);
@@ -149,16 +157,24 @@ export interface PicElement {
     .separator { width: 1px; height: 40px; background: #444; margin: 0 5px; }
 
     .sticker {
-      font-size: 24px; background: #2a2a2a; min-width: 50px; height: 50px;
-      border-radius: 12px; display: flex; align-items: center; justify-content: center;
+      font-size: 24px; background: #2a2a2a; min-width: 45px; height: 45px;
+      border-radius: 10px; display: flex; align-items: center; justify-content: center;
       color: white; border: 1px solid #444; box-shadow: 0 2px 5px rgba(0,0,0,0.2);
     }
     .sticker:active { transform: scale(0.9); background: #444; }
     
     .sticker.zone { border: 2px solid #555; }
-    .sticker.green { background: rgba(46, 204, 113, 1); }
-    .sticker.yellow { background: rgba(241, 196, 15, 1); }
-    .sticker.red { background: rgba(231, 76, 60, 1); }
+    
+    /* --- COULEURS --- */
+    .sticker.green { background: #2ecc71; }
+    .sticker.yellow { background: #f1c40f; }
+    .sticker.red { background: #e74c3c; }
+    .sticker.blue { background: #3498db; }
+    .sticker.orange { background: #e67e22; }
+    .sticker.purple { background: #9b59b6; }
+    .sticker.cyan { background: #1abc9c; }
+    .sticker.pink { background: #ff69b4; }
+    .sticker.grey { background: #95a5a6; }
 
     .delete-action {
       position: absolute; right: 20px; top: -60px;
@@ -199,9 +215,10 @@ export class PicModalComponent implements OnInit {
     private modalCtrl: ModalController, 
     public api: ApiService, 
     private loadingCtrl: LoadingController,
-    private toastCtrl: ToastController
+    private toastCtrl: ToastController,
+    private actionSheetCtrl: ActionSheetController
   ) {
-    addIcons({ close, save, add, trash, checkmarkCircle, arrowUndo, shapes, move });
+    addIcons({ close, save, add, trash, checkmarkCircle, arrowUndo, shapes, move, camera, image });
   }
 
   ngOnInit() {
@@ -214,7 +231,6 @@ export class PicModalComponent implements OnInit {
         }
 
         const img = new Image();
-        // ⚠️ Important pour éviter le Tainted Canvas
         img.crossOrigin = "Anonymous"; 
         img.src = pic.background_url;
         img.onload = () => {
@@ -225,10 +241,22 @@ export class PicModalComponent implements OnInit {
     });
   }
 
-  async chooseBackground() {
+  async presentPhotoActionSheet() {
+    const actionSheet = await this.actionSheetCtrl.create({
+      header: 'Charger un plan',
+      buttons: [
+        { text: 'Prendre une photo', icon: 'camera', handler: () => { this.getPhoto(CameraSource.Camera); } },
+        { text: 'Choisir depuis la galerie', icon: 'image', handler: () => { this.getPhoto(CameraSource.Photos); } },
+        { text: 'Annuler', icon: 'close', role: 'cancel' }
+      ]
+    });
+    await actionSheet.present();
+  }
+
+  async getPhoto(source: CameraSource) {
     try {
       const image = await Camera.getPhoto({
-        quality: 90, allowEditing: false, resultType: CameraResultType.Uri, source: CameraSource.Photos
+        quality: 90, allowEditing: false, resultType: CameraResultType.Uri, source: source
       });
       if (image.webPath) {
         const img = new Image();
@@ -240,9 +268,7 @@ export class PicModalComponent implements OnInit {
           this.draw();
         };
       }
-    } catch (e) { 
-      // Annulation utilisateur
-    }
+    } catch (e) {}
   }
 
   initCanvas() {
@@ -254,10 +280,7 @@ export class PicModalComponent implements OnInit {
     let w = parent.clientWidth;
     let h = w / ratio;
     
-    if (h > parent.clientHeight) {
-      h = parent.clientHeight;
-      w = h * ratio;
-    }
+    if (h > parent.clientHeight) { h = parent.clientHeight; w = h * ratio; }
 
     const dpr = window.devicePixelRatio || 1;
     this.canvas.width = w * dpr;
@@ -268,8 +291,6 @@ export class PicModalComponent implements OnInit {
     this.ctx = this.canvas.getContext('2d')!;
     this.ctx.scale(dpr, dpr);
   }
-
-  // --- ACTIONS ---
 
   addIcon(icon: string) {
     if (!this.backgroundImg) return;
@@ -308,18 +329,13 @@ export class PicModalComponent implements OnInit {
     }
   }
 
-  // --- MOTEUR DE DESSIN ---
-
   draw() {
     if (!this.ctx || !this.backgroundImg) return;
     const cw = parseInt(this.canvas.style.width);
     const ch = parseInt(this.canvas.style.height);
     this.ctx.clearRect(0, 0, cw, ch);
-    
-    // Fond
     this.ctx.drawImage(this.backgroundImg, 0, 0, cw, ch);
     
-    // Elements
     for (let el of this.elements) {
       const isSelected = el.id === this.selectedId;
 
@@ -342,7 +358,6 @@ export class PicModalComponent implements OnInit {
         }
       }
       else if (el.type === 'icon' && el.x !== undefined && el.y !== undefined) {
-        // CORRECTION 1: On vérifie que x et y existent, puis on utilise !
         if (isSelected) {
            this.ctx.beginPath(); this.ctx.arc(el.x!, el.y!, 25, 0, Math.PI*2);
            this.ctx.fillStyle = 'rgba(255,255,255,0.4)'; this.ctx.fill();
@@ -353,7 +368,6 @@ export class PicModalComponent implements OnInit {
       }
     }
 
-    // Dessin en cours
     if (this.mode === 'DRAWING' && this.currentPoints.length > 0) {
       this.ctx.beginPath();
       this.ctx.moveTo(this.currentPoints[0].x, this.currentPoints[0].y);
@@ -365,8 +379,6 @@ export class PicModalComponent implements OnInit {
       }
     }
   }
-
-  // --- LOGIQUE TOUCH ---
 
   getPos(ev: any) {
     const rect = this.canvas.getBoundingClientRect();
@@ -400,7 +412,6 @@ export class PicModalComponent implements OnInit {
     this.dragPointIndex = null;
     this.dragStartPos = { x, y };
 
-    // 1. Poignée
     if (this.selectedId) {
       const selEl = this.elements.find(e => e.id === this.selectedId);
       if (selEl && selEl.type === 'polygon' && selEl.points) {
@@ -413,11 +424,9 @@ export class PicModalComponent implements OnInit {
       }
     }
 
-    // 2. Sélection
     let foundId = null;
     for (let i = this.elements.length - 1; i >= 0; i--) {
       const el = this.elements[i];
-      // Correction 2: Vérification stricte de x et y
       if (el.type === 'icon' && el.x !== undefined && el.y !== undefined) {
         if (Math.sqrt((x-el.x!)**2 + (y-el.y!)**2) < 30) { foundId = el.id; break; }
       }
@@ -443,10 +452,8 @@ export class PicModalComponent implements OnInit {
       } else {
          const dx = x - this.dragStartPos.x;
          const dy = y - this.dragStartPos.y;
-         // CORRECTION 3: Vérification pour mathématiques
          if (el.type === 'icon' && el.x !== undefined && el.y !== undefined) { 
-            el.x += dx; 
-            el.y += dy; 
+            el.x += dx; el.y += dy; 
          }
          else if (el.type === 'polygon' && el.points) { 
             el.points.forEach(p => { p.x += dx; p.y += dy; }); 
@@ -465,7 +472,6 @@ export class PicModalComponent implements OnInit {
   handleStartMouse(ev: any) { this.handleStart(ev); }
   handleMoveMouse(ev: any) { this.handleMove(ev); }
 
-  // --- SAUVEGARDE ---
   async save() {
     this.selectedId = null;
     this.draw();
@@ -488,7 +494,6 @@ export class PicModalComponent implements OnInit {
                     elements_data: this.elements 
                 };
 
-                // Sauvegarde
                 this.api.http.post(`${this.api.apiUrl}/chantiers/${this.chantierId}/pic`, picData).subscribe({
                   next: async () => {
                     this.isSaving = false;
@@ -498,7 +503,7 @@ export class PicModalComponent implements OnInit {
                   },
                   error: async () => { 
                     this.isSaving = false; 
-                    const t = await this.toastCtrl.create({ message: 'Erreur sauvegarde', duration: 2000, color: 'danger' });
+                    const t = await this.toastCtrl.create({ message: 'Erreur sauvegarde API', duration: 3000, color: 'danger' });
                     t.present();
                   }
                 });
