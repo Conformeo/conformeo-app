@@ -7,11 +7,11 @@ import {
   IonList, IonItem, IonLabel, IonNote, IonFab, IonFabButton, IonIcon, 
   IonBadge, IonAvatar, AlertController, ToastController, LoadingController,
   IonItemSliding, IonItemOptions, IonItemOption, IonModal, IonSelect, IonSelectOption,
-  IonInput // Ajouts nécessaires
+  IonInput 
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
 import { add, person, shieldCheckmark, trash, personAdd, mail, key, business } from 'ionicons/icons';
-import { ApiService, User } from '../../services/api';
+import { ApiService } from '../../services/api';
 
 @Component({
   selector: 'app-team',
@@ -28,7 +28,7 @@ import { ApiService, User } from '../../services/api';
 })
 export class TeamPage implements OnInit {
 
-  users: any[] = []; // On utilise any pour flexibilité ou l'interface User
+  users: any[] = []; 
   currentUserEmail: string = '';
   
   // Pour la Modale d'ajout
@@ -36,7 +36,7 @@ export class TeamPage implements OnInit {
   newUser = { nom: '', email: '', password: '', role: 'Conducteur' };
 
   constructor(
-    public api: ApiService, // Public pour l'utiliser dans le HTML si besoin
+    public api: ApiService, 
     private alertCtrl: AlertController,
     private toastCtrl: ToastController,
     private loadingCtrl: LoadingController
@@ -53,27 +53,56 @@ export class TeamPage implements OnInit {
   }
 
   loadTeam() {
-    // Assurez-vous que votre ApiService a bien la méthode getTeam() -> GET /team
     this.api.http.get<any[]>(`${this.api.apiUrl}/team`).subscribe(data => {
       this.users = data;
     });
   }
 
-  // --- AJOUTER UN MEMBRE ---
-  async saveUser() {
+  // --- 1. DEMANDE DE CONFIRMATION ---
+  async confirmSave() {
+    // Validation basique
     if (!this.newUser.email || !this.newUser.password || !this.newUser.nom) {
       this.presentToast('Veuillez remplir tous les champs', 'warning');
       return;
     }
 
-    const load = await this.loadingCtrl.create({ message: 'Envoi de l\'invitation...' });
+    const alert = await this.alertCtrl.create({
+      header: 'Enregistrer le membre',
+      message: 'Souhaitez-vous envoyer une notification d\'invitation à cette personne ?',
+      buttons: [
+        {
+          text: 'Annuler',
+          role: 'cancel'
+        },
+        {
+          text: 'Non, juste enregistrer',
+          handler: () => this.processSave(false) // false = on n'envoie pas d'invit (simulation)
+        },
+        {
+          text: 'Oui, envoyer',
+          handler: () => this.processSave(true) // true = on confirme l'envoi
+        }
+      ]
+    });
+    await alert.present();
+  }
+
+  // --- 2. EXECUTION API ---
+  async processSave(sendInvite: boolean) {
+    const load = await this.loadingCtrl.create({ message: 'Création en cours...' });
     await load.present();
 
-    // On utilise la route POST /team/invite du backend
     this.api.http.post(`${this.api.apiUrl}/team/invite`, this.newUser).subscribe({
       next: () => {
         load.dismiss();
-        this.presentToast('Invitation envoyée ! 🎉', 'success');
+        
+        // Feedback visuel adapté au choix
+        if (sendInvite) {
+          this.presentToast('Membre créé et invitation envoyée ! 📩', 'success');
+        } else {
+          this.presentToast('Membre enregistré avec succès. ✅', 'medium');
+        }
+
         this.isModalOpen = false;
         this.newUser = { nom: '', email: '', password: '', role: 'Conducteur' }; // Reset
         this.loadTeam(); // Rafraîchir la liste
@@ -112,7 +141,6 @@ export class TeamPage implements OnInit {
 
   // Helpers
   getInitials(user: any) {
-    // Priorité au Nom, sinon Email
     const name = user.nom || user.email;
     return name ? name.charAt(0).toUpperCase() : '?';
   }

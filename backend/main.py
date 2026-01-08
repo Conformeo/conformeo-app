@@ -164,6 +164,15 @@ def update_user_me(user_up: UserUpdate, db: Session = Depends(get_db), current_u
     return current_user
 
 # --- GESTION ÉQUIPE (TEAM) ---
+class UserOut(BaseModel):
+    id: int
+    email: str
+    nom: str | None = None
+    role: str
+    # company_id: int | None = None # Optionnel si vous voulez renvoyer l'ID entreprise
+
+    class Config:
+        from_attributes = True # Indispensable pour lire les objets SQLAlchemy
 
 class UserInvite(BaseModel):
     email: str
