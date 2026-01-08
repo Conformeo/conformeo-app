@@ -9,7 +9,7 @@ import csv
 import codecs
 import time
 import json
-import pydantic import BaseModel
+import pydantic
 
 load_dotenv()
 
