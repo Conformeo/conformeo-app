@@ -1,278 +1,238 @@
-// Fond de page
-.detail-content {
-  --background: #f7f8fa;
+// ==========================================
+// 1. MISE EN PAGE GÉNÉRALE
+// ==========================================
+// EN-TÊTE IMAGE
+.header-image-container {
+  height: 200px; width: 100%; position: relative; background: #eee;
+  .cover-img { width: 100%; height: 100%; object-fit: cover; }
+  .header-overlay {
+    position: absolute; bottom: 0; left: 0; width: 100%; height: 100%;
+    background: linear-gradient(to bottom, transparent 50%, rgba(0,0,0,0.8));
+    display: flex; align-items: flex-end; padding: 20px; padding-bottom: 40px;
+  }
+  .header-text {
+    color: white; width: 100%;
+    .chantier-title { margin: 0; font-size: 24px; font-weight: 800; text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
+    .chantier-subtitle { margin: 5px 0 0; font-size: 14px; opacity: 0.9; }
+  }
 }
 
-// 1. Bouton retour flottant (Style "Bulle")
+// CORPS ARRONDIE
+.body-container {
+  margin-top: -30px; border-top-left-radius: 30px; border-top-right-radius: 30px;
+  background: #f4f5f8; position: relative; z-index: 10; padding: 20px; min-height: 500px;
+}
+
+// SELECT STATUT (STYLE BADGE)
+.status-wrapper {
+  display: flex; flex-direction: column; align-items: center;
+  .label { font-size: 10px; color: #999; font-weight: bold; margin-bottom: 4px; }
+}
+.status-select {
+  background: #eee; color: #666; padding: 0 10px; border-radius: 15px; 
+  font-size: 12px; font-weight: bold; min-height: 25px; --padding-start: 5px;
+  
+  &.actif { background: #e8f5e9; color: #2e7d32; }
+  &::part(icon) { display: none; } /* Cache la flèche par défaut */
+}
+
+// Le reste du CSS (Grille, Cards...) reste comme avant
+// ... (gardez le CSS de la réponse précédente pour .actions-grid, .info-card etc.)
+
+ion-content {
+  --background: #f4f5f8;
+}
+
+// Bouton Retour "Bulle" (Flottant)
 .back-btn-container {
   position: absolute;
-  top: 50px;
-  left: 20px;
+  top: 50px; left: 20px;
   z-index: 100;
   background: rgba(0,0,0,0.3);
   backdrop-filter: blur(5px);
   border-radius: 50%;
   width: 40px; height: 40px;
   display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.2);
 }
 
-// 2. En-tête Image (NOUVEAU STYLE avec IMG)
-.header-image-container {
-  height: 250px;
-  width: 100%;
-  position: relative;
-  background: #eee;
-  overflow: hidden;
-
-  .cover-img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover; /* Remplit le cadre sans déformer */
-    display: block;
-  }
-  
-  .header-overlay {
-    position: absolute; bottom: 0; left: 0; width: 100%; height: 100%;
-    background: linear-gradient(to bottom, transparent 40%, rgba(0,0,0,0.8));
-    display: flex; align-items: flex-end;
-    padding: 20px; padding-bottom: 50px; // Espace pour l'arrondi
-    z-index: 2;
-  }
-
-  .header-text {
-    color: white; width: 100%;
-    .chantier-title { margin: 0; font-size: 26px; font-weight: 800; text-shadow: 0 2px 4px rgba(0,0,0,0.3); line-height: 1.2; }
-    .chantier-subtitle { margin: 5px 0 0; font-size: 14px; opacity: 0.9; font-weight: 500; }
+// Navigation par Onglets (Segment)
+.header-segment {
+  background: white; padding: 5px;
+  ion-segment-button {
+    --indicator-color: var(--ion-color-primary);
+    --color-checked: var(--ion-color-primary);
+    font-weight: 600; letter-spacing: 0.5px;
   }
 }
 
-// 3. Corps de page (Arrondi)
-.body-container {
-  margin-top: -30px; // Remonte sur l'image
-  border-top-left-radius: 30px;
-  border-top-right-radius: 30px;
-  background: #f7f8fa;
-  min-height: 500px;
-  position: relative;
-  z-index: 10;
-  padding: 20px;
+// Animation transition
+.animate-fade {
+  animation: fadeIn 0.3s ease-in-out;
 }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 
-// 4. Carte d'Infos (Fiche Identité)
+
+// ==========================================
+// 2. VUE SUIVI (INFO & ACTIONS)
+// ==========================================
+
+// Carte d'Information (En-tête)
 .info-card {
-  background: white; border-radius: 16px; padding: 20px;
-  box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 25px;
+  margin: 15px 0;
+  border-radius: 16px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+  background: white;
 
-  // Adresse
-  .location-row {
-    display: flex; align-items: center; gap: 10px; margin-bottom: 20px;
-    font-size: 14px; color: #555; font-weight: 500;
+  .header-row {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 15px;
+    h2 { font-size: 18px; font-weight: bold; margin: 0; flex: 1; color: #333; }
+    ion-icon { font-size: 24px; }
+    .gps-icon { background: #e3f2fd; padding: 8px; border-radius: 50%; }
   }
 
-  // Grille Dates & Statut (AJOUTÉ)
-  .info-grid {
-    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;
-    margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid #f0f0f0;
+  .dates-row {
+    display: flex; justify-content: space-between; border-top: 1px solid #eee; padding-top: 15px;
+    div { display: flex; flex-direction: column; align-items: center; }
+    .label { font-size: 10px; color: #999; font-weight: bold; letter-spacing: 1px; margin-bottom: 4px; }
+    .value { font-size: 14px; font-weight: 600; color: #444; }
     
-    .grid-item {
-      label { display: block; font-size: 11px; color: #999; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
-      p { margin: 0; font-size: 13px; font-weight: 700; color: #333; }
+    .status-badge {
+      background: #eee; color: #666; padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: bold;
+      display: flex; align-items: center; gap: 5px; cursor: pointer;
+      &.actif { background: #e8f5e9; color: #2e7d32; }
     }
   }
+}
 
-  // Boutons Actions
-  .actions-row {
-    display: flex; justify-content: space-around; flex-wrap: wrap; gap: 15px;
+// Grille d'Actions Rapides (6 boutons)
+.actions-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr); // 4 colonnes auto
+  gap: 15px; margin-bottom: 25px; padding: 0 5px;
+
+  .action-btn {
+    display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: pointer;
     
-    .action-btn {
-      display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: pointer;
+    .icon-circle {
+      width: 55px; height: 55px; border-radius: 18px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 24px; box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+      transition: transform 0.1s;
       
-      .icon-circle {
-        width: 45px; height: 45px; background: #f4f6f9; border-radius: 50%;
-        display: flex; align-items: center; justify-content: center;
-        color: var(--ion-color-primary); font-size: 20px; transition: transform 0.1s;
-      }
-      span { font-size: 11px; color: #666; font-weight: 600; }
-      
-      &:active .icon-circle { transform: scale(0.9); background: #e0e0e0; }
+      &:active { transform: scale(0.95); }
     }
+
+    span { font-size: 11px; font-weight: 600; color: #555; }
+
+    // Couleurs
+    .bg-pdf { background: #ffebee; color: #d32f2f; }
+    .bg-mail { background: #e3f2fd; color: #1976d2; }
+    .bg-audit { background: #e8f5e9; color: #2e7d32; }
+    .bg-pic { background: #fff3e0; color: #f57c00; }
+    .bg-pdp { background: #f3e5f5; color: #7b1fa2; }
+    .bg-sign { background: #eceff1; color: #455a64; }
   }
 }
 
-// 5. Titres Sections
-.section-title {
-  font-weight: 800; font-size: 18px; margin-bottom: 15px; color: #333; margin-left: 5px;
+// Titres de section
+.section-header {
+  margin: 25px 0 10px; padding-left: 5px; border-left: 4px solid var(--ion-color-primary);
+  h3 { font-size: 18px; font-weight: 700; margin: 0; padding-left: 10px; color: #333; }
 }
 
-// 6. Journal de Bord (Feed)
-.feed-card {
-  background: white; border-radius: 16px; overflow: hidden; margin-bottom: 15px;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.03); display: flex; padding: 12px; gap: 15px;
-  transition: transform 0.1s;
+
+// ==========================================
+// 3. LISTES & CAROUSEL (DOCS / MATERIEL)
+// ==========================================
+
+// Liste Verticale (Documents Récents)
+.doc-list { background: transparent; padding: 0; }
+.doc-item {
+  --background: white; border-radius: 12px; margin-bottom: 10px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.03);
   
-  &:active { transform: scale(0.98); }
-
-  .feed-image {
-    width: 80px; height: 80px; border-radius: 10px;
-    background-size: cover; background-position: center; background-color: #eee;
-    flex-shrink: 0;
-  }
-
-  .feed-content {
-    flex-grow: 1; overflow: hidden;
-    
-    .feed-header {
-      display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 12px;
-      .feed-date { color: #999; }
-      .feed-badge { 
-        font-weight: 700; text-transform: uppercase; font-size: 10px;
-        &.Faible { color: #2dd36f; }
-        &.Moyen { color: #ffc409; }
-        &.Critique { color: #eb445a; }
-      }
-    }
-
-    .feed-title { margin: 0 0 4px; font-size: 15px; font-weight: 700; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .feed-desc { 
-      margin: 0; font-size: 13px; color: #666; 
-      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; 
-    }
+  .doc-icon-box {
+    width: 40px; height: 40px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center; font-size: 20px; margin-right: 15px;
+    &.primary { background: #e3f2fd; color: var(--ion-color-primary); }
+    &.warning { background: #fff8e1; color: var(--ion-color-warning); }
+    &.tertiary { background: #e0f2f1; color: var(--ion-color-tertiary); }
+    &.success { background: #e8f5e9; color: var(--ion-color-success); }
+    &.medium { background: #f5f5f5; color: var(--ion-color-medium); }
   }
 }
 
-.empty-state { text-align: center; color: #999; margin-top: 30px; font-style: italic; }
-
-// 7. Cacher sur Desktop (Largeur > 1200px)
-@media (min-width: 1200px) {
-  .mobile-only-action {
-    display: none !important;
-  }
-}
-
-/* ... votre CSS existant ... */
-
-.section-title h3 {
-  font-size: 18px;
-  font-weight: 700;
-  color: #1e293b;
-  margin: 10px 0;
-  padding-left: 5px;
-  border-left: 4px solid #3b82f6;
-  line-height: 1.2;
-}
-
-/* Défilement horizontal pour le matériel */
-.horizontal-scroll {
-  display: flex;
-  overflow-x: auto;
-  gap: 15px;
-  padding: 10px 5px;
-  
-  /* Masquer la barre de scroll tout en permettant le scroll */
+// Carousel Horizontal (Matériel)
+.materiel-scroll {
+  display: flex; overflow-x: auto; gap: 15px; padding-bottom: 10px;
   -webkit-overflow-scrolling: touch;
   &::-webkit-scrollbar { display: none; }
-}
-
-.materiel-card {
-  min-width: 140px;
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-  overflow: hidden;
-  flex-shrink: 0;
-
-  .mat-img {
-    height: 90px;
-    background: #f1f5f9;
-    img { width: 100%; height: 100%; object-fit: cover; }
-  }
-
-  .mat-info {
-    padding: 8px;
-    h4 { margin: 0; font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    p { margin: 2px 0 5px; font-size: 12px; color: #64748b; }
-  }
-}
-
-.empty-state-small {
-  text-align: center;
-  padding: 20px;
-  background: #f8fafc;
-  border-radius: 12px;
-  border: 1px dashed #cbd5e1;
-  color: #94a3b8;
   
-  ion-icon { font-size: 24px; margin-bottom: 5px; }
-  p { margin: 0; font-size: 13px; }
+  .mat-card {
+    min-width: 140px; margin: 0; border-radius: 12px;
+    background: white; box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    
+    .mat-img { height: 90px; background-size: cover; background-position: center; background-color: #f1f5f9; }
+    ion-card-header { padding: 10px; }
+    ion-card-title { font-size: 13px; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    ion-card-subtitle { font-size: 11px; }
+    
+    .etat-badge {
+      font-size: 10px; text-align: center; padding: 2px; color: white;
+      &.bon { background: var(--ion-color-success); }
+      &.moyen { background: var(--ion-color-warning); }
+      &.mauvais, &.panne { background: var(--ion-color-danger); }
+    }
+  }
 }
 
-.divider {
-  height: 1px;
-  background: #e2e8f0;
-  margin: 20px 0;
+
+// ==========================================
+// 4. JOURNAL DE BORD (RAPPORTS)
+// ==========================================
+.rapport-card {
+  border-radius: 16px; margin-bottom: 15px; background: white;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05); overflow: hidden;
+
+  .rapport-img {
+    height: 140px; background-size: cover; background-position: center; position: relative;
+    .date-badge {
+      position: absolute; top: 10px; right: 10px;
+      background: rgba(0,0,0,0.7); color: white;
+      padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: bold;
+    }
+  }
+
+  .top-line {
+    display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;
+    h2 { margin: 0; font-size: 16px; font-weight: 700; color: #333; }
+  }
+  .desc { font-size: 13px; color: #666; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 }
 
-/* ... votre css existant ... */
+.empty-journal {
+  text-align: center; color: #999; margin: 30px 0; font-style: italic;
+}
 
-/* Zone de défilement horizontal */
-.horizontal-scroll {
-  display: flex;
-  overflow-x: auto;
-  gap: 12px; /* Espace entre les cartes */
-  padding: 5px 5px 15px 5px; /* Un peu d'espace pour l'ombre */
+
+// ==========================================
+// 5. VUE DOE (NOUVEAU MODULE)
+// ==========================================
+.doe-intro {
+  text-align: center; margin: 30px 0; color: #666;
+  p { margin-top: 10px; font-size: 14px; max-width: 80%; margin-left: auto; margin-right: auto; }
+}
+
+.doe-accordion {
+  ion-accordion {
+    margin-bottom: 10px; background: white; border-radius: 12px; overflow: hidden;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+  }
   
-  /* Scroll fluide et masquage de la barre */
-  scroll-behavior: smooth;
-  -webkit-overflow-scrolling: touch;
-  &::-webkit-scrollbar { display: none; }
+  .content-box { background: #fafafa; border-top: 1px solid #eee; }
 }
 
-/* La carte équipement (Vignette) */
-.materiel-card {
-  width: 120px;       /* Largeur Fixe */
-  min-width: 120px;   /* Empêche l'écrasement */
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.08); /* Belle ombre */
-  overflow: hidden;
-  flex-shrink: 0;     /* Reste rigide */
-  display: flex;
-  flex-direction: column;
-
-  .mat-img-container {
-    height: 80px;
-    background: #f8fafc;
-    width: 100%;
-    
-    img { 
-      width: 100%; 
-      height: 100%; 
-      object-fit: cover; 
-    }
-  }
-
-  .mat-info {
-    padding: 8px;
-    
-    h4 { 
-      margin: 0; 
-      font-size: 12px; /* Texte plus petit */
-      font-weight: 600; 
-      color: #1e293b;
-      white-space: nowrap; 
-      overflow: hidden; 
-      text-overflow: ellipsis; 
-    }
-    
-    p { 
-      margin: 2px 0 6px; 
-      font-size: 10px; 
-      color: #64748b; 
-    }
-
-    ion-badge {
-      font-size: 9px;
-      padding: 3px 6px;
-    }
-  }
+.doe-note {
+  font-size: 12px; color: #888; text-align: center; margin-top: 15px; line-height: 1.6;
 }

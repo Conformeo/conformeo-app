@@ -160,20 +160,34 @@ export class ChantierDetailsPage implements OnInit {
     await alert.present();
   }
 
-  onDoeFileSelected(event: any) {
+  // 👇 AJOUTEZ LE MOT 'async' ICI
+  async onDoeFileSelected(event: any) {
     const file = event.target.files[0];
     if (!file) return;
 
+    // On utilise FormData pour envoyer le fichier ET les infos textuelles proprement
     const formData = new FormData();
     formData.append('file', file);
     
-    // Appel direct (à adapter si tu mets la méthode dans api.service)
-    const url = `${this.api.apiUrl}/chantiers/${this.chantierId}/documents?titre=${this.tempTitle}&categorie=${this.selectedCategory}`;
+    // On encode le titre pour éviter les bugs avec les espaces ou accents
+    const url = `${this.api.apiUrl}/chantiers/${this.chantierId}/documents?titre=${encodeURIComponent(this.tempTitle)}&categorie=${this.selectedCategory}`;
     
-    this.api.http.post(url, formData).subscribe(() => {
-      this.loadDoeDocs(); 
-      event.target.value = null; // Reset
-      this.presentToast('Document ajouté au DOE !');
+    // 👇 C'est ici que 'await' posait problème sans le 'async' au dessus
+    const loading = await this.loadingCtrl.create({ message: 'Upload en cours...' });
+    await loading.present();
+
+    this.api.http.post(url, formData).subscribe({
+      next: () => {
+        this.loadDoeDocs(); 
+        event.target.value = null; // Reset input
+        loading.dismiss();
+        this.presentToast('Document ajouté au DOE ! ✅');
+      },
+      error: (err) => {
+        console.error(err);
+        loading.dismiss();
+        this.presentToast('Erreur lors de l\'envoi ❌');
+      }
     });
   }
 
@@ -309,6 +323,19 @@ export class ChantierDetailsPage implements OnInit {
       ]
     });
     await alert.present();
+  }
+
+  // --- GESTION STATUT ---
+  updateStatus(event: any) {
+    const newVal = event.detail.value;
+    // On évite de boucler si la valeur est identique
+    if (this.chantier && this.chantier.est_actif !== newVal) {
+        this.api.updateChantier(this.chantierId, { est_actif: newVal }).subscribe(() => {
+            this.chantier!.est_actif = newVal;
+            const msg = newVal ? 'Chantier réactivé ✅' : 'Chantier terminé 🏁';
+            this.presentToast(msg);
+        });
+    }
   }
 
   async uploadAndCreateRapport(blob: Blob, webPath: string) {

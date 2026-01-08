@@ -523,43 +523,61 @@ def download_pdf(cid: int, db: Session = Depends(get_db)):
 
 @app.get("/chantiers/{cid}/doe")
 def download_doe(cid: int, db: Session = Depends(get_db)):
+    # 1. Vérification
     c = db.query(models.Chantier).filter(models.Chantier.id == cid).first()
-    if not c: raise HTTPException(404)
-    comp = get_company_for_chantier(db, cid) 
+    if not c: raise HTTPException(404, "Chantier introuvable")
+    
+    comp = get_company_for_chantier(db, cid)
+    
+    # 2. Création dossier temp (CRITIQUE pour éviter l'erreur 500)
+    os.makedirs("uploads", exist_ok=True)
 
-    zip_name = f"uploads/DOE_{c.id}.zip"
+    zip_name = f"uploads/DOE_{c.nom.replace(' ', '_')}.zip"
+    
+    # 3. Génération ZIP
     with zipfile.ZipFile(zip_name, 'w') as z:
-        # Journal
-        raps = db.query(models.Rapport).filter(models.Rapport.chantier_id == cid).all()
-        inss = db.query(models.Inspection).filter(models.Inspection.chantier_id == cid).all()
-        j_path = f"uploads/J_{c.id}.pdf"
-        pdf_generator.generate_pdf(c, raps, inss, j_path, company=comp)
-        z.write(j_path, "1_Journal_Chantier.pdf")
         
-        # PPSPS
-        ppsps = db.query(models.PPSPS).filter(models.PPSPS.chantier_id == cid).all()
-        for idx, p in enumerate(ppsps):
-            p_path = f"uploads/P_{p.id}.pdf"
-            pdf_generator.generate_ppsps_pdf(c, p, p_path, company=comp)
-            z.write(p_path, f"2_PPSPS_{idx+1}.pdf")
+        # --- DOSSIER 1 : SUIVI ---
+        folder_suivi = "01_Suivi_Conformeo/"
+        
+        # Journal
+        try:
+            raps = db.query(models.Rapport).filter(models.Rapport.chantier_id == cid).all()
+            inss = db.query(models.Inspection).filter(models.Inspection.chantier_id == cid).all()
+            j_path = f"uploads/Journal_{c.id}.pdf"
+            pdf_generator.generate_pdf(c, raps, inss, j_path, company=comp)
+            z.write(j_path, f"{folder_suivi}Journal.pdf")
+        except Exception as e: print(f"Erreur Journal: {e}")
 
-        # Audits
-        for idx, i in enumerate(inss):
-            a_path = f"uploads/A_{i.id}.pdf"
-            pdf_generator.generate_audit_pdf(c, i, a_path, company=comp)
-            z.write(a_path, f"3_Audit_{i.type}_{idx+1}.pdf")
-            
-        # PIC (Image)
-        pic = db.query(models.PIC).filter(models.PIC.chantier_id == cid).first()
-        if pic and pic.final_url:
+        # --- DOSSIERS DOCUMENTS ---
+        docs_externes = db.execute(text("SELECT titre, categorie, url FROM documents_externes WHERE chantier_id = :cid"), {"cid": cid}).fetchall()
+        
+        map_dossiers = {
+            'PLANS': "02_Plans", 'NOTICES': "03_Notices", 
+            'MAINTENANCE': "04_Maintenance", 'GARANTIES': "05_Garanties", 
+            'DECHETS': "06_Dechets", 'AUTRE': "07_Divers"
+        }
+
+        for doc in docs_externes:
             try:
-                r = requests.get(pic.final_url)
+                titre, cat, url = doc[0], doc[1], doc[2]
+                folder = map_dossiers.get(cat, "07_Divers")
+                
+                # Nettoyage nom fichier
+                safe_titre = "".join([x for x in titre if x.isalnum() or x in (' ', '-', '_')]).strip()
+                ext = url.split('.')[-1]
+                if len(ext) > 4: ext = "pdf"
+
+                # Téléchargement
+                r = requests.get(url, timeout=10)
                 if r.status_code == 200:
-                    pic_path = f"uploads/PIC_{cid}.jpg"
-                    with open(pic_path, "wb") as f: f.write(r.content)
-                    z.write(pic_path, "4_Plan_Installation.jpg")
-            except: pass
-            
+                    tmp = f"uploads/tmp_{safe_titre}.{ext}"
+                    with open(tmp, "wb") as f: f.write(r.content)
+                    z.write(tmp, f"{folder}/{safe_titre}.{ext}")
+                    os.remove(tmp) # Nettoyage
+            except Exception as e:
+                print(f"Erreur doc {titre}: {e}")
+
     return FileResponse(zip_name, filename=f"DOE_{c.nom}.zip", media_type='application/zip')
 
 # ==========================================
@@ -999,5 +1017,17 @@ def fix_pdp_signatures(db: Session = Depends(get_db)):
         db.execute(text("ALTER TABLE plans_prevention ADD COLUMN IF NOT EXISTS signature_ee VARCHAR;"))
         db.commit()
         return {"message": "Colonnes signatures ajoutées avec succès ! ✍️✅"}
+    except Exception as e:
+        return {"error": str(e)}
+
+# ... (Tout en bas de main.py)
+
+@app.get("/force_add_pic_date")
+def force_add_pic_date(db: Session = Depends(get_db)):
+    try:
+        # On force l'ajout de la colonne date_creation
+        db.execute(text("ALTER TABLE pics ADD COLUMN IF NOT EXISTS date_creation TIMESTAMP DEFAULT NOW()"))
+        db.commit()
+        return {"msg": "✅ Colonne date_creation ajoutée avec succès ! Le PIC devrait marcher."}
     except Exception as e:
         return {"error": str(e)}
