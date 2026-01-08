@@ -211,7 +211,10 @@ class PIC(Base):
     signalisation = Column(String, nullable=True)  # 9. Espaces vie & Panneaux
 
     # Méta-données
-    date_creation = Column(DateTime, default=datetime.utcnow)
+    background_url = Column(String, nullable=True) # Pour l'image de fond
+    final_url = Column(String, nullable=True)      # Pour l'image finale
+    elements_data = Column(String, nullable=True)  # Pour stocker les icônes (JSON ou String)
+    date_creation = Column(DateTime, default=datetime.now) # 👈 INDISPENSABLE
     
     # Relation
     chantier = relationship("Chantier", back_populates="pic")

@@ -1031,3 +1031,44 @@ def force_add_pic_date(db: Session = Depends(get_db)):
         return {"msg": "✅ Colonne date_creation ajoutée avec succès ! Le PIC devrait marcher."}
     except Exception as e:
         return {"error": str(e)}
+
+
+# ... (Tout en bas de main.py)
+
+@app.get("/debug_fix_pic")
+def debug_fix_pic(db: Session = Depends(get_db)):
+    status = []
+    try:
+        # 1. Vérifier si la table existe
+        db.execute(text("SELECT 1 FROM pics LIMIT 1"))
+        status.append("✅ Table 'pics' trouvée.")
+    except Exception:
+        return {"error": "La table 'pics' n'existe pas ! Lancez /fix_everything d'abord."}
+
+    try:
+        # 2. Tenter de lire la colonne date_creation
+        db.execute(text("SELECT date_creation FROM pics LIMIT 1"))
+        status.append("✅ Colonne 'date_creation' existe déjà.")
+    except Exception:
+        # 3. Si elle n'existe pas, on la crée (Rollback nécessaire avant)
+        db.rollback() 
+        status.append("⚠️ Colonne manquante. Tentative de création...")
+        try:
+            db.execute(text("ALTER TABLE pics ADD COLUMN date_creation TIMESTAMP DEFAULT NOW()"))
+            db.commit()
+            status.append("🎉 SUCCÈS : Colonne 'date_creation' ajoutée !")
+        except Exception as e:
+            status.append(f"❌ ÉCHEC création : {str(e)}")
+
+    # 4. Vérification des autres colonnes vitales pour le dessin
+    cols_to_check = ['background_url', 'final_url', 'elements_data']
+    for col in cols_to_check:
+        try:
+            db.execute(text(f"SELECT {col} FROM pics LIMIT 1"))
+        except:
+            db.rollback()
+            db.execute(text(f"ALTER TABLE pics ADD COLUMN {col} VARCHAR"))
+            db.commit()
+            status.append(f"➕ Colonne '{col}' ajoutée.")
+
+    return {"rapport_intervention": status}
