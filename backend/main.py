@@ -163,6 +163,10 @@ def update_user_me(user_up: UserUpdate, db: Session = Depends(get_db), current_u
     db.refresh(current_user)
     return current_user
 
+@app.get("/users/me", response_model=UserOut)
+def read_users_me(current_user: models.User = Depends(security.get_current_user)):
+    return current_user
+    
 # ==========================================
 # GESTION ÉQUIPE - À INSÉRER APRES LES IMPORTS
 # ET AVANT LES AUTRES ROUTES
