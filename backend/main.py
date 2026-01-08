@@ -802,3 +802,13 @@ def fix_everything(db: Session = Depends(get_db)):
             db.rollback(); logs.append(f"ℹ️ {col} existe déjà")
             
     return {"status": "Terminé", "details": logs}
+
+@app.get("/fix_users_table")
+def fix_users_table(db: Session = Depends(get_db)):
+    try:
+        # Ajoute la colonne 'nom' si elle n'existe pas
+        db.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS nom VARCHAR"))
+        db.commit()
+        return {"message": "✅ Colonne 'nom' ajoutée à la table Users !"}
+    except Exception as e:
+        return {"error": str(e)}
