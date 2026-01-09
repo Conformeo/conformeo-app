@@ -36,11 +36,13 @@ export class AppComponent {
   
   // 👇 MENU MIS À JOUR
   public appPages = [
-    { title: 'Tableau de Bord', url: '/home', icon: 'grid-outline' }, // /home contient vos stats et la carte
-    { title: 'Mes Chantiers', url: '/chantiers', icon: 'hammer-outline' },
-    { title: 'Matériel', url: '/materiels', icon: 'settings-outline' }, // Attention: 'materiel' ou 'materiels' selon vos routes
-    { title: 'Mon Équipe', url: '/team', icon: 'people-outline' },
-    { title: 'Mon Entreprise', url: '/company', icon: 'business' }, // La nouvelle page fusionnée
+    { title: 'Tableau de Bord', url: '/dashboard', icon: 'grid-outline' },
+    { title: 'Mes Chantiers', url: '/home', icon: 'map-outline' },
+    { title: 'Parc Matériel', url: '/materiel', icon: 'hammer-outline' },
+    { title: 'Équipes', url: '/team', icon: 'people-outline' },
+    { title: 'Mon Compte', url: '/settings', icon: 'settings-outline' },
+    { title: 'Planning', url: '/planning', icon: 'calendar-outline' },
+    { title: 'Mon Entreprise', url: '/company', icon: 'business' },
   ];
 
   currentUrl = '';

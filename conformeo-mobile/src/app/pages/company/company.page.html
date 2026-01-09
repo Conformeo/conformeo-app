@@ -3,16 +3,13 @@
     <ion-buttons slot="start">
       <ion-menu-button auto-hide="false"></ion-menu-button>
     </ion-buttons>
-    
     <ion-title>Mon Entreprise</ion-title>
   </ion-toolbar>
   
   <ion-toolbar color="primary">
     <ion-segment [(ngModel)]="segment" value="docs" color="light">
       <ion-segment-button value="docs">
-        <ion-label>
-          GED <ion-icon *ngIf="hasExpiredDocs" name="warning" color="warning"></ion-icon>
-        </ion-label>
+        <ion-label>GED <ion-icon *ngIf="hasExpiredDocs" name="warning" color="warning"></ion-icon></ion-label>
       </ion-segment-button>
       <ion-segment-button value="infos">
         <ion-label>Infos</ion-label>
@@ -24,32 +21,26 @@
 <ion-content class="bg-light ion-padding">
 
   <div *ngIf="segment === 'docs'">
-    
     <div class="alert-banner" *ngIf="hasExpiredDocs">
       <ion-icon name="warning"></ion-icon>
-      <span>Attention, des documents sont périmés !</span>
+      <span>Documents périmés !</span>
     </div>
 
     <ion-list class="doc-list">
       <ion-item-sliding *ngFor="let doc of docs">
         <ion-item lines="none" class="doc-item">
-          
           <div slot="start" class="doc-icon" [ngClass]="doc.type_doc">
             <ion-icon [name]="getIcon(doc.type_doc)"></ion-icon>
           </div>
-
           <ion-label>
             <h2>{{ doc.titre }}</h2>
-            <p>
-              <ion-badge color="light">{{ doc.type_doc }}</ion-badge>
-            </p>
+            <p><ion-badge color="light">{{ doc.type_doc }}</ion-badge></p>
             <div *ngIf="doc.date_expiration" class="exp-badge">
               <ion-badge [color]="getExpirationStatus(doc.date_expiration).color">
                 {{ getExpirationStatus(doc.date_expiration).text }}
               </ion-badge>
             </div>
           </ion-label>
-
           <div slot="end">
             <ion-button fill="clear" color="dark" (click)="signDocument(doc)">
               <ion-icon name="pencil" slot="icon-only"></ion-icon>
@@ -59,7 +50,6 @@
             </ion-button>
           </div>
         </ion-item>
-
         <ion-item-options side="end">
           <ion-item-option color="danger" (click)="deleteDoc(doc)">
             <ion-icon name="trash" slot="icon-only"></ion-icon>
@@ -83,9 +73,15 @@
   <div *ngIf="segment === 'infos' && company">
     <ion-card class="info-card">
       <ion-card-content>
-        <div class="logo-zone">
+        
+        <div class="logo-zone" (click)="triggerLogoUpload()">
           <img [src]="company.logo_url || 'assets/icon/favicon.png'" />
+          <div class="edit-overlay">
+            <ion-icon name="camera" color="light"></ion-icon>
+          </div>
         </div>
+        <input #logoInput type="file" (change)="onLogoSelected($event)" hidden accept="image/*">
+        
         <ion-list lines="full">
           <ion-item>
             <ion-input label="Nom Société" labelPlacement="stacked" [(ngModel)]="company.name"></ion-input>
@@ -115,7 +111,7 @@
       </ion-header>
       <ion-content class="ion-padding">
         <ion-item fill="outline" class="mb-15">
-          <ion-label position="floating">Titre (ex: Kbis 2024)</ion-label>
+          <ion-label position="floating">Titre</ion-label>
           <ion-input [(ngModel)]="newDoc.titre"></ion-input>
         </ion-item>
         <ion-item fill="outline" class="mb-15">
@@ -128,7 +124,7 @@
           </ion-select>
         </ion-item>
         <ion-item fill="outline" class="mb-15">
-          <ion-label>Expiration (Optionnel)</ion-label>
+          <ion-label>Expiration</ion-label>
           <ion-datetime-button datetime="datetime"></ion-datetime-button>
           <ion-modal [keepContentsMounted]="true">
             <ng-template>
