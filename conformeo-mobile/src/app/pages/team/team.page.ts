@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { IonicModule, AlertController, ToastController, LoadingController } from '@ionic/angular'; 
 import { addIcons } from 'ionicons';
-import { add, person, trash, mail, key, business, create } from 'ionicons/icons';
+import { add, person, trash, mail, key, business, create, personAdd } from 'ionicons/icons';
 import { ApiService } from '../../services/api';
 
 @Component({
@@ -31,7 +31,7 @@ export class TeamPage implements OnInit {
     private toastCtrl: ToastController,
     private loadingCtrl: LoadingController
   ) {
-    addIcons({ add, person, trash, mail, key, business, create });
+    addIcons({ add, person, trash, mail, key, business, create, personAdd });
   }
 
   ngOnInit() {
