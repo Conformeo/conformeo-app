@@ -67,6 +67,12 @@ export class HomePage implements OnInit {
       syncOutline, construct, documentTextOutline, locationOutline,
       chevronForwardOutline, cloudUploadOutline, searchOutline
     });
+    // 👇 1. PASSERELLE MAGIQUE (Pour relier le HTML de la carte à Angular)
+    (window as any).openChantier = (id: number) => {
+      this.ngZone.run(() => {
+        this.router.navigate(['/chantiers', id]);
+      });
+    };
   }
 
   ngOnInit() {
@@ -112,11 +118,11 @@ export class HomePage implements OnInit {
 
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap'
-      }).addTo(this.map);
+      }).addTo(this.map!); // Le '!' dit à TypeScript que map existe bien
 
-      // Icône par défaut (optionnel)
+      // Icône par défaut
       const iconDefault = L.icon({
-        iconUrl: 'assets/icon/marker-icon.png',
+        iconUrl: 'assets/icon/marker-icon.png', 
         shadowUrl: 'assets/icon/marker-shadow.png',
         iconSize: [25, 41],
         iconAnchor: [12, 41],
@@ -124,45 +130,25 @@ export class HomePage implements OnInit {
       });
 
       sites.forEach(site => {
-        const marker = L.marker([site.lat, site.lng]); // Ajoutez {icon: iconDefault} si besoin
+        // On vérifie que les coordonnées existent
+        if (site.lat && site.lng) {
+          const marker = L.marker([site.lat, site.lng]); // Ajoutez {icon: iconDefault} si besoin
 
-        // 👇 1. CRÉATION DE L'ÉLÉMENT HTML "EN DUR"
-        const containerDiv = document.createElement('div');
-        containerDiv.style.textAlign = 'center';
+          // 👇 2. CONTENU HTML SIMPLE (Avec le onclick qui appelle notre passerelle)
+          // Notez l'utilisation de onclick="window.openChantier(...)"
+          const popupHtml = `
+            <div style="text-align: center; font-family: sans-serif;">
+              <b style="font-size: 14px; color: #333;">${site.nom}</b><br>
+              <span style="font-size: 12px; color: #666;">${site.client}</span><br>
+              <button onclick="window.openChantier(${site.id})" 
+                style="margin-top: 10px; background-color: #3880ff; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-size: 12px; cursor: pointer; width: 100%;">
+                Voir le dossier 👉
+              </button>
+            </div>
+          `;
 
-        // Le texte (Nom + Client)
-        const infoDiv = document.createElement('div');
-        infoDiv.innerHTML = `
-          <b style="font-size: 14px; color: #333;">${site.nom}</b><br>
-          <span style="font-size: 12px; color: #666;">${site.client}</span>
-        `;
-        containerDiv.appendChild(infoDiv);
-
-        // Le Bouton
-        const btn = document.createElement('button');
-        btn.innerText = 'Voir le dossier 👉';
-        // Styles du bouton
-        btn.style.marginTop = '10px';
-        btn.style.backgroundColor = '#3880ff';
-        btn.style.color = 'white';
-        btn.style.border = 'none';
-        btn.style.padding = '8px 16px';
-        btn.style.borderRadius = '20px';
-        btn.style.fontSize = '12px';
-        btn.style.fontWeight = 'bold';
-        btn.style.cursor = 'pointer';
-
-        // 👇 2. GESTION DU CLIC DIRECTEMENT ICI
-        btn.onclick = () => {
-          this.ngZone.run(() => {
-            this.router.navigate(['/chantiers', site.id]);
-          });
-        };
-
-        containerDiv.appendChild(btn);
-
-        // 👇 3. ON DONNE L'ELEMENT COMPLET A LEAFLET
-        marker.addTo(this.map!).bindPopup(containerDiv);
+          marker.addTo(this.map!).bindPopup(popupHtml);
+        }
       });
 
     }, 200);
