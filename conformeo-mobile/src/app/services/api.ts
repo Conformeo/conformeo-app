@@ -135,7 +135,6 @@ export interface User {
   company_id?: number;
 }
 
-// J'ai assoupli l'interface pour accepter aussi {username, password} si besoin
 export interface UserLogin { email?: string; username?: string; password: string; }
 export interface Token { access_token: string; token_type: string; }
 
@@ -154,23 +153,31 @@ export class ApiService {
     private offline: OfflineService,
     private navCtrl: NavController
   ) { 
-    this.loadToken();
+    // 1. Chargement SYNCHRONE immédiat (Local Storage)
+    // Cela évite les erreurs 401 au démarrage de l'app avant que l'async ne finisse
+    this.token = localStorage.getItem('token') || localStorage.getItem('access_token');
+    
+    // 2. Chargement ASYNCHRONE (Capacitor Preferences) pour la persistance long terme
+    this.loadTokenAsync();
   }
 
-  // --- AUTHENTIFICATION ---
+  // 👇 AJOUTEZ CETTE MÉTHODE (Utilisée par LoginPage)
+  public forceTokenRefresh(newToken: string) {
+    this.token = newToken;
+  }
 
-  async loadToken() {
-    // On charge depuis les préférences Capacitor
+  async loadTokenAsync() {
     const { value } = await Preferences.get({ key: 'auth_token' });
-    this.token = value;
-    
-    // On synchronise aussi avec le localStorage pour getOptions()
-    if (value) localStorage.setItem('token', value);
+    if (value) {
+      this.token = value;
+      // On resynchronise le localStorage au cas où
+      localStorage.setItem('token', value);
+      localStorage.setItem('access_token', value);
+    }
   }
 
   login(credentials: UserLogin): Observable<any> {
     const formData = new FormData();
-    // Supporte 'email' ou 'username' pour la compatibilité
     formData.append('username', credentials.email || credentials.username || '');
     formData.append('password', credentials.password);
 
@@ -179,8 +186,7 @@ export class ApiService {
         const t = res.access_token || (res as any).token;
         this.token = t;
         
-        // 💾 SAUVEGARDE DOUBLE (Capacitor + LocalStorage)
-        // C'est vital pour que getOptions() fonctionne immédiatement après
+        // 💾 DOUBLE SAUVEGARDE
         await Preferences.set({ key: 'auth_token', value: t });
         localStorage.setItem('token', t);
         localStorage.setItem('access_token', t);
@@ -206,32 +212,30 @@ export class ApiService {
     return false;
   }
 
-  // 👇 C'EST ICI QUE VOS ERREURS 401 SONT RÉSOLUES 👇
+  // 👇 MÉTHODE BLINDÉE POUR RÉCUPÉRER LE TOKEN
   public getOptions() {
-    // 1. On essaie la variable mémoire
-    let currentToken = this.token;
+    // 1. Variable mémoire
+    let t = this.token;
 
-    // 2. Si vide, on force la lecture dans le localStorage
-    if (!currentToken) {
-      currentToken = localStorage.getItem('token') || localStorage.getItem('access_token');
+    // 2. Secours LocalStorage
+    if (!t) {
+      t = localStorage.getItem('token') || localStorage.getItem('access_token');
     }
 
-    // 3. Si on a trouvé un token, on l'injecte
-    if (currentToken) {
-      // On remet à jour la variable mémoire au passage
-      this.token = currentToken;
+    // 3. Construction Header
+    if (t) {
+      // Mise à jour mémoire pour les prochains appels
+      this.token = t; 
       return {
         headers: new HttpHeaders({
-          'Authorization': `Bearer ${currentToken}`
+          'Authorization': `Bearer ${t}`
         })
       };
     }
 
-    // 4. Sinon, headers minimums (provoquera une 401 légitime si route protégée)
+    // 4. Fallback sans auth
     return {
-      headers: new HttpHeaders({
-        'Content-Type': 'application/json'
-      })
+      headers: new HttpHeaders({ 'Content-Type': 'application/json' })
     };
   }
 
@@ -290,24 +294,12 @@ export class ApiService {
     formData.append('type_doc', type_doc);
     if (date_expiration) formData.append('date_expiration', date_expiration);
 
-    // On passe getOptions() pour l'auth, mais sans Content-Type JSON (car c'est du FormData)
-    // Angular gère le boundary automatiquement
-    const headers = this.getOptions().headers.delete('Content-Type'); 
+    const headers = this.getOptions().headers?.delete('Content-Type'); 
     return this.http.post<CompanyDoc>(`${this.apiUrl}/companies/me/documents`, formData, { headers });
   }
 
   deleteCompanyDoc(docId: number): Observable<any> {
     return this.http.delete(`${this.apiUrl}/companies/me/documents/${docId}`, this.getOptions());
-  }
-
-  // 👇 MÉTHODE POUR UPLOAD PHOTO GÉNÉRIQUE (Pour Logo Entreprise notamment)
-  uploadPhoto(blob: Blob | File): Observable<{url: string}> {
-    const formData = new FormData();
-    formData.append('file', blob, 'photo.jpg');
-    
-    // Astuce pour FormData : ne pas forcer le Content-Type
-    const headers = this.getOptions().headers.delete('Content-Type');
-    return this.http.post<{url: string}>(`${this.apiUrl}/upload`, formData, { headers });
   }
 
   // ==========================================
@@ -327,7 +319,7 @@ export class ApiService {
   importChantiersCSV(file: File): Observable<any> {
     const formData = new FormData();
     formData.append('file', file);
-    const headers = this.getOptions().headers.delete('Content-Type');
+    const headers = this.getOptions().headers?.delete('Content-Type');
     return this.http.post(`${this.apiUrl}/chantiers/import`, formData, { headers });
   }
 
@@ -361,7 +353,7 @@ export class ApiService {
     const formData = new FormData();
     formData.append('file', file);
     const url = `${this.apiUrl}/chantiers/${chantierId}/documents?titre=${encodeURIComponent(titre)}&categorie=${encodeURIComponent(categorie)}`;
-    const headers = this.getOptions().headers.delete('Content-Type');
+    const headers = this.getOptions().headers?.delete('Content-Type');
     return this.http.post<DocExterne>(url, formData, { headers });
   }
 
@@ -381,6 +373,15 @@ export class ApiService {
     } else {
       return from(this.offline.get(`rapports_${chantierId}`)).pipe(switchMap(d => of(d || [])));
     }
+  }
+
+  uploadPhoto(blob: Blob): Observable<{url: string}> {
+    if (!this.offline.isOnline.value) throw new Error("Offline");
+    const formData = new FormData();
+    formData.append('file', blob, 'photo.jpg');
+    // Important pour FormData
+    const headers = this.getOptions().headers?.delete('Content-Type');
+    return this.http.post<{url: string}>(`${this.apiUrl}/upload`, formData, { headers });
   }
 
   createRapport(rapport: Rapport, photoUrl?: string): Observable<Rapport> {
@@ -455,12 +456,12 @@ export class ApiService {
   importMaterielsCSV(file: File): Observable<any> {
     const formData = new FormData();
     formData.append('file', file);
-    const headers = this.getOptions().headers.delete('Content-Type');
+    const headers = this.getOptions().headers?.delete('Content-Type');
     return this.http.post(`${this.apiUrl}/materiels/import`, formData, { headers });
   }
 
   // ==========================================
-  // 📑 DOCUMENTS (SPS, PIC, INSPECTIONS, PDP, DUERP)
+  // 📑 DOCUMENTS (SPS, PIC, INSPECTIONS, PDP)
   // ==========================================
 
   createPPSPS(doc: any): Observable<any> {
@@ -504,12 +505,13 @@ export class ApiService {
     window.open(url, '_system');
   }
 
-  // DUERP PDF Download
+
+  // 👇 NOUVELLE MÉTHODE POUR TÉLÉCHARGER LE PDF DUERP
   downloadDuerpPdf(annee: string) {
     const url = `${this.apiUrl}/companies/me/duerp/${annee}/pdf`;
     
-    // On force le type blob pour le téléchargement binaire
-    // On utilise any pour contourner le typage strict d'Angular sur 'json'
+    // On doit forcer le type de réponse en 'blob' pour gérer le fichier binaire
+    // On fusionne les options d'auth (getOptions) avec responseType: 'blob'
     const headers = this.getOptions().headers;
     return this.http.get(url, { headers, responseType: 'blob' as 'json' });
   }

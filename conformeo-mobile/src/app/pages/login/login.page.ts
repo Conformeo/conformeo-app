@@ -23,48 +23,47 @@ export class LoginPage {
 
   async login() {
     if (!this.credentials.email || !this.credentials.password) {
-      this.presentToast('Veuillez remplir tous les champs', 'warning');
+      this.presentToast('Veuillez remplir email et mot de passe', 'warning');
       return;
     }
 
-    const loading = await this.loadingCtrl.create({ message: 'Authentification...' });
+    const loading = await this.loadingCtrl.create({ message: 'Connexion...' });
     await loading.present();
 
-    console.log("Tentative de connexion...", this.credentials);
-
-    // 👇 CORRECTION ICI : On envoie l'objet 'this.credentials' en entier
+    // On passe l'objet entier car votre ApiService attend un objet UserLogin
     this.api.login(this.credentials).subscribe({
-      next: (res: any) => {
+      next: async (res: any) => {
         loading.dismiss();
-        console.log("🔍 Réponse Serveur Login :", res);
-
-        // --- SAUVEGARDE DU TOKEN (Partie importante à garder) ---
-        const token = res.token || res.access_token || (res.data ? res.data.token : null);
+        
+        // 1. Analyse de la réponse
+        // FastAPI renvoie souvent 'access_token', parfois 'token'
+        const token = res.access_token || res.token;
 
         if (token) {
-          console.log("✅ Token trouvé ! Sauvegarde...");
+          console.log("🔑 Token reçu :", token.substring(0, 10) + "...");
           
-          localStorage.removeItem('token');
-          localStorage.removeItem('access_token');
-
+          // 2. SAUVEGARDE SYNCHRONE IMMÉDIATE (Vital !)
           localStorage.setItem('token', token);
           localStorage.setItem('access_token', token);
+          
+          // 3. Mise à jour de la variable mémoire du service
+          this.api.forceTokenRefresh(token);
 
+          // 4. Redirection
           this.presentToast('Connexion réussie', 'success');
           this.navCtrl.navigateRoot('/dashboard'); 
         } else {
-          console.error("❌ ERREUR : Pas de token reçu !", res);
-          this.presentToast('Erreur technique : Pas de jeton', 'danger');
+          console.error("❌ Pas de token dans la réponse :", res);
+          this.presentToast('Erreur serveur : Token manquant', 'danger');
         }
       },
       error: (err) => {
         loading.dismiss();
-        console.error("❌ Échec connexion :", err);
-        
-        if (err.status === 401) {
+        console.error("❌ Erreur Login :", err);
+        if (err.status === 401 || err.status === 403) {
           this.presentToast('Email ou mot de passe incorrect', 'danger');
         } else {
-          this.presentToast('Impossible de joindre le serveur', 'warning');
+          this.presentToast('Erreur de connexion serveur', 'warning');
         }
       }
     });
@@ -72,10 +71,7 @@ export class LoginPage {
 
   async presentToast(message: string, color: string) {
     const toast = await this.toastCtrl.create({
-      message: message,
-      duration: 3000,
-      color: color,
-      position: 'top'
+      message, duration: 3000, color, position: 'top'
     });
     toast.present();
   }
