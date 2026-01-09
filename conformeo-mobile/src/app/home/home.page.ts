@@ -94,17 +94,16 @@ export class HomePage implements OnInit {
   }
 
   initMap(sites: any[]) {
-    // Si la carte existe déjà, on la nettoie pour éviter les doublons
+    // Nettoyage
     if (this.map) {
       this.map.remove();
+      this.map = undefined;
     }
 
-    // On attend un petit peu que le HTML soit prêt (sécurité)
     setTimeout(() => {
       const container = document.getElementById('map');
       if (!container) return;
 
-      // 1. Centrer la carte (Par défaut sur la France ou sur le 1er chantier)
       const centerLat = sites.length > 0 ? sites[0].lat : 46.603354;
       const centerLng = sites.length > 0 ? sites[0].lng : 1.888334;
       const zoomLevel = sites.length > 0 ? 10 : 5;
@@ -115,9 +114,9 @@ export class HomePage implements OnInit {
         attribution: '© OpenStreetMap'
       }).addTo(this.map);
 
-      // 2. Ajouter les épingles
+      // Icône par défaut (optionnel)
       const iconDefault = L.icon({
-        iconUrl: 'assets/icon/marker-icon.png', // Assurez-vous d'avoir une icône ou utilisez celle par défaut de Leaflet
+        iconUrl: 'assets/icon/marker-icon.png',
         shadowUrl: 'assets/icon/marker-shadow.png',
         iconSize: [25, 41],
         iconAnchor: [12, 41],
@@ -125,17 +124,45 @@ export class HomePage implements OnInit {
       });
 
       sites.forEach(site => {
-        const marker = L.marker([site.lat, site.lng]) // On peut ajouter {icon: iconDefault} si vous avez les assets
-          .addTo(this.map!)
-          .bindPopup(`<b>${site.nom}</b><br>${site.client}`);
+        const marker = L.marker([site.lat, site.lng]); // Ajoutez {icon: iconDefault} si besoin
 
-        // 👇 LE CLICK MAGIQUE 👇
-        marker.on('click', () => {
+        // 👇 1. CRÉATION DE L'ÉLÉMENT HTML "EN DUR"
+        const containerDiv = document.createElement('div');
+        containerDiv.style.textAlign = 'center';
+
+        // Le texte (Nom + Client)
+        const infoDiv = document.createElement('div');
+        infoDiv.innerHTML = `
+          <b style="font-size: 14px; color: #333;">${site.nom}</b><br>
+          <span style="font-size: 12px; color: #666;">${site.client}</span>
+        `;
+        containerDiv.appendChild(infoDiv);
+
+        // Le Bouton
+        const btn = document.createElement('button');
+        btn.innerText = 'Voir le dossier 👉';
+        // Styles du bouton
+        btn.style.marginTop = '10px';
+        btn.style.backgroundColor = '#3880ff';
+        btn.style.color = 'white';
+        btn.style.border = 'none';
+        btn.style.padding = '8px 16px';
+        btn.style.borderRadius = '20px';
+        btn.style.fontSize = '12px';
+        btn.style.fontWeight = 'bold';
+        btn.style.cursor = 'pointer';
+
+        // 👇 2. GESTION DU CLIC DIRECTEMENT ICI
+        btn.onclick = () => {
           this.ngZone.run(() => {
-            // Redirection vers la page détail du chantier
             this.router.navigate(['/chantiers', site.id]);
           });
-        });
+        };
+
+        containerDiv.appendChild(btn);
+
+        // 👇 3. ON DONNE L'ELEMENT COMPLET A LEAFLET
+        marker.addTo(this.map!).bindPopup(containerDiv);
       });
 
     }, 200);
