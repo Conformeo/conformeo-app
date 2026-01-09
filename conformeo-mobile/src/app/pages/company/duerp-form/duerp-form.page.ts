@@ -2,7 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { IonicModule, ToastController, LoadingController, AlertController } from '@ionic/angular';
-import { ApiService } from '../../../services/api'; // Votre service API
+import { ApiService } from '../../../services/api'; // Vérifiez que le chemin est bon
 import { addIcons } from 'ionicons';
 import { add, trash, save, download, arrowBack } from 'ionicons/icons';
 
@@ -32,13 +32,14 @@ export class DuerpFormPage implements OnInit {
   }
 
   loadDuerp() {
-    // Appel API GET DUERP (à ajouter dans api.service.ts)
+    // Récupération des données
     this.api.http.get<any>(`${this.api.apiUrl}/companies/me/duerp/${this.annee}`, this.api.getOptions()).subscribe({
       next: (data) => {
         if (data.lignes) this.lignes = data.lignes;
         else this.lignes = [];
         
-        if (this.lignes.length === 0) this.addRow(); // Une ligne vide par défaut
+        // Ajout d'une ligne vide par défaut si le tableau est vide
+        if (this.lignes.length === 0) this.addRow(); 
       },
       error: () => this.addRow()
     });
@@ -58,7 +59,6 @@ export class DuerpFormPage implements OnInit {
 
     const payload = { annee: this.annee, lignes: this.lignes };
 
-    // Appel API POST DUERP (à ajouter dans api.service.ts)
     this.api.http.post(`${this.api.apiUrl}/companies/me/duerp`, payload, this.api.getOptions()).subscribe({
       next: () => {
         load.dismiss();
@@ -71,11 +71,37 @@ export class DuerpFormPage implements OnInit {
     });
   }
 
-  downloadPdf() {
+  // 👇 MISE À JOUR : TÉLÉCHARGEMENT SÉCURISÉ
+  async downloadPdf() {
+    const load = await this.loadingCtrl.create({ message: 'Génération du PDF...' });
+    await load.present();
+
     const url = `${this.api.apiUrl}/companies/me/duerp/${this.annee}/pdf`;
-    // Il faut ajouter le token dans l'URL ou utiliser le navigateur système qui gère les cookies/session si possible
-    // Pour simplifier ici avec votre méthode :
-    window.open(url, '_system');
+    
+    // On construit les options manuellement pour inclure le Token ET le type Blob
+    const options: any = {
+      headers: this.api.getOptions().headers, // Récupère le token de votre service
+      responseType: 'blob' // Indispensable pour les fichiers PDF/Images
+    };
+
+    this.api.http.get(url, options).subscribe({
+      next: (blob: any) => {
+        load.dismiss();
+        
+        // 1. Création d'une URL temporaire pour le fichier
+        const fileUrl = window.URL.createObjectURL(blob);
+        
+        // 2. Ouverture dans le navigateur système (ou visualiseur PDF)
+        window.open(fileUrl, '_system');
+        
+        this.presentToast('PDF téléchargé 📄', 'success');
+      },
+      error: (err) => {
+        console.error(err);
+        load.dismiss();
+        this.presentToast('Erreur lors du téléchargement', 'danger');
+      }
+    });
   }
 
   async presentToast(message: string, color: string) {

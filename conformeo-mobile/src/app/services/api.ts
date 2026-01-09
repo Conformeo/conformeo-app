@@ -478,6 +478,21 @@ export class ApiService {
     window.open(url, '_system');
   }
 
+
+  // 👇 NOUVELLE MÉTHODE POUR TÉLÉCHARGER LE PDF DUERP
+  downloadDuerpPdf(annee: string) {
+    const url = `${this.apiUrl}/companies/me/duerp/${annee}/pdf`;
+    
+    // On doit forcer le type de réponse en 'blob' pour gérer le fichier binaire
+    // On fusionne les options d'auth (getOptions) avec responseType: 'blob'
+    const options: any = {
+        headers: this.getOptions().headers,
+        responseType: 'blob' as 'json' // Astuce TypeScript pour dire qu'on veut un Blob
+    };
+
+    return this.http.get(url, options);
+  }
+
   // PLAN PREVENTION
   createPdp(data: any) {
     return this.http.post<PlanPrevention>(`${this.apiUrl}/plans-prevention`, data, this.getOptions());
