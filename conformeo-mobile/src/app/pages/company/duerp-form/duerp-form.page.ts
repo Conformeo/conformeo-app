@@ -69,48 +69,71 @@ export class DuerpFormPage implements OnInit {
   // 👇 VERSION BLINDÉE DE LA FONCTION DE TÉLÉCHARGEMENT
   async downloadPdf() {
     console.log("1. Début demande téléchargement...");
+    
+    // 🔍 DIAGNOSTIC : On cherche le token sous plusieurs noms possibles
+    let token = localStorage.getItem('token');
+    
+    // Si 'token' est vide, on essaie 'access_token' (nom fréquent)
+    if (!token) {
+        console.log("⚠️ Pas de 'token', essai avec 'access_token'...");
+        token = localStorage.getItem('access_token');
+    }
+
+    // 🛑 STOP si toujours rien
+    if (!token) {
+        console.error("❌ ERREUR FATALE : Aucun token trouvé dans le stockage !");
+        this.presentToast('Erreur : Vous semblez déconnecté (Token vide).', 'danger');
+        // Force la déconnexion si vous avez une méthode pour ça, sinon :
+        // this.router.navigate(['/login']);
+        return;
+    }
+
+    console.log("✅ Token trouvé (début) :", token.substring(0, 10) + "...");
+
     const load = await this.loadingCtrl.create({ message: 'Génération du PDF...' });
     await load.present();
 
     const url = `${this.api.apiUrl}/companies/me/duerp/${this.annee}/pdf`;
     
-    // On récupère le token
-    const token = localStorage.getItem('token');
-    const headers = new HttpHeaders({ 'Authorization': `Bearer ${token}` });
+    const headers = new HttpHeaders({
+        'Authorization': `Bearer ${token}`
+    });
 
     this.api.http.get(url, { headers, responseType: 'blob' }).subscribe({
       next: (blob: any) => {
-        console.log("2. Fichier reçu !", blob);
+        console.log("2. Fichier reçu (Taille):", blob.size);
         load.dismiss();
         
-        // 1. URL Blob
         const fileUrl = window.URL.createObjectURL(blob);
         
-        // 2. Stratégie double : Ouvrir ET Télécharger
-        
-        // A. Essayer d'ouvrir dans une nouvelle fenêtre (Meilleur pour mobile)
+        // Méthode hybride (Fenêtre + Lien caché) pour max compatibilité
         const win = window.open(fileUrl, '_blank');
         
-        // B. Si le navigateur a bloqué la fenêtre (win est null), on tente le téléchargement forcé
         if (!win) {
+            console.log("⚠️ Popup bloquée, tentative lien direct...");
             const link = document.createElement('a');
             link.href = fileUrl;
             link.download = `DUERP_${this.annee}.pdf`;
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
-            this.presentToast('Si le fichier ne s\'ouvre pas, vérifiez vos pop-ups.', 'warning');
-        } else {
-            this.presentToast('PDF ouvert 📄', 'success');
         }
-
-        // Nettoyage après 1 minute (pour laisser le temps au mobile d'ouvrir)
-        setTimeout(() => window.URL.revokeObjectURL(fileUrl), 60000);
+        
+        // Nettoyage plus rapide (10s)
+        setTimeout(() => window.URL.revokeObjectURL(fileUrl), 10000);
+        this.presentToast('PDF ouvert/téléchargé 📄', 'success');
       },
       error: (err) => {
-        console.error("Erreur", err);
         load.dismiss();
-        this.presentToast('Erreur téléchargement', 'danger');
+        console.error("3. ERREUR API :", err);
+        
+        if (err.status === 401) {
+            this.presentToast('Session expirée : Veuillez vous reconnecter.', 'warning');
+        } else if (err.status === 500) {
+            this.presentToast('Erreur interne serveur (Python)', 'danger');
+        } else {
+            this.presentToast(`Erreur ${err.status}`, 'danger');
+        }
       }
     });
   }
