@@ -69,53 +69,48 @@ export class DuerpFormPage implements OnInit {
   // 👇 VERSION BLINDÉE DE LA FONCTION DE TÉLÉCHARGEMENT
   async downloadPdf() {
     console.log("1. Début demande téléchargement...");
-    
-    // 1. On récupère le token BRUT (pour être sûr à 100%)
-    const token = localStorage.getItem('token'); // Ou la clé que vous utilisez (ex: 'access_token')
-    
-    if (!token) {
-        this.presentToast('Erreur : Vous êtes déconnecté.', 'danger');
-        return;
-    }
-
     const load = await this.loadingCtrl.create({ message: 'Génération du PDF...' });
     await load.present();
 
     const url = `${this.api.apiUrl}/companies/me/duerp/${this.annee}/pdf`;
     
-    // 2. On construit les headers MANUELLEMENT
-    const headers = new HttpHeaders({
-        'Authorization': `Bearer ${token}`
-    });
+    // On récupère le token
+    const token = localStorage.getItem('token');
+    const headers = new HttpHeaders({ 'Authorization': `Bearer ${token}` });
 
-    // 3. On prépare la requête pour recevoir un BLOB (Fichier)
-    this.api.http.get(url, { headers: headers, responseType: 'blob' }).subscribe({
+    this.api.http.get(url, { headers, responseType: 'blob' }).subscribe({
       next: (blob: any) => {
         console.log("2. Fichier reçu !", blob);
         load.dismiss();
         
+        // 1. URL Blob
         const fileUrl = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = fileUrl;
-        link.download = `DUERP_${this.annee}.pdf`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(fileUrl);
         
-        this.presentToast('Téléchargement lancé 🚀', 'success');
+        // 2. Stratégie double : Ouvrir ET Télécharger
+        
+        // A. Essayer d'ouvrir dans une nouvelle fenêtre (Meilleur pour mobile)
+        const win = window.open(fileUrl, '_blank');
+        
+        // B. Si le navigateur a bloqué la fenêtre (win est null), on tente le téléchargement forcé
+        if (!win) {
+            const link = document.createElement('a');
+            link.href = fileUrl;
+            link.download = `DUERP_${this.annee}.pdf`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            this.presentToast('Si le fichier ne s\'ouvre pas, vérifiez vos pop-ups.', 'warning');
+        } else {
+            this.presentToast('PDF ouvert 📄', 'success');
+        }
+
+        // Nettoyage après 1 minute (pour laisser le temps au mobile d'ouvrir)
+        setTimeout(() => window.URL.revokeObjectURL(fileUrl), 60000);
       },
       error: (err) => {
-        console.error("3. ERREUR :", err);
+        console.error("Erreur", err);
         load.dismiss();
-        
-        if (err.status === 401) {
-            this.presentToast('Session expirée. Déconnectez-vous et réessayez.', 'warning');
-        } else if (err.status === 500) {
-            this.presentToast('Erreur Serveur (Le PDF plante côté Python)', 'danger');
-        } else {
-            this.presentToast(`Erreur ${err.status} lors du téléchargement`, 'danger');
-        }
+        this.presentToast('Erreur téléchargement', 'danger');
       }
     });
   }
