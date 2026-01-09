@@ -827,13 +827,24 @@ def get_duerp(annee: str, db: Session = Depends(get_db), current_user: models.Us
 
 @app.get("/companies/me/duerp/{annee}/pdf")
 def download_duerp_pdf(annee: str, db: Session = Depends(get_db), current_user: models.User = Depends(security.get_current_user)):
+    # 1. Récupération des données
     d = db.query(models.DUERP).filter(models.DUERP.company_id == current_user.company_id, models.DUERP.annee == annee).first()
     if not d: raise HTTPException(404, "DUERP introuvable")
     
     comp = db.query(models.Company).filter(models.Company.id == current_user.company_id).first()
-    path = f"uploads/DUERP_{comp.name}_{annee}.pdf"
+    
+    # 2. Création du dossier uploads s'il n'existe pas (Important sur Render)
+    if not os.path.exists("uploads"):
+        os.makedirs("uploads")
+
+    # 3. Génération
+    filename = f"DUERP_{comp.name.replace(' ', '_')}_{annee}.pdf"
+    path = f"uploads/{filename}"
+    
     pdf_generator.generate_duerp_pdf(comp, d, path)
-    return FileResponse(path, media_type='application/pdf')
+    
+    # 4. Envoi
+    return FileResponse(path, media_type='application/pdf', filename=filename)
 
 # ==========================================
 # 9. FIX & MIGRATIONS
