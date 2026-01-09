@@ -177,21 +177,21 @@ export class ApiService {
   }
 
   login(credentials: UserLogin): Observable<any> {
-    // 👇 CORRECTION MAJEURE : On passe de FormData à URLSearchParams
-    // FastAPI /token attend impérativement du 'application/x-www-form-urlencoded'
+    // 1. On prépare le corps de la requête au format "x-www-form-urlencoded"
+    // C'est le SEUL format que FastAPI /token accepte par défaut.
     const body = new URLSearchParams();
     body.set('username', credentials.email || credentials.username || '');
     body.set('password', credentials.password);
 
-    // On force l'en-tête correct
+    // 2. On définit les en-têtes explicitement
     const headers = new HttpHeaders({
-      'Content-Type': 'application/x-www-form-urlencoded'
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'Accept': 'application/json'
     });
 
-    // On envoie body.toString()
+    // 3. On envoie body.toString() (c'est important !)
     return this.http.post<Token>(`${this.apiUrl}/token`, body.toString(), { headers }).pipe(
       tap(async (res) => {
-        // Log pour vérifier que ça passe enfin
         console.log("✅ API Service : Token reçu !", res);
 
         const t = res.access_token || (res as any).token;
