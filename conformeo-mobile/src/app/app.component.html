@@ -9,23 +9,32 @@
         </div>
 
         <ion-list id="inbox-list">
-          <ion-item *ngFor="let p of appPages" 
-                    button="true" 
-                    (click)="navigateTo(p.url)" 
-                    lines="none" 
-                    detail="false" 
-                    [class.selected]="isUrlActive(p.url)">
-            <ion-icon aria-hidden="true" slot="start" [name]="p.icon"></ion-icon>
-            <ion-label>{{ p.title }}</ion-label>
-          </ion-item>
+          <ion-menu-toggle auto-hide="false" *ngFor="let p of appPages">
+            
+            <ion-item 
+              button 
+              [routerLink]="[p.url]" 
+              routerDirection="root" 
+              lines="none" 
+              detail="false" 
+              [class.selected]="isUrlActive(p.url)">
+              
+              <ion-icon aria-hidden="true" slot="start" [name]="p.icon"></ion-icon>
+              <ion-label>{{ p.title }}</ion-label>
+            </ion-item>
+
+          </ion-menu-toggle>
         </ion-list>
 
         <ion-list id="labels-list">
-          <ion-item lines="none" button (click)="logout()">
-            <ion-icon slot="start" name="log-out-outline" color="danger"></ion-icon>
-            <ion-label color="danger">Déconnexion</ion-label>
-          </ion-item>
+          <ion-menu-toggle auto-hide="false">
+            <ion-item lines="none" button (click)="logout()">
+              <ion-icon slot="start" name="log-out-outline" color="danger"></ion-icon>
+              <ion-label color="danger">Déconnexion</ion-label>
+            </ion-item>
+          </ion-menu-toggle>
         </ion-list>
+
       </ion-content>
     </ion-menu>
 
