@@ -49,9 +49,9 @@ export interface Chantier {
   date_debut?: string;
   date_fin?: string;
   statut_planning?: string;
-  soumis_sps: boolean; // V11
-  latitude?: number;   // V10 (GPS)
-  longitude?: number;  // V10 (GPS)
+  soumis_sps: boolean;
+  latitude?: number;
+  longitude?: number;
 }
 
 export interface Rapport {
@@ -109,15 +109,14 @@ export interface PIC {
   date_update?: string;
 }
 
-// Interface mise à jour avec les signatures
 export interface PlanPrevention {
   id?: number;
   chantier_id: number;
   entreprise_utilisatrice: string;
   entreprise_exterieure: string;
-  date_inspection_commune: string; // ISO Date
-  signature_eu?: string | null; // Signature Client
-  signature_ee?: string | null; // Signature Nous
+  date_inspection_commune: string;
+  signature_eu?: string | null;
+  signature_ee?: string | null;
   risques_interferents: { tache: string; risque: string; mesure: string }[];
   consignes_securite: {
     urgence?: string;
@@ -136,7 +135,8 @@ export interface User {
   company_id?: number;
 }
 
-export interface UserLogin { email: string; password: string; }
+// J'ai assoupli l'interface pour accepter aussi {username, password} si besoin
+export interface UserLogin { email?: string; username?: string; password: string; }
 export interface Token { access_token: string; token_type: string; }
 
 @Injectable({
@@ -144,7 +144,6 @@ export interface Token { access_token: string; token_type: string; }
 })
 export class ApiService {
   
-  // 👇 MODIFIEZ CECI SI VOTRE URL A CHANGÉ
   public apiUrl = 'https://conformeo-api.onrender.com'; 
   
   public needsRefresh = false;
@@ -161,19 +160,30 @@ export class ApiService {
   // --- AUTHENTIFICATION ---
 
   async loadToken() {
+    // On charge depuis les préférences Capacitor
     const { value } = await Preferences.get({ key: 'auth_token' });
     this.token = value;
+    
+    // On synchronise aussi avec le localStorage pour getOptions()
+    if (value) localStorage.setItem('token', value);
   }
 
   login(credentials: UserLogin): Observable<any> {
     const formData = new FormData();
-    formData.append('username', credentials.email);
+    // Supporte 'email' ou 'username' pour la compatibilité
+    formData.append('username', credentials.email || credentials.username || '');
     formData.append('password', credentials.password);
 
     return this.http.post<Token>(`${this.apiUrl}/token`, formData).pipe(
       tap(async (res) => {
-        this.token = res.access_token;
-        await Preferences.set({ key: 'auth_token', value: res.access_token });
+        const t = res.access_token || (res as any).token;
+        this.token = t;
+        
+        // 💾 SAUVEGARDE DOUBLE (Capacitor + LocalStorage)
+        // C'est vital pour que getOptions() fonctionne immédiatement après
+        await Preferences.set({ key: 'auth_token', value: t });
+        localStorage.setItem('token', t);
+        localStorage.setItem('access_token', t);
       })
     );
   }
@@ -181,6 +191,8 @@ export class ApiService {
   logout() {
     this.token = null;
     Preferences.remove({ key: 'auth_token' });
+    localStorage.removeItem('token');
+    localStorage.removeItem('access_token');
     this.navCtrl.navigateRoot('/login');
   }
 
@@ -194,24 +206,33 @@ export class ApiService {
     return false;
   }
 
-  // Ajoute le Header "Authorization: Bearer ..."
-  // Cette méthode est utilisée par la majorité des fonctions
+  // 👇 C'EST ICI QUE VOS ERREURS 401 SONT RÉSOLUES 👇
   public getOptions() {
-    if (this.token) {
+    // 1. On essaie la variable mémoire
+    let currentToken = this.token;
+
+    // 2. Si vide, on force la lecture dans le localStorage
+    if (!currentToken) {
+      currentToken = localStorage.getItem('token') || localStorage.getItem('access_token');
+    }
+
+    // 3. Si on a trouvé un token, on l'injecte
+    if (currentToken) {
+      // On remet à jour la variable mémoire au passage
+      this.token = currentToken;
       return {
         headers: new HttpHeaders({
-          'Authorization': `Bearer ${this.token}`
+          'Authorization': `Bearer ${currentToken}`
         })
       };
     }
-    // Tentative de récupération synchrone si token est null (cas rare)
-    const storedToken = localStorage.getItem('token'); 
-    // Note: localStorage est moins sécurisé que Capacitor Preferences mais plus rapide pour du synchrone ici
-    // Idéalement, on charge tout au démarrage.
-    if (storedToken) {
-       return { headers: new HttpHeaders({ 'Authorization': `Bearer ${storedToken}` }) };
-    }
-    return {};
+
+    // 4. Sinon, headers minimums (provoquera une 401 légitime si route protégée)
+    return {
+      headers: new HttpHeaders({
+        'Content-Type': 'application/json'
+      })
+    };
   }
 
   // --- OFFLINE TOOLS ---
@@ -269,11 +290,24 @@ export class ApiService {
     formData.append('type_doc', type_doc);
     if (date_expiration) formData.append('date_expiration', date_expiration);
 
-    return this.http.post<CompanyDoc>(`${this.apiUrl}/companies/me/documents`, formData, this.getOptions());
+    // On passe getOptions() pour l'auth, mais sans Content-Type JSON (car c'est du FormData)
+    // Angular gère le boundary automatiquement
+    const headers = this.getOptions().headers.delete('Content-Type'); 
+    return this.http.post<CompanyDoc>(`${this.apiUrl}/companies/me/documents`, formData, { headers });
   }
 
   deleteCompanyDoc(docId: number): Observable<any> {
     return this.http.delete(`${this.apiUrl}/companies/me/documents/${docId}`, this.getOptions());
+  }
+
+  // 👇 MÉTHODE POUR UPLOAD PHOTO GÉNÉRIQUE (Pour Logo Entreprise notamment)
+  uploadPhoto(blob: Blob | File): Observable<{url: string}> {
+    const formData = new FormData();
+    formData.append('file', blob, 'photo.jpg');
+    
+    // Astuce pour FormData : ne pas forcer le Content-Type
+    const headers = this.getOptions().headers.delete('Content-Type');
+    return this.http.post<{url: string}>(`${this.apiUrl}/upload`, formData, { headers });
   }
 
   // ==========================================
@@ -293,7 +327,8 @@ export class ApiService {
   importChantiersCSV(file: File): Observable<any> {
     const formData = new FormData();
     formData.append('file', file);
-    return this.http.post(`${this.apiUrl}/chantiers/import`, formData, this.getOptions());
+    const headers = this.getOptions().headers.delete('Content-Type');
+    return this.http.post(`${this.apiUrl}/chantiers/import`, formData, { headers });
   }
 
   createChantier(chantier: Chantier): Observable<Chantier> {
@@ -325,9 +360,9 @@ export class ApiService {
   uploadChantierDoc(chantierId: number, file: File, titre: string, categorie: string): Observable<DocExterne> {
     const formData = new FormData();
     formData.append('file', file);
-    // Envoi des métadonnées en Query Params (simple et efficace avec FastAPI)
     const url = `${this.apiUrl}/chantiers/${chantierId}/documents?titre=${encodeURIComponent(titre)}&categorie=${encodeURIComponent(categorie)}`;
-    return this.http.post<DocExterne>(url, formData, this.getOptions());
+    const headers = this.getOptions().headers.delete('Content-Type');
+    return this.http.post<DocExterne>(url, formData, { headers });
   }
 
   deleteChantierDoc(docId: number): Observable<any> {
@@ -346,13 +381,6 @@ export class ApiService {
     } else {
       return from(this.offline.get(`rapports_${chantierId}`)).pipe(switchMap(d => of(d || [])));
     }
-  }
-
-  uploadPhoto(blob: Blob): Observable<{url: string}> {
-    if (!this.offline.isOnline.value) throw new Error("Offline");
-    const formData = new FormData();
-    formData.append('file', blob, 'photo.jpg');
-    return this.http.post<{url: string}>(`${this.apiUrl}/upload`, formData, this.getOptions());
   }
 
   createRapport(rapport: Rapport, photoUrl?: string): Observable<Rapport> {
@@ -427,11 +455,12 @@ export class ApiService {
   importMaterielsCSV(file: File): Observable<any> {
     const formData = new FormData();
     formData.append('file', file);
-    return this.http.post(`${this.apiUrl}/materiels/import`, formData, this.getOptions());
+    const headers = this.getOptions().headers.delete('Content-Type');
+    return this.http.post(`${this.apiUrl}/materiels/import`, formData, { headers });
   }
 
   // ==========================================
-  // 📑 DOCUMENTS (SPS, PIC, INSPECTIONS, PDP)
+  // 📑 DOCUMENTS (SPS, PIC, INSPECTIONS, PDP, DUERP)
   // ==========================================
 
   createPPSPS(doc: any): Observable<any> {
@@ -450,8 +479,6 @@ export class ApiService {
   
   // PIC
   savePIC(doc: any): Observable<any> {
-    // Attention : l'URL dans le backend est /chantiers/{cid}/pic (POST)
-    // Assurez-vous que 'doc' contient chantier_id
     if (!doc.chantier_id) throw new Error("Chantier ID manquant pour le PIC");
     return this.http.post<any>(`${this.apiUrl}/chantiers/${doc.chantier_id}/pic`, doc, this.getOptions());
   }
@@ -464,7 +491,6 @@ export class ApiService {
     return this.http.put(`${this.apiUrl}/chantiers/${chantierId}/signature?signature_url=${encodeURIComponent(signatureUrl)}`, {}, this.getOptions());
   }
 
-  // Nouvelle méthode pour signer un doc entreprise
   signCompanyDoc(docId: number, nomSignataire: string, signatureUrl: string): Observable<any> {
     const payload = {
       nom_signataire: nomSignataire,
@@ -478,19 +504,14 @@ export class ApiService {
     window.open(url, '_system');
   }
 
-
-  // 👇 NOUVELLE MÉTHODE POUR TÉLÉCHARGER LE PDF DUERP
+  // DUERP PDF Download
   downloadDuerpPdf(annee: string) {
     const url = `${this.apiUrl}/companies/me/duerp/${annee}/pdf`;
     
-    // On doit forcer le type de réponse en 'blob' pour gérer le fichier binaire
-    // On fusionne les options d'auth (getOptions) avec responseType: 'blob'
-    const options: any = {
-        headers: this.getOptions().headers,
-        responseType: 'blob' as 'json' // Astuce TypeScript pour dire qu'on veut un Blob
-    };
-
-    return this.http.get(url, options);
+    // On force le type blob pour le téléchargement binaire
+    // On utilise any pour contourner le typage strict d'Angular sur 'json'
+    const headers = this.getOptions().headers;
+    return this.http.get(url, { headers, responseType: 'blob' as 'json' });
   }
 
   // PLAN PREVENTION
@@ -544,12 +565,10 @@ export class ApiService {
     return this.http.post(`${this.apiUrl}/team/invite`, data, this.getOptions());
   }
 
-  // 👇 C'EST CETTE MÉTHODE QUI MANQUAIT
   updateTeamMember(userId: number, data: any): Observable<any> {
     return this.http.put(`${this.apiUrl}/team/${userId}`, data, this.getOptions());
   }
 
-  // Alias pour la compatibilité (si utilisé ailleurs)
   addTeamMember(user: any): Observable<User> {
     return this.inviteMember(user);
   }
