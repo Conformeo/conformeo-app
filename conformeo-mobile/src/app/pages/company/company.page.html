@@ -74,10 +74,22 @@
     <ion-card class="info-card">
       <ion-card-content>
         
-        <div class="logo-zone" (click)="triggerLogoUpload()">
-          <img [src]="company.logo_url || 'assets/icon/favicon.png'" />
-          <div class="edit-overlay">
-            <ion-icon name="camera" color="light"></ion-icon>
+        <div class="logo-container">
+          <div class="logo-drop-zone" 
+               [class.dragging]="isLogoDragging"
+               (click)="triggerLogoUpload()"
+               (dragover)="onLogoDragOver($event)"
+               (dragleave)="onLogoDragLeave($event)"
+               (drop)="onLogoDrop($event)">
+            
+            <img *ngIf="company?.logo_url" [src]="company.logo_url" class="logo-preview" />
+            <img *ngIf="!company?.logo_url" src="assets/icon/favicon.png" class="logo-preview" style="opacity: 0.2;" />
+
+            <div class="drop-content">
+              <ion-icon name="cloud-upload-outline"></ion-icon>
+              <h3>Logo Entreprise</h3>
+              <p>Glissez votre logo ici<br>ou cliquez pour choisir</p>
+            </div>
           </div>
         </div>
         <input #logoInput type="file" (change)="onLogoSelected($event)" hidden accept="image/*">

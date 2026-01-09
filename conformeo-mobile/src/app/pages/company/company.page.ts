@@ -7,10 +7,10 @@ import {
 import { addIcons } from 'ionicons';
 import { 
   business, documentText, cloudUpload, trash, shieldCheckmark, 
-  briefcase, warning, calendar, eye, pencil, add, folderOpen, close, camera
+  briefcase, warning, calendar, eye, pencil, add, folderOpen, close, camera, cloudUploadOutline
 } from 'ionicons/icons';
 import { ApiService, Company, CompanyDoc } from '../../services/api';
-import { SignatureModalComponent } from '..//chantier-details/signature-modal/signature-modal.component';
+import { SignatureModalComponent } from '../chantier-details/signature-modal/signature-modal.component';
 
 @Component({
   selector: 'app-company',
@@ -34,8 +34,11 @@ export class CompanyPage implements OnInit {
   selectedFile: File | null = null;
   @ViewChild('fileInput') fileInput!: ElementRef;
 
-  // 👇 AJOUT : Référence pour l'input du Logo
+  // Référence pour l'input du Logo
   @ViewChild('logoInput') logoInput!: ElementRef;
+  
+  // État pour le style visuel du Drag & Drop
+  isLogoDragging = false; 
 
   constructor(
     private api: ApiService,
@@ -46,7 +49,7 @@ export class CompanyPage implements OnInit {
   ) {
     addIcons({ 
       business, documentText, cloudUpload, trash, shieldCheckmark, 
-      briefcase, warning, calendar, eye, pencil, add, folderOpen, close, camera
+      briefcase, warning, calendar, eye, pencil, add, folderOpen, close, camera, cloudUploadOutline
     });
   }
 
@@ -70,35 +73,65 @@ export class CompanyPage implements OnInit {
     });
   }
 
-  // --- 👇 NOUVEAU : GESTION DU LOGO ---
+  // --- GESTION DU LOGO (DRAG & DROP + CLIC) ---
 
   triggerLogoUpload() {
-    // Simule le clic sur l'input caché
     this.logoInput.nativeElement.click();
   }
 
-  async onLogoSelected(event: any) {
+  // 1. Gestion des événements Drag & Drop
+  onLogoDragOver(event: DragEvent) {
+    event.preventDefault();
+    event.stopPropagation();
+    this.isLogoDragging = true;
+  }
+
+  onLogoDragLeave(event: DragEvent) {
+    event.preventDefault();
+    event.stopPropagation();
+    this.isLogoDragging = false;
+  }
+
+  onLogoDrop(event: DragEvent) {
+    event.preventDefault();
+    event.stopPropagation();
+    this.isLogoDragging = false;
+    
+    if (event.dataTransfer && event.dataTransfer.files.length > 0) {
+      const file = event.dataTransfer.files[0];
+      if (file.type.startsWith('image/')) {
+        this.processLogoUpload(file);
+      } else {
+        this.presentToast('Veuillez glisser une image valide (JPG, PNG)', 'warning');
+      }
+    }
+  }
+
+  // 2. Sélection classique via clic (Input File)
+  onLogoSelected(event: any) {
     const file = event.target.files[0];
-    if (!file || !this.company) return;
+    if (file) this.processLogoUpload(file);
+  }
+
+  // 3. Logique commune d'envoi vers le serveur
+  async processLogoUpload(file: File) {
+    if (!this.company) return;
 
     const load = await this.loadingCtrl.create({ message: 'Mise à jour du logo...' });
     await load.present();
 
-    // 1. On upload l'image via la route générique d'upload
     this.api.uploadPhoto(file).subscribe({
       next: (res) => {
-        // 2. On met à jour l'URL dans l'objet company
         if (this.company) {
             this.company.logo_url = res.url;
-            // 3. On sauvegarde les infos de l'entreprise
-            this.saveInfos(false); // false = pas de toast "sauvegardé" pour éviter le doublon
+            this.saveInfos(false); // Sauvegarde auto en BDD
         }
         load.dismiss();
-        this.presentToast('Logo modifié avec succès ! 📸', 'success');
+        this.presentToast('Logo modifié ! 📸', 'success');
       },
       error: () => {
         load.dismiss();
-        this.presentToast('Erreur lors de l\'envoi du logo', 'danger');
+        this.presentToast('Erreur upload logo', 'danger');
       }
     });
   }
