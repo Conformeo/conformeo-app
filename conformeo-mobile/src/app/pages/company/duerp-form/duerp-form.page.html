@@ -1,0 +1,65 @@
+<ion-header>
+  <ion-toolbar color="tertiary">
+    <ion-buttons slot="start"><ion-back-button defaultHref="/company"></ion-back-button></ion-buttons>
+    <ion-title>DUERP {{ annee }}</ion-title>
+    <ion-buttons slot="end">
+      <ion-button (click)="downloadPdf()">
+        <ion-icon name="download" slot="icon-only"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="bg-light ion-padding">
+
+  <div class="header-info">
+    <p>Ce document est obligatoire et doit être mis à jour au moins une fois par an.</p>
+  </div>
+
+  <div *ngFor="let l of lignes; let i = index" class="duerp-card">
+    <div class="card-header">
+      <span class="index">Ligne #{{ i + 1 }}</span>
+      <ion-button fill="clear" color="danger" size="small" (click)="removeRow(i)">
+        <ion-icon name="trash" slot="icon-only"></ion-icon>
+      </ion-button>
+    </div>
+
+    <ion-item lines="none" class="input-item">
+      <ion-label position="stacked">1. Tâches effectuées</ion-label>
+      <ion-textarea [(ngModel)]="l.tache" placeholder="Ex: Utilisation marteau-piqueur" rows="2"></ion-textarea>
+    </ion-item>
+
+    <ion-item lines="none" class="input-item">
+      <ion-label position="stacked">2. Identification des Risques</ion-label>
+      <ion-textarea [(ngModel)]="l.risque" placeholder="Ex: Bruit, Vibrations" rows="2"></ion-textarea>
+    </ion-item>
+
+    <ion-item lines="none" class="input-item">
+      <ion-label position="stacked">3. Gravité * (de 1 à 3)</ion-label>
+      <ion-select [(ngModel)]="l.gravite" interface="popover">
+        <ion-select-option [value]="1">1 - Faible</ion-select-option>
+        <ion-select-option [value]="2">2 - Moyen</ion-select-option>
+        <ion-select-option [value]="3">3 - Grave/Mortel</ion-select-option>
+      </ion-select>
+    </ion-item>
+
+    <ion-item lines="none" class="input-item">
+      <ion-label position="stacked">4. Prévention Réalisée</ion-label>
+      <ion-textarea [(ngModel)]="l.mesures_realisees" placeholder="Ex: Casque anti-bruit fourni" rows="2"></ion-textarea>
+    </ion-item>
+
+    <ion-item lines="none" class="input-item">
+      <ion-label position="stacked">5. Prévention à Réaliser</ion-label>
+      <ion-textarea [(ngModel)]="l.mesures_a_realiser" placeholder="Ex: Formation bruit prévue" rows="2"></ion-textarea>
+    </ion-item>
+  </div>
+
+  <ion-button expand="block" fill="outline" class="dashed-btn" (click)="addRow()">
+    <ion-icon name="add" slot="start"></ion-icon> Ajouter un risque
+  </ion-button>
+
+  <div class="ion-padding-vertical">
+    <ion-button expand="block" (click)="save()" size="large">Enregistrer le DUERP</ion-button>
+  </div>
+
+</ion-content>

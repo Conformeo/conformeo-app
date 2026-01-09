@@ -21,11 +21,19 @@
 <ion-content class="bg-light ion-padding">
 
   <div *ngIf="segment === 'docs'">
+    
     <div class="alert-banner" *ngIf="hasExpiredDocs">
       <ion-icon name="warning"></ion-icon>
       <span>Documents périmés !</span>
     </div>
 
+    <div class="ion-padding-bottom">
+      <ion-button expand="block" color="tertiary" [routerLink]="['/duerp-form']" style="margin-bottom: 15px;">
+        <ion-icon name="list" slot="start"></ion-icon>
+        Gérer le DUERP (Digital)
+        <ion-icon name="chevron-forward" slot="end"></ion-icon>
+      </ion-button>
+    </div>
     <ion-list class="doc-list">
       <ion-item-sliding *ngFor="let doc of docs">
         <ion-item lines="none" class="doc-item">
@@ -129,7 +137,7 @@
         <ion-item fill="outline" class="mb-15">
           <ion-label>Type</ion-label>
           <ion-select [(ngModel)]="newDoc.type_doc" interface="popover">
-            <ion-select-option value="DUERP">🛡️ DUERP</ion-select-option>
+            <ion-select-option value="DUERP">🛡️ DUERP (PDF Stocké)</ion-select-option>
             <ion-select-option value="ASSURANCE">📄 Assurance</ion-select-option>
             <ion-select-option value="KBIS">🏢 Kbis</ion-select-option>
             <ion-select-option value="AUTRE">📂 Autre</ion-select-option>

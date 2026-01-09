@@ -534,3 +534,65 @@ def generate_pdp_pdf(chantier, pdp, output_path, company=None):
     draw_footer(c, width, height, chantier, "Plan de Prévention")
     c.save()
     return output_path
+
+def generate_duerp_pdf(company, duerp, filepath):
+    doc = SimpleDocTemplate(filepath, pagesize=landscape(A4), rightMargin=20, leftMargin=20, topMargin=20, bottomMargin=20)
+    elements = []
+    styles = getSampleStyleSheet()
+
+    # 1. En-tête
+    elements.append(Paragraph(f"<b>DOCUMENT UNIQUE (DUERP) - {duerp.annee}</b>", styles['Title']))
+    elements.append(Spacer(1, 10))
+    if company:
+        elements.append(Paragraph(f"Entreprise : {company.name}", styles['Normal']))
+    elements.append(Paragraph(f"Mis à jour le : {duerp.date_mise_a_jour.strftime('%d/%m/%Y')}", styles['Normal']))
+    elements.append(Spacer(1, 20))
+
+    # 2. Tableau (Les 5 colonnes)
+    # En-têtes exacts de votre image
+    headers = [
+        "1. Tâches effectuées", 
+        "2. Identification des risques", 
+        "3. Gravité\n(de 1 à 3)", 
+        "4. Mesures de prévention\nréalisées", 
+        "5. Mesures de prévention\nà réaliser"
+    ]
+    
+    data = [headers]
+    
+    # Remplissage des données
+    for l in duerp.lignes:
+        row = [
+            Paragraph(l.tache or "", styles['Normal']),
+            Paragraph(l.risque or "", styles['Normal']),
+            str(l.gravite), # Centré
+            Paragraph(l.mesures_realisees or "", styles['Normal']),
+            Paragraph(l.mesures_a_realiser or "", styles['Normal'])
+        ]
+        data.append(row)
+
+    # 3. Style du Tableau (Bordures noires comme sur l'image)
+    # Largeurs colonnes : On donne plus de place aux mesures et risques
+    col_widths = [140, 140, 60, 200, 200] 
+    
+    t = Table(data, colWidths=col_widths)
+    t.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.white), # Fond blanc entête
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('ALIGN', (0, 0), (-1, 0), 'CENTER'), # Entêtes centrés
+        ('ALIGN', (2, 1), (2, -1), 'CENTER'), # Colonne Gravité centrée
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 10),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black), # Quadrillage noir complet
+        ('BOX', (0, 0), (-1, -1), 2, colors.black),  # Bordure extérieure épaisse
+    ]))
+
+    elements.append(t)
+    
+    # 4. Légende Gravité (Optionnel mais utile)
+    elements.append(Spacer(1, 20))
+    elements.append(Paragraph("<i>* Légende Gravité : 1 = Faible, 2 = Moyen, 3 = Grave/Mortel</i>", styles['Normal']))
+
+    doc.build(elements)

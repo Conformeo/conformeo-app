@@ -68,4 +68,8 @@ export const routes: Routes = [
     path: 'pic-form',
     loadComponent: () => import('./pages/pic-form/pic-form.page').then( m => m.PicFormPage)
   },
+  {
+    path: 'duerp-form',
+    loadComponent: () => import('./pages/company/duerp-form/duerp-form.page').then( m => m.DuerpFormPage)
+  },
 ];

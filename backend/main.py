@@ -786,6 +786,55 @@ def update_my_company(up: schemas.CompanyUpdate, db: Session = Depends(get_db), 
     db.commit(); db.refresh(c)
     return c
 
+@app.post("/companies/me/duerp", response_model=schemas.DUERPOut)
+def create_or_update_duerp(duerp_data: schemas.DUERPCreate, db: Session = Depends(get_db), current_user: models.User = Depends(security.get_current_user)):
+    if not current_user.company_id: raise HTTPException(400, "Pas d'entreprise")
+    
+    # On cherche s'il existe déjà un DUERP pour cette année
+    existing = db.query(models.DUERP).filter(
+        models.DUERP.company_id == current_user.company_id, 
+        models.DUERP.annee == duerp_data.annee
+    ).first()
+
+    if existing:
+        # On supprime les anciennes lignes pour remettre les nouvelles (Mise à jour simple)
+        db.query(models.DUERPLigne).filter(models.DUERPLigne.duerp_id == existing.id).delete()
+        existing.date_mise_a_jour = datetime.now()
+        db_duerp = existing
+    else:
+        db_duerp = models.DUERP(company_id=current_user.company_id, annee=duerp_data.annee)
+        db.add(db_duerp)
+        db.commit()
+        db.refresh(db_duerp)
+
+    # Ajout des lignes
+    for l in duerp_data.lignes:
+        new_line = models.DUERPLigne(
+            duerp_id=db_duerp.id,
+            tache=l.tache, risque=l.risque, gravite=l.gravite,
+            mesures_realisees=l.mesures_realisees, mesures_a_realiser=l.mesures_a_realiser
+        )
+        db.add(new_line)
+    
+    db.commit()
+    return db_duerp
+
+@app.get("/companies/me/duerp/{annee}", response_model=schemas.DUERPOut)
+def get_duerp(annee: str, db: Session = Depends(get_db), current_user: models.User = Depends(security.get_current_user)):
+    d = db.query(models.DUERP).filter(models.DUERP.company_id == current_user.company_id, models.DUERP.annee == annee).first()
+    if not d: return {"id": 0, "annee": annee, "date_mise_a_jour": datetime.now(), "lignes": []}
+    return d
+
+@app.get("/companies/me/duerp/{annee}/pdf")
+def download_duerp_pdf(annee: str, db: Session = Depends(get_db), current_user: models.User = Depends(security.get_current_user)):
+    d = db.query(models.DUERP).filter(models.DUERP.company_id == current_user.company_id, models.DUERP.annee == annee).first()
+    if not d: raise HTTPException(404, "DUERP introuvable")
+    
+    comp = db.query(models.Company).filter(models.Company.id == current_user.company_id).first()
+    path = f"uploads/DUERP_{comp.name}_{annee}.pdf"
+    pdf_generator.generate_duerp_pdf(comp, d, path)
+    return FileResponse(path, media_type='application/pdf')
+
 # ==========================================
 # 9. FIX & MIGRATIONS
 # ==========================================
@@ -891,7 +940,6 @@ def fix_users_table(db: Session = Depends(get_db)):
     except Exception as e:
         return {"error": str(e)}
 
-# ... (Vers la fin du fichier)
 
 @app.get("/fix_company_docs_signature")
 def fix_company_docs_signature(db: Session = Depends(get_db)):
@@ -935,3 +983,4 @@ def sign_company_doc(
     })
     db.commit()
     return {"message": "Document signé avec succès"}
+

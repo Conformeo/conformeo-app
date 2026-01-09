@@ -195,3 +195,30 @@ class CompanyDocOut(BaseModel):
     date_upload: datetime
     class Config:
         from_attributes = True
+
+class DUERPLigneBase(BaseModel):
+    tache: str
+    risque: str
+    gravite: int = 1
+    mesures_realisees: Optional[str] = ""
+    mesures_a_realiser: Optional[str] = ""
+
+class DUERPLigneCreate(DUERPLigneBase):
+    pass
+
+class DUERPLigneOut(DUERPLigneBase):
+    id: int
+    class Config:
+        from_attributes = True
+
+class DUERPCreate(BaseModel):
+    annee: str
+    lignes: List[DUERPLigneCreate]
+
+class DUERPOut(BaseModel):
+    id: int
+    annee: str
+    date_mise_a_jour: datetime
+    lignes: List[DUERPLigneOut] = []
+    class Config:
+        from_attributes = True

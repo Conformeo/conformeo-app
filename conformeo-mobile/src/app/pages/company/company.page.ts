@@ -1,13 +1,16 @@
 import { Component, OnInit, ViewChild, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+// 👇 AJOUTEZ L'IMPORT ROUTERLINK ICI
+import { RouterLink } from '@angular/router'; 
 import { 
   IonicModule, AlertController, ToastController, LoadingController, ModalController 
 } from '@ionic/angular';
 import { addIcons } from 'ionicons';
 import { 
   business, documentText, cloudUpload, trash, shieldCheckmark, 
-  briefcase, warning, calendar, eye, pencil, add, folderOpen, close, camera, cloudUploadOutline
+  briefcase, warning, calendar, eye, pencil, add, folderOpen, close, camera, 
+  cloudUploadOutline, list, chevronForward // J'ajoute les icônes manquantes pour le bouton DUERP
 } from 'ionicons/icons';
 import { ApiService, Company, CompanyDoc } from '../../services/api';
 import { SignatureModalComponent } from '../chantier-details/signature-modal/signature-modal.component';
@@ -17,7 +20,8 @@ import { SignatureModalComponent } from '../chantier-details/signature-modal/sig
   templateUrl: './company.page.html',
   styleUrls: ['./company.page.scss'],
   standalone: true,
-  imports: [CommonModule, FormsModule, IonicModule]
+  // 👇 AJOUTEZ RouterLink DANS CE TABLEAU 👇
+  imports: [CommonModule, FormsModule, IonicModule, RouterLink]
 })
 export class CompanyPage implements OnInit {
 
@@ -28,16 +32,12 @@ export class CompanyPage implements OnInit {
   isLoading = false;
   hasExpiredDocs = false;
 
-  // Variables pour l'upload Document
   isUploadModalOpen = false;
   newDoc = { titre: '', type_doc: 'AUTRE', date_expiration: '' };
   selectedFile: File | null = null;
   @ViewChild('fileInput') fileInput!: ElementRef;
-
-  // Référence pour l'input du Logo
   @ViewChild('logoInput') logoInput!: ElementRef;
   
-  // État pour le style visuel du Drag & Drop
   isLogoDragging = false; 
 
   constructor(
@@ -47,9 +47,11 @@ export class CompanyPage implements OnInit {
     private loadingCtrl: LoadingController,
     private modalCtrl: ModalController
   ) {
+    // 👇 Ajout des nouvelles icônes utilisées dans le HTML
     addIcons({ 
       business, documentText, cloudUpload, trash, shieldCheckmark, 
-      briefcase, warning, calendar, eye, pencil, add, folderOpen, close, camera, cloudUploadOutline
+      briefcase, warning, calendar, eye, pencil, add, folderOpen, close, camera, 
+      cloudUploadOutline, list, chevronForward 
     });
   }
 
@@ -73,13 +75,11 @@ export class CompanyPage implements OnInit {
     });
   }
 
-  // --- GESTION DU LOGO (DRAG & DROP + CLIC) ---
-
+  // --- GESTION DU LOGO ---
   triggerLogoUpload() {
     this.logoInput.nativeElement.click();
   }
 
-  // 1. Gestion des événements Drag & Drop
   onLogoDragOver(event: DragEvent) {
     event.preventDefault();
     event.stopPropagation();
@@ -107,16 +107,13 @@ export class CompanyPage implements OnInit {
     }
   }
 
-  // 2. Sélection classique via clic (Input File)
   onLogoSelected(event: any) {
     const file = event.target.files[0];
     if (file) this.processLogoUpload(file);
   }
 
-  // 3. Logique commune d'envoi vers le serveur
   async processLogoUpload(file: File) {
     if (!this.company) return;
-
     const load = await this.loadingCtrl.create({ message: 'Mise à jour du logo...' });
     await load.present();
 
@@ -124,7 +121,7 @@ export class CompanyPage implements OnInit {
       next: (res) => {
         if (this.company) {
             this.company.logo_url = res.url;
-            this.saveInfos(false); // Sauvegarde auto en BDD
+            this.saveInfos(false);
         }
         load.dismiss();
         this.presentToast('Logo modifié ! 📸', 'success');
@@ -136,8 +133,7 @@ export class CompanyPage implements OnInit {
     });
   }
 
-  // --- FIN GESTION LOGO ---
-
+  // --- GESTION DOCS ---
   checkGlobalStatus() {
     this.hasExpiredDocs = this.docs.some(d => {
         if(!d.date_expiration) return false;
@@ -166,7 +162,6 @@ export class CompanyPage implements OnInit {
     }
   }
 
-  // --- UPLOAD DOCS ---
   onFileSelected(event: any) {
     this.selectedFile = event.target.files[0];
   }
@@ -200,7 +195,6 @@ export class CompanyPage implements OnInit {
     this.selectedFile = null;
   }
 
-  // --- SIGNATURE ---
   async signDocument(doc: any) {
     const alert = await this.alertCtrl.create({
       header: 'Signature',

@@ -196,7 +196,7 @@ export class ApiService {
 
   // Ajoute le Header "Authorization: Bearer ..."
   // Cette méthode est utilisée par la majorité des fonctions
-  private getOptions() {
+  public getOptions() {
     if (this.token) {
       return {
         headers: new HttpHeaders({

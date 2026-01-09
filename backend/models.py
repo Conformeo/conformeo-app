@@ -187,3 +187,28 @@ class PIC(Base):
     date_creation = Column(DateTime, default=datetime.now)
     
     chantier = relationship("Chantier", back_populates="pic")
+
+class DUERP(Base):
+    __tablename__ = "duerps"
+    id = Column(Integer, PrimaryKey=True, index=True)
+    company_id = Column(Integer, ForeignKey("companies.id"))
+    date_creation = Column(DateTime, default=datetime.now)
+    date_mise_a_jour = Column(DateTime, default=datetime.now)
+    annee = Column(String) # Ex: "2026"
+    
+    # Relation vers les lignes
+    lignes = relationship("DUERPLigne", back_populates="duerp", cascade="all, delete-orphan")
+
+class DUERPLigne(Base):
+    __tablename__ = "duerp_lignes"
+    id = Column(Integer, PrimaryKey=True, index=True)
+    duerp_id = Column(Integer, ForeignKey("duerps.id"))
+    
+    # Les 5 colonnes de votre image
+    tache = Column(String)              # Col 1: Tâches effectuées
+    risque = Column(String)             # Col 2: Identification des risques
+    gravite = Column(Integer)           # Col 3: Gravité (1 à 3)
+    mesures_realisees = Column(String)  # Col 4: Mesures réalisées
+    mesures_a_realiser = Column(String) # Col 5: Mesures à réaliser
+    
+    duerp = relationship("DUERP", back_populates="lignes")
