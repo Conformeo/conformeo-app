@@ -464,6 +464,15 @@ export class ApiService {
     return this.http.put(`${this.apiUrl}/chantiers/${chantierId}/signature?signature_url=${encodeURIComponent(signatureUrl)}`, {}, this.getOptions());
   }
 
+  // Nouvelle méthode pour signer un doc entreprise
+  signCompanyDoc(docId: number, nomSignataire: string, signatureUrl: string): Observable<any> {
+    const payload = {
+      nom_signataire: nomSignataire,
+      signature_url: signatureUrl
+    };
+    return this.http.post(`${this.apiUrl}/companies/documents/${docId}/sign`, payload, this.getOptions());
+  }
+
   downloadDOE(id: number) {
     const url = `${this.apiUrl}/chantiers/${id}/doe`;
     window.open(url, '_system');

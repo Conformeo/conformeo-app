@@ -1,18 +1,17 @@
 <ion-header>
   <ion-toolbar color="primary">
-    <ion-buttons slot="start">
-      <ion-menu-button></ion-menu-button>
-    </ion-buttons>
+    <ion-buttons slot="start"><ion-menu-button></ion-menu-button></ion-buttons>
     <ion-title>Mon Entreprise</ion-title>
   </ion-toolbar>
   
   <ion-toolbar color="primary">
     <ion-segment [(ngModel)]="segment" value="infos" color="light">
-      <ion-segment-button value="infos">
-        <ion-label>Infos</ion-label>
-      </ion-segment-button>
+      <ion-segment-button value="infos"><ion-label>Infos</ion-label></ion-segment-button>
       <ion-segment-button value="docs">
-        <ion-label>Coffre-fort</ion-label>
+        <ion-label>
+          GED 
+          <ion-icon *ngIf="hasExpiredDocs" name="warning" color="warning" style="margin-left:5px;"></ion-icon>
+        </ion-label>
       </ion-segment-button>
     </ion-segment>
   </ion-toolbar>
@@ -20,112 +19,146 @@
 
 <ion-content class="ion-padding bg-light">
 
-  <div *ngIf="isLoading" class="ion-text-center ion-padding">
-    <ion-spinner></ion-spinner>
+  <div *ngIf="isLoading" class="ion-text-center ion-padding mt-20">
+    <ion-spinner color="primary"></ion-spinner>
   </div>
 
   <div *ngIf="!isLoading && segment === 'infos' && company">
-    
     <ion-card class="ios-card">
       <ion-card-content>
         <div class="logo-zone">
-          <img [src]="company.logo_url || 'assets/no-image.png'" class="company-logo"/>
-          </div>
+          <img [src]="company.logo_url || 'assets/icon/favicon.png'" class="company-logo"/>
+        </div>
 
-        <form (ngSubmit)="saveInfos()">
-          <ion-list lines="full">
-            
-            <ion-item>
-              <ion-input 
-                label="Nom Société" 
-                labelPlacement="stacked" 
-                [(ngModel)]="company.name" 
-                name="name">
-              </ion-input>
-            </ion-item>
-            
-            <ion-item>
-              <ion-input 
-                label="Adresse Siège" 
-                labelPlacement="stacked" 
-                [(ngModel)]="company.address" 
-                name="address">
-              </ion-input>
-            </ion-item>
-            
-            <ion-item>
-              <ion-input 
-                label="Email Contact" 
-                labelPlacement="stacked" 
-                [(ngModel)]="company.contact_email" 
-                name="email">
-              </ion-input>
-            </ion-item>
-            
-            <ion-item>
-              <ion-input 
-                label="Téléphone" 
-                labelPlacement="stacked" 
-                [(ngModel)]="company.phone" 
-                name="phone">
-              </ion-input>
-            </ion-item>
+        <ion-list lines="full">
+          <ion-item>
+            <ion-input label="Nom Société" labelPlacement="stacked" [(ngModel)]="company.name"></ion-input>
+          </ion-item>
+          <ion-item>
+            <ion-input label="Adresse Siège" labelPlacement="stacked" [(ngModel)]="company.address"></ion-input>
+          </ion-item>
+          <ion-item>
+            <ion-input label="Email Contact" labelPlacement="stacked" [(ngModel)]="company.contact_email"></ion-input>
+          </ion-item>
+          <ion-item>
+            <ion-input label="Téléphone" labelPlacement="stacked" [(ngModel)]="company.phone"></ion-input>
+          </ion-item>
+        </ion-list>
 
-          </ion-list>
-
-          <div class="ion-padding-top">
-            <ion-button expand="block" type="submit">Enregistrer les modifications</ion-button>
-          </div>
-        </form>
+        <div class="ion-padding-top">
+          <ion-button expand="block" (click)="saveInfos()">Enregistrer les modifications</ion-button>
+        </div>
       </ion-card-content>
     </ion-card>
-
-    <p class="ion-text-center ion-text-muted" style="font-size: 12px; margin-top: 20px;">
+    <p class="ion-text-center ion-text-muted footer-note">
       Ces informations apparaîtront en en-tête de vos documents PDF.
     </p>
   </div>
 
   <div *ngIf="!isLoading && segment === 'docs'">
 
-    <div class="header-doc">
-      <h3>Documents Transverses</h3>
-      <p>Kbis, Assurances, DUERP...</p>
+    <div class="alert-banner" *ngIf="hasExpiredDocs">
+      <ion-icon name="warning"></ion-icon>
+      <span>Attention, documents périmés !</span>
     </div>
 
-    <input type="file" #fileInput (change)="onFileSelected($event)" style="display: none" accept=".pdf,.jpg,.png,.jpeg">
+    <ion-list class="doc-list">
+      <ion-item-sliding *ngFor="let doc of docs">
+        <ion-item lines="none" class="doc-item">
+          
+          <div slot="start" class="doc-icon" [ngClass]="doc.type_doc">
+            <ion-icon [name]="getIcon(doc.type_doc)"></ion-icon>
+          </div>
 
-    <ion-button expand="block" class="upload-btn" (click)="triggerUpload()">
-      <ion-icon name="cloud-upload" slot="start"></ion-icon>
-      Ajouter un document
-    </ion-button>
+          <ion-label>
+            <h2>{{ doc.titre }}</h2>
+            <p>{{ doc.type_doc }}</p>
+            
+            <div *ngIf="doc.date_expiration" class="expiration-badge">
+              <ion-badge [color]="getExpirationStatus(doc.date_expiration).color">
+                {{ getExpirationStatus(doc.date_expiration).text }}
+              </ion-badge>
+            </div>
+          </ion-label>
+
+          <div slot="end" class="actions-wrapper">
+            <ion-button fill="clear" color="dark" (click)="signDocument(doc)">
+              <ion-icon name="pencil" slot="icon-only"></ion-icon>
+            </ion-button>
+            
+            <ion-button fill="clear" color="primary" (click)="openDoc(doc.url)">
+              <ion-icon name="eye" slot="icon-only"></ion-icon>
+            </ion-button>
+          </div>
+        </ion-item>
+
+        <ion-item-options side="end">
+          <ion-item-option color="danger" (click)="deleteDoc(doc)">
+            <ion-icon name="trash" slot="icon-only"></ion-icon>
+          </ion-item-option>
+        </ion-item-options>
+      </ion-item-sliding>
+    </ion-list>
 
     <div *ngIf="docs.length === 0" class="empty-state">
-      <ion-icon name="folder-open-outline" size="large"></ion-icon>
-      <p>Aucun document pour l'instant.</p>
+      <ion-icon name="folder-open" color="medium"></ion-icon>
+      <p>Aucun document.</p>
+      <p class="sub">Ajoutez DUERP, Kbis, Assurance...</p>
     </div>
 
-    <div class="doc-grid">
-      <ion-card *ngFor="let d of docs" class="doc-card" (click)="openDoc(d.url)">
-        
-        <div class="doc-icon" [ngClass]="d.type_doc">
-          <ion-icon [name]="d.type_doc === 'Assurance' ? 'shield-checkmark' : (d.type_doc === 'Kbis' ? 'business' : 'document-text')"></ion-icon>
-        </div>
-        
-        <div class="doc-info">
-          <h4>{{ d.titre }}</h4>
-          <p>{{ d.type_doc }} • {{ d.date_upload | date:'dd/MM/yyyy' }}</p>
-          
-          <ion-badge *ngIf="d.date_expiration" [color]="isExpired(d.date_expiration) ? 'danger' : 'success'">
-            {{ isExpired(d.date_expiration) ? 'Expiré' : 'Valide' }}
-            <span *ngIf="!isExpired(d.date_expiration)">{{ d.date_expiration | date:'MM/yy' }}</span>
-          </ion-badge>
-        </div>
+    <ion-fab vertical="bottom" horizontal="end" slot="fixed">
+      <ion-fab-button (click)="isUploadModalOpen = true">
+        <ion-icon name="add"></ion-icon>
+      </ion-fab-button>
+    </ion-fab>
 
-        <ion-button fill="clear" color="medium" (click)="$event.stopPropagation(); deleteDoc(d)">
-          <ion-icon name="trash"></ion-icon>
-        </ion-button>
-      </ion-card>
-    </div>
+    <ion-modal [isOpen]="isUploadModalOpen" (didDismiss)="isUploadModalOpen = false" [initialBreakpoint]="0.85" [breakpoints]="[0, 0.85]">
+      <ng-template>
+        <ion-header>
+          <ion-toolbar>
+            <ion-title>Nouveau Document</ion-title>
+            <ion-buttons slot="end"><ion-button (click)="isUploadModalOpen = false">Fermer</ion-button></ion-buttons>
+          </ion-toolbar>
+        </ion-header>
+        
+        <ion-content class="ion-padding">
+          <ion-item fill="outline" class="mb-15">
+            <ion-label position="floating">Titre (ex: Kbis 2024)</ion-label>
+            <ion-input [(ngModel)]="newDoc.titre"></ion-input>
+          </ion-item>
+
+          <ion-item fill="outline" class="mb-15">
+            <ion-label>Type</ion-label>
+            <ion-select [(ngModel)]="newDoc.type_doc" interface="popover">
+              <ion-select-option value="DUERP">🛡️ DUERP</ion-select-option>
+              <ion-select-option value="ASSURANCE">📄 Assurance</ion-select-option>
+              <ion-select-option value="KBIS">🏢 Kbis</ion-select-option>
+              <ion-select-option value="AUTRE">📂 Autre</ion-select-option>
+            </ion-select>
+          </ion-item>
+
+          <ion-item fill="outline" class="mb-15">
+            <ion-label>Date d'expiration</ion-label>
+            <ion-datetime-button datetime="datetime"></ion-datetime-button>
+            <ion-modal [keepContentsMounted]="true">
+              <ng-template>
+                <ion-datetime id="datetime" presentation="date" [(ngModel)]="newDoc.date_expiration"></ion-datetime>
+              </ng-template>
+            </ion-modal>
+          </ion-item>
+
+          <div class="file-box" (click)="fileInput.click()" [class.has-file]="selectedFile">
+            <input #fileInput type="file" (change)="onFileSelected($event)" hidden accept=".pdf,.jpg,.png">
+            <ion-icon [name]="selectedFile ? 'document-text' : 'cloud-upload'" size="large"></ion-icon>
+            <p>{{ selectedFile ? selectedFile.name : 'Choisir un fichier (PDF/Photo)' }}</p>
+          </div>
+
+          <ion-button expand="block" class="ion-margin-top" (click)="uploadDoc()" [disabled]="!selectedFile || !newDoc.titre">
+            Uploader
+          </ion-button>
+        </ion-content>
+      </ng-template>
+    </ion-modal>
 
   </div>
 

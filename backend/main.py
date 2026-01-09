@@ -890,3 +890,48 @@ def fix_users_table(db: Session = Depends(get_db)):
         return {"message": "✅ Colonne 'nom' ajoutée à la table Users !"}
     except Exception as e:
         return {"error": str(e)}
+
+# ... (Vers la fin du fichier)
+
+@app.get("/fix_company_docs_signature")
+def fix_company_docs_signature(db: Session = Depends(get_db)):
+    try:
+        # Ajout des colonnes pour la signature
+        db.execute(text("ALTER TABLE company_documents ADD COLUMN IF NOT EXISTS signature_url VARCHAR"))
+        db.execute(text("ALTER TABLE company_documents ADD COLUMN IF NOT EXISTS nom_signataire VARCHAR"))
+        db.commit()
+        return {"msg": "✅ Colonnes signature ajoutées aux documents entreprise !"}
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.post("/companies/documents/{doc_id}/sign")
+def sign_company_doc(
+    doc_id: int, 
+    payload: dict, # On attend { "signature_url": "...", "nom_signataire": "..." }
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(security.get_current_user)
+):
+    if not current_user.company_id:
+        raise HTTPException(400, "Pas d'entreprise")
+    
+    # On cherche le document
+    # Note: On vérifie que le document appartient bien à l'entreprise de l'utilisateur
+    sql = text("SELECT id FROM company_documents WHERE id = :did AND company_id = :cid")
+    doc = db.execute(sql, {"did": doc_id, "cid": current_user.company_id}).first()
+    
+    if not doc:
+        raise HTTPException(404, "Document introuvable")
+
+    # Mise à jour
+    update_sql = text("""
+        UPDATE company_documents 
+        SET signature_url = :url, nom_signataire = :nom 
+        WHERE id = :did
+    """)
+    db.execute(update_sql, {
+        "url": payload.get("signature_url"),
+        "nom": payload.get("nom_signataire"),
+        "did": doc_id
+    })
+    db.commit()
+    return {"message": "Document signé avec succès"}

@@ -68,8 +68,4 @@ export const routes: Routes = [
     path: 'pic-form',
     loadComponent: () => import('./pages/pic-form/pic-form.page').then( m => m.PicFormPage)
   },
-  {
-    path: 'company-docs',
-    loadComponent: () => import('./pages/company-docs/company-docs.page').then( m => m.CompanyDocsPage)
-  },
 ];
