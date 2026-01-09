@@ -177,16 +177,27 @@ export class ApiService {
   }
 
   login(credentials: UserLogin): Observable<any> {
-    const formData = new FormData();
-    formData.append('username', credentials.email || credentials.username || '');
-    formData.append('password', credentials.password);
+    // 👇 CORRECTION MAJEURE : On passe de FormData à URLSearchParams
+    // FastAPI /token attend impérativement du 'application/x-www-form-urlencoded'
+    const body = new URLSearchParams();
+    body.set('username', credentials.email || credentials.username || '');
+    body.set('password', credentials.password);
 
-    return this.http.post<Token>(`${this.apiUrl}/token`, formData).pipe(
+    // On force l'en-tête correct
+    const headers = new HttpHeaders({
+      'Content-Type': 'application/x-www-form-urlencoded'
+    });
+
+    // On envoie body.toString()
+    return this.http.post<Token>(`${this.apiUrl}/token`, body.toString(), { headers }).pipe(
       tap(async (res) => {
+        // Log pour vérifier que ça passe enfin
+        console.log("✅ API Service : Token reçu !", res);
+
         const t = res.access_token || (res as any).token;
         this.token = t;
         
-        // 💾 DOUBLE SAUVEGARDE
+        // Sauvegarde immédiate
         await Preferences.set({ key: 'auth_token', value: t });
         localStorage.setItem('token', t);
         localStorage.setItem('access_token', t);
