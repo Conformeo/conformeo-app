@@ -72,34 +72,56 @@ export class DuerpFormPage implements OnInit {
   }
 
   // 👇 MISE À JOUR : TÉLÉCHARGEMENT SÉCURISÉ
+  // ...
+
   async downloadPdf() {
+    console.log("1. Début demande téléchargement...");
+    
     const load = await this.loadingCtrl.create({ message: 'Génération du PDF...' });
     await load.present();
 
     const url = `${this.api.apiUrl}/companies/me/duerp/${this.annee}/pdf`;
     
-    // On construit les options manuellement pour inclure le Token ET le type Blob
+    // Options pour récupérer le fichier binaire (Blob) avec le Token
     const options: any = {
-      headers: this.api.getOptions().headers, // Récupère le token de votre service
-      responseType: 'blob' // Indispensable pour les fichiers PDF/Images
+      headers: this.api.getOptions().headers, 
+      responseType: 'blob' 
     };
 
     this.api.http.get(url, options).subscribe({
       next: (blob: any) => {
+        console.log("2. Fichier reçu du serveur !", blob);
         load.dismiss();
         
-        // 1. Création d'une URL temporaire pour le fichier
+        // --- MÉTHODE ROBUSTE (Lien invisible) ---
+        // 1. Créer une URL pour le blob
         const fileUrl = window.URL.createObjectURL(blob);
         
-        // 2. Ouverture dans le navigateur système (ou visualiseur PDF)
-        window.open(fileUrl, '_system');
+        // 2. Créer un lien <a> invisible
+        const link = document.createElement('a');
+        link.href = fileUrl;
+        link.download = `DUERP_${this.annee}.pdf`; // Nom du fichier forcé
         
-        this.presentToast('PDF téléchargé 📄', 'success');
+        // 3. L'ajouter au DOM, cliquer, et le retirer
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        // 4. Nettoyer
+        window.URL.revokeObjectURL(fileUrl);
+        
+        this.presentToast('Téléchargement lancé 🚀', 'success');
       },
       error: (err) => {
-        console.error(err);
+        console.error("3. ERREUR TÉLÉCHARGEMENT :", err);
         load.dismiss();
-        this.presentToast('Erreur lors du téléchargement', 'danger');
+        
+        // Afficher l'erreur exacte à l'utilisateur pour comprendre
+        let msg = 'Erreur technique';
+        if (err.status === 500) msg = 'Erreur Serveur (Vérifiez le code Python)';
+        if (err.status === 404) msg = 'Document introuvable';
+        
+        this.presentToast(`Échec : ${msg}`, 'danger');
       }
     });
   }
