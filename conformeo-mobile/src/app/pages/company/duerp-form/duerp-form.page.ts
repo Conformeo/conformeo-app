@@ -1,8 +1,10 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+// 👇 AJOUTEZ HttpHeaders ICI
+import { HttpHeaders } from '@angular/common/http'; 
 import { IonicModule, ToastController, LoadingController, AlertController } from '@ionic/angular';
-import { ApiService } from '../../../services/api'; // Vérifiez que le chemin est bon
+import { ApiService } from '../../../services/api';
 import { addIcons } from 'ionicons';
 import { add, trash, save, download, arrowBack } from 'ionicons/icons';
 
@@ -32,16 +34,17 @@ export class DuerpFormPage implements OnInit {
   }
 
   loadDuerp() {
-    // Récupération des données
     this.api.http.get<any>(`${this.api.apiUrl}/companies/me/duerp/${this.annee}`, this.api.getOptions()).subscribe({
       next: (data) => {
         if (data.lignes) this.lignes = data.lignes;
         else this.lignes = [];
-        
-        // Ajout d'une ligne vide par défaut si le tableau est vide
         if (this.lignes.length === 0) this.addRow(); 
       },
-      error: () => this.addRow()
+      error: (err) => {
+        // Si on a une erreur 401 ici aussi, c'est que l'utilisateur est vraiment déconnecté
+        if(err.status === 401) this.presentToast('Session expirée, reconnectez-vous.', 'warning');
+        this.addRow();
+      }
     });
   }
 
@@ -56,78 +59,69 @@ export class DuerpFormPage implements OnInit {
   async save() {
     const load = await this.loadingCtrl.create({ message: 'Sauvegarde...' });
     await load.present();
-
     const payload = { annee: this.annee, lignes: this.lignes };
-
     this.api.http.post(`${this.api.apiUrl}/companies/me/duerp`, payload, this.api.getOptions()).subscribe({
-      next: () => {
-        load.dismiss();
-        this.presentToast('DUERP enregistré ! ✅', 'success');
-      },
-      error: () => {
-        load.dismiss();
-        this.presentToast('Erreur sauvegarde', 'danger');
-      }
+      next: () => { load.dismiss(); this.presentToast('DUERP enregistré ! ✅', 'success'); },
+      error: () => { load.dismiss(); this.presentToast('Erreur sauvegarde', 'danger'); }
     });
   }
 
-  // 👇 MISE À JOUR : TÉLÉCHARGEMENT SÉCURISÉ
-  // ...
-
+  // 👇 VERSION BLINDÉE DE LA FONCTION DE TÉLÉCHARGEMENT
   async downloadPdf() {
     console.log("1. Début demande téléchargement...");
     
+    // 1. On récupère le token BRUT (pour être sûr à 100%)
+    const token = localStorage.getItem('token'); // Ou la clé que vous utilisez (ex: 'access_token')
+    
+    if (!token) {
+        this.presentToast('Erreur : Vous êtes déconnecté.', 'danger');
+        return;
+    }
+
     const load = await this.loadingCtrl.create({ message: 'Génération du PDF...' });
     await load.present();
 
     const url = `${this.api.apiUrl}/companies/me/duerp/${this.annee}/pdf`;
     
-    // Options pour récupérer le fichier binaire (Blob) avec le Token
-    const options: any = {
-      headers: this.api.getOptions().headers, 
-      responseType: 'blob' 
-    };
+    // 2. On construit les headers MANUELLEMENT
+    const headers = new HttpHeaders({
+        'Authorization': `Bearer ${token}`
+    });
 
-    this.api.http.get(url, options).subscribe({
+    // 3. On prépare la requête pour recevoir un BLOB (Fichier)
+    this.api.http.get(url, { headers: headers, responseType: 'blob' }).subscribe({
       next: (blob: any) => {
-        console.log("2. Fichier reçu du serveur !", blob);
+        console.log("2. Fichier reçu !", blob);
         load.dismiss();
         
-        // --- MÉTHODE ROBUSTE (Lien invisible) ---
-        // 1. Créer une URL pour le blob
         const fileUrl = window.URL.createObjectURL(blob);
-        
-        // 2. Créer un lien <a> invisible
         const link = document.createElement('a');
         link.href = fileUrl;
-        link.download = `DUERP_${this.annee}.pdf`; // Nom du fichier forcé
-        
-        // 3. L'ajouter au DOM, cliquer, et le retirer
+        link.download = `DUERP_${this.annee}.pdf`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        
-        // 4. Nettoyer
         window.URL.revokeObjectURL(fileUrl);
         
         this.presentToast('Téléchargement lancé 🚀', 'success');
       },
       error: (err) => {
-        console.error("3. ERREUR TÉLÉCHARGEMENT :", err);
+        console.error("3. ERREUR :", err);
         load.dismiss();
         
-        // Afficher l'erreur exacte à l'utilisateur pour comprendre
-        let msg = 'Erreur technique';
-        if (err.status === 500) msg = 'Erreur Serveur (Vérifiez le code Python)';
-        if (err.status === 404) msg = 'Document introuvable';
-        
-        this.presentToast(`Échec : ${msg}`, 'danger');
+        if (err.status === 401) {
+            this.presentToast('Session expirée. Déconnectez-vous et réessayez.', 'warning');
+        } else if (err.status === 500) {
+            this.presentToast('Erreur Serveur (Le PDF plante côté Python)', 'danger');
+        } else {
+            this.presentToast(`Erreur ${err.status} lors du téléchargement`, 'danger');
+        }
       }
     });
   }
 
   async presentToast(message: string, color: string) {
-    const t = await this.toastCtrl.create({ message, duration: 2000, color });
+    const t = await this.toastCtrl.create({ message, duration: 3000, color });
     t.present();
   }
 }
