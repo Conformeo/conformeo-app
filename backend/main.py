@@ -218,17 +218,63 @@ def update_team_member(
     return {"message": "Profil mis à jour avec succès ✅"}
 
 # ==========================================
-# 3. DASHBOARD
+# 3. DASHBOARD (CORRIGÉ POUR LA CARTE)
 # ==========================================
 @app.get("/dashboard/stats")
 def get_stats(db: Session = Depends(get_db)):
+    # 1. KPIs
     total = db.query(models.Chantier).count()
     actifs = db.query(models.Chantier).filter(models.Chantier.est_actif == True).count()
     rap = db.query(models.Rapport).count()
     alert = db.query(models.Rapport).filter(models.Rapport.niveau_urgence.in_(['Critique', 'Moyen'])).count()
+
+    # 2. GRAPHIQUE (7 derniers jours)
+    today = datetime.now().date()
+    labels, values = [], []
+    for i in range(6, -1, -1):
+        day = today - timedelta(days=i)
+        labels.append(day.strftime("%d/%m"))
+        start = datetime.combine(day, datetime.min.time())
+        end = datetime.combine(day, datetime.max.time())
+        cnt = db.query(models.Rapport).filter(models.Rapport.date_creation >= start, models.Rapport.date_creation <= end).count()
+        values.append(cnt)
+
+    # 3. RAPPORTS RÉCENTS (Liste en bas du dashboard)
+    recents = db.query(models.Rapport).order_by(models.Rapport.date_creation.desc()).limit(5).all()
+    rec_fmt = []
+    for r in recents:
+        c_nom = r.chantier.nom if r.chantier else "Inconnu"
+        rec_fmt.append({
+            "titre": r.titre, 
+            "date_creation": r.date_creation, 
+            "chantier_nom": c_nom, 
+            "niveau_urgence": r.niveau_urgence
+        })
+
+    # 4. CARTE (C'est la partie qui manquait !)
+    map_data = []
+    chantiers = db.query(models.Chantier).filter(models.Chantier.est_actif == True).all()
+    for c in chantiers:
+        lat, lng = c.latitude, c.longitude
+        
+        # Si le chantier n'a pas de GPS, on essaie de prendre celui d'un de ses rapports
+        if not lat:
+            last_gps = db.query(models.Rapport).filter(models.Rapport.chantier_id == c.id, models.Rapport.latitude != None).first()
+            if last_gps:
+                lat, lng = last_gps.latitude, last_gps.longitude
+        
+        if lat and lng:
+            map_data.append({"id": c.id, "nom": c.nom, "client": c.client, "lat": lat, "lng": lng})
+
     return {
-        "kpis": {"total_chantiers": total, "actifs": actifs, "rapports": rap, "alertes": alert},
-        "chart": {"labels": [], "values": []}, "recents": [], "map": []
+        "kpis": {
+            "total_chantiers": total, "actifs": actifs, 
+            "rapports": rap, "alertes": alert,
+            "materiel_sorti": db.query(models.Materiel).filter(models.Materiel.chantier_id != None).count()
+        },
+        "chart": { "labels": labels, "values": values },
+        "recents": rec_fmt,
+        "map": map_data
     }
 
 # ==========================================

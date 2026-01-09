@@ -1,7 +1,7 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, NgZone } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { 
   IonHeader, IonToolbar, IonTitle, IonContent, IonList, 
   IonCard, IonCardHeader, IonCardTitle, IonCardSubtitle, IonCardContent, 
@@ -22,6 +22,7 @@ import {
 import { ApiService, Chantier } from '../services/api';
 import { OfflineService } from '../services/offline';
 import { AddChantierModalComponent } from './add-chantier-modal/add-chantier-modal.component';
+import * as L from 'leaflet';
 
 @Component({
   selector: 'app-home',
@@ -43,12 +44,22 @@ export class HomePage implements OnInit {
   searchTerm: string = '';
   isOnline = true;
 
+  stats: any = {
+    kpis: { total_chantiers: 0, actifs: 0, rapports: 0, alertes: 0, materiel_sorti: 0 },
+    recents: [],
+    map: [] // La liste des points GPS
+  };
+
+  map: L.Map | undefined;
+
   constructor(
     public api: ApiService,
     private modalCtrl: ModalController,
     public offline: OfflineService,
     private navCtrl: NavController,
-    private loadingCtrl: LoadingController
+    private loadingCtrl: LoadingController,
+    private router: Router,   // 👈 Pour naviguer
+    private ngZone: NgZone
   ) {
     addIcons({ 
       business, location, checkmarkCircle, alertCircle, add, 
@@ -61,6 +72,7 @@ export class HomePage implements OnInit {
   ngOnInit() {
     this.offline.isOnline.subscribe(state => this.isOnline = state);
     this.loadChantiers();
+    this.loadDashboard();
   }
   
   ionViewWillEnter() {
@@ -68,6 +80,65 @@ export class HomePage implements OnInit {
         this.loadChantiers();
         this.api.needsRefresh = false;
     }
+    this.loadDashboard();
+  }
+
+  loadDashboard() {
+    this.api.getStats().subscribe({
+      next: (data) => {
+        this.stats = data;
+        this.initMap(data.map); // On lance la carte avec les données reçues
+      },
+      error: (err) => console.error(err)
+    });
+  }
+
+  initMap(sites: any[]) {
+    // Si la carte existe déjà, on la nettoie pour éviter les doublons
+    if (this.map) {
+      this.map.remove();
+    }
+
+    // On attend un petit peu que le HTML soit prêt (sécurité)
+    setTimeout(() => {
+      const container = document.getElementById('map');
+      if (!container) return;
+
+      // 1. Centrer la carte (Par défaut sur la France ou sur le 1er chantier)
+      const centerLat = sites.length > 0 ? sites[0].lat : 46.603354;
+      const centerLng = sites.length > 0 ? sites[0].lng : 1.888334;
+      const zoomLevel = sites.length > 0 ? 10 : 5;
+
+      this.map = L.map('map').setView([centerLat, centerLng], zoomLevel);
+
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap'
+      }).addTo(this.map);
+
+      // 2. Ajouter les épingles
+      const iconDefault = L.icon({
+        iconUrl: 'assets/icon/marker-icon.png', // Assurez-vous d'avoir une icône ou utilisez celle par défaut de Leaflet
+        shadowUrl: 'assets/icon/marker-shadow.png',
+        iconSize: [25, 41],
+        iconAnchor: [12, 41],
+        popupAnchor: [1, -34]
+      });
+
+      sites.forEach(site => {
+        const marker = L.marker([site.lat, site.lng]) // On peut ajouter {icon: iconDefault} si vous avez les assets
+          .addTo(this.map!)
+          .bindPopup(`<b>${site.nom}</b><br>${site.client}`);
+
+        // 👇 LE CLICK MAGIQUE 👇
+        marker.on('click', () => {
+          this.ngZone.run(() => {
+            // Redirection vers la page détail du chantier
+            this.router.navigate(['/chantiers', site.id]);
+          });
+        });
+      });
+
+    }, 200);
   }
 
   loadChantiers(event?: any) {
