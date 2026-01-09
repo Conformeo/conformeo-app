@@ -7,6 +7,7 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib import colors
 from reportlab.lib.units import cm
+
 from PIL import Image, ImageOps
 import os
 import requests
@@ -541,15 +542,17 @@ def generate_pdp_pdf(chantier, pdp, output_path, company=None):
     return output_path
 
 def generate_duerp_pdf(company, duerp, filepath):
-    # La ligne qui plantait fonctionne maintenant car SimpleDocTemplate est importé
+    # Création du document (C'est ici que ça plantait avant)
     doc = SimpleDocTemplate(filepath, pagesize=landscape(A4), rightMargin=20, leftMargin=20, topMargin=20, bottomMargin=20)
     
     elements = []
     styles = getSampleStyleSheet()
 
     # 1. En-tête
-    elements.append(Paragraph(f"<b>DOCUMENT UNIQUE (DUERP) - {duerp.annee}</b>", styles['Title']))
+    title = f"<b>DOCUMENT UNIQUE (DUERP) - {duerp.annee}</b>"
+    elements.append(Paragraph(title, styles['Title']))
     elements.append(Spacer(1, 10))
+    
     if company:
         elements.append(Paragraph(f"Entreprise : {company.name}", styles['Normal']))
     
@@ -568,7 +571,7 @@ def generate_duerp_pdf(company, duerp, filepath):
     
     data = [headers]
     
-    # Remplissage
+    # Remplissage des données
     for l in duerp.lignes:
         row = [
             Paragraph(l.tache or "", styles['Normal']),
@@ -579,23 +582,31 @@ def generate_duerp_pdf(company, duerp, filepath):
         ]
         data.append(row)
 
-    # 3. Style Tableau
-    # Largeur totale A4 paysage ~ 29.7cm. Marges 2cm. Reste ~25cm.
-    col_widths = [150, 150, 50, 200, 200] 
+    # 3. Style du Tableau
+    # Largeur totale A4 paysage ~ 29.7cm.
+    # On définit des largeurs fixes pour éviter les erreurs de calcul
+    col_widths = [140, 140, 50, 200, 200] 
     
     t = Table(data, colWidths=col_widths)
     t.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.white),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
         ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-        ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
-        ('ALIGN', (2, 1), (2, -1), 'CENTER'),
+        ('ALIGN', (0, 0), (-1, 0), 'CENTER'), # Entêtes centrés
+        ('ALIGN', (2, 1), (2, -1), 'CENTER'), # Colonne Gravité centrée
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
         ('FONTSIZE', (0, 0), (-1, 0), 10),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
         ('GRID', (0, 0), (-1, -1), 1, colors.black),
         ('BOX', (0, 0), (-1, -1), 2, colors.black),
-        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
     ]))
 
     elements.append(t)
-    doc.build(elements)
+    
+    # 4. Génération finale
+    try:
+        doc.build(elements)
+        print(f"✅ PDF généré avec succès : {filepath}")
+    except Exception as e:
+        print(f"❌ Erreur lors de la construction du PDF : {e}")
+        raise e
