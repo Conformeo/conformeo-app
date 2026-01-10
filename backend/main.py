@@ -118,16 +118,16 @@ def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     db.add(new_user); db.commit(); db.refresh(new_user)
     return new_user
 
-@app.post("/token", response_model=schemas.Token)
+@app.post("/token")
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    # OAuth2PasswordRequestForm gère automatiquement le parsing du body
-    # (username, password) envoyés en x-www-form-urlencoded
+    # FastAPI s'attend à recevoir 'username' et 'password' dans un FORMULAIRE
     user = db.query(models.User).filter(models.User.email == form_data.username).first()
     if not user or not security.verify_password(form_data.password, user.hashed_password):
-        raise HTTPException(status_code=401, detail="Erreur login")
+        raise HTTPException(status_code=400, detail="Identifiants incorrects")
     
-    # IMPORTANT : On met l'email dans 'sub' pour que get_current_user le retrouve
     token = security.create_access_token(data={"sub": user.email, "role": user.role})
+    
+    # ⚠️ TRÈS IMPORTANT : Le nom de la clé est "access_token"
     return {"access_token": token, "token_type": "bearer"}
 
 @app.get("/users/me", response_model=schemas.UserOut)
