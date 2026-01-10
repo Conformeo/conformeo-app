@@ -541,16 +541,20 @@ export class ApiService {
     return this.http.post(`${this.apiUrl}/chantiers/${chantierId}/send-email?email_dest=${email}`, {}, this.getOptions());
   }
 
+  // ... (Tout le code du haut reste identique : login, getOptions, etc.) ...
+
   // ==========================================
-  // 📊 DASHBOARD, TEAM & PROFIL
+  // 📊 DASHBOARD, TEAM & PROFIL (CORRECTION TYPES)
   // ==========================================
   
   getStats(): Observable<any> {
     return this.http.get<any>(`${this.apiUrl}/dashboard/stats`, this.getOptions());
   }
   
-  getMe() { return this.http.get(`${this.apiUrl}/users/me`, this.getOptions()); }
-  getTeam() { return this.http.get(`${this.apiUrl}/team`, this.getOptions()); }
+  // 👇 AJOUT DE <User> ICI
+  getMe(): Observable<User> {
+    return this.http.get<User>(`${this.apiUrl}/users/me`, this.getOptions());
+  }
 
   updateUser(data: any): Observable<User> {
     return this.http.put<User>(`${this.apiUrl}/users/me`, data, this.getOptions());
@@ -558,6 +562,10 @@ export class ApiService {
 
   // --- GESTION ÉQUIPE (Team) ---
 
+  // 👇 AJOUT DE <User[]> ICI
+  getTeam(): Observable<User[]> {
+    return this.http.get<User[]>(`${this.apiUrl}/team`, this.getOptions());
+  }
 
   inviteMember(data: any): Observable<any> {
     return this.http.post(`${this.apiUrl}/team/invite`, data, this.getOptions());
