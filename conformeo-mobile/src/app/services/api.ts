@@ -176,42 +176,42 @@ export class ApiService {
     }
   }
 
-  login(credentials: UserLogin): Observable<any> {
-    // 1. On prépare le corps de la requête au format "x-www-form-urlencoded"
-    // C'est le SEUL format que FastAPI /token accepte par défaut.
+  login(credentials: any): Observable<any> {
+    // FastAPI attend du x-www-form-urlencoded, pas du JSON
     const body = new URLSearchParams();
     body.set('username', credentials.email || credentials.username || '');
     body.set('password', credentials.password);
 
-    // 2. On définit les en-têtes explicitement
     const headers = new HttpHeaders({
       'Content-Type': 'application/x-www-form-urlencoded',
       'Accept': 'application/json'
     });
 
-    // 3. On envoie body.toString() (c'est important !)
-    return this.http.post<Token>(`${this.apiUrl}/token`, body.toString(), { headers }).pipe(
+    return this.http.post<any>(`${this.apiUrl}/token`, body.toString(), { headers }).pipe(
       tap(async (res) => {
-        console.log("✅ API Service : Token reçu !", res);
-
-        const t = res.access_token || (res as any).token;
-        this.token = t;
+        console.log("✅ LOGIN SUCCESS - Token reçu :", res);
         
-        // Sauvegarde immédiate
-        await Preferences.set({ key: 'auth_token', value: t });
-        localStorage.setItem('token', t);
-        localStorage.setItem('access_token', t);
+        // On sécurise le token sous les deux noms possibles
+        const t = res.access_token || res.token;
+        
+        if (t) {
+            localStorage.setItem('token', t);
+            localStorage.setItem('access_token', t);
+            await Preferences.set({ key: 'auth_token', value: t });
+        }
       })
     );
   }
 
   logout() {
-    this.token = null;
-    Preferences.remove({ key: 'auth_token' });
-    localStorage.removeItem('token');
-    localStorage.removeItem('access_token');
+    localStorage.clear();
+    Preferences.clear();
     this.navCtrl.navigateRoot('/login');
   }
+
+  // --- 🏢 EXEMPLE D'APPEL PROTÉGÉ ---
+
+  
 
   async isAuthenticated(): Promise<boolean> {
     if (this.token) return true;
@@ -225,26 +225,19 @@ export class ApiService {
 
   // 👇 MÉTHODE BLINDÉE POUR RÉCUPÉRER LE TOKEN
   public getOptions() {
-    // 1. Variable mémoire
-    let t = this.token;
+    // 1. Lecture directe (Synchrone)
+    const token = localStorage.getItem('token') || localStorage.getItem('access_token');
 
-    // 2. Secours LocalStorage
-    if (!t) {
-      t = localStorage.getItem('token') || localStorage.getItem('access_token');
-    }
-
-    // 3. Construction Header
-    if (t) {
-      // Mise à jour mémoire pour les prochains appels
-      this.token = t; 
+    // 2. Si le token existe, on l'ajoute au Header
+    if (token) {
       return {
         headers: new HttpHeaders({
-          'Authorization': `Bearer ${t}`
+          'Authorization': `Bearer ${token}` // <--- LE SESAME
         })
       };
     }
 
-    // 4. Fallback sans auth
+    // 3. Sinon, on envoie vide (le serveur répondra 401, ce qui est normal)
     return {
       headers: new HttpHeaders({ 'Content-Type': 'application/json' })
     };
@@ -560,8 +553,9 @@ export class ApiService {
     return this.http.get<any>(`${this.apiUrl}/dashboard/stats`, this.getOptions());
   }
   
-  getMe(): Observable<User> {
-    return this.http.get<User>(`${this.apiUrl}/users/me`, this.getOptions());
+  getMe(): Observable<any> {
+    // On passe this.getOptions() qui va insérer le token automatiquement
+    return this.http.get<any>(`${this.apiUrl}/users/me`, this.getOptions());
   }
 
   updateUser(data: any): Observable<User> {

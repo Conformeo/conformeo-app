@@ -12,7 +12,7 @@ import { ApiService } from 'src/app/services/api';
   imports: [CommonModule, FormsModule, IonicModule]
 })
 export class LoginPage {
-  credentials = { email: 'admin@conformeo.com', password: 'admin' };
+  credentials = { email: '', password: '' };
 
   constructor(
     private api: ApiService, 
@@ -22,72 +22,32 @@ export class LoginPage {
   ) {}
 
   async login() {
-    console.log("🚀 Démarrage connexion (Mode FETCH)...");
-
-    if (!this.credentials.email || !this.credentials.password) {
-      this.presentToast('Remplissez les champs', 'warning');
-      return;
-    }
-
-    const loading = await this.loadingCtrl.create({ message: 'Connexion directe...' });
+    const loading = await this.loadingCtrl.create({ message: 'Connexion...' });
     await loading.present();
 
-    // 1. Préparation des données (Format standard OAuth2)
-    const body = new URLSearchParams();
-    body.append('username', this.credentials.email);
-    body.append('password', this.credentials.password);
-
-    try {
-      // 2. Appel "BRUT" via fetch (contourne le HttpClient Angular pour le test)
-      const response = await fetch('https://conformeo-api.onrender.com/token', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'Accept': 'application/json'
-        },
-        body: body
-      });
-
-      console.log("📡 Statut Réponse :", response.status);
-
-      // 3. Traitement du résultat
-      if (response.ok) {
-        const data = await response.json();
-        console.log("🔥 TOKEN REÇU VIA FETCH :", data);
-
-        const token = data.access_token || data.token;
-        
-        // Sauvegarde manuelle
-        localStorage.setItem('token', token);
-        localStorage.setItem('access_token', token);
-        
-        // On informe le service API
-        this.api.forceTokenRefresh(token);
-
+    this.api.login(this.credentials).subscribe({
+      next: () => {
         loading.dismiss();
-        this.presentToast('Connexion Réussie !', 'success');
+        this.presentToast('Connexion réussie', 'success');
+        
+        // Redirection vers le dashboard
+        // Le token est déjà dans le localStorage grâce au tap() du service
         this.navCtrl.navigateRoot('/dashboard');
-
-      } else {
-        // Erreur serveur (401, 500, etc.)
-        const errorData = await response.text();
-        console.error("❌ ERREUR FETCH :", errorData);
+      },
+      error: (err) => {
         loading.dismiss();
-        this.presentToast(`Erreur ${response.status}: Identifiants incorrects ?`, 'danger');
+        console.error("Erreur Login:", err);
+        if (err.status === 401 || err.status === 403) {
+           this.presentToast('Identifiants incorrects', 'danger');
+        } else {
+           this.presentToast('Erreur serveur ou connexion', 'warning');
+        }
       }
-
-    } catch (error) {
-      // Erreur réseau ou CORS
-      loading.dismiss();
-      console.error("☠️ CRASH RÉSEAU/CORS :", error);
-      alert("Blocage Réseau ! Vérifiez que votre backend autorise bien les requêtes (CORS).");
-    }
+    });
   }
 
   async presentToast(message: string, color: string) {
-    const toast = await this.toastCtrl.create({
-      message, duration: 4000, color, position: 'top'
-    });
-    toast.present();
+    const t = await this.toastCtrl.create({ message, duration: 3000, color, position: 'top' });
+    t.present();
   }
 }
