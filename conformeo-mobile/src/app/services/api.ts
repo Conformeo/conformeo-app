@@ -154,14 +154,14 @@ export class ApiService {
     private navCtrl: NavController
   ) { 
     // 1. Chargement SYNCHRONE immédiat (Local Storage)
-    // Cela évite les erreurs 401 au démarrage de l'app avant que l'async ne finisse
     this.token = localStorage.getItem('token') || localStorage.getItem('access_token');
     
-    // 2. Chargement ASYNCHRONE (Capacitor Preferences) pour la persistance long terme
+    // 2. Chargement ASYNCHRONE (Capacitor Preferences)
     this.loadTokenAsync();
   }
 
-  // 👇 AJOUTEZ CETTE MÉTHODE (Utilisée par LoginPage)
+  // --- AUTHENTIFICATION ---
+
   public forceTokenRefresh(newToken: string) {
     this.token = newToken;
   }
@@ -170,58 +170,45 @@ export class ApiService {
     const { value } = await Preferences.get({ key: 'auth_token' });
     if (value) {
       this.token = value;
-      // On resynchronise le localStorage au cas où
+      // Synchro localStorage
       localStorage.setItem('token', value);
       localStorage.setItem('access_token', value);
     }
   }
 
-  // 1. LOGIN : VERSION FORMULAIRE (URLSearchParams)
+  // LOGIN CORRIGÉ POUR FASTAPI (x-www-form-urlencoded)
   login(credentials: any): Observable<any> {
-    // On transforme l'objet en format URL (x-www-form-urlencoded)
     const body = new URLSearchParams();
-    body.set('username', credentials.email || credentials.username); // FastAPI attend 'username'
+    body.set('username', credentials.email || credentials.username);
     body.set('password', credentials.password);
 
     const headers = new HttpHeaders({
-      'Content-Type': 'application/x-www-form-urlencoded' // On prévient le serveur
+      'Content-Type': 'application/x-www-form-urlencoded'
     });
 
     return this.http.post<any>(`${this.apiUrl}/token`, body.toString(), { headers }).pipe(
-      tap({
-        // Cas de SUCCÈS (Code 200)
-        next: (res) => {
-          console.log("🔥 RÉPONSE SUCCÈS :", res);
-          
-          if (res && res.access_token) {
-            console.log("✅ Token identifié :", res.access_token);
-            this.token = res.access_token;
-            localStorage.setItem('access_token', res.access_token);
-            localStorage.setItem('token', res.access_token); 
-            Preferences.set({ key: 'auth_token', value: res.access_token });
-          } else {
-            console.warn("⚠️ Réponse 200 reçue, mais PAS de 'access_token' dedans !", res);
-          }
-        },
-        // Cas d'ERREUR (Code 4xx, 5xx, ou CORS)
-        error: (err) => {
-          console.error("☠️ LE LOGIN A ÉCHOUÉ AVANT LE TRAITEMENT :", err);
-          console.error("Statut :", err.status);
-          console.error("Message :", err.error ? err.error.detail : err.message);
+      tap((res) => {
+        console.log("🔥 LOGIN SUCCESS:", res);
+        
+        const t = res.access_token || res.token;
+        if (t) {
+          this.token = t;
+          localStorage.setItem('access_token', t);
+          localStorage.setItem('token', t); 
+          Preferences.set({ key: 'auth_token', value: t });
         }
       })
     );
   }
 
-  // 2. INTERCEPTOR : Injecte le token partout
+  // INTERCEPTOR MANUEL
   public getOptions() {
-    // On relit le stockage pour être sûr à 100%
     const t = this.token || localStorage.getItem('access_token') || localStorage.getItem('token');
     
     if (t) {
       return {
         headers: new HttpHeaders({
-          'Authorization': `Bearer ${t}` // Espace important après Bearer
+          'Authorization': `Bearer ${t}`
         })
       };
     }
@@ -244,7 +231,6 @@ export class ApiService {
     }
     return false;
   }
-
 
   // --- OFFLINE TOOLS ---
 
@@ -386,7 +372,6 @@ export class ApiService {
     if (!this.offline.isOnline.value) throw new Error("Offline");
     const formData = new FormData();
     formData.append('file', blob, 'photo.jpg');
-    // Important pour FormData
     const headers = this.getOptions().headers?.delete('Content-Type');
     return this.http.post<{url: string}>(`${this.apiUrl}/upload`, formData, { headers });
   }
@@ -512,13 +497,9 @@ export class ApiService {
     window.open(url, '_system');
   }
 
-
-  // 👇 NOUVELLE MÉTHODE POUR TÉLÉCHARGER LE PDF DUERP
+  // DUERP PDF Download
   downloadDuerpPdf(annee: string) {
     const url = `${this.apiUrl}/companies/me/duerp/${annee}/pdf`;
-    
-    // On doit forcer le type de réponse en 'blob' pour gérer le fichier binaire
-    // On fusionne les options d'auth (getOptions) avec responseType: 'blob'
     const headers = this.getOptions().headers;
     return this.http.get(url, { headers, responseType: 'blob' as 'json' });
   }
@@ -549,14 +530,14 @@ export class ApiService {
   }
 
   // ==========================================
-  // 📊 DASHBOARD, TEAM & PROFIL (CORRECTION TYPES)
+  // 📊 DASHBOARD, TEAM & PROFIL
   // ==========================================
   
   getStats(): Observable<any> {
     return this.http.get<any>(`${this.apiUrl}/dashboard/stats`, this.getOptions());
   }
   
-  // 👇 AJOUT DE <User> ICI pour corriger l'erreur de build
+  // 👇 ICI LE TYPAGE <User> EST CRUCIAL POUR LE BUILD PROD
   getMe(): Observable<User> {
     return this.http.get<User>(`${this.apiUrl}/users/me`, this.getOptions());
   }
@@ -567,7 +548,7 @@ export class ApiService {
 
   // --- GESTION ÉQUIPE (Team) ---
 
-  // 👇 AJOUT DE <User[]> ICI pour corriger l'erreur de build
+  // 👇 ICI LE TYPAGE <User[]> EST CRUCIAL POUR LE BUILD PROD
   getTeam(): Observable<User[]> {
     return this.http.get<User[]>(`${this.apiUrl}/team`, this.getOptions());
   }
