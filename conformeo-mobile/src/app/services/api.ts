@@ -176,11 +176,11 @@ export class ApiService {
     }
   }
 
-  // 1. LOGIN : LA CORRECTION CRITIQUE
+  // 1. LOGIN : VERSION FORMULAIRE (URLSearchParams)
   login(credentials: any): Observable<any> {
     // On transforme l'objet en format URL (x-www-form-urlencoded)
     const body = new URLSearchParams();
-    body.set('username', credentials.email); // FastAPI attend 'username', on lui donne l'email
+    body.set('username', credentials.email || credentials.username); // FastAPI attend 'username'
     body.set('password', credentials.password);
 
     const headers = new HttpHeaders({
@@ -198,6 +198,7 @@ export class ApiService {
           localStorage.setItem('access_token', res.access_token);
           // Pour compatibilité avec d'autres bouts de code
           localStorage.setItem('token', res.access_token); 
+          Preferences.set({ key: 'auth_token', value: res.access_token });
         }
       })
     );
@@ -206,7 +207,7 @@ export class ApiService {
   // 2. INTERCEPTOR : Injecte le token partout
   public getOptions() {
     // On relit le stockage pour être sûr à 100%
-    const t = this.token || localStorage.getItem('access_token');
+    const t = this.token || localStorage.getItem('access_token') || localStorage.getItem('token');
     
     if (t) {
       return {
@@ -221,12 +222,9 @@ export class ApiService {
   logout() {
     localStorage.clear();
     Preferences.clear();
+    this.token = null;
     this.navCtrl.navigateRoot('/login');
   }
-
-  // --- 🏢 EXEMPLE D'APPEL PROTÉGÉ ---
-
-  
 
   async isAuthenticated(): Promise<boolean> {
     if (this.token) return true;
@@ -541,8 +539,6 @@ export class ApiService {
     return this.http.post(`${this.apiUrl}/chantiers/${chantierId}/send-email?email_dest=${email}`, {}, this.getOptions());
   }
 
-  // ... (Tout le code du haut reste identique : login, getOptions, etc.) ...
-
   // ==========================================
   // 📊 DASHBOARD, TEAM & PROFIL (CORRECTION TYPES)
   // ==========================================
@@ -551,7 +547,7 @@ export class ApiService {
     return this.http.get<any>(`${this.apiUrl}/dashboard/stats`, this.getOptions());
   }
   
-  // 👇 AJOUT DE <User> ICI
+  // 👇 AJOUT DE <User> ICI pour corriger l'erreur de build
   getMe(): Observable<User> {
     return this.http.get<User>(`${this.apiUrl}/users/me`, this.getOptions());
   }
@@ -562,7 +558,7 @@ export class ApiService {
 
   // --- GESTION ÉQUIPE (Team) ---
 
-  // 👇 AJOUT DE <User[]> ICI
+  // 👇 AJOUT DE <User[]> ICI pour corriger l'erreur de build
   getTeam(): Observable<User[]> {
     return this.http.get<User[]>(`${this.apiUrl}/team`, this.getOptions());
   }

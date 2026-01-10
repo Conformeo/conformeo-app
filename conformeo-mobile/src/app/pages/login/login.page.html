@@ -7,16 +7,33 @@
 
     <ion-card>
       <ion-card-content>
+        
         <ion-item>
           <ion-label position="stacked">Email</ion-label>
-          <ion-input type="email" [(ngModel)]="credentials.email"></ion-input>
-        </ion-item>
-        <ion-item>
-          <ion-label position="stacked">Mot de passe</ion-label>
-          <ion-input type="password" [(ngModel)]="credentials.password"></ion-input>
+          <ion-input 
+            type="email" 
+            name="email"
+            placeholder="exemple@entreprise.com"
+            [(ngModel)]="credentials.email">
+          </ion-input>
         </ion-item>
 
-        <ion-button expand="block" (click)="login()" class="ion-margin-top">
+        <ion-item>
+          <ion-label position="stacked">Mot de passe</ion-label>
+          <ion-input 
+            type="password" 
+            name="password"
+            placeholder="Votre mot de passe"
+            [(ngModel)]="credentials.password"
+            (keyup.enter)="login()"> 
+          </ion-input>
+        </ion-item>
+
+        <ion-button 
+          expand="block" 
+          type="button" 
+          (click)="login()" 
+          class="ion-margin-top">
           Se connecter
         </ion-button>
         
