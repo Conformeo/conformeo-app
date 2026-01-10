@@ -176,8 +176,8 @@ export class ApiService {
     }
   }
 
-  login(credentials: any): Observable<any> {
-    // FastAPI attend du x-www-form-urlencoded, pas du JSON
+  login(credentials: UserLogin): Observable<any> {
+    // 1. Préparation des données (Format x-www-form-urlencoded OBLIGATOIRE pour FastAPI)
     const body = new URLSearchParams();
     body.set('username', credentials.email || credentials.username || '');
     body.set('password', credentials.password);
@@ -187,20 +187,32 @@ export class ApiService {
       'Accept': 'application/json'
     });
 
+    console.log("📡 Envoi demande login...", body.toString());
+
     return this.http.post<any>(`${this.apiUrl}/token`, body.toString(), { headers }).pipe(
       tap(async (res) => {
-        console.log("✅ LOGIN SUCCESS - Token reçu :", res);
-        
-        // On sécurise le token sous les deux noms possibles
-        const t = res.access_token || res.token;
-        
-       if (t) {
-          this.token = t;
-          localStorage.setItem('token', t);
-          localStorage.setItem('access_token', t);
-          await Preferences.set({ key: 'auth_token', value: t });
-        }
+        // 👇 ZONE DE DÉBOGAGE CRITIQUE 👇
+        console.log("🔥 RÉPONSE SERVEUR REÇUE :", res);
 
+        // On cherche le token sous TOUTES ses formes possibles
+        // FastAPI renvoie standardement "access_token"
+        const t = res.access_token || res.token || (res.data ? res.data.token : null);
+
+        if (t) {
+            console.log("✅ Token trouvé :", t.substring(0, 15) + "...");
+            
+            // SAUVEGARDE FORCÉE ET IMMÉDIATE
+            this.token = t;
+            localStorage.setItem('token', t);
+            localStorage.setItem('access_token', t);
+            await Preferences.set({ key: 'auth_token', value: t });
+
+            // VÉRIFICATION IMMÉDIATE
+            const verif = localStorage.getItem('token');
+            console.log("💾 Vérification LocalStorage après écriture :", verif ? "OK (Sauvegardé)" : "ECHEC (Vide)");
+        } else {
+            console.error("❌ ERREUR GRAVE : Le serveur a répondu 200 OK mais aucun token n'a été trouvé dans l'objet réponse !", res);
+        }
       })
     );
   }
