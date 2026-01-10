@@ -194,11 +194,13 @@ export class ApiService {
         // On sécurise le token sous les deux noms possibles
         const t = res.access_token || res.token;
         
-        if (t) {
-            localStorage.setItem('token', t);
-            localStorage.setItem('access_token', t);
-            await Preferences.set({ key: 'auth_token', value: t });
+       if (t) {
+          this.token = t;
+          localStorage.setItem('token', t);
+          localStorage.setItem('access_token', t);
+          await Preferences.set({ key: 'auth_token', value: t });
         }
+
       })
     );
   }
