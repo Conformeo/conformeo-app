@@ -188,17 +188,26 @@ export class ApiService {
     });
 
     return this.http.post<any>(`${this.apiUrl}/token`, body.toString(), { headers }).pipe(
-      tap((res) => {
-        console.log("🔥 LOGIN SUCCESS:", res);
-        
-        // On récupère "access_token" (c'est ce que renvoie Python)
-        if (res && res.access_token) {
-          this.token = res.access_token;
-          // Sauvegarde immédiate
-          localStorage.setItem('access_token', res.access_token);
-          // Pour compatibilité avec d'autres bouts de code
-          localStorage.setItem('token', res.access_token); 
-          Preferences.set({ key: 'auth_token', value: res.access_token });
+      tap({
+        // Cas de SUCCÈS (Code 200)
+        next: (res) => {
+          console.log("🔥 RÉPONSE SUCCÈS :", res);
+          
+          if (res && res.access_token) {
+            console.log("✅ Token identifié :", res.access_token);
+            this.token = res.access_token;
+            localStorage.setItem('access_token', res.access_token);
+            localStorage.setItem('token', res.access_token); 
+            Preferences.set({ key: 'auth_token', value: res.access_token });
+          } else {
+            console.warn("⚠️ Réponse 200 reçue, mais PAS de 'access_token' dedans !", res);
+          }
+        },
+        // Cas d'ERREUR (Code 4xx, 5xx, ou CORS)
+        error: (err) => {
+          console.error("☠️ LE LOGIN A ÉCHOUÉ AVANT LE TRAITEMENT :", err);
+          console.error("Statut :", err.status);
+          console.error("Message :", err.error ? err.error.detail : err.message);
         }
       })
     );
