@@ -25,6 +25,10 @@ export class LoginPage {
     const loading = await this.loadingCtrl.create({ message: 'Connexion...' });
     await loading.present();
 
+    // 👇 AJOUTEZ CETTE LIGNE TEMPORAIRE
+    alert("1. Le bouton fonctionne !"); 
+    
+    console.log("2. Démarrage connexion...");
     this.api.login(this.credentials).subscribe({
       next: () => {
         loading.dismiss();
