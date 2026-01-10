@@ -29,19 +29,14 @@ export class LoginPage {
       next: () => {
         loading.dismiss();
         this.presentToast('Connexion réussie', 'success');
-        
-        // Redirection vers le dashboard
-        // Le token est déjà dans le localStorage grâce au tap() du service
+        // On force la navigation
         this.navCtrl.navigateRoot('/dashboard');
       },
       error: (err) => {
         loading.dismiss();
-        console.error("Erreur Login:", err);
-        if (err.status === 401 || err.status === 403) {
-           this.presentToast('Identifiants incorrects', 'danger');
-        } else {
-           this.presentToast('Erreur serveur ou connexion', 'warning');
-        }
+        console.error("❌ Erreur Login:", err);
+        // Si c'est 400 ou 401 ou 422, c'est identifiants ou format
+        this.presentToast('Erreur : Vérifiez vos identifiants.', 'danger');
       }
     });
   }
