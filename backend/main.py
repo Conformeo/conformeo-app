@@ -23,7 +23,7 @@ from fastapi_mail import FastMail, MessageSchema, ConnectionConfig, MessageType
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-# 👇 ON IMPORTE TOUT DEPUIS SCHEMAS MAINTENANT
+# 👇 IMPORTATION DES MODULES LOCAUX
 import models
 import schemas 
 import security
@@ -61,12 +61,13 @@ mail_conf = ConnectionConfig(
 os.makedirs("uploads", exist_ok=True)
 app.mount("/static", StaticFiles(directory="uploads"), name="static")
 
+# 👇 MIDDLEWARE CORS (CRUCIAL POUR LE MOBILE)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"], # Autorise toutes les origines
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["*"], # Autorise tous les verbes (GET, POST, OPTIONS...)
+    allow_headers=["*"], # Autorise tous les headers (Authorization, Content-Type...)
 )
 
 @app.get("/")
@@ -110,7 +111,7 @@ def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
         new_company = models.Company(name=user.company_name, subscription_plan="free")
         db.add(new_company); db.commit(); db.refresh(new_company)
         company_id = new_company.id
-        role = "admin" # Le créateur de l'entreprise est admin
+        role = "admin" 
 
     hashed_pwd = security.get_password_hash(user.password)
     new_user = models.User(email=user.email, hashed_password=hashed_pwd, role=role, company_id=company_id)
@@ -119,13 +120,16 @@ def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
 
 @app.post("/token", response_model=schemas.Token)
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    # OAuth2PasswordRequestForm gère automatiquement le parsing du body
+    # (username, password) envoyés en x-www-form-urlencoded
     user = db.query(models.User).filter(models.User.email == form_data.username).first()
     if not user or not security.verify_password(form_data.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Erreur login")
+    
+    # IMPORTANT : On met l'email dans 'sub' pour que get_current_user le retrouve
     token = security.create_access_token(data={"sub": user.email, "role": user.role})
     return {"access_token": token, "token_type": "bearer"}
 
-# 👇 ICI LE FIX: on utilise schemas.UserOut, pas UserOut tout court
 @app.get("/users/me", response_model=schemas.UserOut)
 def read_users_me(current_user: models.User = Depends(security.get_current_user)):
     return current_user
@@ -192,11 +196,9 @@ def update_team_member(
     db: Session = Depends(get_db), 
     current_user: models.User = Depends(security.get_current_user)
 ):
-    # 1. Vérif Admin
     if not current_user.company_id:
         raise HTTPException(400, "Pas d'entreprise")
     
-    # 2. Trouver le membre dans la MÊME entreprise
     user_to_edit = db.query(models.User).filter(
         models.User.id == user_id, 
         models.User.company_id == current_user.company_id
@@ -205,12 +207,10 @@ def update_team_member(
     if not user_to_edit:
         raise HTTPException(404, "Utilisateur introuvable")
 
-    # 3. Mise à jour des champs
     if user_up.nom: user_to_edit.nom = user_up.nom
     if user_up.email: user_to_edit.email = user_up.email
     if user_up.role: user_to_edit.role = user_up.role
     
-    # 4. Reset mot de passe (optionnel)
     if user_up.password and len(user_up.password) > 0:
         user_to_edit.hashed_password = security.get_password_hash(user_up.password)
 
@@ -218,17 +218,15 @@ def update_team_member(
     return {"message": "Profil mis à jour avec succès ✅"}
 
 # ==========================================
-# 3. DASHBOARD (CORRIGÉ POUR LA CARTE)
+# 3. DASHBOARD
 # ==========================================
 @app.get("/dashboard/stats")
 def get_stats(db: Session = Depends(get_db)):
-    # 1. KPIs
     total = db.query(models.Chantier).count()
     actifs = db.query(models.Chantier).filter(models.Chantier.est_actif == True).count()
     rap = db.query(models.Rapport).count()
     alert = db.query(models.Rapport).filter(models.Rapport.niveau_urgence.in_(['Critique', 'Moyen'])).count()
 
-    # 2. GRAPHIQUE (7 derniers jours)
     today = datetime.now().date()
     labels, values = [], []
     for i in range(6, -1, -1):
@@ -239,7 +237,6 @@ def get_stats(db: Session = Depends(get_db)):
         cnt = db.query(models.Rapport).filter(models.Rapport.date_creation >= start, models.Rapport.date_creation <= end).count()
         values.append(cnt)
 
-    # 3. RAPPORTS RÉCENTS (Liste en bas du dashboard)
     recents = db.query(models.Rapport).order_by(models.Rapport.date_creation.desc()).limit(5).all()
     rec_fmt = []
     for r in recents:
@@ -251,18 +248,14 @@ def get_stats(db: Session = Depends(get_db)):
             "niveau_urgence": r.niveau_urgence
         })
 
-    # 4. CARTE (C'est la partie qui manquait !)
     map_data = []
     chantiers = db.query(models.Chantier).filter(models.Chantier.est_actif == True).all()
     for c in chantiers:
         lat, lng = c.latitude, c.longitude
-        
-        # Si le chantier n'a pas de GPS, on essaie de prendre celui d'un de ses rapports
         if not lat:
             last_gps = db.query(models.Rapport).filter(models.Rapport.chantier_id == c.id, models.Rapport.latitude != None).first()
             if last_gps:
                 lat, lng = last_gps.latitude, last_gps.longitude
-        
         if lat and lng:
             map_data.append({"id": c.id, "nom": c.nom, "client": c.client, "lat": lat, "lng": lng})
 
@@ -994,4 +987,3 @@ def sign_company_doc(
     })
     db.commit()
     return {"message": "Document signé avec succès"}
-
