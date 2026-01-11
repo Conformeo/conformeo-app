@@ -164,37 +164,39 @@ export class ApiService {
 
   public forceTokenRefresh(newToken: string) {
     this.token = newToken;
+    localStorage.setItem('token', newToken);
+    localStorage.setItem('access_token', newToken);
+    Preferences.set({ key: 'auth_token', value: newToken });
   }
 
   async loadTokenAsync() {
     const { value } = await Preferences.get({ key: 'auth_token' });
     if (value) {
       this.token = value;
-      // Synchro localStorage
       localStorage.setItem('token', value);
       localStorage.setItem('access_token', value);
     }
   }
 
-  // LOGIN CORRIGÉ POUR FASTAPI (x-www-form-urlencoded)
+  // LOGIN POUR FASTAPI (x-www-form-urlencoded)
   login(credentials: any): Observable<any> {
     const body = new URLSearchParams();
-    body.set('username', credentials.email || credentials.username);
+    body.set('username', credentials.email || credentials.username || '');
     body.set('password', credentials.password);
 
     const headers = new HttpHeaders({
-      'Content-Type': 'application/x-www-form-urlencoded'
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'Accept': 'application/json'
     });
 
     return this.http.post<any>(`${this.apiUrl}/token`, body.toString(), { headers }).pipe(
       tap((res) => {
-        console.log("🔥 LOGIN SUCCESS:", res);
-        
+        console.log('🔥 LOGIN SUCCESS:', res);
         const t = res.access_token || res.token;
         if (t) {
-          this.token = t;
+          this.token = t;                         // <-- immédiatement en mémoire
           localStorage.setItem('access_token', t);
-          localStorage.setItem('token', t); 
+          localStorage.setItem('token', t);
           Preferences.set({ key: 'auth_token', value: t });
         }
       })
@@ -203,7 +205,9 @@ export class ApiService {
 
   // INTERCEPTOR MANUEL
   public getOptions() {
-    const t = this.token || localStorage.getItem('access_token') || localStorage.getItem('token');
+    const t = this.token
+      || localStorage.getItem('access_token')
+      || localStorage.getItem('token');
     
     if (t) {
       return {
@@ -369,7 +373,7 @@ export class ApiService {
   }
 
   uploadPhoto(blob: Blob): Observable<{url: string}> {
-    if (!this.offline.isOnline.value) throw new Error("Offline");
+    if (!this.offline.isOnline.value) throw new Error('Offline');
     const formData = new FormData();
     formData.append('file', blob, 'photo.jpg');
     const headers = this.getOptions().headers?.delete('Content-Type');
@@ -459,6 +463,7 @@ export class ApiService {
   createPPSPS(doc: any): Observable<any> {
     return this.http.post<any>(`${this.apiUrl}/ppsps`, doc, this.getOptions());
   }
+
   getPPSPSList(id: number): Observable<any[]> {
     return this.http.get<any[]>(`${this.apiUrl}/chantiers/${id}/ppsps`, this.getOptions());
   }
@@ -466,13 +471,14 @@ export class ApiService {
   createInspection(doc: any): Observable<any> {
     return this.http.post<any>(`${this.apiUrl}/inspections`, doc, this.getOptions());
   }
+
   getInspections(id: number): Observable<any[]> {
     return this.http.get<any[]>(`${this.apiUrl}/chantiers/${id}/inspections`, this.getOptions());
   }
   
   // PIC
   savePIC(doc: any): Observable<any> {
-    if (!doc.chantier_id) throw new Error("Chantier ID manquant pour le PIC");
+    if (!doc.chantier_id) throw new Error('Chantier ID manquant pour le PIC');
     return this.http.post<any>(`${this.apiUrl}/chantiers/${doc.chantier_id}/pic`, doc, this.getOptions());
   }
   
@@ -537,7 +543,6 @@ export class ApiService {
     return this.http.get<any>(`${this.apiUrl}/dashboard/stats`, this.getOptions());
   }
   
-  // 👇 ICI LE TYPAGE <User> EST CRUCIAL POUR LE BUILD PROD
   getMe(): Observable<User> {
     return this.http.get<User>(`${this.apiUrl}/users/me`, this.getOptions());
   }
@@ -548,7 +553,6 @@ export class ApiService {
 
   // --- GESTION ÉQUIPE (Team) ---
 
-  // 👇 ICI LE TYPAGE <User[]> EST CRUCIAL POUR LE BUILD PROD
   getTeam(): Observable<User[]> {
     return this.http.get<User[]>(`${this.apiUrl}/team`, this.getOptions());
   }
