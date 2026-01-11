@@ -36,11 +36,27 @@ export class LoginPage {
         // On force la navigation
         this.navCtrl.navigateRoot('/dashboard');
       },
-      error: (err) => {
+     error: (err) => {
         loading.dismiss();
-        console.error("❌ Erreur Login:", err);
-        // Si c'est 400 ou 401 ou 422, c'est identifiants ou format
-        this.presentToast('Erreur : Vérifiez vos identifiants.', 'danger');
+        console.error("❌ DEBUG ERREUR:", err);
+
+        let message = 'Erreur inconnue';
+        
+        // ANALYSE DU CODE D'ERREUR
+        if (err.status === 0) {
+          message = '⚠️ ERREUR RÉSEAU (0) : Le serveur Render dort ou le CORS bloque.';
+        } else if (err.status === 422) {
+          message = '⚠️ ERREUR 422 (Format) : Le code Vercel est OBSOLÈTE (envoie du JSON).';
+        } else if (err.status === 401) {
+          message = '❌ ERREUR 401 (Auth) : Mot de passe refusé par le serveur.';
+        } else if (err.status === 500) {
+          message = '🔥 ERREUR 500 : Le serveur Python a planté.';
+        } else {
+          message = `Erreur ${err.status} : ${err.error ? JSON.stringify(err.error) : err.message}`;
+        }
+
+        // On affiche l'alerte précise à l'écran
+        alert(message); 
       }
     });
   }
