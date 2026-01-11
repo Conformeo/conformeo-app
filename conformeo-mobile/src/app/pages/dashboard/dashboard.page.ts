@@ -55,6 +55,7 @@ export class DashboardPage implements OnInit {
   ) {
     addIcons({ business, documentText, hammer, warning, cameraOutline });  
   }
+  
 
   ngOnInit() {
     // 👇 LA CORRECTION EST ICI 👇
