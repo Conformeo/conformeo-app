@@ -141,7 +141,7 @@ export class QhseFormPage implements OnInit {
 
     // 2. On crée l'objet Inspection GLOBAL
     const inspection: Inspection = {
-      titre: `Audit Complet du Chantier`, // Titre générique
+      titre: `Inspection Complète du Chantier`, // Titre générique
       type: 'GLOBAL', // Type global
       chantier_id: this.chantierId,
       createur: 'Moi',
@@ -151,7 +151,7 @@ export class QhseFormPage implements OnInit {
     // 3. Envoi
     this.api.createInspection(inspection).subscribe({
       next: () => {
-        alert("Audit complet enregistré !");
+        alert("Inspection complète enregistré !");
         this.api.needsRefresh = true;
         this.navCtrl.back();
       },

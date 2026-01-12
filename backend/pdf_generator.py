@@ -1,13 +1,10 @@
-from reportlab.lib.pagesizes import A4
+from reportlab.lib.pagesizes import A4, landscape
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import cm
 from reportlab.lib.utils import ImageReader
-from reportlab.lib.pagesizes import landscape, A4
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image as ReportLabImage
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib import colors
-from reportlab.lib.units import cm
-from reportlab.platypus import Image as ReportLabImage 
 from PIL import Image, ImageOps
 import os
 import requests
@@ -15,122 +12,157 @@ from io import BytesIO
 from datetime import datetime
 
 # --- CONFIGURATION DESIGN SOBRE ---
-COLOR_PRIMARY = (0.1, 0.1, 0.3) # Bleu nuit
+COLOR_PRIMARY = (0.1, 0.1, 0.3) # Bleu nuit Conforméo
 COLOR_SECONDARY = (0.4, 0.4, 0.4) # Gris
 FONT_TITLE = "Helvetica-Bold"
 FONT_TEXT = "Helvetica"
 
 # ==========================================
-# 1. FONCTIONS UTILITAIRES (HELPERS)
+# 1. FONCTIONS UTILITAIRES
 # ==========================================
 
 def get_optimized_image(path_or_url):
-    """Télécharge une image optimisée."""
+    """Télécharge ou récupère une image locale de manière robuste."""
     if not path_or_url: return None
     try:
         if path_or_url.startswith("http"):
+            # Gestion Cloudinary ou URL externe
             optimized_url = path_or_url
             if "cloudinary.com" in path_or_url and "/upload/" in path_or_url:
-                # On demande à Cloudinary une version JPG compressée et redimensionnée
                 optimized_url = path_or_url.replace("/upload/", "/upload/w_1000,q_auto,f_jpg/")
-            response = requests.get(optimized_url, stream=True, timeout=10)
+            response = requests.get(optimized_url, stream=True, timeout=5)
             if response.status_code == 200:
                 return Image.open(BytesIO(response.content))
         else:
-            # Gestion fichier local (dev)
-            clean_path = path_or_url.replace("/static/", "")
-            possible_paths = [os.path.join("uploads", clean_path), clean_path]
+            # Gestion fichier local (Uploads)
+            # On nettoie le chemin au cas où (ex: "uploads/logo.png" vs "/uploads/logo.png")
+            clean_path = path_or_url.strip("/")
+            
+            # On cherche dans plusieurs dossiers possibles pour être sûr
+            possible_paths = [
+                clean_path,
+                os.path.join("uploads", os.path.basename(clean_path)),
+                os.path.join(os.getcwd(), clean_path)
+            ]
+            
             for p in possible_paths:
                 if os.path.exists(p):
                     return Image.open(p)
+                    
+            print(f"⚠️ Image introuvable localement : {path_or_url}")
+
     except Exception as e:
-        print(f"Warning image: {e}")
+        print(f"❌ Erreur chargement image ({path_or_url}): {e}")
     return None
 
 def draw_footer(c, width, height, chantier, titre_doc):
-    """En-tête et pied de page discret sur toutes les pages"""
     c.saveState()
-    
-    # Ligne de séparation
     c.setStrokeColorRGB(0.8, 0.8, 0.8); c.setLineWidth(0.5)
     c.line(1*cm, 1.5*cm, width-1*cm, 1.5*cm)
-    
-    # Texte
     c.setFont(FONT_TEXT, 8); c.setFillColorRGB(0.5, 0.5, 0.5)
     c.drawString(1*cm, 1*cm, f"Conforméo - {titre_doc} - {chantier.nom}")
     c.drawRightString(width-1*cm, 1*cm, f"Page {c.getPageNumber()}")
-
     c.restoreState()
 
 def draw_cover_page(c, chantier, titre_principal, sous_titre, company=None):
     width, height = A4
     
-    # 1. LOGO DYNAMIQUE (BRANDING)
+    # --- MISE EN PAGE TYPE "MAQUETTE CLIENT" ---
+    
+    # Définition du cadre central pour le logo
+    # On le place un peu au-dessus du centre optique
+    rect_w = 12 * cm
+    rect_h = 7 * cm
+    rect_x = (width - rect_w) / 2
+    rect_y = (height / 2) + 1 * cm 
+    
+    # 1. Dessin du cadre arrondi
+    c.setStrokeColorRGB(*COLOR_PRIMARY) # Couleur brique/orange du logo si besoin, ici bleu
+    # Si vous voulez la couleur "Brique" du logo Conforméo sur le screenshot:
+    # c.setStrokeColorRGB(0.8, 0.4, 0.2) 
+    c.setLineWidth(2)
+    c.roundRect(rect_x, rect_y, rect_w, rect_h, 15, stroke=1, fill=0)
+
+    # 2. Insertion du Logo CENTRÉ dans le cadre
     logo_source = None
-    
-    # Priorité 1 : L'objet company passé explicitement
-    if company and company.logo_url:
-        logo_source = company.logo_url
-    # Priorité 2 : Le logo lié au chantier
-    elif hasattr(chantier, 'company') and chantier.company and chantier.company.logo_url:
-        logo_source = chantier.company.logo_url
-    # Priorité 3 : Fallback local
-    else:
-        logo_source = "logo.png"
+    if company and company.logo_url: logo_source = company.logo_url
+    elif hasattr(chantier, 'company') and chantier.company: logo_source = chantier.company.logo_url
 
-    logo = get_optimized_image(logo_source)
-    
-    if logo:
-        try:
-            # On utilise ImageReader pour compatibilité ReportLab
-            rl_logo = ImageReader(logo)
-            # Affichage du logo en haut à gauche
-            c.drawImage(rl_logo, 2*cm, height-4*cm, width=5*cm, height=2.5*cm, mask='auto', preserveAspectRatio=True)
-        except: pass
+    logo_drawn = False
+    if logo_source:
+        img = get_optimized_image(logo_source)
+        if img:
+            # Calcul pour centrer et redimensionner l'image DANS le cadre (avec marge)
+            max_im_w = rect_w - 2*cm
+            max_im_h = rect_h - 2*cm
+            
+            iw, ih = img.size
+            ratio = min(max_im_w/iw, max_im_h/ih)
+            new_w = iw * ratio
+            new_h = ih * ratio
+            
+            # Coordonnées pour centrer
+            pos_x = rect_x + (rect_w - new_w) / 2
+            pos_y = rect_y + (rect_h - new_h) / 2
+            
+            try:
+                c.drawImage(ImageReader(img), pos_x, pos_y, width=new_w, height=new_h, mask='auto', preserveAspectRatio=True)
+                logo_drawn = True
+            except Exception as e:
+                print(f"Erreur rendu logo PDF: {e}")
 
-    # 2. Titres
-    y_center = height / 2 + 2*cm
+    # Si pas de logo, on met un texte temporaire
+    if not logo_drawn:
+        c.setFillColorRGB(0.7, 0.7, 0.7)
+        c.setFont(FONT_TEXT, 10)
+        c.drawCentredString(width/2, rect_y + rect_h/2, "(Logo Entreprise ici)")
+
+    # 3. Titres (SOUS le cadre)
+    y_text = rect_y - 2 * cm
     
     c.setFillColorRGB(*COLOR_PRIMARY)
     c.setFont(FONT_TITLE, 24)
-    c.drawString(2*cm, y_center, titre_principal)
+    c.drawCentredString(width/2, y_text, titre_principal) # "JOURNAL DE BORD"
     
-    y_center -= 1*cm
+    y_text -= 1 * cm
     c.setFillColorRGB(*COLOR_SECONDARY)
     c.setFont(FONT_TEXT, 14)
-    c.drawString(2*cm, y_center, sous_titre)
+    c.drawCentredString(width/2, y_text, sous_titre) # "Suivi d'exécution..."
     
-    y_center -= 1.5*cm
+    # 4. Ligne de séparation
+    y_text -= 1.5 * cm
     c.setStrokeColorRGB(0.8, 0.8, 0.8); c.setLineWidth(0.5)
-    c.line(2*cm, y_center, width-2*cm, y_center)
+    c.line(4*cm, y_text, width-4*cm, y_text)
 
-    # 3. Infos Chantier
-    y_center -= 2*cm
-    c.setFillColorRGB(0, 0, 0)
-    c.setFont(FONT_TITLE, 14)
-    c.drawString(2*cm, y_center, "PROJET :")
-    c.setFont(FONT_TEXT, 14)
-    c.drawString(5*cm, y_center, chantier.nom or "Non défini")
+    # 5. Infos Projet (Alignées à gauche mais centrées globalement par rapport à la page)
+    y_info = y_text - 2.5 * cm
+    x_labels = 4 * cm
+    x_values = 8 * cm
     
-    y_center -= 1*cm
+    c.setFillColorRGB(0, 0, 0)
+    
+    # Projet
     c.setFont(FONT_TITLE, 14)
-    c.drawString(2*cm, y_center, "ADRESSE :")
+    c.drawString(x_labels, y_info, "PROJET :")
     c.setFont(FONT_TEXT, 14)
-    c.drawString(5*cm, y_center, chantier.adresse or "Non définie")
-
-    # 4. Info Entreprise (Si dispo)
+    c.drawString(x_values, y_info, chantier.nom or "Non défini")
+    
+    # Adresse
+    y_info -= 1.2 * cm
+    c.setFont(FONT_TITLE, 14)
+    c.drawString(x_labels, y_info, "ADRESSE :")
+    c.setFont(FONT_TEXT, 14)
+    c.drawString(x_values, y_info, chantier.adresse or "Non définie")
+    
+    # Réalisé par
     if company:
-        y_center -= 2*cm
+        y_info -= 2 * cm
         c.setFont(FONT_TITLE, 12); c.setFillColorRGB(*COLOR_SECONDARY)
-        c.drawString(2*cm, y_center, "RÉALISÉ PAR :")
+        c.drawString(x_labels, y_info, "RÉALISÉ PAR :")
         c.setFont(FONT_TEXT, 12)
-        c.drawString(6*cm, y_center, company.name)
-        if company.contact_email:
-            y_center -= 0.6*cm
-            c.setFont(FONT_TEXT, 10)
-            c.drawString(6*cm, y_center, company.contact_email)
+        c.drawString(x_values, y_info, company.name)
 
-    # 5. Date
+    # Date en bas à droite
     date_str = datetime.now().strftime('%d/%m/%Y')
     c.setFont(FONT_TEXT, 10); c.setFillColorRGB(0.5, 0.5, 0.5)
     c.drawRightString(width-2*cm, 3*cm, f"Édité le {date_str}")
@@ -145,7 +177,6 @@ def generate_pdf(chantier, rapports, inspections, output_path, company=None):
     width, height = A4
     margin = 2 * cm
     
-    # On passe 'company' à la page de garde
     draw_cover_page(c, chantier, "JOURNAL DE BORD", "Suivi d'exécution & Rapports", company)
 
     y = height - 3 * cm
@@ -343,13 +374,13 @@ def generate_audit_pdf(chantier, inspection, output_path, company=None):
     width, height = A4
     margin = 2 * cm
     
-    draw_cover_page(c, chantier, "RAPPORT D'AUDIT", f"{inspection.titre} ({inspection.type})", company)
+    draw_cover_page(c, chantier, "RAPPORT D'INSPECTION", f"{inspection.titre} ({inspection.type})", company)
     
     y = height - 3 * cm
     def check_space(needed):
         nonlocal y
         if y < needed:
-            draw_footer(c, width, height, chantier, "Rapport d'Audit")
+            draw_footer(c, width, height, chantier, "Rapport d'Inspection")
             c.showPage()
             y = height - 3 * cm
 
@@ -385,7 +416,7 @@ def generate_audit_pdf(chantier, inspection, output_path, company=None):
         c.line(margin, y-0.4*cm, width-margin, y-0.4*cm)
         y -= 1*cm
 
-    draw_footer(c, width, height, chantier, "Rapport d'Audit")
+    draw_footer(c, width, height, chantier, "Rapport d'Inspection")
     c.save()
 
 # ==========================================
@@ -486,43 +517,30 @@ def generate_pdp_pdf(chantier, pdp, output_path, company=None):
             
             y -= 2.2*cm
 
-    # ... (Dans generate_pdp_pdf) ...
-
     # 4. SIGNATURES
-    check_space(5*cm) # On s'assure d'avoir de la place
+    check_space(5*cm)
     y -= 1*cm
-    
-    # Cadre de signature
     c.setStrokeColorRGB(0.8, 0.8, 0.8); c.setLineWidth(1)
     c.line(margin, y, width-margin, y)
     y -= 0.5*cm
     
-    # En-têtes colonnes
     col_w = (width - 2*margin) / 2
     c.setFont(FONT_TITLE, 10); c.setFillColorRGB(0, 0, 0)
-    
-    # Colonne Client (Gauche)
     c.drawString(margin, y, "Pour l'Entreprise Utilisatrice (Client) :")
-    # Colonne Nous (Droite)
     c.drawString(margin + col_w, y, "Pour l'Entreprise Extérieure (Nous) :")
     
-    y_sig_start = y - 3.5*cm # Espace pour signer
+    y_sig_start = y - 3.5*cm
 
-    # --- SIGNATURE CLIENT (EU) ---
     if pdp.signature_eu:
         sig_eu = get_optimized_image(pdp.signature_eu)
         if sig_eu:
             try:
-                # On dessine la signature Client
                 c.drawImage(ImageReader(sig_eu), margin, y_sig_start, width=5*cm, height=3*cm, mask='auto', preserveAspectRatio=True)
                 c.setFont(FONT_TEXT, 8); c.setFillColorRGB(0, 0.6, 0)
                 c.drawString(margin, y_sig_start - 0.3*cm, "Signé électroniquement")
             except: pass
 
-    # --- SIGNATURE ENTREPRISE (EE) ---
-    # Logique : Si pas de signature spécifique au PdP, on prend celle du chantier (Automatique)
     sig_ee_source = pdp.signature_ee or (chantier.signature_url if chantier.signature_url else None)
-    
     if sig_ee_source:
         sig_ee = get_optimized_image(sig_ee_source)
         if sig_ee:
@@ -532,7 +550,6 @@ def generate_pdp_pdf(chantier, pdp, output_path, company=None):
                 c.drawString(margin + col_w, y_sig_start - 0.3*cm, "Signé électroniquement (Auto)")
             except: pass
 
-    # Mention légale
     y = y_sig_start - 1*cm
     c.setFont(FONT_TEXT, 8); c.setFillColorRGB(0.5, 0.5, 0.5)
     c.drawCentredString(width/2, y, "Document certifié conforme par Conforméo BTP.")
@@ -541,14 +558,39 @@ def generate_pdp_pdf(chantier, pdp, output_path, company=None):
     c.save()
     return output_path
 
+# ==========================================
+# 6. GENERATEUR DUERP (DOCUMENT UNIQUE)
+# ==========================================
 def generate_duerp_pdf(company, duerp, filepath):
-    # Création du document (C'est ici que ça plantait avant)
     doc = SimpleDocTemplate(filepath, pagesize=landscape(A4), rightMargin=20, leftMargin=20, topMargin=20, bottomMargin=20)
     
     elements = []
     styles = getSampleStyleSheet()
 
-    # 1. En-tête
+    # --- EN-TÊTE DU DUERP ---
+    if company and company.logo_url:
+        try:
+            pil_img = get_optimized_image(company.logo_url)
+            if pil_img:
+                # Hack pour ReportLab Platypus qui gère mal les images dynamiques parfois
+                temp_logo_path = "temp_logo_duerp.jpg"
+                pil_img.save(temp_logo_path)
+                
+                logo = ReportLabImage(temp_logo_path)
+                
+                # Redimensionnement (Max 4cm de haut)
+                max_h = 4 * cm
+                img_w, img_h = pil_img.size
+                aspect = img_w / float(img_h)
+                
+                logo.drawHeight = max_h
+                logo.drawWidth = max_h * aspect
+                logo.hAlign = 'LEFT'
+                
+                elements.append(logo)
+                elements.append(Spacer(1, 10))
+        except: pass
+
     title = f"<b>DOCUMENT UNIQUE (DUERP) - {duerp.annee}</b>"
     elements.append(Paragraph(title, styles['Title']))
     elements.append(Spacer(1, 10))
@@ -560,7 +602,7 @@ def generate_duerp_pdf(company, duerp, filepath):
     elements.append(Paragraph(f"Mis à jour le : {date_str}", styles['Normal']))
     elements.append(Spacer(1, 20))
 
-    # 2. Tableau
+    # --- TABLEAU ---
     headers = [
         "1. Tâches effectuées", 
         "2. Identification des risques", 
@@ -582,9 +624,7 @@ def generate_duerp_pdf(company, duerp, filepath):
         ]
         data.append(row)
 
-    # 3. Style du Tableau
-    # Largeur totale A4 paysage ~ 29.7cm.
-    # On définit des largeurs fixes pour éviter les erreurs de calcul
+    # Style du Tableau
     col_widths = [140, 140, 50, 200, 200] 
     
     t = Table(data, colWidths=col_widths)
@@ -603,10 +643,10 @@ def generate_duerp_pdf(company, duerp, filepath):
 
     elements.append(t)
     
-    # 4. Génération finale
+    # Génération
     try:
         doc.build(elements)
-        print(f"✅ PDF généré avec succès : {filepath}")
+        print(f"✅ PDF DUERP généré : {filepath}")
     except Exception as e:
-        print(f"❌ Erreur lors de la construction du PDF : {e}")
+        print(f"❌ Erreur PDF DUERP : {e}")
         raise e
