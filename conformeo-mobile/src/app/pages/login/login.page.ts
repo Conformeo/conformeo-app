@@ -22,47 +22,55 @@ export class LoginPage {
   ) {}
 
   async login() {
-    console.log('ApiService instance', this.api);
-    console.log('LOGIN CALL', this.credentials);
+  console.log('ApiService instance', this.api);
+  console.log('LOGIN CALL', this.credentials);
 
-    const loading = await this.loadingCtrl.create({ message: 'Connexion...' });
-    await loading.present();
+  const loading = await this.loadingCtrl.create({ message: 'Connexion...' });
+  await loading.present();
 
-    // 👇 AJOUTEZ CETTE LIGNE TEMPORAIRE
-    alert("1. Le bouton fonctionne !"); 
-    
-    console.log("2. Démarrage connexion...");
-    this.api.login(this.credentials).subscribe({
-      next: () => {
-        loading.dismiss();
-        this.presentToast('Connexion réussie', 'success');
-        // On force la navigation
-        this.navCtrl.navigateRoot('/dashboard');
-      },
-     error: (err) => {
-        loading.dismiss();
-        console.error("❌ DEBUG ERREUR:", err);
+  alert("1. Le bouton fonctionne !"); 
+  console.log("2. Démarrage connexion...");
 
-        let message = 'Erreur inconnue';
-        
-        // ANALYSE DU CODE D'ERREUR
-        if (err.status === 0) {
-          message = '⚠️ ERREUR RÉSEAU (0) : Le serveur Render dort ou le CORS bloque.';
-        } else if (err.status === 422) {
-          message = '⚠️ ERREUR 422 (Format) : Le code Vercel est OBSOLÈTE (envoie du JSON).';
-        } else if (err.status === 401) {
-          message = '❌ ERREUR 401 (Auth) : Mot de passe refusé par le serveur.';
-        } else if (err.status === 500) {
-          message = '🔥 ERREUR 500 : Le serveur Python a planté.';
-        } else {
-          message = `Erreur ${err.status} : ${err.error ? JSON.stringify(err.error) : err.message}`;
-        }
+  // 👇 DEBUG : Log ce qui est envoyé
+  const body = new URLSearchParams();
+  body.set('username', this.credentials.email);
+  body.set('password', this.credentials.password);
+  console.log('Body URLSearchParams:', body);
+  console.log('Body toString():', body.toString());
+  console.log('Body entries:', Array.from(body.entries()));
 
-        // On affiche l'alerte précise à l'écran
-        alert(message); 
+  this.api.login(this.credentials).subscribe({
+    next: () => {
+      loading.dismiss();
+      this.presentToast('Connexion réussie', 'success');
+      this.navCtrl.navigateRoot('/dashboard');
+    },
+    error: (err) => {
+      loading.dismiss();
+      console.error("❌ DEBUG ERREUR COMPLET:", err);
+      console.error("Status:", err.status);
+      console.error("StatusText:", err.statusText);
+      console.error("Error object:", err.error);
+      console.error("Full error:", JSON.stringify(err));
+
+      let message = 'Erreur inconnue';
+      if (err.status === 0) {
+        message = '⚠️ ERREUR RÉSEAU (0) : Impossible de contacter le serveur.';
+      } else if (err.status === 422) {
+        message = '⚠️ ERREUR 422 (Format) : Le serveur refuse le format des données.';
+      } else if (err.status === 401) {
+        message = '❌ ERREUR 401 (Auth) : Mot de passe incorrect.';
+      } else if (err.status === 500) {
+        message = '🔥 ERREUR 500 : Le serveur a crashé.';
+      } else {
+        message = `Erreur ${err.status} : ${err.error ? JSON.stringify(err.error) : err.message}`;
       }
-    });
-  }
+
+      alert(message); 
+    }
+  });
+}
+
 
   async presentToast(message: string, color: string) {
     const t = await this.toastCtrl.create({ message, duration: 3000, color, position: 'top' });
