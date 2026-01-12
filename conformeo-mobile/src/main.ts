@@ -11,6 +11,10 @@ import { environment } from './environments/environment';
 import { LoggingInterceptor } from './app/services/logging.service'
 
 import { defineCustomElements } from '@ionic/pwa-elements/loader';
+import { imageOutline } from 'ionicons/icons';
+import { addIcons } from 'ionicons';
+
+addIcons({ imageOutline });
 
 if (environment.production) {
   enableProdMode();

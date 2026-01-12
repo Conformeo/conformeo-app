@@ -506,6 +506,18 @@ export class ApiService {
     window.open(url, '_system');
   }
 
+  // --- GESTION DUERP ---
+
+  // 1. Récupérer les données (lignes) du DUERP pour une année donnée
+  getDuerp(annee: string): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/companies/me/duerp/${annee}`, this.getOptions());
+  }
+
+  // 2. Sauvegarder le formulaire (Écrase et remplace les lignes existantes)
+  saveDuerp(data: any): Observable<any> {
+    return this.http.post(`${this.apiUrl}/companies/me/duerp`, data, this.getOptions());
+  }
+
   // DUERP PDF Download
   downloadDuerpPdf(annee: string) {
     const url = `${this.apiUrl}/companies/me/duerp/${annee}/pdf`;
