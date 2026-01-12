@@ -7,6 +7,9 @@ import { Preferences } from '@capacitor/preferences';
 import { NavController } from '@ionic/angular';
 import { OfflineService } from './offline'; 
 
+import { catchError } from 'rxjs/operators';
+import { throwError } from 'rxjs';
+
 // --- INTERFACES ---
 
 export interface Company {
@@ -189,7 +192,7 @@ export class ApiService {
       'Accept': 'application/json'
     });
 
-    return this.http.post<any>(`${this.apiUrl}/token`, body.toString(), { headers }).pipe(
+    return this.http.post<any>(`${this.apiUrl}/token`, body, { headers }).pipe(
       tap((res) => {
         console.log('🔥 LOGIN SUCCESS:', res);
         const t = res.access_token || res.token;
