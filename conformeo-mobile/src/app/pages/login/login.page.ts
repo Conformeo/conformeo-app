@@ -22,6 +22,8 @@ export class LoginPage {
   ) {}
 
   async login() {
+    console.log('ApiService instance', this.api);
+
     const loading = await this.loadingCtrl.create({ message: 'Connexion...' });
     await loading.present();
 
