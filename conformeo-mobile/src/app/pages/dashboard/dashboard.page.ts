@@ -69,7 +69,7 @@ export class DashboardPage implements OnInit {
       error: (err) => {
         console.error("❌ Dashboard : Session invalide ou expirée", err);
         // Si getMe échoue, on renvoie au login pour éviter l'écran vide
-        this.api.logout();
+        // this.api.logout();
       }
     });
   }
