@@ -61,6 +61,14 @@ mail_conf = ConnectionConfig(
 os.makedirs("uploads", exist_ok=True)
 app.mount("/static", StaticFiles(directory="uploads"), name="static")
 
+origins = [
+    "http://localhost:8100",             # Votre environnement local Ionic
+    "http://localhost:4200",             # Au cas où vous utilisez ng serve
+    "https://conformeo-app.vercel.app",  # Votre site en production
+    "capacitor://localhost",             # Pour l'application mobile native (iOS/Android)
+    "http://localhost",                  # Parfois nécessaire
+]
+
 # 👇 MIDDLEWARE CORS (CRUCIAL POUR LE MOBILE)
 app.add_middleware(
     CORSMiddleware,
