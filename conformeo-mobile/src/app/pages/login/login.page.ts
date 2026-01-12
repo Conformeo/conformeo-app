@@ -29,60 +29,31 @@ export class LoginPage {
 
 
   async login() {
-    try {
-      console.log('🔴 LOGIN STARTED');
-      
-      if (!this.loadingCtrl) {
-        console.error('❌ LoadingController is NULL');
-        return;
+  try {
+    console.log('🔴 LOGIN STARTED');
+    
+    // Skip le loading UI qui timeout - on l'affichera pas
+    console.log('🔴 ABOUT TO CALL API.LOGIN');
+    
+    this.api.login(this.credentials).subscribe({
+      next: () => {
+        console.log('🟢 LOGIN SUCCESS');
+        this.presentToast('Connexion réussie', 'success');
+        this.navCtrl.navigateRoot('/dashboard');
+      },
+      error: (err) => {
+        console.log('🔴 LOGIN ERROR');
+        console.error("Status:", err.status);
+        
+        let message = `Erreur ${err.status}: ${err.message || 'Inconnue'}`;
+        this.presentToast(message, 'danger');
       }
-      
-      console.log('🔴 ABOUT TO CREATE LOADING');
-      
-      // Timeout de sécurité
-      const loadingPromise = this.loadingCtrl.create({ message: 'Connexion...' });
-      const timeoutPromise = new Promise<any>((resolve) => {
-        setTimeout(() => {
-          console.error('❌ LoadingController.create() TIMEOUT');
-          resolve(null);
-        }, 3000);
-      });
-      
-      const loading = await Promise.race([loadingPromise, timeoutPromise]);
-      console.log('🔴 LOADING RESULT:', loading);
-      
-      if (loading) {
-        await loading.present();
-        console.log('🔴 LOADING PRESENTED');
-      } else {
-        console.warn('⚠️ Loading is null, skipping loading UI');
-      }
-
-      console.log('🔴 ABOUT TO CALL API.LOGIN');
-      
-      this.api.login(this.credentials).subscribe({
-        next: () => {
-          console.log('🟢 LOGIN SUCCESS');
-          if (loading) loading.dismiss();
-          this.presentToast('Connexion réussie', 'success');
-          this.navCtrl.navigateRoot('/dashboard');
-        },
-        error: (err) => {
-          console.log('🔴 LOGIN ERROR');
-          console.error("Status:", err.status);
-          console.error("Message:", err.message);
-          
-          if (loading) loading.dismiss();
-          let message = `Erreur ${err.status}: ${err.message || 'Inconnue'}`;
-          console.log(message); 
-        }
-      });
-      
-    } catch (error) {
-      console.error('🔴 CATCH ERROR:', error);
-    }
+    });
+    
+  } catch (error) {
+    console.error('🔴 CATCH ERROR:', error);
   }
-
+}
 
 
   async presentToast(message: string, color: string) {
