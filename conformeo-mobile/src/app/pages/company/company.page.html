@@ -24,7 +24,7 @@
     
     <div class="alert-banner" *ngIf="hasExpiredDocs">
       <ion-icon name="warning"></ion-icon>
-      <span>Documents périmés !</span>
+      <span>Certains documents sont périmés !</span>
     </div>
 
     <div class="ion-padding-bottom">
@@ -34,6 +34,7 @@
         <ion-icon name="chevron-forward" slot="end"></ion-icon>
       </ion-button>
     </div>
+
     <ion-list class="doc-list">
       <ion-item-sliding *ngFor="let doc of docs">
         <ion-item lines="none" class="doc-item">
@@ -68,7 +69,7 @@
 
     <div *ngIf="docs.length === 0 && !isLoading" class="empty-state">
       <ion-icon name="folder-open" color="medium"></ion-icon>
-      <p>Aucun document.</p>
+      <p>Aucun document pour le moment.</p>
     </div>
 
     <ion-fab vertical="bottom" horizontal="end" slot="fixed">
@@ -90,8 +91,13 @@
                (dragleave)="onLogoDragLeave($event)"
                (drop)="onLogoDrop($event)">
             
-            <img *ngIf="company?.logo_url" [src]="company.logo_url" class="logo-preview" />
-            <img *ngIf="!company?.logo_url" src="assets/icon/favicon.png" class="logo-preview" style="opacity: 0.2;" />
+            <img *ngIf="company.logo_url" 
+              [src]="company.logo_url!.startsWith('data') ? company.logo_url : api.apiUrl + '/' + company.logo_url" 
+              class="logo-preview" />
+            
+            <div *ngIf="!company.logo_url" class="placeholder-logo">
+               <ion-icon name="image" style="font-size: 40px; color: #ccc;"></ion-icon>
+            </div>
 
             <div class="drop-content">
               <ion-icon name="cloud-upload-outline"></ion-icon>
@@ -110,13 +116,14 @@
             <ion-input label="Adresse" labelPlacement="stacked" [(ngModel)]="company.address"></ion-input>
           </ion-item>
           <ion-item>
-            <ion-input label="Email" labelPlacement="stacked" [(ngModel)]="company.contact_email"></ion-input>
+            <ion-input label="Email Contact" labelPlacement="stacked" [(ngModel)]="company.contact_email"></ion-input>
           </ion-item>
           <ion-item>
             <ion-input label="Téléphone" labelPlacement="stacked" [(ngModel)]="company.phone"></ion-input>
           </ion-item>
         </ion-list>
-        <ion-button expand="block" class="ion-margin-top" (click)="saveInfos()">Enregistrer</ion-button>
+        
+        <ion-button expand="block" class="ion-margin-top" (click)="saveInfos()">Enregistrer les modifications</ion-button>
       </ion-card-content>
     </ion-card>
   </div>
@@ -131,20 +138,22 @@
       </ion-header>
       <ion-content class="ion-padding">
         <ion-item fill="outline" class="mb-15">
-          <ion-label position="floating">Titre</ion-label>
+          <ion-label position="floating">Titre du document</ion-label>
           <ion-input [(ngModel)]="newDoc.titre"></ion-input>
         </ion-item>
+        
         <ion-item fill="outline" class="mb-15">
-          <ion-label>Type</ion-label>
+          <ion-label>Type de document</ion-label>
           <ion-select [(ngModel)]="newDoc.type_doc" interface="popover">
-            <ion-select-option value="DUERP">🛡️ DUERP (PDF Stocké)</ion-select-option>
-            <ion-select-option value="ASSURANCE">📄 Assurance</ion-select-option>
+            <ion-select-option value="DUERP">🛡️ DUERP (Scan PDF)</ion-select-option>
+            <ion-select-option value="ASSURANCE">📄 Assurance Décennale</ion-select-option>
             <ion-select-option value="KBIS">🏢 Kbis</ion-select-option>
             <ion-select-option value="AUTRE">📂 Autre</ion-select-option>
           </ion-select>
         </ion-item>
+        
         <ion-item fill="outline" class="mb-15">
-          <ion-label>Expiration</ion-label>
+          <ion-label>Date d'Expiration</ion-label>
           <ion-datetime-button datetime="datetime"></ion-datetime-button>
           <ion-modal [keepContentsMounted]="true">
             <ng-template>
@@ -156,11 +165,11 @@
         <div class="file-box" (click)="fileInput.click()" [class.has-file]="selectedFile">
           <input #fileInput type="file" (change)="onFileSelected($event)" hidden accept=".pdf,.jpg,.png">
           <ion-icon [name]="selectedFile ? 'document-text' : 'cloud-upload'" size="large"></ion-icon>
-          <p>{{ selectedFile ? selectedFile.name : 'Choisir un fichier' }}</p>
+          <p>{{ selectedFile ? selectedFile.name : 'Choisir un fichier (PDF, JPG)' }}</p>
         </div>
 
         <ion-button expand="block" class="ion-margin-top" (click)="uploadDoc()" [disabled]="!selectedFile || !newDoc.titre">
-          Uploader
+          Uploader le document
         </ion-button>
       </ion-content>
     </ng-template>

@@ -631,6 +631,53 @@ def delete_external_doc(did: int, db: Session = Depends(get_db)):
     db.commit()
     return {"status": "deleted"}
 
+from fastapi.staticfiles import StaticFiles # <--- Important pour voir le logo
+
+# Ajoutez ceci si ce n'est pas déjà fait pour lire les images stockées
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+
+# 1. Route pour mettre à jour les infos (Texte uniquement)
+@app.put("/companies/me", response_model=schemas.CompanyOut)
+def update_company(
+    comp_update: schemas.CompanyCreate, # On réutilise le schéma Create ou Update
+    db: Session = Depends(get_db), 
+    current_user: models.User = Depends(security.get_current_user)
+):
+    if not current_user.company_id: raise HTTPException(400, "Pas d'entreprise")
+    
+    company = db.query(models.Company).filter(models.Company.id == current_user.company_id).first()
+    
+    # Mise à jour champ par champ
+    if comp_update.name: company.name = comp_update.name
+    if comp_update.email: company.email = comp_update.email
+    if comp_update.phone: company.phone = comp_update.phone
+    if comp_update.address: company.address = comp_update.address
+    
+    db.commit()
+    db.refresh(company)
+    return company
+
+# 2. Route SPÉCIALE pour le logo (Upload)
+@app.post("/companies/me/logo")
+def upload_logo(
+    file: UploadFile = File(...), 
+    db: Session = Depends(get_db), 
+    current_user: models.User = Depends(security.get_current_user)
+):
+    if not current_user.company_id: raise HTTPException(400, "Pas d'entreprise")
+    
+    # On sauvegarde le fichier sur le disque
+    file_location = f"uploads/logo_{current_user.company_id}.png"
+    with open(file_location, "wb+") as file_object:
+        file_object.write(file.file.read())
+    
+    # On met à jour l'URL dans la base de données
+    company = db.query(models.Company).filter(models.Company.id == current_user.company_id).first()
+    company.logo_url = file_location # On stocke le chemin relatif
+    db.commit()
+    
+    return {"url": file_location}
+
 @app.post("/companies/me/documents", response_model=schemas.CompanyDocOut)
 def upload_company_doc(
     titre: str, type_doc: str, date_expiration: Optional[str] = None, 

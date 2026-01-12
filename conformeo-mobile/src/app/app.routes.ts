@@ -46,11 +46,11 @@ export const routes: Routes = [
   },
   {
     path: 'planning',
-    loadComponent: () => import('./pages/planning/planning.page').then( m => m.PlanningPage)
+    loadComponent: () => import('./pages/planning/planning.page').then( m => m.PlanningPage), canActivate: [authGuard]
   },
   {
     path: 'company',
-    loadComponent: () => import('./pages/company/company.page').then( m => m.CompanyPage)
+    loadComponent: () => import('./pages/company/company.page').then( m => m.CompanyPage), canActivate: [authGuard]
   },
   {
     path: 'pdp-form',
@@ -62,7 +62,7 @@ export const routes: Routes = [
   },
   {
     path: 'team',
-    loadComponent: () => import('./pages/team/team.page').then( m => m.TeamPage)
+    loadComponent: () => import('./pages/team/team.page').then( m => m.TeamPage), canActivate: [authGuard]
   },
   {
     path: 'pic-form',

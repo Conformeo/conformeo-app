@@ -1,7 +1,7 @@
 import { Component, OnInit, ViewChild, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-// 👇 AJOUTEZ L'IMPORT ROUTERLINK ICI
+// 👇 IMPORT IMPORTANT POUR LA NAVIGATION
 import { RouterLink } from '@angular/router'; 
 import { 
   IonicModule, AlertController, ToastController, LoadingController, ModalController 
@@ -10,9 +10,9 @@ import { addIcons } from 'ionicons';
 import { 
   business, documentText, cloudUpload, trash, shieldCheckmark, 
   briefcase, warning, calendar, eye, pencil, add, folderOpen, close, camera, 
-  cloudUploadOutline, list, chevronForward // J'ajoute les icônes manquantes pour le bouton DUERP
+  cloudUploadOutline, list, chevronForward 
 } from 'ionicons/icons';
-import { ApiService, Company, CompanyDoc } from '../../services/api';
+import { ApiService, Company, CompanyDoc } from '../../services/api'; // Vérifiez le chemin (.service)
 import { SignatureModalComponent } from '../chantier-details/signature-modal/signature-modal.component';
 
 @Component({
@@ -20,7 +20,7 @@ import { SignatureModalComponent } from '../chantier-details/signature-modal/sig
   templateUrl: './company.page.html',
   styleUrls: ['./company.page.scss'],
   standalone: true,
-  // 👇 AJOUTEZ RouterLink DANS CE TABLEAU 👇
+  // 👇 RouterLink EST BIEN AJOUTÉ ICI
   imports: [CommonModule, FormsModule, IonicModule, RouterLink]
 })
 export class CompanyPage implements OnInit {
@@ -32,22 +32,23 @@ export class CompanyPage implements OnInit {
   isLoading = false;
   hasExpiredDocs = false;
 
+  // Gestion Modal Doc
   isUploadModalOpen = false;
   newDoc = { titre: '', type_doc: 'AUTRE', date_expiration: '' };
   selectedFile: File | null = null;
+  
+  // Gestion Logo
   @ViewChild('fileInput') fileInput!: ElementRef;
   @ViewChild('logoInput') logoInput!: ElementRef;
-  
   isLogoDragging = false; 
 
   constructor(
-    private api: ApiService,
+    public api: ApiService,
     private alertCtrl: AlertController,
     private toastCtrl: ToastController,
     private loadingCtrl: LoadingController,
     private modalCtrl: ModalController
   ) {
-    // 👇 Ajout des nouvelles icônes utilisées dans le HTML
     addIcons({ 
       business, documentText, cloudUpload, trash, shieldCheckmark, 
       briefcase, warning, calendar, eye, pencil, add, folderOpen, close, camera, 
@@ -61,11 +62,13 @@ export class CompanyPage implements OnInit {
 
   loadData() {
     this.isLoading = true;
+    // On utilise forkJoin ou Promise.all pour charger les deux en parallèle
     Promise.all([
-      this.api.getMyCompany().toPromise(),
+      this.api.getMe().toPromise(), // Souvent getMe contient la company, sinon adaptez avec getMyCompany()
       this.api.getCompanyDocs().toPromise()
-    ]).then(([comp, docs]) => {
-      this.company = comp || null;
+    ]).then(([user, docs]) => {
+      // @ts-ignore
+      this.company = user.company || null; 
       this.docs = docs || [];
       this.checkGlobalStatus();
       this.isLoading = false;
@@ -113,15 +116,16 @@ export class CompanyPage implements OnInit {
   }
 
   async processLogoUpload(file: File) {
-    if (!this.company) return;
     const load = await this.loadingCtrl.create({ message: 'Mise à jour du logo...' });
     await load.present();
 
-    this.api.uploadPhoto(file).subscribe({
+    this.api.uploadLogo(file).subscribe({ // Assurez-vous que cette méthode existe dans ApiService
       next: (res) => {
         if (this.company) {
-            this.company.logo_url = res.url;
-            this.saveInfos(false);
+            // Mise à jour locale pour affichage immédiat
+            const reader = new FileReader();
+            reader.onload = (e: any) => this.company!.logo_url = e.target.result;
+            reader.readAsDataURL(file);
         }
         load.dismiss();
         this.presentToast('Logo modifié ! 📸', 'success');
@@ -225,7 +229,11 @@ export class CompanyPage implements OnInit {
     }
   }
 
-  openDoc(url: string) { window.open(url, '_system'); }
+  openDoc(url: string) { 
+    // Gère l'URL relative vs absolue
+    const fullUrl = url.startsWith('http') ? url : `${this.api.apiUrl}/${url}`;
+    window.open(fullUrl, '_system'); 
+  }
 
   async deleteDoc(doc: CompanyDoc) {
     const alert = await this.alertCtrl.create({
@@ -243,16 +251,17 @@ export class CompanyPage implements OnInit {
     await alert.present();
   }
 
-  async saveInfos(showToast = true) {
+  async saveInfos() {
     if (!this.company) return;
     const load = await this.loadingCtrl.create({ message: 'Sauvegarde...' });
     await load.present();
+    
     this.api.updateCompany(this.company).subscribe({
       next: () => { 
           load.dismiss(); 
-          if(showToast) this.presentToast('Infos mises à jour ✅', 'success'); 
+          this.presentToast('Infos mises à jour ✅', 'success'); 
       },
-      error: () => { load.dismiss(); this.presentToast('Erreur', 'danger'); }
+      error: () => { load.dismiss(); this.presentToast('Erreur sauvegarde', 'danger'); }
     });
   }
 

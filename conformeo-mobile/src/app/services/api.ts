@@ -279,8 +279,22 @@ export class ApiService {
     return this.http.get<Company>(`${this.apiUrl}/companies/me`, this.getOptions());
   }
 
-  updateCompany(data: any): Observable<Company> {
-    return this.http.put<Company>(`${this.apiUrl}/companies/me`, data, this.getOptions());
+  // Mettre à jour les infos texte
+  updateCompany(data: any): Observable<any> {
+    return this.http.put(`${this.apiUrl}/companies/me`, data, this.getOptions());
+  }
+
+  // Uploader le logo (Notez l'absence de headers manuels, Angular gère le Multipart)
+  uploadLogo(file: File): Observable<any> {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    // On doit passer le token, mais PAS le Content-Type (le navigateur le fera)
+    const headers = new HttpHeaders({
+      'Authorization': `Bearer ${this.token}`
+    });
+
+    return this.http.post(`${this.apiUrl}/companies/me/logo`, formData, { headers });
   }
 
   getCompanyDocs(): Observable<CompanyDoc[]> {
