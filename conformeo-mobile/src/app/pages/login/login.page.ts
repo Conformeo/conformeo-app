@@ -32,7 +32,7 @@ export class LoginPage {
       await loading.present();
       console.log('🔴 LOADING PRESENTED');
 
-      alert("1. Le bouton fonctionne !"); 
+      console.log("1. Le bouton fonctionne !"); 
       console.log("2. Démarrage connexion...");
 
       console.log('🔴 ABOUT TO CALL API.LOGIN');
@@ -52,13 +52,13 @@ export class LoginPage {
           
           loading.dismiss();
           let message = `Erreur ${err.status}: ${err.message || err.error?.detail || 'Inconnue'}`;
-          alert(message); 
+          console.log(message); 
         }
       });
       
     } catch (error) {
       console.error('🔴 ERREUR CATCH:', error);
-      alert('Erreur critique: ' + (error as any).message);
+      console.log('Erreur critique: ' + (error as any).message);
     }
   }
 

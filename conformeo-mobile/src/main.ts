@@ -1,9 +1,9 @@
-import { enableProdMode, importProvidersFrom } from '@angular/core'; // <--- AJOUT importProvidersFrom
+import { enableProdMode, importProvidersFrom } from '@angular/core';
 import { bootstrapApplication } from '@angular/platform-browser';
 import { RouteReuseStrategy, provideRouter, withPreloading, PreloadAllModules } from '@angular/router';
 import { IonicRouteStrategy, provideIonicAngular } from '@ionic/angular/standalone';
-import { provideHttpClient, withInterceptors, HTTP_INTERCEPTORS  } from '@angular/common/http';
-import { IonicStorageModule } from '@ionic/storage-angular'; // <--- AJOUT IMPORT
+import { provideHttpClient, HTTP_INTERCEPTORS } from '@angular/common/http';
+import { IonicStorageModule } from '@ionic/storage-angular';
 
 import { routes } from './app/app.routes';
 import { AppComponent } from './app/app.component';
@@ -18,8 +18,8 @@ if (environment.production) {
 
 bootstrapApplication(AppComponent, {
   providers: [
+    provideIonicAngular(),  // ✅ DOIT ÊTRE EN PREMIER
     { provide: RouteReuseStrategy, useClass: IonicRouteStrategy },
-    provideIonicAngular(),
     provideRouter(routes, withPreloading(PreloadAllModules)),
     provideHttpClient(),
     {
@@ -27,9 +27,8 @@ bootstrapApplication(AppComponent, {
       useClass: LoggingInterceptor,
       multi: true
     },
-    // 👇 ON ACTIVE LE STOCKAGE LOCAL ICI
-    importProvidersFrom(IonicStorageModule.forRoot()) 
+    importProvidersFrom(IonicStorageModule.forRoot())
   ],
-});
+}).catch(err => console.log(err));
 
 defineCustomElements(window);
