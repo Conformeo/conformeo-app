@@ -30,53 +30,60 @@ export class LoginPage {
 
   async login() {
     try {
-      console.log('🔴 LOGIN STARTED - Before anything');
-      
-      console.log('this.loadingCtrl type:', typeof this.loadingCtrl);
-      console.log('this.loadingCtrl is:', this.loadingCtrl);
+      console.log('🔴 LOGIN STARTED');
       
       if (!this.loadingCtrl) {
-        console.error('❌ LoadingController is NULL or UNDEFINED');
-        console.log('Erreur critique: LoadingController not injected!');
+        console.error('❌ LoadingController is NULL');
         return;
       }
       
       console.log('🔴 ABOUT TO CREATE LOADING');
-      const loading = await this.loadingCtrl.create({ message: 'Connexion...' });
-      console.log('🔴 LOADING CREATED');
       
-      await loading.present();
-      console.log('🔴 LOADING PRESENTED');
-
-      console.log("1. Le bouton fonctionne !"); 
-      console.log("2. Démarrage connexion...");
+      // Timeout de sécurité
+      const loadingPromise = this.loadingCtrl.create({ message: 'Connexion...' });
+      const timeoutPromise = new Promise<any>((resolve) => {
+        setTimeout(() => {
+          console.error('❌ LoadingController.create() TIMEOUT');
+          resolve(null);
+        }, 3000);
+      });
+      
+      const loading = await Promise.race([loadingPromise, timeoutPromise]);
+      console.log('🔴 LOADING RESULT:', loading);
+      
+      if (loading) {
+        await loading.present();
+        console.log('🔴 LOADING PRESENTED');
+      } else {
+        console.warn('⚠️ Loading is null, skipping loading UI');
+      }
 
       console.log('🔴 ABOUT TO CALL API.LOGIN');
       
       this.api.login(this.credentials).subscribe({
         next: () => {
           console.log('🟢 LOGIN SUCCESS');
-          loading.dismiss();
+          if (loading) loading.dismiss();
           this.presentToast('Connexion réussie', 'success');
           this.navCtrl.navigateRoot('/dashboard');
         },
         error: (err) => {
-          console.log('🔴 LOGIN ERROR - SUBSCRIBE ERROR HANDLER HIT');
-          console.error("❌ ERREUR COMPLÈTE:", err);
+          console.log('🔴 LOGIN ERROR');
           console.error("Status:", err.status);
           console.error("Message:", err.message);
           
-          loading.dismiss();
-          let message = `Erreur ${err.status}: ${err.message || err.error?.detail || 'Inconnue'}`;
+          if (loading) loading.dismiss();
+          let message = `Erreur ${err.status}: ${err.message || 'Inconnue'}`;
           console.log(message); 
         }
       });
       
     } catch (error) {
-      console.error('🔴 ERREUR CATCH:', error);
-      console.log('Erreur critique: ' + (error as any).message);
+      console.error('🔴 CATCH ERROR:', error);
     }
   }
+
+
 
   async presentToast(message: string, color: string) {
     const t = await this.toastCtrl.create({ message, duration: 3000, color, position: 'top' });
