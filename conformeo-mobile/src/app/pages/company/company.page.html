@@ -21,7 +21,6 @@
 <ion-content class="bg-light ion-padding">
 
   <div *ngIf="segment === 'docs'">
-    
     <div class="alert-banner" *ngIf="hasExpiredDocs">
       <ion-icon name="warning"></ion-icon>
       <span>Certains documents sont périmés !</span>
@@ -92,8 +91,9 @@
                (drop)="onLogoDrop($event)">
             
             <img *ngIf="company.logo_url" 
-              [src]="company.logo_url!.startsWith('data') ? company.logo_url : api.apiUrl + '/' + company.logo_url" 
-              class="logo-preview" />
+                 [src]="company.logo_url.startsWith('data') ? company.logo_url : api.apiUrl + '/' + company.logo_url" 
+                 class="logo-preview" 
+                 onError="this.style.display='none'"/>
             
             <div *ngIf="!company.logo_url" class="placeholder-logo">
                <ion-icon name="image" style="font-size: 40px; color: #ccc;"></ion-icon>

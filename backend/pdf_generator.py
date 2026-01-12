@@ -35,55 +35,49 @@ def get_optimized_image(path_or_url):
                 return Image.open(BytesIO(response.content))
         else:
             # Gestion fichier local (Uploads)
-            # On nettoie le chemin au cas où (ex: "uploads/logo.png" vs "/uploads/logo.png")
             clean_path = path_or_url.strip("/")
-            
-            # On cherche dans plusieurs dossiers possibles pour être sûr
             possible_paths = [
                 clean_path,
                 os.path.join("uploads", os.path.basename(clean_path)),
                 os.path.join(os.getcwd(), clean_path)
             ]
-            
             for p in possible_paths:
                 if os.path.exists(p):
                     return Image.open(p)
-                    
-            print(f"⚠️ Image introuvable localement : {path_or_url}")
-
     except Exception as e:
-        print(f"❌ Erreur chargement image ({path_or_url}): {e}")
+        print(f"❌ Erreur image: {e}")
     return None
 
 def draw_footer(c, width, height, chantier, titre_doc):
+    """Pied de page remonté pour éviter les débordements"""
     c.saveState()
+    
+    # On remonte le footer à 2cm du bas (au lieu de 1cm) pour éviter la coupure
+    footer_y = 2 * cm 
+    
     c.setStrokeColorRGB(0.8, 0.8, 0.8); c.setLineWidth(0.5)
-    c.line(1*cm, 1.5*cm, width-1*cm, 1.5*cm)
+    c.line(1*cm, footer_y + 0.5*cm, width-1*cm, footer_y + 0.5*cm) # Ligne
+    
     c.setFont(FONT_TEXT, 8); c.setFillColorRGB(0.5, 0.5, 0.5)
-    c.drawString(1*cm, 1*cm, f"Conforméo - {titre_doc} - {chantier.nom}")
-    c.drawRightString(width-1*cm, 1*cm, f"Page {c.getPageNumber()}")
+    c.drawString(1*cm, footer_y, f"Conforméo - {titre_doc} - {chantier.nom}")
+    c.drawRightString(width-1*cm, footer_y, f"Page {c.getPageNumber()}")
     c.restoreState()
 
 def draw_cover_page(c, chantier, titre_principal, sous_titre, company=None):
     width, height = A4
     
-    # --- MISE EN PAGE TYPE "MAQUETTE CLIENT" ---
-    
-    # Définition du cadre central pour le logo
-    # On le place un peu au-dessus du centre optique
+    # Cadre central
     rect_w = 12 * cm
     rect_h = 7 * cm
     rect_x = (width - rect_w) / 2
     rect_y = (height / 2) + 1 * cm 
     
-    # 1. Dessin du cadre arrondi
-    c.setStrokeColorRGB(*COLOR_PRIMARY) # Couleur brique/orange du logo si besoin, ici bleu
-    # Si vous voulez la couleur "Brique" du logo Conforméo sur le screenshot:
-    # c.setStrokeColorRGB(0.8, 0.4, 0.2) 
+    # Dessin du cadre
+    c.setStrokeColorRGB(*COLOR_PRIMARY)
     c.setLineWidth(2)
     c.roundRect(rect_x, rect_y, rect_w, rect_h, 15, stroke=1, fill=0)
 
-    # 2. Insertion du Logo CENTRÉ dans le cadre
+    # Logo
     logo_source = None
     if company and company.logo_url: logo_source = company.logo_url
     elif hasattr(chantier, 'company') and chantier.company: logo_source = chantier.company.logo_url
@@ -92,81 +86,57 @@ def draw_cover_page(c, chantier, titre_principal, sous_titre, company=None):
     if logo_source:
         img = get_optimized_image(logo_source)
         if img:
-            # Calcul pour centrer et redimensionner l'image DANS le cadre (avec marge)
             max_im_w = rect_w - 2*cm
             max_im_h = rect_h - 2*cm
-            
             iw, ih = img.size
             ratio = min(max_im_w/iw, max_im_h/ih)
             new_w = iw * ratio
             new_h = ih * ratio
-            
-            # Coordonnées pour centrer
             pos_x = rect_x + (rect_w - new_w) / 2
             pos_y = rect_y + (rect_h - new_h) / 2
-            
             try:
                 c.drawImage(ImageReader(img), pos_x, pos_y, width=new_w, height=new_h, mask='auto', preserveAspectRatio=True)
                 logo_drawn = True
-            except Exception as e:
-                print(f"Erreur rendu logo PDF: {e}")
+            except: pass
 
-    # Si pas de logo, on met un texte temporaire
     if not logo_drawn:
-        c.setFillColorRGB(0.7, 0.7, 0.7)
-        c.setFont(FONT_TEXT, 10)
-        c.drawCentredString(width/2, rect_y + rect_h/2, "(Logo Entreprise ici)")
+        c.setFillColorRGB(0.7, 0.7, 0.7); c.setFont(FONT_TEXT, 10)
+        c.drawCentredString(width/2, rect_y + rect_h/2, "(Logo Entreprise)")
 
-    # 3. Titres (SOUS le cadre)
+    # Titres
     y_text = rect_y - 2 * cm
-    
-    c.setFillColorRGB(*COLOR_PRIMARY)
-    c.setFont(FONT_TITLE, 24)
-    c.drawCentredString(width/2, y_text, titre_principal) # "JOURNAL DE BORD"
+    c.setFillColorRGB(*COLOR_PRIMARY); c.setFont(FONT_TITLE, 24)
+    c.drawCentredString(width/2, y_text, titre_principal)
     
     y_text -= 1 * cm
-    c.setFillColorRGB(*COLOR_SECONDARY)
-    c.setFont(FONT_TEXT, 14)
-    c.drawCentredString(width/2, y_text, sous_titre) # "Suivi d'exécution..."
+    c.setFillColorRGB(*COLOR_SECONDARY); c.setFont(FONT_TEXT, 14)
+    c.drawCentredString(width/2, y_text, sous_titre)
     
-    # 4. Ligne de séparation
     y_text -= 1.5 * cm
     c.setStrokeColorRGB(0.8, 0.8, 0.8); c.setLineWidth(0.5)
     c.line(4*cm, y_text, width-4*cm, y_text)
 
-    # 5. Infos Projet (Alignées à gauche mais centrées globalement par rapport à la page)
+    # Infos
     y_info = y_text - 2.5 * cm
-    x_labels = 4 * cm
-    x_values = 8 * cm
-    
+    x_labels = 4 * cm; x_values = 8 * cm
     c.setFillColorRGB(0, 0, 0)
     
-    # Projet
-    c.setFont(FONT_TITLE, 14)
-    c.drawString(x_labels, y_info, "PROJET :")
-    c.setFont(FONT_TEXT, 14)
-    c.drawString(x_values, y_info, chantier.nom or "Non défini")
+    c.setFont(FONT_TITLE, 14); c.drawString(x_labels, y_info, "PROJET :")
+    c.setFont(FONT_TEXT, 14); c.drawString(x_values, y_info, chantier.nom or "Non défini")
     
-    # Adresse
     y_info -= 1.2 * cm
-    c.setFont(FONT_TITLE, 14)
-    c.drawString(x_labels, y_info, "ADRESSE :")
-    c.setFont(FONT_TEXT, 14)
-    c.drawString(x_values, y_info, chantier.adresse or "Non définie")
+    c.setFont(FONT_TITLE, 14); c.drawString(x_labels, y_info, "ADRESSE :")
+    c.setFont(FONT_TEXT, 14); c.drawString(x_values, y_info, chantier.adresse or "Non définie")
     
-    # Réalisé par
     if company:
         y_info -= 2 * cm
         c.setFont(FONT_TITLE, 12); c.setFillColorRGB(*COLOR_SECONDARY)
         c.drawString(x_labels, y_info, "RÉALISÉ PAR :")
-        c.setFont(FONT_TEXT, 12)
-        c.drawString(x_values, y_info, company.name)
+        c.setFont(FONT_TEXT, 12); c.drawString(x_values, y_info, company.name)
 
-    # Date en bas à droite
     date_str = datetime.now().strftime('%d/%m/%Y')
     c.setFont(FONT_TEXT, 10); c.setFillColorRGB(0.5, 0.5, 0.5)
     c.drawRightString(width-2*cm, 3*cm, f"Édité le {date_str}")
-    
     c.showPage()
 
 # ==========================================
@@ -180,10 +150,11 @@ def generate_pdf(chantier, rapports, inspections, output_path, company=None):
     draw_cover_page(c, chantier, "JOURNAL DE BORD", "Suivi d'exécution & Rapports", company)
 
     y = height - 3 * cm
+    bottom_limit = 3 * cm # Limite de sécurité
 
-    def check_space(needed):
+    def check_space(needed_height):
         nonlocal y
-        if y < needed:
+        if (y - needed_height) < bottom_limit:
             draw_footer(c, width, height, chantier, "Journal de Bord")
             c.showPage()
             y = height - 3 * cm
@@ -198,13 +169,8 @@ def generate_pdf(chantier, rapports, inspections, output_path, company=None):
 
         for rap in rapports:
             check_space(4*cm)
-            
             c.setFillColorRGB(0,0,0); c.setFont(FONT_TITLE, 11)
-            date_rap = ""
-            if rap.date_creation:
-                if isinstance(rap.date_creation, str): date_rap = rap.date_creation[:10]
-                elif isinstance(rap.date_creation, datetime): date_rap = rap.date_creation.strftime('%d/%m')
-            
+            date_rap = rap.date_creation.strftime('%d/%m') if isinstance(rap.date_creation, datetime) else str(rap.date_creation)[:10]
             c.drawString(margin, y, f"{date_rap} | {rap.titre or 'Observation'}")
             y -= 0.6*cm
             
@@ -218,10 +184,8 @@ def generate_pdf(chantier, rapports, inspections, output_path, company=None):
             elif hasattr(rap, 'photo_url') and rap.photo_url: imgs = [rap.photo_url]
 
             img_w, img_h, gap = 8*cm, 6*cm, 1*cm
-            
             for i in range(0, len(imgs), 2):
                 check_space(img_h + 0.5*cm)
-                
                 url1 = imgs[i]
                 pil1 = get_optimized_image(url1)
                 if pil1:
@@ -229,7 +193,6 @@ def generate_pdf(chantier, rapports, inspections, output_path, company=None):
                         pil1 = ImageOps.exif_transpose(pil1)
                         c.drawImage(ImageReader(pil1), margin, y-img_h, width=img_w, height=img_h, preserveAspectRatio=True)
                     except: pass
-                
                 if i+1 < len(imgs):
                     url2 = imgs[i+1]
                     pil2 = get_optimized_image(url2)
@@ -253,9 +216,7 @@ def generate_pdf(chantier, rapports, inspections, output_path, company=None):
         for insp in inspections:
             check_space(2*cm)
             c.setFillColorRGB(0,0,0); c.setFont(FONT_TITLE, 11)
-            date_audit = ""
-            if insp.date_creation:
-                if isinstance(insp.date_creation, datetime): date_audit = insp.date_creation.strftime('%d/%m')
+            date_audit = insp.date_creation.strftime('%d/%m') if isinstance(insp.date_creation, datetime) else ""
             c.drawString(margin, y, f"{insp.titre or 'Audit'} ({date_audit})")
             y -= 0.8*cm
             
@@ -275,13 +236,10 @@ def generate_pdf(chantier, rapports, inspections, output_path, company=None):
                 y -= 0.5*cm
             y -= 0.5*cm
 
-    # --- SIGNATURE ---
     check_space(5*cm)
-    y -= 1*cm
-    c.setStrokeColorRGB(0,0,0); c.setLineWidth(1)
+    y -= 1*cm; c.setStrokeColorRGB(0,0,0); c.setLineWidth(1)
     c.line(margin, y, width-margin, y)
-    y -= 1*cm
-    c.setFillColorRGB(0,0,0); c.setFont(FONT_TITLE, 12)
+    y -= 1*cm; c.setFillColorRGB(0,0,0); c.setFont(FONT_TITLE, 12)
     c.drawString(width-8*cm, y, "Validation :")
     
     if chantier.signature_url:
@@ -301,14 +259,14 @@ def generate_ppsps_pdf(chantier, ppsps, output_path, company=None):
     c = canvas.Canvas(output_path, pagesize=A4)
     width, height = A4
     margin = 2 * cm
-    
     draw_cover_page(c, chantier, "P.P.S.P.S", "Plan Particulier de Sécurité", company)
-
+    
     y = height - 3 * cm
+    bottom_limit = 3 * cm
 
-    def check_space(needed):
+    def check_space(needed_height):
         nonlocal y
-        if y < needed:
+        if (y - needed_height) < bottom_limit:
             draw_footer(c, width, height, chantier, "PPSPS")
             c.showPage()
             y = height - 3 * cm
@@ -347,12 +305,10 @@ def generate_ppsps_pdf(chantier, ppsps, output_path, company=None):
     draw_section("3. ANALYSE DES RISQUES")
     taches = ppsps.taches_data or []
     if not taches: c.drawString(margin, y, "Aucun risque spécifique."); y -= 1*cm
-
     for t in taches:
         check_space(2.5*cm)
         c.setStrokeColorRGB(0.9,0.9,0.9); c.setLineWidth(0.5)
         c.line(margin, y, width-margin, y); y -= 0.5*cm
-        
         c.setFont(FONT_TITLE, 10); c.drawString(margin, y, t.get('tache',''))
         y -= 0.5*cm
         c.setFont(FONT_TEXT, 9); c.setFillColorRGB(0.8, 0, 0)
@@ -373,13 +329,14 @@ def generate_audit_pdf(chantier, inspection, output_path, company=None):
     c = canvas.Canvas(output_path, pagesize=A4)
     width, height = A4
     margin = 2 * cm
-    
     draw_cover_page(c, chantier, "RAPPORT D'INSPECTION", f"{inspection.titre} ({inspection.type})", company)
     
     y = height - 3 * cm
-    def check_space(needed):
+    bottom_limit = 3 * cm
+
+    def check_space(needed_height):
         nonlocal y
-        if y < needed:
+        if (y - needed_height) < bottom_limit:
             draw_footer(c, width, height, chantier, "Rapport d'Inspection")
             c.showPage()
             y = height - 3 * cm
@@ -400,9 +357,7 @@ def generate_audit_pdf(chantier, inspection, output_path, company=None):
         check_space(1.5*cm)
         q_text = item.get('q', 'Point')
         status = item.get('status', 'NA')
-        
-        c.setFont(FONT_TEXT, 10)
-        c.drawString(margin, y, q_text)
+        c.setFont(FONT_TEXT, 10); c.drawString(margin, y, q_text)
         
         txt, color = "N/A", (0.5,0.5,0.5)
         if status == 'OK': txt, color = "CONFORME", (0, 0.6, 0)
@@ -411,7 +366,6 @@ def generate_audit_pdf(chantier, inspection, output_path, company=None):
         c.setFont(FONT_TITLE, 10); c.setFillColorRGB(*color)
         c.drawRightString(width-margin, y, txt)
         c.setFillColorRGB(0,0,0)
-        
         c.setStrokeColorRGB(0.9,0.9,0.9); c.setLineWidth(0.5)
         c.line(margin, y-0.4*cm, width-margin, y-0.4*cm)
         y -= 1*cm
@@ -426,15 +380,14 @@ def generate_pdp_pdf(chantier, pdp, output_path, company=None):
     c = canvas.Canvas(output_path, pagesize=A4)
     width, height = A4
     margin = 2 * cm
-    
-    # Page de garde
     draw_cover_page(c, chantier, "PLAN DE PRÉVENTION", "Travaux en site occupé / Coactivité", company)
 
     y = height - 3 * cm
+    bottom_limit = 3 * cm
 
-    def check_space(needed):
+    def check_space(needed_height):
         nonlocal y
-        if y < needed:
+        if (y - needed_height) < bottom_limit:
             draw_footer(c, width, height, chantier, "Plan de Prévention")
             c.showPage()
             y = height - 3 * cm
@@ -447,36 +400,24 @@ def generate_pdp_pdf(chantier, pdp, output_path, company=None):
         y -= 0.2*cm; c.setLineWidth(1); c.setStrokeColorRGB(*COLOR_PRIMARY)
         c.line(margin, y, width-margin, y); c.setFillColorRGB(0,0,0); y -= 1*cm
 
-    # 1. ACTEURS & INSPECTION
     draw_section_title("1. INTERVENANTS & INSPECTION COMMUNE")
-    
     c.setFont(FONT_TEXT, 10)
-    date_insp = "Non réalisée"
-    if pdp.date_inspection_commune:
-        if isinstance(pdp.date_inspection_commune, datetime):
-            date_insp = pdp.date_inspection_commune.strftime('%d/%m/%Y à %H:%M')
-        else:
-            date_insp = str(pdp.date_inspection_commune)[:16]
-
+    date_insp = pdp.date_inspection_commune.strftime('%d/%m/%Y à %H:%M') if isinstance(pdp.date_inspection_commune, datetime) else str(pdp.date_inspection_commune)[:16]
     c.drawString(margin, y, f"Date de l'inspection commune : {date_insp}")
     y -= 0.8*cm
     
-    # Tableau simple pour EU / EE
     col_w = (width - 2*margin) / 2
     c.setFont(FONT_TITLE, 11)
     c.drawString(margin, y, "Entreprise Utilisatrice (Client)")
     c.drawString(margin + col_w, y, "Entreprise Extérieure (Nous)")
     y -= 0.5*cm
-    
     c.setFont(FONT_TEXT, 10); c.setFillColorRGB(0.2, 0.2, 0.2)
     c.drawString(margin, y, pdp.entreprise_utilisatrice or "Non défini")
     c.drawString(margin + col_w, y, pdp.entreprise_exterieure or (company.name if company else "Nous"))
     y -= 1.5*cm
 
-    # 2. CONSIGNES DE SÉCURITÉ
     draw_section_title("2. CONSIGNES DU SITE & SECOURS")
     cons = pdp.consignes_securite or {}
-    
     items = [
         f"🚑 Numéros d'urgence : {cons.get('urgence', '15 / 18')}",
         f"📍 Point de Rassemblement : {cons.get('rassemblement', 'Parking Principal')}",
@@ -484,51 +425,35 @@ def generate_pdp_pdf(chantier, pdp, output_path, company=None):
         f"🚬 Zone Fumeur : {cons.get('fumeur', 'Zone dédiée uniquement')}",
         f"🔥 Permis de Feu requis : {cons.get('permis_feu', 'Non')}"
     ]
-    
     for item in items:
-        check_space(0.8*cm)
-        c.setFont(FONT_TEXT, 10)
-        c.drawString(margin, y, f"• {item}")
-        y -= 0.6*cm
+        check_space(0.8*cm); c.setFont(FONT_TEXT, 10)
+        c.drawString(margin, y, f"• {item}"); y -= 0.6*cm
     y -= 0.5*cm
 
-    # 3. ANALYSE DES RISQUES INTERFÉRENTS
     draw_section_title("3. RISQUES LIÉS À LA COACTIVITÉ")
-    
     risques = pdp.risques_interferents or []
     if not risques:
         c.setFont(FONT_TEXT, 10); c.drawString(margin, y, "Aucun risque d'interférence majeur identifié.")
     else:
         for r in risques:
             check_space(2.5*cm)
-            # Cadre léger
             c.setStrokeColorRGB(0.9, 0.9, 0.9); c.setLineWidth(0.5)
             c.rect(margin, y-1.8*cm, width-2*margin, 1.8*cm)
-            
-            # Contenu
             c.setFont(FONT_TITLE, 10); c.setFillColorRGB(0, 0, 0)
             c.drawString(margin+0.2*cm, y-0.5*cm, f"Activité : {r.get('tache', '?')}")
-            
             c.setFont(FONT_TEXT, 9); c.setFillColorRGB(0.8, 0, 0)
             c.drawString(margin+0.2*cm, y-1.0*cm, f"Risque : {r.get('risque', '?')}")
-            
             c.setFillColorRGB(0, 0.5, 0)
             c.drawString(margin+0.2*cm, y-1.5*cm, f"Mesure : {r.get('mesure', '?')}")
-            
             y -= 2.2*cm
 
-    # 4. SIGNATURES
-    check_space(5*cm)
-    y -= 1*cm
+    check_space(5*cm); y -= 1*cm
     c.setStrokeColorRGB(0.8, 0.8, 0.8); c.setLineWidth(1)
-    c.line(margin, y, width-margin, y)
-    y -= 0.5*cm
-    
+    c.line(margin, y, width-margin, y); y -= 0.5*cm
     col_w = (width - 2*margin) / 2
     c.setFont(FONT_TITLE, 10); c.setFillColorRGB(0, 0, 0)
     c.drawString(margin, y, "Pour l'Entreprise Utilisatrice (Client) :")
     c.drawString(margin + col_w, y, "Pour l'Entreprise Extérieure (Nous) :")
-    
     y_sig_start = y - 3.5*cm
 
     if pdp.signature_eu:
@@ -553,40 +478,31 @@ def generate_pdp_pdf(chantier, pdp, output_path, company=None):
     y = y_sig_start - 1*cm
     c.setFont(FONT_TEXT, 8); c.setFillColorRGB(0.5, 0.5, 0.5)
     c.drawCentredString(width/2, y, "Document certifié conforme par Conforméo BTP.")
-
     draw_footer(c, width, height, chantier, "Plan de Prévention")
     c.save()
     return output_path
 
 # ==========================================
-# 6. GENERATEUR DUERP (DOCUMENT UNIQUE)
+# 6. GENERATEUR DUERP
 # ==========================================
 def generate_duerp_pdf(company, duerp, filepath):
     doc = SimpleDocTemplate(filepath, pagesize=landscape(A4), rightMargin=20, leftMargin=20, topMargin=20, bottomMargin=20)
-    
     elements = []
     styles = getSampleStyleSheet()
 
-    # --- EN-TÊTE DU DUERP ---
     if company and company.logo_url:
         try:
             pil_img = get_optimized_image(company.logo_url)
             if pil_img:
-                # Hack pour ReportLab Platypus qui gère mal les images dynamiques parfois
                 temp_logo_path = "temp_logo_duerp.jpg"
                 pil_img.save(temp_logo_path)
-                
                 logo = ReportLabImage(temp_logo_path)
-                
-                # Redimensionnement (Max 4cm de haut)
                 max_h = 4 * cm
                 img_w, img_h = pil_img.size
                 aspect = img_w / float(img_h)
-                
                 logo.drawHeight = max_h
                 logo.drawWidth = max_h * aspect
                 logo.hAlign = 'LEFT'
-                
                 elements.append(logo)
                 elements.append(Spacer(1, 10))
         except: pass
@@ -594,26 +510,13 @@ def generate_duerp_pdf(company, duerp, filepath):
     title = f"<b>DOCUMENT UNIQUE (DUERP) - {duerp.annee}</b>"
     elements.append(Paragraph(title, styles['Title']))
     elements.append(Spacer(1, 10))
-    
-    if company:
-        elements.append(Paragraph(f"Entreprise : {company.name}", styles['Normal']))
-    
+    if company: elements.append(Paragraph(f"Entreprise : {company.name}", styles['Normal']))
     date_str = duerp.date_mise_a_jour.strftime('%d/%m/%Y') if duerp.date_mise_a_jour else "N/A"
     elements.append(Paragraph(f"Mis à jour le : {date_str}", styles['Normal']))
     elements.append(Spacer(1, 20))
 
-    # --- TABLEAU ---
-    headers = [
-        "1. Tâches effectuées", 
-        "2. Identification des risques", 
-        "3. Gravité\n(1-3)", 
-        "4. Mesures réalisées", 
-        "5. Mesures à réaliser"
-    ]
-    
+    headers = ["1. Tâches effectuées", "2. Identification des risques", "3. Gravité\n(1-3)", "4. Mesures réalisées", "5. Mesures à réaliser"]
     data = [headers]
-    
-    # Remplissage des données
     for l in duerp.lignes:
         row = [
             Paragraph(l.tache or "", styles['Normal']),
@@ -624,26 +527,21 @@ def generate_duerp_pdf(company, duerp, filepath):
         ]
         data.append(row)
 
-    # Style du Tableau
     col_widths = [140, 140, 50, 200, 200] 
-    
     t = Table(data, colWidths=col_widths)
     t.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.white),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
         ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-        ('ALIGN', (0, 0), (-1, 0), 'CENTER'), # Entêtes centrés
-        ('ALIGN', (2, 1), (2, -1), 'CENTER'), # Colonne Gravité centrée
+        ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+        ('ALIGN', (2, 1), (2, -1), 'CENTER'),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
         ('FONTSIZE', (0, 0), (-1, 0), 10),
         ('VALIGN', (0, 0), (-1, -1), 'TOP'),
         ('GRID', (0, 0), (-1, -1), 1, colors.black),
         ('BOX', (0, 0), (-1, -1), 2, colors.black),
     ]))
-
     elements.append(t)
-    
-    # Génération
     try:
         doc.build(elements)
         print(f"✅ PDF DUERP généré : {filepath}")

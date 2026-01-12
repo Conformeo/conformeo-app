@@ -666,16 +666,30 @@ def upload_logo(
 ):
     if not current_user.company_id: raise HTTPException(400, "Pas d'entreprise")
     
-    # On sauvegarde le fichier sur le disque
-    file_location = f"uploads/logo_{current_user.company_id}.png"
+    # 1. Création du dossier uploads s'il n'existe pas
+    if not os.path.exists("uploads"):
+        os.makedirs("uploads")
+    
+    # 2. Nom de fichier propre et unique (force l'extension .png pour simplifier)
+    # On ajoute un timestamp pour éviter que le navigateur garde l'ancien logo en cache
+    import time
+    timestamp = int(time.time())
+    filename = f"logo_{current_user.company_id}_{timestamp}.png"
+    file_location = f"uploads/{filename}"
+    
+    # 3. Sauvegarde physique
     with open(file_location, "wb+") as file_object:
-        file_object.write(file.file.read())
+        shutil.copyfileobj(file.file, file_object)
     
-    # On met à jour l'URL dans la base de données
+    # 4. Mise à jour Base de données
     company = db.query(models.Company).filter(models.Company.id == current_user.company_id).first()
-    company.logo_url = file_location # On stocke le chemin relatif
-    db.commit()
     
+    # Si on avait un ancien logo, on pourrait le supprimer ici pour nettoyer, mais gardons simple
+    company.logo_url = file_location 
+    db.commit()
+    db.refresh(company)
+    
+    # Retourne l'URL relative que le frontend pourra utiliser
     return {"url": file_location}
 
 @app.post("/companies/me/documents", response_model=schemas.CompanyDocOut)

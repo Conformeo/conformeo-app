@@ -11,7 +11,7 @@ import {
   briefcase, warning, calendar, eye, pencil, add, folderOpen, close, camera, 
   cloudUploadOutline, list, chevronForward, image 
 } from 'ionicons/icons';
-import { ApiService } from '../../services/api'; // Adaptez le chemin
+import { ApiService } from '../../services/api'; // Adaptez si nécessaire
 import { SignatureModalComponent } from '../chantier-details/signature-modal/signature-modal.component';
 
 @Component({
@@ -23,25 +23,23 @@ import { SignatureModalComponent } from '../chantier-details/signature-modal/sig
 })
 export class CompanyPage implements OnInit {
 
-  segment = 'infos'; // 👉 J'ai mis 'infos' par défaut pour que vous voyiez le résultat tout de suite
+  segment = 'infos';
   company: any = null;
   docs: any[] = [];
   
   isLoading = false;
   hasExpiredDocs = false;
 
-  // Gestion Modal Doc
   isUploadModalOpen = false;
   newDoc = { titre: '', type_doc: 'AUTRE', date_expiration: '' };
   selectedFile: File | null = null;
   
-  // Gestion Logo
   @ViewChild('fileInput') fileInput!: ElementRef;
   @ViewChild('logoInput') logoInput!: ElementRef;
   isLogoDragging = false; 
 
   constructor(
-    public api: ApiService, // 👉 Doit être PUBLIC pour le HTML
+    public api: ApiService,
     private alertCtrl: AlertController,
     private toastCtrl: ToastController,
     private loadingCtrl: LoadingController,
@@ -60,24 +58,18 @@ export class CompanyPage implements OnInit {
 
   loadData() {
     this.isLoading = true;
-    
     Promise.all([
       this.api.getMe().toPromise(),
       this.api.getMyCompany().toPromise().catch(() => null),
       this.api.getCompanyDocs().toPromise()
     ]).then(([user, comp, docs]) => {
-      
       this.company = comp || null; 
-      
-      // 👇 CORRECTION ICI : On ajoute "user &&" ou "user?.company_id"
       if (!this.company && user && user.company_id) {
           console.warn("ID trouvé mais objet manquant ?");
       }
-
       this.docs = docs || [];
       this.checkGlobalStatus();
       this.isLoading = false;
-
     }).catch(err => {
       this.isLoading = false;
       console.error(err);
@@ -85,10 +77,8 @@ export class CompanyPage implements OnInit {
     });
   }
 
-  // --- LE RESTE DU CODE NE CHANGE PAS (Méthodes Logo, Docs, etc.) ---
-  
+  // --- LOGO GESTION ---
   triggerLogoUpload() { this.logoInput.nativeElement.click(); }
-
   onLogoDragOver(event: DragEvent) { event.preventDefault(); event.stopPropagation(); this.isLogoDragging = true; }
   onLogoDragLeave(event: DragEvent) { event.preventDefault(); event.stopPropagation(); this.isLogoDragging = false; }
   onLogoDrop(event: DragEvent) {
@@ -111,18 +101,22 @@ export class CompanyPage implements OnInit {
     this.api.uploadLogo(file).subscribe({
       next: (res) => {
         if (this.company) {
-            // Force l'affichage immédiat via FileReader
-            const reader = new FileReader();
-            reader.onload = (e: any) => this.company.logo_url = e.target.result;
-            reader.readAsDataURL(file);
+            // ASTUCE : On ajoute un timestamp pour forcer le rafraîchissement de l'image
+            // Sinon le navigateur garde l'ancien logo en cache
+            this.company.logo_url = res.url + '?t=' + new Date().getTime();
         }
         load.dismiss();
         this.presentToast('Logo modifié ! 📸', 'success');
       },
-      error: () => { load.dismiss(); this.presentToast('Erreur upload logo', 'danger'); }
+      error: (err) => { 
+        console.error(err);
+        load.dismiss(); 
+        this.presentToast('Erreur upload logo', 'danger'); 
+      }
     });
   }
 
+  // --- DOCS & HELPERS ---
   checkGlobalStatus() {
     this.hasExpiredDocs = this.docs.some(d => {
         if(!d.date_expiration) return false;
