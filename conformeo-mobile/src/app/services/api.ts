@@ -275,8 +275,8 @@ export class ApiService {
   // 🏢 GESTION ENTREPRISE (MON ENTREPRISE)
   // ==========================================
 
-  getMyCompany(): Observable<Company> {
-    return this.http.get<Company>(`${this.apiUrl}/companies/me`, this.getOptions());
+  getMyCompany(): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/companies/me`, this.getOptions());
   }
 
   // Mettre à jour les infos texte

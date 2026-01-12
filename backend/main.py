@@ -818,11 +818,19 @@ async def send_pdp_email(pid: int, email_dest: str, db: Session = Depends(get_db
         print(e); raise HTTPException(500, "Erreur lors de l'envoi de l'email")
 
 @app.get("/companies/me", response_model=schemas.CompanyOut)
-def read_my_company(db: Session = Depends(get_db), current_user: models.User = Depends(security.get_current_user)):
-    if not current_user.company_id: raise HTTPException(400)
-    return db.query(models.Company).filter(models.Company.id == current_user.company_id).first()
-
-# Dans backend/main.py
+def read_own_company(
+    db: Session = Depends(get_db), 
+    current_user: models.User = Depends(security.get_current_user)
+):
+    if not current_user.company_id:
+        # Si l'utilisateur n'a pas d'entreprise, on renvoie une 404 que le frontend gérera
+        raise HTTPException(status_code=404, detail="Aucune entreprise liée")
+        
+    company = db.query(models.Company).filter(models.Company.id == current_user.company_id).first()
+    if not company:
+        raise HTTPException(status_code=404, detail="Entreprise introuvable")
+        
+    return company
 
 @app.put("/companies/me", response_model=schemas.CompanyOut)
 def update_company(
