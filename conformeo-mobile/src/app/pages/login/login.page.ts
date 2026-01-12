@@ -36,8 +36,7 @@ export class LoginPage {
   body.set('username', this.credentials.email);
   body.set('password', this.credentials.password);
   console.log('Body URLSearchParams:', body);
-  console.log('Body toString():', body.toString());
-  console.log('Body entries:', Array.from(body.entries()));
+  console.log('Body string:', body.toString());  // ✅ C'EST BON (pas .entries())
 
   this.api.login(this.credentials).subscribe({
     next: () => {
@@ -51,15 +50,14 @@ export class LoginPage {
       console.error("Status:", err.status);
       console.error("StatusText:", err.statusText);
       console.error("Error object:", err.error);
-      console.error("Full error:", JSON.stringify(err));
 
       let message = 'Erreur inconnue';
       if (err.status === 0) {
         message = '⚠️ ERREUR RÉSEAU (0) : Impossible de contacter le serveur.';
       } else if (err.status === 422) {
-        message = '⚠️ ERREUR 422 (Format) : Le serveur refuse le format des données.';
+        message = '⚠️ ERREUR 422 (Format) : Le serveur refuse le format.';
       } else if (err.status === 401) {
-        message = '❌ ERREUR 401 (Auth) : Mot de passe incorrect.';
+        message = '❌ ERREUR 401 (Auth) : Identifiants incorrects.';
       } else if (err.status === 500) {
         message = '🔥 ERREUR 500 : Le serveur a crashé.';
       } else {
