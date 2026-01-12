@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { IonicModule, NavController, LoadingController, ToastController } from '@ionic/angular';
 import { ApiService } from 'src/app/services/api';
 
+
 @Component({
   selector: 'app-login',
   templateUrl: './login.page.html',
@@ -14,16 +15,31 @@ import { ApiService } from 'src/app/services/api';
 export class LoginPage {
   credentials = { email: '', password: '' };
 
+
   constructor(
     private api: ApiService, 
     private navCtrl: NavController,
     private loadingCtrl: LoadingController,
     private toastCtrl: ToastController
-  ) {}
+  ) {
+    console.log('🔴 LoginPage CONSTRUCTOR');
+    console.log('LoadingController:', this.loadingCtrl);
+    console.log('ToastController:', this.toastCtrl);
+  }
+
 
   async login() {
     try {
       console.log('🔴 LOGIN STARTED - Before anything');
+      
+      console.log('this.loadingCtrl type:', typeof this.loadingCtrl);
+      console.log('this.loadingCtrl is:', this.loadingCtrl);
+      
+      if (!this.loadingCtrl) {
+        console.error('❌ LoadingController is NULL or UNDEFINED');
+        console.log('Erreur critique: LoadingController not injected!');
+        return;
+      }
       
       console.log('🔴 ABOUT TO CREATE LOADING');
       const loading = await this.loadingCtrl.create({ message: 'Connexion...' });
@@ -61,9 +77,6 @@ export class LoginPage {
       console.log('Erreur critique: ' + (error as any).message);
     }
   }
-
-
-
 
   async presentToast(message: string, color: string) {
     const t = await this.toastCtrl.create({ message, duration: 3000, color, position: 'top' });
