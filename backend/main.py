@@ -822,17 +822,28 @@ def read_my_company(db: Session = Depends(get_db), current_user: models.User = D
     if not current_user.company_id: raise HTTPException(400)
     return db.query(models.Company).filter(models.Company.id == current_user.company_id).first()
 
+# Dans backend/main.py
+
 @app.put("/companies/me", response_model=schemas.CompanyOut)
-def update_my_company(up: schemas.CompanyUpdate, db: Session = Depends(get_db), current_user: models.User = Depends(security.get_current_user)):
-    if not current_user.company_id: raise HTTPException(400)
-    c = db.query(models.Company).filter(models.Company.id == current_user.company_id).first()
-    if up.name: c.name = up.name
-    if up.address: c.address = up.address
-    if up.contact_email: c.contact_email = up.contact_email
-    if up.phone: c.phone = up.phone
-    if up.logo_url: c.logo_url = up.logo_url
-    db.commit(); db.refresh(c)
-    return c
+def update_company(
+    # 👇 On utilise CompanyUpdate (ou CompanyCreate si vous préférez, les deux existent maintenant)
+    comp_update: schemas.CompanyUpdate, 
+    db: Session = Depends(get_db), 
+    current_user: models.User = Depends(security.get_current_user)
+):
+    if not current_user.company_id: raise HTTPException(400, "Pas d'entreprise")
+    
+    company = db.query(models.Company).filter(models.Company.id == current_user.company_id).first()
+    
+    # Mise à jour des champs s'ils sont présents
+    if comp_update.name: company.name = comp_update.name
+    if comp_update.email: company.email = comp_update.email
+    if comp_update.phone: company.phone = comp_update.phone
+    if comp_update.address: company.address = comp_update.address
+    
+    db.commit()
+    db.refresh(company)
+    return company
 
 @app.post("/companies/me/duerp", response_model=schemas.DUERPOut)
 def create_or_update_duerp(duerp_data: schemas.DUERPCreate, db: Session = Depends(get_db), current_user: models.User = Depends(security.get_current_user)):

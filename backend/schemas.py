@@ -158,7 +158,7 @@ class PicSchema(BaseModel):
     signalisation: str = ""
     background_url: Optional[str] = None
     final_url: Optional[str] = None
-    elements_data: Optional[Any] = None # Can be list or string
+    elements_data: Optional[Any] = None 
 
 # --- DOCS EXTERNES ---
 class DocExterneOut(BaseModel):
@@ -170,18 +170,27 @@ class DocExterneOut(BaseModel):
     class Config:
         from_attributes = True
 
-# --- COMPANY ---
-class CompanyUpdate(BaseModel):
+# --- COMPANY (CORRIGÉ) ---
+
+# 1. Base commune pour ne pas répéter les champs
+class CompanyBase(BaseModel):
     name: Optional[str] = None
     address: Optional[str] = None
     contact_email: Optional[str] = None
     phone: Optional[str] = None
-    logo_url: Optional[str] = None
 
-class CompanyOut(BaseModel):
+# 2. Le schéma Create qui manquait !
+class CompanyCreate(CompanyBase):
+    name: str # Obligatoire à la création
+
+# 3. Update (hérite de Base, donc tout est optionnel)
+class CompanyUpdate(CompanyBase):
+    pass 
+
+# 4. Out (hérite de Base pour renvoyer l'adresse, l'email, etc.)
+class CompanyOut(CompanyBase):
     id: int
-    name: str
-    subscription_plan: str
+    subscription_plan: str = "free"
     logo_url: Optional[str] = None
     class Config:
         from_attributes = True
@@ -196,6 +205,7 @@ class CompanyDocOut(BaseModel):
     class Config:
         from_attributes = True
 
+# --- DUERP ---
 class DUERPLigneBase(BaseModel):
     tache: str
     risque: str
