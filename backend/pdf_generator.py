@@ -107,32 +107,29 @@ def draw_cover_page(c, chantier, titre_principal, sous_titre, company=None):
         c.setFillColorRGB(0.7, 0.7, 0.7); c.setFont(FONT_TEXT, 10)
         c.drawCentredString(width/2, logo_center_y, "")
 
+    # ... (Code du logo inchangé) ...
+
     # 2. Titres (SOUS le logo)
-    # On se place en dessous de la zone prévue pour le logo
     y_text = logo_center_y - 5 * cm 
     
-    c.setFillColorRGB(*COLOR_PRIMARY)
-    c.setFont(FONT_TITLE, 24)
-    c.drawCentredString(width/2, y_text, titre_principal) # "JOURNAL DE BORD"
+    c.setFillColorRGB(*COLOR_PRIMARY); c.setFont(FONT_TITLE, 24)
+    c.drawCentredString(width/2, y_text, titre_principal)
     
     y_text -= 1.2 * cm
-    c.setFillColorRGB(*COLOR_SECONDARY)
-    c.setFont(FONT_TEXT, 14)
-    c.drawCentredString(width/2, y_text, sous_titre) # "Suivi d'exécution..."
+    c.setFillColorRGB(*COLOR_SECONDARY); c.setFont(FONT_TEXT, 14)
+    c.drawCentredString(width/2, y_text, sous_titre)
     
-    # 3. Ligne de séparation
+    # 3. Ligne de séparation (ALIGNÉE À GAUCHE MAINTENANT)
     y_text -= 2 * cm
     c.setStrokeColorRGB(0.8, 0.8, 0.8); c.setLineWidth(0.5)
-    c.line(4*cm, y_text, width-4*cm, y_text)
+    # 👇 On commence la ligne à 2*cm (Marge gauche) jusqu'à width-2*cm (Marge droite)
+    c.line(2*cm, y_text, width-2*cm, y_text)
 
-    # 4. Infos Projet
-    # On descend un peu le bloc pour l'aérer
-    y_info = y_text - 3.5 * cm
+    # 4. Infos Projet (ALIGNÉES À GAUCHE)
+    y_info = y_text - 3 * cm
     
-    # 👇 CORRECTION ALIGNEMENT GAUCHE
-    # x_labels à 2*cm = Marge gauche standard du document
+    # 👇 C'est ici que ça se joue : 2*cm c'est le bord gauche du contenu
     x_labels = 2 * cm 
-    # x_values à 6*cm = Décalage pour le contenu
     x_values = 6 * cm 
     
     c.setFillColorRGB(0, 0, 0)
@@ -149,7 +146,7 @@ def draw_cover_page(c, chantier, titre_principal, sous_titre, company=None):
     c.drawString(x_labels, y_info, "ADRESSE :")
     c.setFont(FONT_TEXT, 14)
     c.drawString(x_values, y_info, chantier.adresse or "Non définie")
-        
+    
     # Réalisé par
     if company:
         y_info -= 2.5 * cm
@@ -158,15 +155,14 @@ def draw_cover_page(c, chantier, titre_principal, sous_titre, company=None):
         c.setFont(FONT_TEXT, 12)
         c.drawString(x_values, y_info, company.name)
 
-    # 👇 CORRECTION : Date alignée sur la même hauteur (y_info)
+    # Date en bas (Alignée avec Réalisé par)
     date_str = datetime.now().strftime('%d/%m/%Y')
     c.setFont(FONT_TEXT, 10); c.setFillColorRGB(0.5, 0.5, 0.5)
-    
-    # On utilise 'y_info' ici au lieu de '3*cm'
+    # Alignée à droite
     c.drawRightString(width-2*cm, y_info, f"Édité le {date_str}")
     
     c.showPage()
-
+    
 # ==========================================
 # 2. GENERATEUR JOURNAL DE BORD 
 # ==========================================

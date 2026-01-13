@@ -61,13 +61,6 @@ mail_conf = ConnectionConfig(
 os.makedirs("uploads", exist_ok=True)
 app.mount("/static", StaticFiles(directory="uploads"), name="static")
 
-origins = [
-    "http://localhost:8100",             # Votre environnement local Ionic
-    "http://localhost:4200",             # Au cas où vous utilisez ng serve
-    "https://conformeo-app.vercel.app",  # Votre site en production
-    "capacitor://localhost",             # Pour l'application mobile native (iOS/Android)
-    "http://localhost",                  # Parfois nécessaire
-]
 
 # 👇 MIDDLEWARE CORS (CRUCIAL POUR LE MOBILE)
 app.add_middleware(
@@ -866,6 +859,7 @@ def read_own_company(
         
     return company
 
+# 2. ROUTE MISE À JOUR SÉCURISÉE (Remplacez l'existante)
 @app.put("/companies/me", response_model=schemas.CompanyOut)
 def update_company(
     comp_update: schemas.CompanyUpdate, 
@@ -873,22 +867,19 @@ def update_company(
     current_user: models.User = Depends(security.get_current_user)
 ):
     if not current_user.company_id: 
-        raise HTTPException(400, "Pas d'entreprise liée à cet utilisateur")
+        raise HTTPException(400, "Utilisateur sans entreprise")
     
     company = db.query(models.Company).filter(models.Company.id == current_user.company_id).first()
-    
-    if not company:
-        raise HTTPException(404, "Entreprise introuvable")
+    if not company: raise HTTPException(404, "Entreprise introuvable")
 
-    # Mise à jour conditionnelle (Seulement si le champ est envoyé)
-    if comp_update.name is not None:
-        company.name = comp_update.name
-    if comp_update.address is not None:
-        company.address = comp_update.address
-    if comp_update.contact_email is not None:
-        company.contact_email = comp_update.contact_email
-    if comp_update.phone is not None:
-        company.phone = comp_update.phone
+    # On vérifie chaque champ. Si le frontend envoie 'null', on l'ignore pour ne pas écraser la DB avec du vide.
+    if comp_update.name: company.name = comp_update.name
+    if comp_update.address: company.address = comp_update.address
+    if comp_update.phone: company.phone = comp_update.phone
+    
+    # Mapping spécial : contact_email (JSON) -> email (DB)
+    if comp_update.contact_email: 
+        company.email = comp_update.contact_email
     
     try:
         db.commit()
@@ -896,9 +887,9 @@ def update_company(
         return company
     except Exception as e:
         db.rollback()
-        print(f"❌ Erreur Update Company: {e}")
-        raise HTTPException(status_code=500, detail="Erreur lors de la mise à jour en base de données")
-
+        print(f"❌ ERREUR SQL: {e}") # Apparaîtra dans les logs Render
+        raise HTTPException(status_code=500, detail="Erreur serveur lors de la sauvegarde")
+    
 @app.post("/companies/me/duerp", response_model=schemas.DUERPOut)
 def create_or_update_duerp(duerp_data: schemas.DUERPCreate, db: Session = Depends(get_db), current_user: models.User = Depends(security.get_current_user)):
     if not current_user.company_id: raise HTTPException(400, "Pas d'entreprise")
