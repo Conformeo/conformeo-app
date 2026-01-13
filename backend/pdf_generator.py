@@ -66,18 +66,13 @@ def draw_footer(c, width, height, chantier, titre_doc):
 def draw_cover_page(c, chantier, titre_principal, sous_titre, company=None):
     width, height = A4
     
-    # Cadre central
-    rect_w = 12 * cm
-    rect_h = 7 * cm
-    rect_x = (width - rect_w) / 2
-    rect_y = (height / 2) + 1 * cm 
+    # --- MISE EN PAGE : LOGO LIBRE ET GRAND ---
     
-    # Dessin du cadre
-    c.setStrokeColorRGB(*COLOR_PRIMARY)
-    c.setLineWidth(2)
-    c.roundRect(rect_x, rect_y, rect_w, rect_h, 15, stroke=1, fill=0)
-
-    # Logo
+    # On définit le centre vertical pour le bloc logo
+    # On le remonte un peu pour laisser de la place aux titres
+    logo_center_y = height / 2 + 3 * cm 
+    
+    # 1. Insertion du Logo (SANS CADRE)
     logo_source = None
     if company and company.logo_url: logo_source = company.logo_url
     elif hasattr(chantier, 'company') and chantier.company: logo_source = chantier.company.logo_url
@@ -86,57 +81,83 @@ def draw_cover_page(c, chantier, titre_principal, sous_titre, company=None):
     if logo_source:
         img = get_optimized_image(logo_source)
         if img:
-            max_im_w = rect_w - 2*cm
-            max_im_h = rect_h - 2*cm
+            # --- MODIFICATION TAILLE ---
+            # On autorise une taille beaucoup plus grande (12cm de large ou 8cm de haut)
+            max_im_w = 12 * cm  # Avant c'était ~10cm avec marges
+            max_im_h = 8 * cm   # Avant c'était ~5cm
+            
             iw, ih = img.size
             ratio = min(max_im_w/iw, max_im_h/ih)
             new_w = iw * ratio
             new_h = ih * ratio
-            pos_x = rect_x + (rect_w - new_w) / 2
-            pos_y = rect_y + (rect_h - new_h) / 2
+            
+            # Centrage horizontal
+            pos_x = (width - new_w) / 2
+            # Centrage vertical autour de logo_center_y
+            pos_y = logo_center_y - (new_h / 2)
+            
             try:
                 c.drawImage(ImageReader(img), pos_x, pos_y, width=new_w, height=new_h, mask='auto', preserveAspectRatio=True)
                 logo_drawn = True
-            except: pass
+            except Exception as e:
+                print(f"Erreur rendu logo PDF: {e}")
 
+    # Si pas de logo, on ne met rien ou un texte discret
     if not logo_drawn:
         c.setFillColorRGB(0.7, 0.7, 0.7); c.setFont(FONT_TEXT, 10)
-        c.drawCentredString(width/2, rect_y + rect_h/2, "(Logo Entreprise)")
+        c.drawCentredString(width/2, logo_center_y, "")
 
-    # Titres
-    y_text = rect_y - 2 * cm
-    c.setFillColorRGB(*COLOR_PRIMARY); c.setFont(FONT_TITLE, 24)
-    c.drawCentredString(width/2, y_text, titre_principal)
+    # 2. Titres (SOUS le logo)
+    # On se place en dessous de la zone prévue pour le logo
+    y_text = logo_center_y - 5 * cm 
     
-    y_text -= 1 * cm
-    c.setFillColorRGB(*COLOR_SECONDARY); c.setFont(FONT_TEXT, 14)
-    c.drawCentredString(width/2, y_text, sous_titre)
+    c.setFillColorRGB(*COLOR_PRIMARY)
+    c.setFont(FONT_TITLE, 24)
+    c.drawCentredString(width/2, y_text, titre_principal) # "JOURNAL DE BORD"
     
-    y_text -= 1.5 * cm
+    y_text -= 1.2 * cm
+    c.setFillColorRGB(*COLOR_SECONDARY)
+    c.setFont(FONT_TEXT, 14)
+    c.drawCentredString(width/2, y_text, sous_titre) # "Suivi d'exécution..."
+    
+    # 3. Ligne de séparation
+    y_text -= 2 * cm
     c.setStrokeColorRGB(0.8, 0.8, 0.8); c.setLineWidth(0.5)
     c.line(4*cm, y_text, width-4*cm, y_text)
 
-    # Infos
-    y_info = y_text - 2.5 * cm
-    x_labels = 4 * cm; x_values = 8 * cm
+    # 4. Infos Projet
+    y_info = y_text - 3 * cm
+    x_labels = 4 * cm
+    x_values = 8 * cm
+    
     c.setFillColorRGB(0, 0, 0)
     
-    c.setFont(FONT_TITLE, 14); c.drawString(x_labels, y_info, "PROJET :")
-    c.setFont(FONT_TEXT, 14); c.drawString(x_values, y_info, chantier.nom or "Non défini")
+    # Projet
+    c.setFont(FONT_TITLE, 14)
+    c.drawString(x_labels, y_info, "PROJET :")
+    c.setFont(FONT_TEXT, 14)
+    c.drawString(x_values, y_info, chantier.nom or "Non défini")
     
-    y_info -= 1.2 * cm
-    c.setFont(FONT_TITLE, 14); c.drawString(x_labels, y_info, "ADRESSE :")
-    c.setFont(FONT_TEXT, 14); c.drawString(x_values, y_info, chantier.adresse or "Non définie")
+    # Adresse
+    y_info -= 1.5 * cm
+    c.setFont(FONT_TITLE, 14)
+    c.drawString(x_labels, y_info, "ADRESSE :")
+    c.setFont(FONT_TEXT, 14)
+    c.drawString(x_values, y_info, chantier.adresse or "Non définie")
     
+    # Réalisé par
     if company:
-        y_info -= 2 * cm
+        y_info -= 2.5 * cm
         c.setFont(FONT_TITLE, 12); c.setFillColorRGB(*COLOR_SECONDARY)
         c.drawString(x_labels, y_info, "RÉALISÉ PAR :")
-        c.setFont(FONT_TEXT, 12); c.drawString(x_values, y_info, company.name)
+        c.setFont(FONT_TEXT, 12)
+        c.drawString(x_values, y_info, company.name)
 
+    # Date en bas
     date_str = datetime.now().strftime('%d/%m/%Y')
     c.setFont(FONT_TEXT, 10); c.setFillColorRGB(0.5, 0.5, 0.5)
     c.drawRightString(width-2*cm, 3*cm, f"Édité le {date_str}")
+    
     c.showPage()
 
 # ==========================================
