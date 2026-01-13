@@ -149,7 +149,7 @@ def draw_cover_page(c, chantier, titre_principal, sous_titre, company=None):
     c.drawString(x_labels, y_info, "ADRESSE :")
     c.setFont(FONT_TEXT, 14)
     c.drawString(x_values, y_info, chantier.adresse or "Non définie")
-    
+        
     # Réalisé par
     if company:
         y_info -= 2.5 * cm
@@ -158,10 +158,12 @@ def draw_cover_page(c, chantier, titre_principal, sous_titre, company=None):
         c.setFont(FONT_TEXT, 12)
         c.drawString(x_values, y_info, company.name)
 
-    # Date en bas
+    # 👇 CORRECTION : Date alignée sur la même hauteur (y_info)
     date_str = datetime.now().strftime('%d/%m/%Y')
     c.setFont(FONT_TEXT, 10); c.setFillColorRGB(0.5, 0.5, 0.5)
-    c.drawRightString(width-2*cm, 3*cm, f"Édité le {date_str}")
+    
+    # On utilise 'y_info' ici au lieu de '3*cm'
+    c.drawRightString(width-2*cm, y_info, f"Édité le {date_str}")
     
     c.showPage()
 
