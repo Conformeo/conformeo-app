@@ -100,7 +100,8 @@ class RapportOut(BaseModel):
 class InspectionCreate(BaseModel):
     titre: str
     type: str
-    data: Dict[str, Any]
+    # 👇 CORRECTION : On ajoute Optional et = None pour éviter le crash si vide
+    data: Optional[Dict[str, Any]] = None 
     chantier_id: int
     createur: str
 
