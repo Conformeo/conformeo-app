@@ -126,9 +126,14 @@ def draw_cover_page(c, chantier, titre_principal, sous_titre, company=None):
     c.line(4*cm, y_text, width-4*cm, y_text)
 
     # 4. Infos Projet
-    y_info = y_text - 3 * cm
-    x_labels = 4 * cm
-    x_values = 8 * cm
+    # On descend un peu le bloc pour l'aérer
+    y_info = y_text - 3.5 * cm
+    
+    # 👇 CORRECTION ALIGNEMENT GAUCHE
+    # x_labels à 2*cm = Marge gauche standard du document
+    x_labels = 2 * cm 
+    # x_values à 6*cm = Décalage pour le contenu
+    x_values = 6 * cm 
     
     c.setFillColorRGB(0, 0, 0)
     

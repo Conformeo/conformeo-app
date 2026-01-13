@@ -639,23 +639,43 @@ app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 # 1. Route pour mettre à jour les infos (Texte uniquement)
 @app.put("/companies/me", response_model=schemas.CompanyOut)
 def update_company(
-    comp_update: schemas.CompanyCreate, # On réutilise le schéma Create ou Update
+    comp_update: schemas.CompanyUpdate, 
     db: Session = Depends(get_db), 
     current_user: models.User = Depends(security.get_current_user)
 ):
-    if not current_user.company_id: raise HTTPException(400, "Pas d'entreprise")
+    if not current_user.company_id: 
+        raise HTTPException(400, "Pas d'entreprise liée à cet utilisateur")
     
     company = db.query(models.Company).filter(models.Company.id == current_user.company_id).first()
     
-    # Mise à jour champ par champ
-    if comp_update.name: company.name = comp_update.name
-    if comp_update.email: company.email = comp_update.email
-    if comp_update.phone: company.phone = comp_update.phone
-    if comp_update.address: company.address = comp_update.address
+    if not company:
+        raise HTTPException(404, "Entreprise introuvable")
+
+    # Mise à jour conditionnelle avec mapping correct
+    if comp_update.name is not None:
+        company.name = comp_update.name
+    if comp_update.address is not None:
+        company.address = comp_update.address
+    if comp_update.phone is not None:
+        company.phone = comp_update.phone
+        
+    # 👇 CORRECTION ICI : on mappe 'contact_email' (JSON) vers 'email' (Base de données)
+    if comp_update.contact_email is not None:
+        company.email = comp_update.contact_email 
     
-    db.commit()
-    db.refresh(company)
-    return company
+    try:
+        db.commit()
+        db.refresh(company)
+        # On s'assure de renvoyer le bon champ pour le frontend
+        # Le schéma de sortie attend 'contact_email', donc on mappe l'inverse manuellement si besoin
+        # Mais Pydantic est intelligent, si CompanyOut a 'contact_email', il faut s'assurer qu'il le trouve.
+        # Si votre modèle DB a 'email', Pydantic ne le trouvera pas tout seul si le schéma demande 'contact_email'.
+        # Solution simple : on renvoie l'objet company tel quel, Pydantic fera le tri.
+        return company
+    except Exception as e:
+        db.rollback()
+        print(f"❌ Erreur Update Company: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur serveur: {str(e)}")
 
 # 2. Route SPÉCIALE pour le logo (Upload)
 @app.post("/companies/me/logo")

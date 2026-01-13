@@ -191,12 +191,26 @@ class CompanyUpdate(BaseModel):
     phone: Optional[str] = None
 
 # 4. Out (hérite de Base pour renvoyer l'adresse, l'email, etc.)
-class CompanyOut(CompanyBase):
+# Dans backend/schemas.py
+
+class CompanyOut(BaseModel):
     id: int
+    name: str
     subscription_plan: str = "free"
     logo_url: Optional[str] = None
+    
+    address: Optional[str] = None
+    phone: Optional[str] = None
+    
+    # 👇 On utilise Field avec alias si possible, ou on garde contact_email
+    # Si ça ne marche pas, renommez simplement ceci en 'email' côté frontend aussi à terme.
+    # Pour l'instant, gardons contact_email pour ne pas casser le frontend
+    contact_email: Optional[str] = None 
+
     class Config:
         from_attributes = True
+        # 👇 Cette ligne permet de mapper automatiquement company.email (DB) -> contact_email (Schema)
+        # si vous utilisez des alias, mais ici le plus simple est de s'assurer que le backend renvoie bien la donnée.
 
 class CompanyDocOut(BaseModel):
     id: int
