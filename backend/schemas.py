@@ -100,14 +100,23 @@ class RapportOut(BaseModel):
 class InspectionCreate(BaseModel):
     titre: str
     type: str
-    # 👇 CORRECTION : On ajoute Optional et = None pour éviter le crash si vide
+    # We make data optional here too to be safe
     data: Optional[Dict[str, Any]] = None 
     chantier_id: int
     createur: str
 
-class InspectionOut(InspectionCreate):
+# 👇 CRITICAL FIX: We decouple Out from Create
+# We redefine InspectionOut completely with defaults for EVERYTHING.
+# This ensures it never crashes even if a field is missing in the DB.
+class InspectionOut(BaseModel):
     id: int
-    date_creation: datetime
+    titre: Optional[str] = "Inspection sans titre"
+    type: Optional[str] = "Standard"
+    data: Optional[Dict[str, Any]] = None
+    chantier_id: Optional[int] = None
+    createur: Optional[str] = "Non renseigné"
+    date_creation: Optional[datetime] = None
+
     class Config:
         from_attributes = True
 

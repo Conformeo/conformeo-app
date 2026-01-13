@@ -491,15 +491,14 @@ def read_inspections(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(security.get_current_user)
 ):
-    # 1. On vérifie que le chantier existe
+    # 1. Check if chantier exists
     chantier = db.query(models.Chantier).filter(models.Chantier.id == chantier_id).first()
     if not chantier:
         raise HTTPException(status_code=404, detail="Chantier introuvable")
 
-    # 2. On récupère les inspections
+    # 2. Retrieve inspections
     inspections = db.query(models.Inspection).filter(models.Inspection.chantier_id == chantier_id).all()
     
-    # 3. Si la liste est vide, on renvoie une liste vide [] (ce n'est pas une erreur)
     return inspections
 
 @app.get("/inspections/{iid}/pdf")
