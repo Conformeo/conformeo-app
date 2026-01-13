@@ -184,8 +184,11 @@ class CompanyCreate(CompanyBase):
     name: str # Obligatoire à la création
 
 # 3. Update (hérite de Base, donc tout est optionnel)
-class CompanyUpdate(CompanyBase):
-    pass 
+class CompanyUpdate(BaseModel):
+    name: Optional[str] = None
+    address: Optional[str] = None
+    contact_email: Optional[str] = None
+    phone: Optional[str] = None
 
 # 4. Out (hérite de Base pour renvoyer l'adresse, l'email, etc.)
 class CompanyOut(CompanyBase):

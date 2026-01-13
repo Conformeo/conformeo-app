@@ -848,24 +848,36 @@ def read_own_company(
 
 @app.put("/companies/me", response_model=schemas.CompanyOut)
 def update_company(
-    # 👇 On utilise CompanyUpdate (ou CompanyCreate si vous préférez, les deux existent maintenant)
     comp_update: schemas.CompanyUpdate, 
     db: Session = Depends(get_db), 
     current_user: models.User = Depends(security.get_current_user)
 ):
-    if not current_user.company_id: raise HTTPException(400, "Pas d'entreprise")
+    if not current_user.company_id: 
+        raise HTTPException(400, "Pas d'entreprise liée à cet utilisateur")
     
     company = db.query(models.Company).filter(models.Company.id == current_user.company_id).first()
     
-    # Mise à jour des champs s'ils sont présents
-    if comp_update.name: company.name = comp_update.name
-    if comp_update.email: company.email = comp_update.email
-    if comp_update.phone: company.phone = comp_update.phone
-    if comp_update.address: company.address = comp_update.address
+    if not company:
+        raise HTTPException(404, "Entreprise introuvable")
+
+    # Mise à jour conditionnelle (Seulement si le champ est envoyé)
+    if comp_update.name is not None:
+        company.name = comp_update.name
+    if comp_update.address is not None:
+        company.address = comp_update.address
+    if comp_update.contact_email is not None:
+        company.contact_email = comp_update.contact_email
+    if comp_update.phone is not None:
+        company.phone = comp_update.phone
     
-    db.commit()
-    db.refresh(company)
-    return company
+    try:
+        db.commit()
+        db.refresh(company)
+        return company
+    except Exception as e:
+        db.rollback()
+        print(f"❌ Erreur Update Company: {e}")
+        raise HTTPException(status_code=500, detail="Erreur lors de la mise à jour en base de données")
 
 @app.post("/companies/me/duerp", response_model=schemas.DUERPOut)
 def create_or_update_duerp(duerp_data: schemas.DUERPCreate, db: Session = Depends(get_db), current_user: models.User = Depends(security.get_current_user)):

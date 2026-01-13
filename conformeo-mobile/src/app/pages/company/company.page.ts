@@ -227,32 +227,32 @@ export class CompanyPage implements OnInit {
     const load = await this.loadingCtrl.create({ message: 'Sauvegarde...' });
     await load.present();
     
-    // 👇 CORRECTION : On crée un objet "propre" avec seulement les champs modifiables
-    // Cela évite d'envoyer l'ID, le logo_url ou d'autres champs techniques qui bloquent l'API
+    // 👇 CORRECTION : On crée un objet "propre" manuellement.
+    // On n'envoie JAMAIS "this.company" directement car il contient l'ID et l'URL du logo.
     const payload = {
       name: this.company.name,
       address: this.company.address,
-      contact_email: this.company.contact_email,
+      contact_email: this.company.contact_email, // Attention à bien utiliser ce nom de variable
       phone: this.company.phone
     };
+
+    console.log("📤 Envoi payload:", payload); // Pour vérifier dans la console
 
     this.api.updateCompany(payload).subscribe({
       next: (res) => { 
           load.dismiss(); 
           this.presentToast('Infos mises à jour ✅', 'success'); 
-          // On met à jour l'affichage local si le serveur a renvoyé des données formatées
+          // On met à jour l'affichage local
           if (res) this.company = { ...this.company, ...res };
       },
       error: (err) => { 
         load.dismiss(); 
-        console.error('Erreur Save:', err);
-        // Affiche le détail de l'erreur si dispo
-        const msg = err.error?.detail || 'Erreur lors de la sauvegarde';
-        this.presentToast(msg, 'danger'); 
+        console.error('🔴 Erreur Save:', err);
+        this.presentToast('Erreur serveur (vérifiez les logs)', 'danger'); 
       }
     });
   }
-
+  
   async presentToast(message: string, color: string) {
     const t = await this.toastCtrl.create({ message, duration: 2000, color, position: 'bottom' });
     t.present();
