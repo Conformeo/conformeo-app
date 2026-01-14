@@ -106,7 +106,7 @@ class TaskOut(BaseModel):
     class Config:
         from_attributes = True
 
-# --- DOCS INTERNES ---
+# --- DOCS ---
 class DocumentCreate(BaseModel):
     titre: str
     type_doc: str 
@@ -127,7 +127,7 @@ class DocSign(BaseModel):
     signature_base64: str
     nom_signataire: str
 
-# 👇 --- DOCS EXTERNES (DOE/GED) - AJOUTÉ ICI ---
+# 👇 AJOUT : Documents Externes Chantier (DOE/GED)
 class DocExterneOut(BaseModel):
     id: int
     titre: str
@@ -136,6 +136,16 @@ class DocExterneOut(BaseModel):
     date_upload: datetime
     chantier_id: Optional[int] = None
     
+    class Config:
+        from_attributes = True
+
+# 👇 AJOUT : Documents Entreprise (KBIS, Assurance...) pour /companies/me/documents
+class CompanyDocOut(BaseModel):
+    id: int
+    titre: str
+    url: str
+    date_upload: datetime
+    company_id: int
     class Config:
         from_attributes = True
 
@@ -240,7 +250,6 @@ class PlanPreventionOut(PlanPreventionCreate):
     class Config:
         from_attributes = True
 
-# Alias de compatibilité
 PdpCreate = PlanPreventionCreate
 PdpOut = PlanPreventionOut
 
