@@ -10,6 +10,8 @@ import { addIcons } from 'ionicons';
 import { close, save, camera, image } from 'ionicons/icons';
 import { ApiService } from 'src/app/services/api'; // Ensure correct path
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
+import { BarcodeScanner, BarcodeFormat } from '@capacitor-mlkit/barcode-scanning';
+import { Capacitor } from '@capacitor/core';
 import { removeBackground } from '@imgly/background-removal';
 
 @Component({

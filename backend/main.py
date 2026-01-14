@@ -300,7 +300,7 @@ def create_chantier(chantier: schemas.ChantierCreate, db: Session = Depends(get_
     db.add(new_c); db.commit(); db.refresh(new_c)
     return new_c
 
-# --- ROUTE CHANTIERS (DEBUG MODE) ---
+# --- ROUTE CHANTIERS (ROBUST VERSION) ---
 @app.get("/chantiers", response_model=List[schemas.ChantierOut])
 def read_chantiers(
     skip: int = 0, 
@@ -309,20 +309,39 @@ def read_chantiers(
     current_user: models.User = Depends(security.get_current_user)
 ):
     try:
-        if current_user.company_id:
-            chantiers = db.query(models.Chantier).filter(
-                models.Chantier.company_id == current_user.company_id
-            ).offset(skip).limit(limit).all()
-        else:
-            chantiers = []
+        # Raw query to avoid Pydantic validation during fetch
+        query = db.query(models.Chantier)
         
-        # Petit log pour vérifier ce qu'on récupère
-        print(f"DEBUG: Found {len(chantiers)} chantiers")
-        return chantiers
+        if current_user.company_id:
+            query = query.filter(models.Chantier.company_id == current_user.company_id)
+            
+        raw_chantiers = query.offset(skip).limit(limit).all()
+        
+        valid_chantiers = []
+        for c in raw_chantiers:
+            try:
+                # Manual safety check
+                valid_chantiers.append({
+                    "id": c.id,
+                    "nom": c.nom or "Chantier sans nom",
+                    "adresse": c.adresse,
+                    "client": c.client,
+                    "date_debut": c.date_debut,
+                    "date_fin": c.date_fin,
+                    "est_actif": c.est_actif if c.est_actif is not None else True,
+                    "cover_url": c.cover_url,
+                    "company_id": c.company_id,
+                    "signature_url": c.signature_url,
+                    "date_creation": c.date_creation
+                })
+            except Exception as e:
+                print(f"⚠️ Skipped corrupted chantier {c.id}: {e}")
+                continue
+                
+        return valid_chantiers
 
     except Exception as e:
         print(f"❌ CRITICAL ERROR /chantiers: {str(e)}")
-        # On renvoie une liste vide pour ne pas bloquer le front, mais on verra l'erreur dans les logs Render
         return []
 
 @app.get("/chantiers/{chantier_id}", response_model=schemas.ChantierOut)
