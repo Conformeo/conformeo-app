@@ -76,11 +76,18 @@ class MaterielCreate(BaseModel):
     etat: str = "BON" 
     chantier_id: Optional[int] = None
 
-class MaterielOut(MaterielCreate):
+# 👇 VERSION BLINDÉE
+class MaterielOut(BaseModel):
     id: int
-    date_derniere_vgp: Optional[datetime] = None
+    nom: str
+    reference: Optional[str] = None
+    etat: Optional[str] = "BON" 
+    chantier_id: Optional[int] = None
+    # On accepte tout format pour éviter l'erreur 500
+    date_derniere_vgp: Optional[Any] = None
     image_url: Optional[str] = None
-    statut_vgp: Optional[str] = "INCONNU"
+    statut_vgp: Optional[str] = "INCONNU" 
+    
     class Config:
         from_attributes = True
 

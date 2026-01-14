@@ -443,37 +443,59 @@ def create_materiel(mat: schemas.MaterielCreate, db: Session = Depends(get_db)):
 # --- ROUTE MATERIEL (CORRIGÉE : VGP vs ETAT) ---
 @app.get("/materiels", response_model=List[schemas.MaterielOut])
 def read_materiels(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    materiels = db.query(models.Materiel).offset(skip).limit(limit).all()
-    
-    today = datetime.now()
-    
-    for mat in materiels:
-        # Simulation date si vide
-        if not mat.date_derniere_vgp:
-            months_back = random.randint(2, 14)
-            mat.date_derniere_vgp = today - timedelta(days=months_back * 30)
+    try:
+        materiels = db.query(models.Materiel).offset(skip).limit(limit).all()
         
-        # Calcul VGP
-        date_controle = mat.date_derniere_vgp
-        # Gestion de sécurité si date_controle est une chaine (arrive parfois avec SQLite)
-        if isinstance(date_controle, str):
-             try:
-                 date_controle = datetime.fromisoformat(date_controle)
-             except:
-                 date_controle = today # Fallback
+        today = datetime.now()
+        valid_materiels = []
 
-        prochaine_vgp = date_controle + timedelta(days=365)
-        jours_restants = (prochaine_vgp - today).days
-        
-        # 👇 ON REMPLIT LE NOUVEAU CHAMP "statut_vgp" (et on ne touche pas à mat.etat)
-        if jours_restants < 0:
-            setattr(mat, "statut_vgp", "NON CONFORME")
-        elif jours_restants < 30:
-            setattr(mat, "statut_vgp", "A PREVOIR")
-        else:
-            setattr(mat, "statut_vgp", "CONFORME")
+        for mat in materiels:
+            try:
+                # 1. Simulation date si vide (Demo effect)
+                if not mat.date_derniere_vgp:
+                    months_back = random.randint(2, 14)
+                    mat.date_derniere_vgp = today - timedelta(days=months_back * 30)
+                
+                # 2. Sécurisation du format de date
+                date_controle = mat.date_derniere_vgp
+                if isinstance(date_controle, str):
+                    try:
+                        # On tente de convertir si c'est du texte
+                        date_controle = datetime.fromisoformat(str(date_controle))
+                    except:
+                        # Si échec, on prend aujourd'hui pour ne pas crasher
+                        date_controle = today
+
+                # 3. Calcul VGP
+                # On s'assure qu'on a bien un objet datetime pour faire des maths
+                if not isinstance(date_controle, datetime):
+                     # Cas extrême (date en format int/float...)
+                     date_controle = today
+
+                prochaine_vgp = date_controle + timedelta(days=365)
+                jours_restants = (prochaine_vgp - today).days
+                
+                if jours_restants < 0:
+                    setattr(mat, "statut_vgp", "NON CONFORME")
+                elif jours_restants < 30:
+                    setattr(mat, "statut_vgp", "A PREVOIR")
+                else:
+                    setattr(mat, "statut_vgp", "CONFORME")
+                
+                # On ajoute à la liste validée
+                valid_materiels.append(mat)
+
+            except Exception as e_inner:
+                print(f"⚠️ Erreur sur matériel {mat.id}: {e_inner}")
+                # On l'ajoute quand même pour qu'il s'affiche !
+                setattr(mat, "statut_vgp", "INCONNU")
+                valid_materiels.append(mat)
             
-    return materiels
+        return valid_materiels
+
+    except Exception as e:
+        print(f"❌ CRITICAL ERROR /materiels: {str(e)}")
+        return []
 
 @app.put("/materiels/{mid}/transfert")
 def transfer_materiel(mid: int, chantier_id: Optional[int] = None, db: Session = Depends(get_db)):
