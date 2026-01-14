@@ -106,7 +106,7 @@ class TaskOut(BaseModel):
     class Config:
         from_attributes = True
 
-# --- DOCS ---
+# --- DOCS INTERNES ---
 class DocumentCreate(BaseModel):
     titre: str
     type_doc: str 
@@ -126,6 +126,18 @@ class DocumentOut(DocumentCreate):
 class DocSign(BaseModel):
     signature_base64: str
     nom_signataire: str
+
+# 👇 --- DOCS EXTERNES (DOE/GED) - AJOUTÉ ICI ---
+class DocExterneOut(BaseModel):
+    id: int
+    titre: str
+    url: str
+    categorie: Optional[str] = "Autre" # Ex: PLANS, NOTICES, DECHETS
+    date_upload: datetime
+    chantier_id: Optional[int] = None
+    
+    class Config:
+        from_attributes = True
 
 # --- CHANTIER ---
 class ChantierCreate(BaseModel):
@@ -228,6 +240,7 @@ class PlanPreventionOut(PlanPreventionCreate):
     class Config:
         from_attributes = True
 
+# Alias de compatibilité
 PdpCreate = PlanPreventionCreate
 PdpOut = PlanPreventionOut
 
@@ -251,7 +264,7 @@ class DuerpOut(BaseModel):
     class Config:
         from_attributes = True
 
-# --- PIC (Plan Installation Chantier) - NOUVEAU ---
+# --- PIC (Plan Installation Chantier) ---
 class PicSchema(BaseModel):
     chantier_id: int
     final_url: Optional[str] = None
