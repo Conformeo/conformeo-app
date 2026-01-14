@@ -20,6 +20,12 @@ class UserLogin(BaseModel):
     email: EmailStr
     password: str
 
+# 👇 C'est cette classe qui manquait et causait le crash
+class UserUpdate(BaseModel):
+    full_name: Optional[str] = None
+    email: Optional[EmailStr] = None
+    password: Optional[str] = None
+
 class UserOut(BaseModel):
     id: int
     email: EmailStr
@@ -162,7 +168,6 @@ class RapportOut(RapportCreate):
         from_attributes = True
 
 # --- INSPECTION (CORRIGÉ & BLINDÉ) ---
-# C'est ici que l'erreur 500 se produisait
 class InspectionCreate(BaseModel):
     titre: str
     type: str
