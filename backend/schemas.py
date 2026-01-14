@@ -207,7 +207,8 @@ class PpspsCreate(BaseModel):
     secours_data: Optional[Dict[str, Any]] = None
     taches_data: Optional[List[Dict[str, Any]]] = None
 
-class PpspsOut(PpspsCreate):
+# 👇 RENOMMAGE ICI : PpspsOut -> PPSPSOut (pour coller à votre main.py)
+class PPSPSOut(PpspsCreate):
     id: int
     date_creation: datetime
     class Config:
