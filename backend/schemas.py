@@ -20,20 +20,18 @@ class UserLogin(BaseModel):
     email: EmailStr
     password: str
 
-# Mise à jour par l'utilisateur lui-même (nom, email, mdp)
 class UserUpdate(BaseModel):
     full_name: Optional[str] = None
     email: Optional[EmailStr] = None
     password: Optional[str] = None
 
-# 👇 C'est cette classe qui manquait pour la route Admin
 class UserUpdateAdmin(BaseModel):
     full_name: Optional[str] = None
     email: Optional[EmailStr] = None
     password: Optional[str] = None
-    role: Optional[str] = None      # L'admin peut changer le rôle
-    is_active: Optional[bool] = None # L'admin peut activer/désactiver
-    company_id: Optional[int] = None # L'admin peut changer l'entreprise
+    role: Optional[str] = None      
+    is_active: Optional[bool] = None 
+    company_id: Optional[int] = None 
 
 class UserOut(BaseModel):
     id: int
@@ -196,8 +194,9 @@ class InspectionOut(BaseModel):
     class Config:
         from_attributes = True
 
-# --- PPSPS & PDP ---
-class PpspsCreate(BaseModel):
+# --- PPSPS & PDP (CORRIGÉ MAJUSCULES) ---
+# J'ai renommé PpspsCreate -> PPSPSCreate
+class PPSPSCreate(BaseModel):
     chantier_id: int
     responsable_chantier: Optional[str] = None
     nb_compagnons: int = 0
@@ -207,8 +206,8 @@ class PpspsCreate(BaseModel):
     secours_data: Optional[Dict[str, Any]] = None
     taches_data: Optional[List[Dict[str, Any]]] = None
 
-# 👇 RENOMMAGE ICI : PpspsOut -> PPSPSOut (pour coller à votre main.py)
-class PPSPSOut(PpspsCreate):
+# J'ai renommé PpspsOut -> PPSPSOut
+class PPSPSOut(PPSPSCreate):
     id: int
     date_creation: datetime
     class Config:
