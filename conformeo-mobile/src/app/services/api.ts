@@ -76,6 +76,7 @@ export interface Materiel {
   nom: string;
   reference: string;
   etat: string;
+  statut_vgp: string;
   image_url?: string | null;
   chantier_id?: number | null;
 }

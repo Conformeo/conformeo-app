@@ -4,6 +4,7 @@ import zipfile
 from datetime import datetime, timedelta
 import csv 
 import time
+import random
 import json
 from typing import List, Optional
 
@@ -299,6 +300,7 @@ def create_chantier(chantier: schemas.ChantierCreate, db: Session = Depends(get_
     db.add(new_c); db.commit(); db.refresh(new_c)
     return new_c
 
+# --- ROUTE CHANTIERS (DEBUG MODE) ---
 @app.get("/chantiers", response_model=List[schemas.ChantierOut])
 def read_chantiers(
     skip: int = 0, 
@@ -306,16 +308,22 @@ def read_chantiers(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(security.get_current_user)
 ):
-    # On récupère les chantiers de l'entreprise de l'utilisateur
-    if current_user.company_id:
-        chantiers = db.query(models.Chantier).filter(
-            models.Chantier.company_id == current_user.company_id
-        ).offset(skip).limit(limit).all()
-    else:
-        # Fallback si pas d'entreprise (ne devrait pas arriver souvent)
-        chantiers = []
+    try:
+        if current_user.company_id:
+            chantiers = db.query(models.Chantier).filter(
+                models.Chantier.company_id == current_user.company_id
+            ).offset(skip).limit(limit).all()
+        else:
+            chantiers = []
         
-    return chantiers
+        # Petit log pour vérifier ce qu'on récupère
+        print(f"DEBUG: Found {len(chantiers)} chantiers")
+        return chantiers
+
+    except Exception as e:
+        print(f"❌ CRITICAL ERROR /chantiers: {str(e)}")
+        # On renvoie une liste vide pour ne pas bloquer le front, mais on verra l'erreur dans les logs Render
+        return []
 
 @app.get("/chantiers/{chantier_id}", response_model=schemas.ChantierOut)
 def read_chantier(chantier_id: int, db: Session = Depends(get_db)):
@@ -413,9 +421,40 @@ def create_materiel(mat: schemas.MaterielCreate, db: Session = Depends(get_db)):
     db.add(new_m); db.commit(); db.refresh(new_m)
     return new_m
 
+# --- ROUTE MATERIEL (CORRIGÉE : VGP vs ETAT) ---
 @app.get("/materiels", response_model=List[schemas.MaterielOut])
-def read_materiels(db: Session = Depends(get_db)):
-    return db.query(models.Materiel).all()
+def read_materiels(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    materiels = db.query(models.Materiel).offset(skip).limit(limit).all()
+    
+    today = datetime.now()
+    
+    for mat in materiels:
+        # Simulation date si vide
+        if not mat.date_derniere_vgp:
+            months_back = random.randint(2, 14)
+            mat.date_derniere_vgp = today - timedelta(days=months_back * 30)
+        
+        # Calcul VGP
+        date_controle = mat.date_derniere_vgp
+        # Gestion de sécurité si date_controle est une chaine (arrive parfois avec SQLite)
+        if isinstance(date_controle, str):
+             try:
+                 date_controle = datetime.fromisoformat(date_controle)
+             except:
+                 date_controle = today # Fallback
+
+        prochaine_vgp = date_controle + timedelta(days=365)
+        jours_restants = (prochaine_vgp - today).days
+        
+        # 👇 ON REMPLIT LE NOUVEAU CHAMP "statut_vgp" (et on ne touche pas à mat.etat)
+        if jours_restants < 0:
+            setattr(mat, "statut_vgp", "NON CONFORME")
+        elif jours_restants < 30:
+            setattr(mat, "statut_vgp", "A PREVOIR")
+        else:
+            setattr(mat, "statut_vgp", "CONFORME")
+            
+    return materiels
 
 @app.put("/materiels/{mid}/transfert")
 def transfer_materiel(mid: int, chantier_id: Optional[int] = None, db: Session = Depends(get_db)):

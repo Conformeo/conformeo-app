@@ -72,7 +72,7 @@ class CompanyOut(BaseModel):
 # --- MATERIEL ---
 class MaterielCreate(BaseModel):
     nom: str
-    ref_interne: Optional[str] = None
+    reference: Optional[str] = None
     etat: str = "BON" 
     chantier_id: Optional[int] = None
 
@@ -80,6 +80,7 @@ class MaterielOut(MaterielCreate):
     id: int
     date_derniere_vgp: Optional[datetime] = None
     image_url: Optional[str] = None
+    statut_vgp: Optional[str] = "INCONNU"
     class Config:
         from_attributes = True
 
@@ -162,12 +163,13 @@ class ChantierUpdate(BaseModel):
     est_actif: Optional[bool] = None
     client: Optional[str] = None
 
+# --- CHANTIER ---
 class ChantierOut(BaseModel):
     id: int
     nom: Optional[str] = "Chantier sans nom"
     adresse: Optional[str] = None
     client: Optional[str] = None
-    # 👇 C'EST ICI LE FIX : On accepte 'Any' (n'importe quoi) pour éviter le crash 500 sur les dates mal formatées
+    # On accepte tout type de date pour éviter le crash 500
     date_debut: Optional[Any] = None 
     date_fin: Optional[Any] = None
     est_actif: bool = True 

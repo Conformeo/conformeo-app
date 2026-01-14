@@ -61,7 +61,12 @@
 
         <div class="card-main" (click)="openTransfer(mat)">
           
-          <div class="img-wrapper">
+          <div class="img-wrapper"
+               [class.border-green]="mat.statut_vgp === 'CONFORME'"
+               [class.border-orange]="mat.statut_vgp === 'A PREVOIR'"
+               [class.border-red]="mat.statut_vgp === 'NON CONFORME'"
+               style="position: relative; border-bottom: 3px solid #ccc;">
+            
             <img 
               *ngIf="getImageUrl(mat)" 
               [src]="getThumbUrl(getImageUrl(mat))"
@@ -71,6 +76,14 @@
               *ngIf="!getImageUrl(mat)"
               [name]="mat.chantier_id ? 'construct' : 'cube'">
             </ion-icon>
+
+            <div class="vgp-badge-mobile" 
+                 [class.bg-green]="mat.statut_vgp === 'CONFORME'"
+                 [class.bg-orange]="mat.statut_vgp === 'A PREVOIR'"
+                 [class.bg-red]="mat.statut_vgp === 'NON CONFORME'"
+                 style="position: absolute; bottom: 5px; right: 5px; font-size: 0.6rem; padding: 2px 6px; border-radius: 4px; color: white; font-weight: bold;">
+              {{ mat.statut_vgp === 'CONFORME' ? 'VGP OK' : (mat.statut_vgp === 'A PREVOIR' ? 'VGP Bientôt' : 'VGP EXPIRÉE') }}
+            </div>
           </div>
 
           <div class="text-info">
@@ -81,6 +94,11 @@
                <ion-icon [name]="mat.chantier_id ? 'location-outline' : 'home-outline'" size="small"></ion-icon>
                <span>{{ mat.chantier_id ? getChantierName(mat.chantier_id) : 'Dépôt' }}</span>
             </div>
+
+            <ion-button fill="outline" size="small" class="qr-btn-mobile" (click)="$event.stopPropagation(); showQrCode(mat)" style="margin-top: 8px; height: 24px; font-size: 0.7rem;">
+              <ion-icon name="qr-code-outline" slot="start"></ion-icon>
+              Passeport
+            </ion-button>
           </div>
 
         </div>
@@ -135,11 +153,12 @@
 
         </div>
 
-        <div class="status-dot" [class.active]="mat.chantier_id">
-          <ion-icon [name]="mat.chantier_id ? 'construct' : 'shield-checkmark'"></ion-icon>
-        </div>
-
-        <div class="equip-image">
+        <div class="equip-image"
+             [class.border-green]="mat.statut_vgp === 'CONFORME'"
+             [class.border-orange]="mat.statut_vgp === 'A PREVOIR'"
+             [class.border-red]="mat.statut_vgp === 'NON CONFORME'"
+             style="border-bottom: 4px solid #ccc;">
+          
           <img 
             *ngIf="getImageUrl(mat)" 
             [src]="getThumbUrl(getImageUrl(mat))"
@@ -151,6 +170,15 @@
             name="hammer" 
             style="font-size:64px; color:#333; opacity:0.1;">
           </ion-icon>
+
+          <div class="vgp-badge" 
+               [class.bg-green]="mat.statut_vgp === 'CONFORME'"
+               [class.bg-orange]="mat.statut_vgp === 'A PREVOIR'"
+               [class.bg-red]="mat.statut_vgp === 'NON CONFORME'"
+               style="position: absolute; top: 10px; left: 10px; padding: 4px 8px; border-radius: 12px; color: white; font-weight: bold; font-size: 0.7rem; display: flex; align-items: center; gap: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
+            <ion-icon name="shield-checkmark"></ion-icon>
+            {{ mat.statut_vgp }}
+          </div>
         </div>
 
         <div class="equip-info">
@@ -165,9 +193,14 @@
             {{ getChantierName(mat.chantier_id) }}
           </p>
           
-          <ion-badge [color]="mat.etat === 'Bon' ? 'success' : 'warning'" style="margin-top: 5px;">
+          <ion-badge color="medium" style="margin-top: 5px;">
             {{ mat.etat || 'Bon' }}
           </ion-badge>
+
+          <ion-button expand="block" fill="outline" size="small" (click)="$event.stopPropagation(); showQrCode(mat)" style="margin-top: 10px;">
+            <ion-icon name="qr-code-outline" slot="start"></ion-icon>
+            Passeport Sécurité
+          </ion-button>
         </div>
 
       </div>

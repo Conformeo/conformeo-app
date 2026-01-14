@@ -17,7 +17,7 @@ import {
   trashOutline, hammerOutline, cloudUploadOutline, createOutline 
 } from 'ionicons/icons';
 
-import { ApiService, Materiel, Chantier } from '../../services/api'; // Correction du chemin
+import { ApiService, Materiel, Chantier } from '../../services/api'; // Ensure correct path
 import { AddMaterielModalComponent } from './add-materiel-modal/add-materiel-modal.component';
 import { BarcodeScanner, BarcodeFormat } from '@capacitor-mlkit/barcode-scanning';
 
@@ -69,14 +69,14 @@ export class MaterielPage implements OnInit {
   }
 
   loadData(event?: any) {
-    // 1. Charger le matériel
+    // 1. Load equipment
     this.api.getMateriels().subscribe(mats => {
       this.materiels = mats;
-      this.filterMateriels(); // On applique le filtre (si recherche en cours)
+      this.filterMateriels(); // Apply filter if search is active
       if (event) event.target.complete();
     });
 
-    // 2. Charger les chantiers (pour les noms dans les badges)
+    // 2. Load sites (for badge names)
     this.api.getChantiers().subscribe(chantiers => {
       this.chantiers = chantiers;
     });
@@ -89,7 +89,7 @@ export class MaterielPage implements OnInit {
     } else {
       this.filteredMateriels = this.materiels.filter(m =>
         m.nom.toLowerCase().includes(term) ||
-        m.reference.toLowerCase().includes(term)
+        (m.reference && m.reference.toLowerCase().includes(term)) // Safe check
       );
     }
   }
@@ -105,7 +105,7 @@ export class MaterielPage implements OnInit {
         next: (res) => {
           loading.dismiss();
           alert(res.message);
-          this.loadData(); // On rafraîchit la liste
+          this.loadData(); // Refresh list
         },
         error: (err) => {
           loading.dismiss();
@@ -140,11 +140,27 @@ export class MaterielPage implements OnInit {
 
   handleScanResult(code: string) {
     const mat = this.materiels.find(m => m.reference === code);
-    if (mat) this.openTransfer(mat); // On ouvre le transfert direct
+    if (mat) this.openTransfer(mat); // Open transfer directly
     else alert(`Aucun matériel trouvé avec la référence : ${code}`);
   }
 
-  // --- CRÉATION ---
+  // --- SHOW QR CODE (PASSEPORT SECURITE) ---
+  async showQrCode(mat: any) {
+    const alert = await this.alertCtrl.create({
+      header: mat.nom,
+      subHeader: 'Passeport de Conformité',
+      // Dynamically generated QR code via API for demo
+      message: `<div style="text-align:center;">
+                  <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=CONFORME-${mat.id}" style="margin: 10px auto; border-radius: 8px;">
+                  <p>Statut: <strong>${mat.statut_vgp || 'INCONNU'}</strong></p>
+                  <p style="font-size: 0.8em; color: gray;">Scannez pour voir le rapport VGP</p>
+                </div>`,
+      buttons: ['Fermer']
+    });
+    await alert.present();
+  }
+
+  // --- CREATION ---
   async addMateriel() {
     const modal = await this.modalCtrl.create({
       component: AddMaterielModalComponent
@@ -155,7 +171,7 @@ export class MaterielPage implements OnInit {
   }
 
   // --- MODIFICATION ---
-  async openEdit(mat: Materiel) { // Retiré 'event' car géré par le HTML si bien séparé
+  async openEdit(mat: Materiel) {
     const modal = await this.modalCtrl.create({
       component: AddMaterielModalComponent,
       componentProps: { existingItem: mat } 
@@ -167,7 +183,7 @@ export class MaterielPage implements OnInit {
   }
 
   // --- TRANSFERT (DEPLACEMENT) ---
-  async openTransfer(mat: Materiel) { // Retiré 'event'
+  async openTransfer(mat: Materiel) {
     const inputs: any[] = [
       { type: 'radio', label: '🏠 Retour au Dépôt', value: null, checked: !mat.chantier_id }
     ];
@@ -185,7 +201,6 @@ export class MaterielPage implements OnInit {
         {
           text: 'Valider Transfert',
           handler: chantierId => {
-            // Si le chantier n'a pas changé, on ne fait rien
             if (mat.chantier_id === chantierId && (chantierId !== null || mat.chantier_id !== null)) return;
 
             this.api.transferMateriel(mat.id!, chantierId).subscribe(() => {
@@ -199,7 +214,7 @@ export class MaterielPage implements OnInit {
   }
 
   // --- SUPPRESSION ---
-  async deleteMateriel(mat: Materiel) { // Retiré 'event'
+  async deleteMateriel(mat: Materiel) {
     const alert = await this.alertCtrl.create({
       header: 'Supprimer ?',
       message: `Voulez-vous supprimer ${mat.nom} ?`,
@@ -220,29 +235,23 @@ export class MaterielPage implements OnInit {
 
   // --- HELPERS VISUELS ---
   
-  // Renvoie une URL d'image valide ou une placeholder
   getImageUrl(mat: Materiel): string {
     if (mat.image_url && mat.image_url.trim() !== '') {
-       // Optimisation Cloudinary (Thumbnails pour la liste)
        if (mat.image_url.includes('cloudinary.com') && mat.image_url.includes('/upload/')) {
           return mat.image_url.replace('/upload/', '/upload/w_200,h_200,c_fill,q_auto,f_auto/');
        }
        return mat.image_url;
     }
-    return 'assets/no-image.png'; // Image par défaut
+    // Return empty string to let ngIf handle the fallback icon
+    return ''; 
   }
 
-  // 👇 AJOUTEZ CETTE FONCTION MANQUANTE
   getThumbUrl(url: string): string {
     if (!url) return '';
-    // Sécurise l'URL
     if (url.startsWith('http:')) url = url.replace('http:', 'https:');
     
-    // Optimisation Cloudinary (Miniature)
     if (url.includes('cloudinary.com') && url.includes('/upload/')) {
-      // Si l'URL a déjà été transformée par getImageUrl, on ne refait pas
       if (url.includes('w_')) return url;
-      
       return url.replace('/upload/', '/upload/w_250,h_250,c_fit,q_auto,f_auto/');
     }
     return url;
@@ -255,7 +264,7 @@ export class MaterielPage implements OnInit {
   }
   
   getStatusColor(etat: string | undefined): string {
-    return etat || 'Bon'; // Retourne la classe CSS (Bon, Moyen, Mauvais...)
+    return etat || 'Bon';
   }
 
   getMaterielsSortis(): number {
@@ -265,6 +274,4 @@ export class MaterielPage implements OnInit {
   getMaterielsDepot(): number {
     return this.materiels.filter(m => !m.chantier_id).length;
   }
-
-  
 }
