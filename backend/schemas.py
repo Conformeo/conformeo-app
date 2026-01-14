@@ -1,267 +1,76 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 from typing import List, Optional, Any, Dict
-from datetime import datetime
+from datetime import datetime, date
 
-# --- USER ---
-class UserBase(BaseModel):
-    email: EmailStr
-    role: str = "Conducteur"
-
-class UserCreate(UserBase):
-    password: str
-    company_name: Optional[str] = None
-
-class UserInvite(BaseModel):
-    email: EmailStr
-    nom: str
-    role: str = "Conducteur"
-    password: str
-
-class UserUpdate(BaseModel):
-    email: Optional[str] = None
-    password: Optional[str] = None
-
-class UserOut(UserBase):
-    id: int
-    nom: Optional[str] = None
-    is_active: bool
-    company_id: Optional[int] = None
-    class Config:
-        from_attributes = True
-        
-class UserUpdateAdmin(BaseModel):
-    nom: Optional[str] = None
-    email: Optional[str] = None
-    role: Optional[str] = None
-    password: Optional[str] = None # Pour reset le mot de passe
-
+# --- AUTH ---
 class Token(BaseModel):
     access_token: str
     token_type: str
 
-# --- CHANTIER ---
-class ChantierBase(BaseModel):
-    nom: str
-    adresse: Optional[str] = None
-    client: Optional[str] = None
-    est_actif: bool = True
-    cover_url: Optional[str] = None
-    date_debut: Optional[datetime] = None
-    date_fin: Optional[datetime] = None
-    soumis_sps: bool = False
+class TokenData(BaseModel):
+    email: Optional[str] = None
 
-class ChantierCreate(ChantierBase):
-    pass
+class UserCreate(BaseModel):
+    email: EmailStr
+    password: str
+    full_name: str
+    company_name: Optional[str] = None
 
-class ChantierOut(ChantierBase):
+class UserLogin(BaseModel):
+    email: EmailStr
+    password: str
+
+class UserOut(BaseModel):
     id: int
-    date_creation: datetime
-    latitude: Optional[float] = None
-    longitude: Optional[float] = None
-    signature_url: Optional[str] = None
+    email: EmailStr
+    full_name: Optional[str] = None
+    role: str
+    is_active: bool
     company_id: Optional[int] = None
     class Config:
         from_attributes = True
 
-# --- MATERIEL ---
-class MaterielCreate(BaseModel):
-    nom: str
-    reference: Optional[str] = None
-    etat: str = "Bon"
-    image_url: Optional[str] = None
+class UserInvite(BaseModel):
+    email: EmailStr
+    role: str = "conducteur" 
 
-class MaterielOut(MaterielCreate):
-    id: int
-    chantier_id: Optional[int] = None
-    class Config:
-        from_attributes = True
-
-# --- RAPPORT ---
-class RapportCreate(BaseModel):
-    titre: str
-    description: Optional[str] = ""
-    chantier_id: int
-    niveau_urgence: str = "Faible"
-    latitude: Optional[float] = None
-    longitude: Optional[float] = None
-    image_urls: Optional[List[str]] = []
-
-class RapportOut(BaseModel):
-    id: int
-    titre: str
-    description: Optional[str] = ""
-    date_creation: datetime
-    niveau_urgence: str
-    photo_url: Optional[str] = None
-    class Config:
-        from_attributes = True
-
-# --- INSPECTION ---
-class InspectionCreate(BaseModel):
-    titre: str
-    type: str
-    # We make data optional here too to be safe
-    data: Optional[Dict[str, Any]] = None 
-    chantier_id: int
-    createur: str
-
-# 👇 CRITICAL FIX: We decouple Out from Create
-# We redefine InspectionOut completely with defaults for EVERYTHING.
-# This ensures it never crashes even if a field is missing in the DB.
-class InspectionOut(BaseModel):
-    id: int
-    titre: Optional[str] = "Inspection sans titre"
-    type: Optional[str] = "Standard"
-    data: Optional[Dict[str, Any]] = None
-    chantier_id: Optional[int] = None
-    createur: Optional[str] = "Non renseigné"
-    date_creation: Optional[datetime] = None
-
-    class Config:
-        from_attributes = True
-
-# --- PPSPS ---
-class PPSPSCreate(BaseModel):
-    chantier_id: int
-    maitre_ouvrage: Optional[str] = None
-    maitre_oeuvre: Optional[str] = None
-    coordonnateur_sps: Optional[str] = None
-    responsable_chantier: Optional[str] = None
-    nb_compagnons: Optional[int] = 0
-    horaires: Optional[str] = None
-    duree_travaux: Optional[str] = None
-    secours_data: Optional[Dict] = None
-    installations_data: Optional[Dict] = None
-    taches_data: Optional[Dict] = None
-
-class PPSPSOut(PPSPSCreate):
-    id: int
-    date_creation: datetime
-    class Config:
-        from_attributes = True
-
-# --- PLAN PREVENTION ---
-class PlanPreventionCreate(BaseModel):
-    chantier_id: int
-    entreprise_utilisatrice: Optional[str] = None
-    entreprise_exterieure: Optional[str] = None
-    date_inspection_commune: Optional[datetime] = None
-    risques_interferents: Optional[List[Dict]] = None
-    consignes_securite: Optional[Dict] = None
-
-class PlanPreventionOut(PlanPreventionCreate):
-    id: int
-    date_creation: datetime
-    class Config:
-        from_attributes = True
-
-# --- PIC ---
-class PicSchema(BaseModel):
-    acces: str = ""
-    clotures: str = ""
-    base_vie: str = ""
-    stockage: str = ""
-    dechets: str = ""
-    levage: str = ""
-    reseaux: str = ""
-    circulations: str = ""
-    signalisation: str = ""
-    background_url: Optional[str] = None
-    final_url: Optional[str] = None
-    elements_data: Optional[Any] = None 
-
-# --- DOCS EXTERNES ---
-class DocExterneOut(BaseModel):
-    id: int
-    titre: str
-    categorie: str
-    url: str
-    date_ajout: datetime
-    class Config:
-        from_attributes = True
-
-# --- COMPANY (CORRIGÉ) ---
-
-# 1. Base commune pour ne pas répéter les champs
-class CompanyBase(BaseModel):
-    name: Optional[str] = None
+# --- COMPANY ---
+class CompanyCreate(BaseModel):
+    name: str
     address: Optional[str] = None
-    contact_email: Optional[str] = None
-    phone: Optional[str] = None
 
-# 2. Le schéma Create qui manquait !
-class CompanyCreate(CompanyBase):
-    name: str # Obligatoire à la création
-
-# 3. Update (hérite de Base, donc tout est optionnel)
 class CompanyUpdate(BaseModel):
     name: Optional[str] = None
     address: Optional[str] = None
     contact_email: Optional[str] = None
     phone: Optional[str] = None
 
-# 4. Out (hérite de Base pour renvoyer l'adresse, l'email, etc.)
-# Dans backend/schemas.py
-
 class CompanyOut(BaseModel):
     id: int
     name: str
     subscription_plan: str = "free"
     logo_url: Optional[str] = None
-    
     address: Optional[str] = None
     phone: Optional[str] = None
-    
-    # 👇 On utilise Field avec alias si possible, ou on garde contact_email
-    # Si ça ne marche pas, renommez simplement ceci en 'email' côté frontend aussi à terme.
-    # Pour l'instant, gardons contact_email pour ne pas casser le frontend
     contact_email: Optional[str] = None 
-
     class Config:
         from_attributes = True
-        # 👇 Cette ligne permet de mapper automatiquement company.email (DB) -> contact_email (Schema)
-        # si vous utilisez des alias, mais ici le plus simple est de s'assurer que le backend renvoie bien la donnée.
 
-class CompanyDocOut(BaseModel):
+# --- MATERIEL ---
+class MaterielCreate(BaseModel):
+    nom: str
+    ref_interne: Optional[str] = None
+    etat: str = "BON" 
+    chantier_id: Optional[int] = None
+
+class MaterielOut(MaterielCreate):
     id: int
-    titre: str
-    type_doc: str
-    url: str
-    date_expiration: Optional[datetime]
-    date_upload: datetime
+    date_derniere_vgp: Optional[datetime] = None
+    image_url: Optional[str] = None
     class Config:
         from_attributes = True
 
-# --- DUERP ---
-class DUERPLigneBase(BaseModel):
-    tache: str
-    risque: str
-    gravite: int = 1
-    mesures_realisees: Optional[str] = ""
-    mesures_a_realiser: Optional[str] = ""
-
-class DUERPLigneCreate(DUERPLigneBase):
-    pass
-
-class DUERPLigneOut(DUERPLigneBase):
-    id: int
-    class Config:
-        from_attributes = True
-
-class DUERPCreate(BaseModel):
-    annee: str
-    lignes: List[DUERPLigneCreate]
-
-class DUERPOut(BaseModel):
-    id: int
-    annee: str
-    date_mise_a_jour: datetime
-    lignes: List[DUERPLigneOut] = []
-    class Config:
-        from_attributes = True
-
-
-# --- TASKS ---
+# --- TASKS (NOUVEAU) ---
 class TaskCreate(BaseModel):
     description: str
     chantier_id: int
@@ -279,12 +88,149 @@ class TaskOut(BaseModel):
     status: Optional[str] = "TODO"
     date_prevue: Optional[datetime] = None
     chantier_id: int
-    
-    # 👇 AJOUT : Un champ virtuel pour l'intelligence (ne sera pas stocké en BDD)
-    alert_message: Optional[str] = None
-    alert_type: Optional[str] = None # ex: "DUERP", "PDP", "PERMIS_FEU"
-    
+    alert_message: Optional[str] = None # Virtuel
+    alert_type: Optional[str] = None # Virtuel
     class Config:
         from_attributes = True
 
-        
+# --- DOCS ---
+class DocumentCreate(BaseModel):
+    titre: str
+    type_doc: str 
+    date_expiration: Optional[date] = None
+
+class DocumentOut(DocumentCreate):
+    id: int
+    url: str
+    date_upload: datetime
+    company_id: int
+    is_signed: bool = False
+    signed_by: Optional[str] = None
+    date_signature: Optional[datetime] = None
+    class Config:
+        from_attributes = True
+
+class DocSign(BaseModel):
+    signature_base64: str
+    nom_signataire: str
+
+# --- CHANTIER ---
+class ChantierCreate(BaseModel):
+    nom: str
+    adresse: Optional[str] = None
+    client: Optional[str] = None
+    date_debut: Optional[date] = None
+    date_fin: Optional[date] = None
+
+class ChantierUpdate(BaseModel):
+    nom: Optional[str] = None
+    adresse: Optional[str] = None
+    est_actif: Optional[bool] = None
+    client: Optional[str] = None
+
+class ChantierOut(ChantierCreate):
+    id: int
+    est_actif: bool
+    cover_url: Optional[str] = None
+    company_id: int
+    signature_url: Optional[str] = None
+    date_creation: datetime
+    class Config:
+        from_attributes = True
+
+# --- RAPPORT ---
+class RapportCreate(BaseModel):
+    titre: str
+    description: Optional[str] = None
+    chantier_id: int
+    niveau_urgence: str = "Normal"
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+
+class ImageOut(BaseModel):
+    id: int
+    url: str
+    class Config:
+        from_attributes = True
+
+class RapportOut(RapportCreate):
+    id: int
+    date_creation: datetime
+    images: List[ImageOut] = []
+    photo_url: Optional[str] = None # Retro-compat
+    class Config:
+        from_attributes = True
+
+# --- INSPECTION (CORRIGÉ & BLINDÉ) ---
+# C'est ici que l'erreur 500 se produisait
+class InspectionCreate(BaseModel):
+    titre: str
+    type: str
+    data: Optional[Dict[str, Any]] = None 
+    chantier_id: int
+    createur: str
+
+class InspectionOut(BaseModel):
+    id: int
+    titre: Optional[str] = "Inspection"
+    type: Optional[str] = "Standard"
+    data: Optional[Dict[str, Any]] = None 
+    createur: Optional[str] = "Non renseigné"
+    date_creation: Optional[datetime] = None
+    chantier_id: int # Ajouté par sécurité
+
+    class Config:
+        from_attributes = True
+
+# --- PPSPS & PDP ---
+class PpspsCreate(BaseModel):
+    chantier_id: int
+    responsable_chantier: Optional[str] = None
+    nb_compagnons: int = 0
+    horaires: Optional[str] = None
+    coordonnateur_sps: Optional[str] = None
+    maitre_ouvrage: Optional[str] = None
+    secours_data: Optional[Dict[str, Any]] = None
+    taches_data: Optional[List[Dict[str, Any]]] = None
+
+class PpspsOut(PpspsCreate):
+    id: int
+    date_creation: datetime
+    class Config:
+        from_attributes = True
+
+class PdpCreate(BaseModel):
+    chantier_id: int
+    entreprise_utilisatrice: Optional[str] = None
+    entreprise_exterieure: Optional[str] = None
+    date_inspection_commune: Optional[datetime] = None
+    consignes_securite: Optional[Dict[str, Any]] = None
+    risques_interferents: Optional[List[Dict[str, Any]]] = None
+
+class PdpOut(PdpCreate):
+    id: int
+    date_creation: datetime
+    signature_eu: Optional[str] = None
+    signature_ee: Optional[str] = None
+    class Config:
+        from_attributes = True
+
+# --- DUERP ---
+class DuerpRow(BaseModel):
+    tache: str
+    risque: str
+    gravite: int
+    mesures_realisees: Optional[str] = None
+    mesures_a_realiser: Optional[str] = None
+
+class DuerpCreate(BaseModel):
+    annee: int
+    lignes: List[DuerpRow]
+
+class DuerpOut(BaseModel):
+    id: int
+    annee: int
+    date_mise_a_jour: datetime
+    lignes: List[DuerpRow]
+    class Config:
+        from_attributes = True

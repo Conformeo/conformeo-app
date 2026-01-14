@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { IonicModule, ModalController, AlertController, LoadingController, ToastController, NavController } from '@ionic/angular';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { ApiService, Rapport, Chantier, PPSPS, Materiel } from '../../services/api'; // (Si ApiService est exporté par défaut, retirez les accolades sinon ok)
+import { ApiService, Rapport, Chantier, PPSPS, Materiel } from '../../services/api';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { Platform } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
@@ -14,10 +14,11 @@ import {
   camera, time, warning, documentText, create, navigate, 
   location, arrowBack, createOutline, trashOutline,
   scanOutline, checkmarkCircle, shieldCheckmark, downloadOutline,
-  shieldCheckmarkOutline, map, checkmarkDoneCircle, checkboxOutline, 
+  shieldCheckmarkOutline, map, checkmarkDoneCircle,
   checkmarkDoneCircleOutline, documentLockOutline,
   documentTextOutline, archiveOutline, mapOutline, hammerOutline, mail,
-  cloudUpload, trash, ribbon, book, construct, download, addCircle // J'ajoute addCircle pour le bouton +
+  cloudUpload, trash, ribbon, book, construct, download, addCircle,
+  checkboxOutline 
 } from 'ionicons/icons';
 
 import { PicModalComponent } from './pic-modal/pic-modal.component';
@@ -41,12 +42,10 @@ export class ChantierDetailsPage implements OnInit {
   ppspsList: PPSPS[] = [];
   materielsSurSite: Materiel[] = []; 
 
-  // 👇 MODULE TÂCHES (NOUVEAU)
-  tasks: any[] = [];
+  tasks: any[] = []; 
   newTaskDesc = '';
 
-  // 👇 GESTION DOE
-  segment = 'suivi'; // Par défaut 'suivi', peut être 'doe' ou 'taches'
+  segment = 'suivi'; 
   doeDocs: any[] = [];
   selectedCategory = '';
   tempTitle = '';
@@ -76,7 +75,8 @@ export class ChantierDetailsPage implements OnInit {
       'hammer-outline': hammerOutline, 'document-lock-outline': documentLockOutline,
       'mail': mail, 'cloud-upload': cloudUpload, 'trash': trash,
       'ribbon': ribbon, 'book': book, 'construct': construct, 'download': download,
-      'add-circle': addCircle // Icône ajoutée
+      'add-circle': addCircle,
+      'checkbox-outline': checkboxOutline
     });
   }
 
@@ -90,32 +90,24 @@ export class ChantierDetailsPage implements OnInit {
 
   ionViewWillEnter() {
     if (this.api.needsRefresh) {
-      console.log("🔄 Refresh demandé !");
       this.loadData();
       this.api.needsRefresh = false;
     }
   }
 
   loadData() {
-    // 1. Infos Chantier & Documents
     this.api.getChantierById(this.chantierId).subscribe(data => {
       this.chantier = data;
       this.buildDocumentsList(); 
     });
-
-    // 2. Rapports (Journal)
     this.loadRapports();
-
-    // 3. Matériel
     this.api.getMateriels().subscribe(allMat => {
       this.materielsSurSite = allMat.filter(m => m.chantier_id === this.chantierId);
     });
-
-    // 4. Documents DOE
     this.loadDoeDocs();
-
-    // 5. Tâches (NOUVEAU)
-    this.loadTasks();
+    
+    // 👇 CORRECTION : On appelle directement la fonction
+    this.loadTasks(); 
   }
 
   loadRapports() {
@@ -126,7 +118,7 @@ export class ChantierDetailsPage implements OnInit {
     });
   }
 
-  // --- GESTION TÂCHES (NOUVEAU) ---
+  // --- TASK MANAGEMENT ---
   loadTasks() {
     this.api.getTasks(this.chantierId).subscribe(data => {
       this.tasks = data || [];
@@ -142,61 +134,29 @@ export class ChantierDetailsPage implements OnInit {
       date_prevue: new Date().toISOString()
     };
     
-    this.api.addTask(payload).subscribe(async (newTask: any) => { // Ajoutez 'async' ici
+    this.api.addTask(payload).subscribe((newTask: any) => {
       this.tasks.push(newTask);
       this.newTaskDesc = ''; 
       
-      // 👇 LE CŒUR DE LA DIFFÉRENCIATION
+      // Intelligence Alert
       if (newTask.alert_message) {
-          const alert = await this.alertCtrl.create({
-            header: 'Conformité Automatique 🛡️',
-            subHeader: 'Risque détecté',
+          this.alertCtrl.create({
+            header: 'Sécurité 🛡️',
             message: newTask.alert_message,
-            cssClass: 'alert-warning', // Vous pourrez styliser ça en orange/rouge
-            buttons: [
-              { text: 'Ignorer', role: 'cancel' },
-              { 
-                text: 'Agir (Générer Document)', 
-                handler: () => {
-                   this.handleRiskAction(newTask.alert_type);
-                }
-              }
-            ]
-          });
-          await alert.present();
+            buttons: ['OK']
+          }).then(a => a.present());
       } else {
           this.presentToast('Tâche ajoutée ! ✅');
       }
     });
   }
 
-  // Nouvelle méthode pour gérer l'action
-  handleRiskAction(type: string) {
-      if (type === 'PERMIS_FEU') {
-          // Pour l'instant, on simule ou on ouvre le PdP
-          this.presentToast("Redirection vers le Permis de Feu... (À venir)");
-          // Plus tard : this.navCtrl.navigateForward(['/permis-feu', this.chantierId]);
-      } else if (type === 'DUERP') {
-          this.presentToast("Mise à jour du DUERP enregistrée.");
-      } else {
-          this.presentToast("Rappel sécurité envoyé à l'équipe.");
-      }
-  }
-
-  scrollToTasks() {
-    const element = document.getElementById('tasks-section');
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-  }
-
   toggleTask(task: any) {
     const newStatus = task.status === 'DONE' ? 'TODO' : 'DONE';
-    // Optimistic update
     task.status = newStatus; 
     
     this.api.updateTask(task.id, { status: newStatus }).subscribe({
-      error: () => task.status = task.status === 'DONE' ? 'TODO' : 'DONE' // Revert si erreur
+      error: () => task.status = task.status === 'DONE' ? 'TODO' : 'DONE'
     });
   }
 
@@ -207,7 +167,14 @@ export class ChantierDetailsPage implements OnInit {
     });
   }
 
-  // --- GESTION DOE ---
+  scrollToTasks() {
+    const element = document.getElementById('tasks-section');
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }
+
+  // --- DOE MANAGEMENT ---
   loadDoeDocs() {
     this.api.http.get<any[]>(`${this.api.apiUrl}/chantiers/${this.chantierId}/documents`).subscribe(data => {
       this.doeDocs = data;
@@ -224,7 +191,6 @@ export class ChantierDetailsPage implements OnInit {
 
   async uploadDoeDoc(category: string) {
     this.selectedCategory = category;
-    
     const alert = await this.alertCtrl.create({
       header: 'Nouveau Document',
       inputs: [ { name: 'titre', type: 'text', placeholder: 'Nom du fichier (ex: Plan RDC)' } ],
@@ -233,7 +199,7 @@ export class ChantierDetailsPage implements OnInit {
         { text: 'Choisir Fichier', handler: (data) => {
             if(!data.titre) return false;
             this.tempTitle = data.titre;
-            this.fileInput.nativeElement.click(); // Déclenche le clic sur l'input caché
+            this.fileInput.nativeElement.click(); 
             return true;
         }}
       ]
@@ -256,7 +222,7 @@ export class ChantierDetailsPage implements OnInit {
     this.api.http.post(url, formData).subscribe({
       next: () => {
         this.loadDoeDocs(); 
-        event.target.value = null; // Reset input
+        event.target.value = null; 
         loading.dismiss();
         this.presentToast('Document ajouté au DOE ! ✅');
       },
@@ -280,11 +246,9 @@ export class ChantierDetailsPage implements OnInit {
     window.open(url, '_system');
   }
 
-  // --- CONSTRUCTION LISTE DOCUMENTS ---
+  // --- BUILD DOCUMENTS LIST ---
   buildDocumentsList() {
     this.documentsList = [];
-
-    // A. Journal
     this.documentsList.push({
         type: 'RAPPORT',
         titre: 'Journal de Bord (Photos & QHSE)',
@@ -294,7 +258,6 @@ export class ChantierDetailsPage implements OnInit {
         action: () => this.downloadPdf()
     });
 
-    // B. PPSPS
     this.api.getPPSPSList(this.chantierId).subscribe(docs => {
         this.ppspsList = docs;
         docs.forEach(doc => {
@@ -309,7 +272,6 @@ export class ChantierDetailsPage implements OnInit {
         });
     });
 
-    // C. PIC
     this.api.getPIC(this.chantierId).subscribe(pic => {
         if (pic && pic.final_url) {
             this.documentsList.push({
@@ -323,7 +285,6 @@ export class ChantierDetailsPage implements OnInit {
         }
     });
 
-    // D. Audits QHSE 
     this.api.getInspections(this.chantierId).subscribe(audits => {
         audits.forEach(audit => {
             this.documentsList.push({
@@ -340,7 +301,6 @@ export class ChantierDetailsPage implements OnInit {
         });
     });
 
-    // E. Signature
     if (this.chantier && this.chantier.signature_url) {
         this.documentsList.push({
             type: 'SIGNATURE',
@@ -354,58 +314,21 @@ export class ChantierDetailsPage implements OnInit {
   }
 
   // --- ACTIONS ---
-
   async takePhoto() {
     try {
       const image = await Camera.getPhoto({
-        quality: 90,
-        allowEditing: false,
-        resultType: CameraResultType.Uri,
-        source: CameraSource.Camera,
-        correctOrientation: true
+        quality: 90, allowEditing: false, resultType: CameraResultType.Uri, source: CameraSource.Camera, correctOrientation: true
       });
-
       if (image.webPath) {
         const response = await fetch(image.webPath);
         const blob = await response.blob();
         this.uploadAndCreateRapport(blob, image.webPath);
       }
-    } catch (e) {
-      console.log('Annulé', e);
-    }
+    } catch (e) { console.log('Annulé', e); }
   }
 
-  async toggleStatus() {
-    if (!this.chantier) return;
-
-    const newStatus = !this.chantier.est_actif;
-    const action = newStatus ? 'Réactiver' : 'Clôturer';
-    
-    const alert = await this.alertCtrl.create({
-      header: `${action} le chantier ?`,
-      message: newStatus 
-        ? 'Le chantier reviendra dans la liste des actifs.' 
-        : 'Le chantier sera marqué comme terminé.',
-      buttons: [
-        { text: 'Annuler', role: 'cancel' },
-        {
-          text: 'Valider',
-          handler: () => {
-            this.api.updateChantier(this.chantierId, { est_actif: newStatus }).subscribe(() => {
-              this.chantier!.est_actif = newStatus;
-              this.api.needsRefresh = true;
-            });
-          }
-        }
-      ]
-    });
-    await alert.present();
-  }
-
-  // --- GESTION STATUT ---
   updateStatus(event: any) {
     const newVal = event.detail.value;
-    // On évite de boucler si la valeur est identique
     if (this.chantier && this.chantier.est_actif !== newVal) {
         this.api.updateChantier(this.chantierId, { est_actif: newVal }).subscribe(() => {
             this.chantier!.est_actif = newVal;
@@ -437,21 +360,15 @@ export class ChantierDetailsPage implements OnInit {
       };
 
       await this.api.addRapportWithMultiplePhotos(newRapport, blobs);
-      
       setTimeout(() => { this.loadRapports(); }, 500);
       this.api.needsRefresh = true;
     }
   }
 
   openItinerary() {
-    if (!this.chantier?.adresse) {
-      alert("Adresse introuvable.");
-      return;
-    }
-
+    if (!this.chantier?.adresse) { alert("Adresse introuvable."); return; }
     const destination = encodeURIComponent(this.chantier.adresse);
     let url = '';
-
     if (this.platform.is('ios') || this.platform.is('ipad') || this.platform.is('iphone')) {
       url = `maps:?q=${destination}`;
     } else if (this.platform.is('android')) {
@@ -459,7 +376,6 @@ export class ChantierDetailsPage implements OnInit {
     } else {
       url = `https://www.google.com/maps/search/?api=1&query=$${destination}`;
     }
-
     window.open(url, '_system');
   }
 
@@ -497,13 +413,9 @@ export class ChantierDetailsPage implements OnInit {
       component: PicModalComponent,
       componentProps: { chantierId: this.chantierId }
     });
-    
     await modal.present();
     const { role } = await modal.onWillDismiss();
-    if (this.api.needsRefresh) {
-       this.loadData();
-       this.api.needsRefresh = false;
-    }
+    if (this.api.needsRefresh) { this.loadData(); this.api.needsRefresh = false; }
   }
 
   async openSignature() {
@@ -511,13 +423,9 @@ export class ChantierDetailsPage implements OnInit {
       component: SignatureModalComponent,
       componentProps: { chantierId: this.chantierId }
     });
-    
     await modal.present();
     const { role } = await modal.onWillDismiss();
-    if (this.api.needsRefresh) {
-        this.loadData();
-        this.api.needsRefresh = false;
-    }
+    if (this.api.needsRefresh) { this.loadData(); this.api.needsRefresh = false; }
   }
 
   async openRapportDetails(rapport: Rapport) {
@@ -530,35 +438,19 @@ export class ChantierDetailsPage implements OnInit {
 
   async presentToast(message: string) {
     const toast = await this.toastCtrl.create({
-      message: message,
-      duration: 2000,
-      position: 'bottom',
-      color: 'dark'
+      message: message, duration: 2000, position: 'bottom', color: 'dark'
     });
     toast.present();
   }
 
-  // 👇 FONCTION D'ENVOI EMAIL
   async sendJournal() {
     const alert = await this.alertCtrl.create({
       header: 'Envoyer le Rapport',
       message: 'Email du destinataire :',
-      inputs: [
-        {
-          name: 'email',
-          type: 'email',
-          placeholder: 'client@chantier.com',
-          value: this.chantier?.client?.includes('@') ? this.chantier.client : ''
-        }
-      ],
+      inputs: [ { name: 'email', type: 'email', placeholder: 'client@chantier.com', value: this.chantier?.client?.includes('@') ? this.chantier.client : '' } ],
       buttons: [
         { text: 'Annuler', role: 'cancel' },
-        {
-          text: 'Envoyer',
-          handler: (data) => {
-            if (data.email) this.processEmail(data.email);
-          }
-        }
+        { text: 'Envoyer', handler: (data) => { if (data.email) this.processEmail(data.email); } }
       ]
     });
     await alert.present();
@@ -567,16 +459,9 @@ export class ChantierDetailsPage implements OnInit {
   async processEmail(email: string) {
     const load = await this.loadingCtrl.create({ message: 'Envoi en cours...' });
     await load.present();
-
     this.api.sendJournalEmail(this.chantierId, email).subscribe({
-      next: () => {
-        load.dismiss();
-        this.presentToast('Rapport envoyé avec succès ! 📧');
-      },
-      error: () => {
-        load.dismiss();
-        this.presentToast('Erreur lors de l\'envoi');
-      }
+      next: () => { load.dismiss(); this.presentToast('Rapport envoyé avec succès ! 📧'); },
+      error: () => { load.dismiss(); this.presentToast('Erreur lors de l\'envoi'); }
     });
   }
 
