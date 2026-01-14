@@ -194,8 +194,7 @@ class InspectionOut(BaseModel):
     class Config:
         from_attributes = True
 
-# --- PPSPS & PDP (CORRIGÉ MAJUSCULES) ---
-# J'ai renommé PpspsCreate -> PPSPSCreate
+# --- PPSPS ---
 class PPSPSCreate(BaseModel):
     chantier_id: int
     responsable_chantier: Optional[str] = None
@@ -206,14 +205,15 @@ class PPSPSCreate(BaseModel):
     secours_data: Optional[Dict[str, Any]] = None
     taches_data: Optional[List[Dict[str, Any]]] = None
 
-# J'ai renommé PpspsOut -> PPSPSOut
 class PPSPSOut(PPSPSCreate):
     id: int
     date_creation: datetime
     class Config:
         from_attributes = True
 
-class PdpCreate(BaseModel):
+# --- PLAN DE PREVENTION (PDP) ---
+# 👇 RENOMMÉ pour correspondre à "PlanPreventionOut" demandé par le serveur
+class PlanPreventionCreate(BaseModel):
     chantier_id: int
     entreprise_utilisatrice: Optional[str] = None
     entreprise_exterieure: Optional[str] = None
@@ -221,13 +221,17 @@ class PdpCreate(BaseModel):
     consignes_securite: Optional[Dict[str, Any]] = None
     risques_interferents: Optional[List[Dict[str, Any]]] = None
 
-class PdpOut(PdpCreate):
+class PlanPreventionOut(PlanPreventionCreate):
     id: int
     date_creation: datetime
     signature_eu: Optional[str] = None
     signature_ee: Optional[str] = None
     class Config:
         from_attributes = True
+
+# 👇 ALIAS DE SECURITÉ (Au cas où le code utilise aussi "PdpCreate/Out")
+PdpCreate = PlanPreventionCreate
+PdpOut = PlanPreventionOut
 
 # --- DUERP ---
 class DuerpRow(BaseModel):
