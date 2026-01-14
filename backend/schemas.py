@@ -280,5 +280,11 @@ class TaskOut(BaseModel):
     date_prevue: Optional[datetime] = None
     chantier_id: int
     
+    # 👇 AJOUT : Un champ virtuel pour l'intelligence (ne sera pas stocké en BDD)
+    alert_message: Optional[str] = None
+    alert_type: Optional[str] = None # ex: "DUERP", "PDP", "PERMIS_FEU"
+    
     class Config:
         from_attributes = True
+
+        

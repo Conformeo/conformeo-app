@@ -142,11 +142,45 @@ export class ChantierDetailsPage implements OnInit {
       date_prevue: new Date().toISOString()
     };
     
-    this.api.addTask(payload).subscribe(newTask => {
+    this.api.addTask(payload).subscribe(async (newTask: any) => { // Ajoutez 'async' ici
       this.tasks.push(newTask);
-      this.newTaskDesc = ''; // Reset input
-      this.presentToast('Tâche ajoutée ! ✅');
+      this.newTaskDesc = ''; 
+      
+      // 👇 LE CŒUR DE LA DIFFÉRENCIATION
+      if (newTask.alert_message) {
+          const alert = await this.alertCtrl.create({
+            header: 'Conformité Automatique 🛡️',
+            subHeader: 'Risque détecté',
+            message: newTask.alert_message,
+            cssClass: 'alert-warning', // Vous pourrez styliser ça en orange/rouge
+            buttons: [
+              { text: 'Ignorer', role: 'cancel' },
+              { 
+                text: 'Agir (Générer Document)', 
+                handler: () => {
+                   this.handleRiskAction(newTask.alert_type);
+                }
+              }
+            ]
+          });
+          await alert.present();
+      } else {
+          this.presentToast('Tâche ajoutée ! ✅');
+      }
     });
+  }
+
+  // Nouvelle méthode pour gérer l'action
+  handleRiskAction(type: string) {
+      if (type === 'PERMIS_FEU') {
+          // Pour l'instant, on simule ou on ouvre le PdP
+          this.presentToast("Redirection vers le Permis de Feu... (À venir)");
+          // Plus tard : this.navCtrl.navigateForward(['/permis-feu', this.chantierId]);
+      } else if (type === 'DUERP') {
+          this.presentToast("Mise à jour du DUERP enregistrée.");
+      } else {
+          this.presentToast("Rappel sécurité envoyé à l'équipe.");
+      }
   }
 
   scrollToTasks() {
