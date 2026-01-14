@@ -4,11 +4,11 @@ import { FormsModule } from '@angular/forms';
 import { 
   IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, 
   IonContent, IonList, IonItem, IonInput, IonLabel, 
-  IonIcon, IonSpinner, ModalController, IonSelect, IonSelectOption, LoadingController
+  IonIcon, IonSpinner, ModalController, IonSelect, IonSelectOption 
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
 import { close, save, camera, image } from 'ionicons/icons';
-import { ApiService } from '../../../services/api'
+import { ApiService } from 'src/app/services/api'; // Ensure correct path
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { removeBackground } from '@imgly/background-removal';
 
@@ -17,7 +17,6 @@ import { removeBackground } from '@imgly/background-removal';
   templateUrl: './add-materiel-modal.component.html',
   styleUrls: ['./add-materiel-modal.component.scss'],
   standalone: true,
-  // 👇 AJOUT DE IonSelect ICI
   imports: [
     CommonModule, FormsModule, 
     IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, 
@@ -32,7 +31,7 @@ export class AddMaterielModalComponent implements OnInit {
   data = {
     nom: '',
     reference: '',
-    etat: 'Bon', // Valeur par défaut
+    etat: 'Bon', // Physical state (manual)
     image_url: ''
   };
   
@@ -44,19 +43,17 @@ export class AddMaterielModalComponent implements OnInit {
 
   constructor(
     private modalCtrl: ModalController, 
-    private api: ApiService,
-    private loadingCtrl: LoadingController
+    private api: ApiService
   ) {
     addIcons({ close, save, camera, image });
   }
 
   ngOnInit() {
     if (this.existingItem) {
-      // Si on modifie, on reprend les infos existantes
       this.data = {
         nom: this.existingItem.nom,
         reference: this.existingItem.reference,
-        etat: this.existingItem.etat || 'Bon', // Récupération de l'état
+        etat: this.existingItem.etat || 'Bon',
         image_url: this.existingItem.image_url
       };
       this.processedImage = this.existingItem.image_url;
@@ -87,7 +84,7 @@ export class AddMaterielModalComponent implements OnInit {
         const response = await fetch(path);
         const originalBlob = await response.blob();
         
-        // ✨ Magie du détourage
+        // AI Background Removal
         const blobSansFond = await removeBackground(originalBlob);
         
         this.imageBlob = blobSansFond;
@@ -95,8 +92,6 @@ export class AddMaterielModalComponent implements OnInit {
         
     } catch (error) {
         console.error(error);
-        // Fallback : si erreur IA, on garde l'image normale ?
-        // Pour l'instant on alerte juste
         alert("Erreur lors du détourage IA");
     } finally {
         this.isProcessing = false;
@@ -111,14 +106,12 @@ export class AddMaterielModalComponent implements OnInit {
     if (this.isSaving) return;
     this.isSaving = true;
 
-    // CAS 1 : On a pris une NOUVELLE photo -> Upload d'abord
+    // Case 1: New photo -> Upload first
     if (this.imageBlob) {
-      // On convertit le Blob en File pour l'upload
       const fileToUpload = new File([this.imageBlob], "materiel_ia.png", { type: "image/png" });
 
       this.api.uploadPhoto(fileToUpload).subscribe({
         next: (res) => {
-           // On sauvegarde avec la NOUVELLE URL Cloudinary
            this.finalizeSave(res.url);
         },
         error: (err) => {
@@ -128,24 +121,25 @@ export class AddMaterielModalComponent implements OnInit {
         }
       });
     } 
-    // CAS 2 : Pas de nouvelle photo -> On garde l'ancienne (ou rien)
+    // Case 2: No new photo -> Keep old URL
     else {
       const oldUrl = this.existingItem ? this.existingItem.image_url : null;
       this.finalizeSave(oldUrl);
     }
   }
 
-  // 👇 FONCTION COMMUNE (CRÉATION OU UPDATE)
   finalizeSave(imageUrl: string | null) {
-    const matData = {
+    const matData: any = {
       nom: this.data.nom,
       reference: this.data.reference,
-      etat: this.data.etat, // 🟢 CORRECTION : On utilise la valeur du formulaire !
-      image_url: imageUrl
+      etat: this.data.etat,
+      image_url: imageUrl,
+      // 👇 IMPORTANT: Add required field for TypeScript/Backend validation
+      statut_vgp: this.existingItem ? this.existingItem.statut_vgp : 'INCONNU' 
     };
 
     if (this.existingItem) {
-      // --- MODE MODIFICATION ---
+      // UPDATE
       this.api.updateMateriel(this.existingItem.id, matData).subscribe({
         next: () => {
           this.modalCtrl.dismiss(true, 'confirm');
@@ -157,7 +151,7 @@ export class AddMaterielModalComponent implements OnInit {
         }
       });
     } else {
-      // --- MODE CRÉATION ---
+      // CREATE
       this.api.createMateriel(matData).subscribe({
         next: () => {
           this.modalCtrl.dismiss(true, 'confirm');
