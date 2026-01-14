@@ -153,8 +153,8 @@ class ChantierCreate(BaseModel):
     nom: str
     adresse: Optional[str] = None
     client: Optional[str] = None
-    date_debut: Optional[date] = None
-    date_fin: Optional[date] = None
+    date_debut: Optional[Any] = None # <-- Modifié : Any au lieu de date
+    date_fin: Optional[Any] = None   # <-- Modifié : Any au lieu de date
 
 class ChantierUpdate(BaseModel):
     nom: Optional[str] = None
@@ -162,20 +162,19 @@ class ChantierUpdate(BaseModel):
     est_actif: Optional[bool] = None
     client: Optional[str] = None
 
-# 👇 CORRECTIF : On découple complètement pour sécuriser
 class ChantierOut(BaseModel):
     id: int
     nom: Optional[str] = "Chantier sans nom"
     adresse: Optional[str] = None
     client: Optional[str] = None
-    date_debut: Optional[date] = None
-    date_fin: Optional[date] = None
-    # On met une valeur par défaut True si c'est NULL en base
+    # 👇 C'EST ICI LE FIX : On accepte 'Any' (n'importe quoi) pour éviter le crash 500 sur les dates mal formatées
+    date_debut: Optional[Any] = None 
+    date_fin: Optional[Any] = None
     est_actif: bool = True 
     cover_url: Optional[str] = None
     company_id: Optional[int] = None
     signature_url: Optional[str] = None
-    date_creation: Optional[datetime] = None
+    date_creation: Optional[Any] = None
     
     class Config:
         from_attributes = True

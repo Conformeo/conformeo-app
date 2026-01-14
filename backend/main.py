@@ -991,35 +991,29 @@ def read_tasks(chantier_id: int, db: Session = Depends(get_db)):
     return db.query(models.Task).filter(models.Task.chantier_id == chantier_id).all()
 
 # --- INTELLIGENCE ENGINE (RISK DETECTION) ---
+# --- MOTEUR D'INTELLIGENCE (RISQUES) ---
 def analyze_task_risks(description: str):
     desc = description.lower()
     
-    # Rule 1: Hot Work
+    # Règle 1 : Points Chauds
     if any(x in desc for x in ["soudure", "meuleuse", "chalumeau", "étincelle", "feu", "découpe"]):
         return {
-            "msg": "⚠️ Travaux par points chauds détectés. Le Permis de Feu est-il signé ?",
+            "msg": "🔥 Travaux par points chauds détectés. Le Permis de Feu est-il signé ?",
             "type": "PERMIS_FEU"
         }
     
-    # Rule 2: Working at Height
+    # Règle 2 : Hauteur
     if any(x in desc for x in ["toiture", "échafaudage", "échelle", "nacelle", "hauteur", "bardage"]):
         return {
-            "msg": "⚠️ Travail en hauteur. Avez-vous vérifié le harnais ou la réception de l'échafaudage ?",
+            "msg": "🪜 Travail en hauteur identifié. Vérification harnais/échafaudage requise.",
             "type": "DUERP"
         }
 
-    # Rule 3: Dust/Asbestos
-    if any(x in desc for x in ["amiante", "démolition", "perçage", "ponçage", "béton"]):
+    # Règle 3 : Poussières / Amiante
+    if any(x in desc for x in ["amiante", "démolition", "perçage", "ponçage", "béton", "chimique"]):
         return {
-            "msg": "⚠️ Risque poussières. Port du masque FFP3/P3 obligatoire.",
+            "msg": "😷 Risque poussières/inhalation. Port du masque FFP3 obligatoire.",
             "type": "EPI"
-        }
-    
-    # Rule 4: Lifting
-    if any(x in desc for x in ["grue", "levage", "élingue", "charge", "manutention"]):
-        return {
-            "msg": "⚠️ Opération de levage. Vérifiez le plan d'élingage et le balisage.",
-            "type": "PPSPS"
         }
         
     return None
@@ -1027,19 +1021,20 @@ def analyze_task_risks(description: str):
 # --- UPDATED CREATE TASK ROUTE ---
 @app.post("/tasks", response_model=schemas.TaskOut)
 def create_task(task: schemas.TaskCreate, db: Session = Depends(get_db)):
-    # 1. Standard creation
+    # 1. Création standard
     db_task = models.Task(**task.dict())
     db.add(db_task)
     db.commit()
     db.refresh(db_task)
     
-    # 2. Intelligence Analysis
+    # 2. Analyse Intelligence
     analysis = analyze_task_risks(db_task.description)
     
-    # 3. Inject alert into response (virtual field, not saved to DB)
+    # 3. Injection de l'alerte (virtuelle) dans la réponse
     if analysis:
-        db_task.alert_message = analysis["msg"]
-        db_task.alert_type = analysis["type"]
+        # On attache manuellement les attributs à l'objet réponse
+        setattr(db_task, "alert_message", analysis["msg"])
+        setattr(db_task, "alert_type", analysis["type"])
         
     return db_task
 
