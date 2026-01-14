@@ -149,25 +149,31 @@ export class MaterielPage implements OnInit {
   async showQrCode(mat: any) {
     const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=CONFORME-${mat.id}`;
     
-    // Détermination de la couleur du statut pour le HTML
-    let statusColor = 'gray';
-    if(mat.statut_vgp === 'CONFORME') statusColor = 'green';
-    if(mat.statut_vgp === 'NON CONFORME') statusColor = 'red';
-    if(mat.statut_vgp === 'A PREVOIR') statusColor = 'orange';
+    // On force la couleur en hexadécimal pour être sûr que le style passe
+    let color = '#7f8c8d'; // Gris par défaut
+    if(mat.statut_vgp === 'CONFORME') color = '#2dd36f'; // Vert
+    if(mat.statut_vgp === 'NON CONFORME') color = '#eb445a'; // Rouge
+    if(mat.statut_vgp === 'A PREVOIR') color = '#ffc409'; // Orange
+
+    // Construction de la chaîne sécurisée
+    const htmlContent = `
+      <div style="text-align: center;">
+        <img src="${qrUrl}" alt="QR Code" style="display: block; margin: 10px auto; width: 150px; height: 150px; border-radius: 8px;">
+        <p style="margin-top: 10px; font-size: 1.1em;">
+          Statut: <strong style="color: ${color};">${mat.statut_vgp || 'INCONNU'}</strong>
+        </p>
+        <p style="color: #666; font-size: 0.9em;">Scannez pour le rapport</p>
+      </div>
+    `;
 
     const alert = await this.alertCtrl.create({
       header: mat.nom,
       subHeader: 'Passeport de Conformité',
-      // Utilisation de IonicSafeString pour autoriser le HTML
-      message: new IonicSafeString(`
-        <div style="text-align:center;">
-          <img src="${qrUrl}" style="margin: 10px auto; border-radius: 8px; display:block;">
-          <p>Statut: <strong style="color:${statusColor}">${mat.statut_vgp || 'INCONNU'}</strong></p>
-          <p style="font-size: 0.8em; color: gray; margin-top:5px;">Scannez pour voir le rapport VGP</p>
-        </div>
-      `),
-      buttons: ['Fermer']
+      message: new IonicSafeString(htmlContent), // 👈 Utilisation explicite
+      buttons: ['Fermer'],
+      cssClass: 'qr-alert' // Classe optionnelle si vous voulez styliser plus tard
     });
+
     await alert.present();
   }
 
