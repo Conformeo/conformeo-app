@@ -212,7 +212,6 @@ class PPSPSOut(PPSPSCreate):
         from_attributes = True
 
 # --- PLAN DE PREVENTION (PDP) ---
-# 👇 RENOMMÉ pour correspondre à "PlanPreventionOut" demandé par le serveur
 class PlanPreventionCreate(BaseModel):
     chantier_id: int
     entreprise_utilisatrice: Optional[str] = None
@@ -229,7 +228,6 @@ class PlanPreventionOut(PlanPreventionCreate):
     class Config:
         from_attributes = True
 
-# 👇 ALIAS DE SECURITÉ (Au cas où le code utilise aussi "PdpCreate/Out")
 PdpCreate = PlanPreventionCreate
 PdpOut = PlanPreventionOut
 
@@ -250,5 +248,17 @@ class DuerpOut(BaseModel):
     annee: int
     date_mise_a_jour: datetime
     lignes: List[DuerpRow]
+    class Config:
+        from_attributes = True
+
+# --- PIC (Plan Installation Chantier) - NOUVEAU ---
+class PicSchema(BaseModel):
+    chantier_id: int
+    final_url: Optional[str] = None
+    drawing_data: Optional[Dict[str, Any]] = None
+
+class PicOut(PicSchema):
+    id: int
+    date_creation: datetime
     class Config:
         from_attributes = True
