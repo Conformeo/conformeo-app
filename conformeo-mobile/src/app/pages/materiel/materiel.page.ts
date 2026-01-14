@@ -6,7 +6,8 @@ import {
   IonHeader, IonToolbar, IonContent,
   IonButtons, IonButton, IonIcon, IonFab, IonFabButton, 
   AlertController, IonBackButton, IonSearchbar,
-  IonTitle, ModalController, LoadingController, IonBadge 
+  IonTitle, ModalController, LoadingController, IonBadge ,
+  IonicSafeString
 } from '@ionic/angular/standalone';
 import { Capacitor } from '@capacitor/core';
 import { addIcons } from 'ionicons';
@@ -146,15 +147,25 @@ export class MaterielPage implements OnInit {
 
   // --- SHOW QR CODE (PASSEPORT SECURITE) ---
   async showQrCode(mat: any) {
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=CONFORME-${mat.id}`;
+    
+    // Détermination de la couleur du statut pour le HTML
+    let statusColor = 'gray';
+    if(mat.statut_vgp === 'CONFORME') statusColor = 'green';
+    if(mat.statut_vgp === 'NON CONFORME') statusColor = 'red';
+    if(mat.statut_vgp === 'A PREVOIR') statusColor = 'orange';
+
     const alert = await this.alertCtrl.create({
       header: mat.nom,
       subHeader: 'Passeport de Conformité',
-      // Dynamically generated QR code via API for demo
-      message: `<div style="text-align:center;">
-                  <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=CONFORME-${mat.id}" style="margin: 10px auto; border-radius: 8px;">
-                  <p>Statut: <strong>${mat.statut_vgp || 'INCONNU'}</strong></p>
-                  <p style="font-size: 0.8em; color: gray;">Scannez pour voir le rapport VGP</p>
-                </div>`,
+      // Utilisation de IonicSafeString pour autoriser le HTML
+      message: new IonicSafeString(`
+        <div style="text-align:center;">
+          <img src="${qrUrl}" style="margin: 10px auto; border-radius: 8px; display:block;">
+          <p>Statut: <strong style="color:${statusColor}">${mat.statut_vgp || 'INCONNU'}</strong></p>
+          <p style="font-size: 0.8em; color: gray; margin-top:5px;">Scannez pour voir le rapport VGP</p>
+        </div>
+      `),
       buttons: ['Fermer']
     });
     await alert.present();
