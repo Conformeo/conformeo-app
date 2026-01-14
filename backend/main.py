@@ -63,12 +63,20 @@ app.mount("/static", StaticFiles(directory="uploads"), name="static")
 
 
 # 👇 MIDDLEWARE CORS (CRUCIAL POUR LE MOBILE)
+origins = [
+    "http://localhost:8100",
+    "http://localhost:4200",
+    "http://localhost",
+    "capacitor://localhost",
+    "https://conformeo-app.vercel.app",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # Autorise toutes les origines
+    allow_origins=origins,          # ← évite "*" si allow_credentials=True
     allow_credentials=True,
-    allow_methods=["*"], # Autorise tous les verbes (GET, POST, OPTIONS...)
-    allow_headers=["*"], # Autorise tous les headers (Authorization, Content-Type...)
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 @app.get("/")
