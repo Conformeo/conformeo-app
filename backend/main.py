@@ -968,46 +968,53 @@ def download_duerp_pdf(annee: str, db: Session = Depends(get_db), current_user: 
 def read_tasks(chantier_id: int, db: Session = Depends(get_db)):
     return db.query(models.Task).filter(models.Task.chantier_id == chantier_id).all()
 
-# --- MOTEUR D'INTELLIGENCE ---
+# --- INTELLIGENCE ENGINE (RISK DETECTION) ---
 def analyze_task_risks(description: str):
     desc = description.lower()
     
-    # Règle 1 : Points Chauds
-    if any(x in desc for x in ["soudure", "meuleuse", "chalumeau", "étincelle", "feu"]):
+    # Rule 1: Hot Work
+    if any(x in desc for x in ["soudure", "meuleuse", "chalumeau", "étincelle", "feu", "découpe"]):
         return {
             "msg": "⚠️ Travaux par points chauds détectés. Le Permis de Feu est-il signé ?",
             "type": "PERMIS_FEU"
         }
     
-    # Règle 2 : Hauteur
-    if any(x in desc for x in ["toiture", "échafaudage", "échelle", "nacelle", "hauteur"]):
+    # Rule 2: Working at Height
+    if any(x in desc for x in ["toiture", "échafaudage", "échelle", "nacelle", "hauteur", "bardage"]):
         return {
-            "msg": "⚠️ Travail en hauteur. Avez-vous vérifié le harnais ou l'échafaudage ?",
+            "msg": "⚠️ Travail en hauteur. Avez-vous vérifié le harnais ou la réception de l'échafaudage ?",
             "type": "DUERP"
         }
 
-    # Règle 3 : Amiante/Poussière
-    if any(x in desc for x in ["amiante", "démolition", "perçage béton", "ponçage"]):
+    # Rule 3: Dust/Asbestos
+    if any(x in desc for x in ["amiante", "démolition", "perçage", "ponçage", "béton"]):
         return {
-            "msg": "⚠️ Risque poussières/inhalation. Port du masque FFP3 obligatoire.",
+            "msg": "⚠️ Risque poussières. Port du masque FFP3/P3 obligatoire.",
             "type": "EPI"
+        }
+    
+    # Rule 4: Lifting
+    if any(x in desc for x in ["grue", "levage", "élingue", "charge", "manutention"]):
+        return {
+            "msg": "⚠️ Opération de levage. Vérifiez le plan d'élingage et le balisage.",
+            "type": "PPSPS"
         }
         
     return None
 
-# --- ROUTE MODIFIÉE ---
+# --- UPDATED CREATE TASK ROUTE ---
 @app.post("/tasks", response_model=schemas.TaskOut)
 def create_task(task: schemas.TaskCreate, db: Session = Depends(get_db)):
-    # 1. Création standard
+    # 1. Standard creation
     db_task = models.Task(**task.dict())
     db.add(db_task)
     db.commit()
     db.refresh(db_task)
     
-    # 2. Analyse Intelligence
+    # 2. Intelligence Analysis
     analysis = analyze_task_risks(db_task.description)
     
-    # 3. On "injecte" l'alerte dans la réponse (sans la stocker en base)
+    # 3. Inject alert into response (virtual field, not saved to DB)
     if analysis:
         db_task.alert_message = analysis["msg"]
         db_task.alert_type = analysis["type"]

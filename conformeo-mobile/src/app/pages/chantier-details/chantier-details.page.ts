@@ -134,21 +134,44 @@ export class ChantierDetailsPage implements OnInit {
       date_prevue: new Date().toISOString()
     };
     
-    this.api.addTask(payload).subscribe((newTask: any) => {
+    // Note: We use 'any' type for newTask to access alert_message easily
+    this.api.addTask(payload).subscribe(async (newTask: any) => {
       this.tasks.push(newTask);
       this.newTaskDesc = ''; 
       
-      // Intelligence Alert
+      // 👇 INTELLIGENCE ALERT TRIGGER
       if (newTask.alert_message) {
-          this.alertCtrl.create({
-            header: 'Sécurité 🛡️',
+          const alert = await this.alertCtrl.create({
+            header: 'Conformité Automatique 🛡️',
+            subHeader: 'Risque détecté',
             message: newTask.alert_message,
-            buttons: ['OK']
-          }).then(a => a.present());
+            cssClass: 'risk-alert',
+            buttons: [
+              { text: 'Ignorer', role: 'cancel' },
+              { 
+                text: 'Agir (Voir Document)', 
+                handler: () => {
+                   this.handleRiskAction(newTask.alert_type);
+                }
+              }
+            ]
+          });
+          await alert.present();
       } else {
           this.presentToast('Tâche ajoutée ! ✅');
       }
     });
+  }
+
+  handleRiskAction(type: string) {
+      if (type === 'PERMIS_FEU') {
+          // Future: Redirect to Permit Form
+          this.presentToast("Ouverture du Permis de Feu... (Module à venir)");
+      } else if (type === 'DUERP') {
+          this.presentToast("Risque ajouté au DUERP.");
+      } else {
+          this.presentToast("Rappel de sécurité noté.");
+      }
   }
 
   toggleTask(task: any) {
