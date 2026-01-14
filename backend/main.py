@@ -300,8 +300,22 @@ def create_chantier(chantier: schemas.ChantierCreate, db: Session = Depends(get_
     return new_c
 
 @app.get("/chantiers", response_model=List[schemas.ChantierOut])
-def read_chantiers(db: Session = Depends(get_db)):
-    return db.query(models.Chantier).all()
+def read_chantiers(
+    skip: int = 0, 
+    limit: int = 100, 
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(security.get_current_user)
+):
+    # On récupère les chantiers de l'entreprise de l'utilisateur
+    if current_user.company_id:
+        chantiers = db.query(models.Chantier).filter(
+            models.Chantier.company_id == current_user.company_id
+        ).offset(skip).limit(limit).all()
+    else:
+        # Fallback si pas d'entreprise (ne devrait pas arriver souvent)
+        chantiers = []
+        
+    return chantiers
 
 @app.get("/chantiers/{chantier_id}", response_model=schemas.ChantierOut)
 def read_chantier(chantier_id: int, db: Session = Depends(get_db)):

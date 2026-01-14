@@ -162,13 +162,21 @@ class ChantierUpdate(BaseModel):
     est_actif: Optional[bool] = None
     client: Optional[str] = None
 
-class ChantierOut(ChantierCreate):
+# 👇 CORRECTIF : On découple complètement pour sécuriser
+class ChantierOut(BaseModel):
     id: int
-    est_actif: bool
+    nom: Optional[str] = "Chantier sans nom"
+    adresse: Optional[str] = None
+    client: Optional[str] = None
+    date_debut: Optional[date] = None
+    date_fin: Optional[date] = None
+    # On met une valeur par défaut True si c'est NULL en base
+    est_actif: bool = True 
     cover_url: Optional[str] = None
-    company_id: int
+    company_id: Optional[int] = None
     signature_url: Optional[str] = None
-    date_creation: datetime
+    date_creation: Optional[datetime] = None
+    
     class Config:
         from_attributes = True
 
