@@ -106,7 +106,7 @@ class TaskOut(BaseModel):
     class Config:
         from_attributes = True
 
-# --- DOCS ---
+# --- DOCS INTERNES ---
 class DocumentCreate(BaseModel):
     titre: str
     type_doc: str 
@@ -127,19 +127,18 @@ class DocSign(BaseModel):
     signature_base64: str
     nom_signataire: str
 
-# 👇 AJOUT : Documents Externes Chantier (DOE/GED)
+# --- DOCS EXTERNES (DOE/GED) ---
 class DocExterneOut(BaseModel):
     id: int
     titre: str
     url: str
-    categorie: Optional[str] = "Autre" # Ex: PLANS, NOTICES, DECHETS
+    categorie: Optional[str] = "Autre"
     date_upload: datetime
     chantier_id: Optional[int] = None
-    
     class Config:
         from_attributes = True
 
-# 👇 AJOUT : Documents Entreprise (KBIS, Assurance...) pour /companies/me/documents
+# --- COMPANY DOCS (KBIS...) ---
 class CompanyDocOut(BaseModel):
     id: int
     titre: str
@@ -253,25 +252,30 @@ class PlanPreventionOut(PlanPreventionCreate):
 PdpCreate = PlanPreventionCreate
 PdpOut = PlanPreventionOut
 
-# --- DUERP ---
-class DuerpRow(BaseModel):
+# --- DUERP (RENOMMÉ EN MAJUSCULES) ---
+class DUERPRow(BaseModel):
     tache: str
     risque: str
     gravite: int
     mesures_realisees: Optional[str] = None
     mesures_a_realiser: Optional[str] = None
 
-class DuerpCreate(BaseModel):
+class DUERPCreate(BaseModel):
     annee: int
-    lignes: List[DuerpRow]
+    lignes: List[DUERPRow]
 
-class DuerpOut(BaseModel):
+class DUERPOut(BaseModel):
     id: int
     annee: int
     date_mise_a_jour: datetime
-    lignes: List[DuerpRow]
+    lignes: List[DUERPRow]
     class Config:
         from_attributes = True
+
+# Alias de compatibilité au cas où
+DuerpRow = DUERPRow
+DuerpCreate = DUERPCreate
+DuerpOut = DUERPOut
 
 # --- PIC (Plan Installation Chantier) ---
 class PicSchema(BaseModel):
