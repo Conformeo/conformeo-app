@@ -20,11 +20,20 @@ class UserLogin(BaseModel):
     email: EmailStr
     password: str
 
-# 👇 C'est cette classe qui manquait et causait le crash
+# Mise à jour par l'utilisateur lui-même (nom, email, mdp)
 class UserUpdate(BaseModel):
     full_name: Optional[str] = None
     email: Optional[EmailStr] = None
     password: Optional[str] = None
+
+# 👇 C'est cette classe qui manquait pour la route Admin
+class UserUpdateAdmin(BaseModel):
+    full_name: Optional[str] = None
+    email: Optional[EmailStr] = None
+    password: Optional[str] = None
+    role: Optional[str] = None      # L'admin peut changer le rôle
+    is_active: Optional[bool] = None # L'admin peut activer/désactiver
+    company_id: Optional[int] = None # L'admin peut changer l'entreprise
 
 class UserOut(BaseModel):
     id: int
@@ -76,7 +85,7 @@ class MaterielOut(MaterielCreate):
     class Config:
         from_attributes = True
 
-# --- TASKS (NOUVEAU) ---
+# --- TASKS ---
 class TaskCreate(BaseModel):
     description: str
     chantier_id: int
@@ -94,8 +103,8 @@ class TaskOut(BaseModel):
     status: Optional[str] = "TODO"
     date_prevue: Optional[datetime] = None
     chantier_id: int
-    alert_message: Optional[str] = None # Virtuel
-    alert_type: Optional[str] = None # Virtuel
+    alert_message: Optional[str] = None
+    alert_type: Optional[str] = None
     class Config:
         from_attributes = True
 
@@ -163,11 +172,11 @@ class RapportOut(RapportCreate):
     id: int
     date_creation: datetime
     images: List[ImageOut] = []
-    photo_url: Optional[str] = None # Retro-compat
+    photo_url: Optional[str] = None 
     class Config:
         from_attributes = True
 
-# --- INSPECTION (CORRIGÉ & BLINDÉ) ---
+# --- INSPECTION ---
 class InspectionCreate(BaseModel):
     titre: str
     type: str
@@ -182,7 +191,7 @@ class InspectionOut(BaseModel):
     data: Optional[Dict[str, Any]] = None 
     createur: Optional[str] = "Non renseigné"
     date_creation: Optional[datetime] = None
-    chantier_id: int # Ajouté par sécurité
+    chantier_id: int
 
     class Config:
         from_attributes = True
