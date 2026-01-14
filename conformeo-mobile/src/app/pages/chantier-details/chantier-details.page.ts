@@ -3,8 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { IonicModule, ModalController, AlertController, LoadingController, ToastController, NavController } from '@ionic/angular';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-// 👇 AJOUT DE 'Materiel' DANS LES IMPORTS
-import { ApiService, Rapport, Chantier, PPSPS, Materiel } from '../../services/api';
+import { ApiService, Rapport, Chantier, PPSPS, Materiel } from '../../services/api'; // (Si ApiService est exporté par défaut, retirez les accolades sinon ok)
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { Platform } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
@@ -15,10 +14,10 @@ import {
   camera, time, warning, documentText, create, navigate, 
   location, arrowBack, createOutline, trashOutline,
   scanOutline, checkmarkCircle, shieldCheckmark, downloadOutline,
-  shieldCheckmarkOutline, map, checkmarkDoneCircle,
+  shieldCheckmarkOutline, map, checkmarkDoneCircle, checkboxOutline, 
   checkmarkDoneCircleOutline, documentLockOutline,
   documentTextOutline, archiveOutline, mapOutline, hammerOutline, mail,
-  cloudUpload, trash, ribbon, book, construct, download
+  cloudUpload, trash, ribbon, book, construct, download, addCircle // J'ajoute addCircle pour le bouton +
 } from 'ionicons/icons';
 
 import { PicModalComponent } from './pic-modal/pic-modal.component';
@@ -40,12 +39,14 @@ export class ChantierDetailsPage implements OnInit {
   rapports: Rapport[] = [];
   documentsList: any[] = [];
   ppspsList: PPSPS[] = [];
-  
-  // 👇 LA VARIABLE MANQUANTE
   materielsSurSite: Materiel[] = []; 
 
+  // 👇 MODULE TÂCHES (NOUVEAU)
+  tasks: any[] = [];
+  newTaskDesc = '';
+
   // 👇 GESTION DOE
-  segment = 'suivi'; // Par défaut 'suivi', peut être 'doe'
+  segment = 'suivi'; // Par défaut 'suivi', peut être 'doe' ou 'taches'
   doeDocs: any[] = [];
   selectedCategory = '';
   tempTitle = '';
@@ -74,7 +75,8 @@ export class ChantierDetailsPage implements OnInit {
       'checkmark-done-circle': checkmarkDoneCircle, 'checkmark-done-circle-outline': checkmarkDoneCircleOutline,
       'hammer-outline': hammerOutline, 'document-lock-outline': documentLockOutline,
       'mail': mail, 'cloud-upload': cloudUpload, 'trash': trash,
-      'ribbon': ribbon, 'book': book, 'construct': construct, 'download': download
+      'ribbon': ribbon, 'book': book, 'construct': construct, 'download': download,
+      'add-circle': addCircle // Icône ajoutée
     });
   }
 
@@ -111,6 +113,9 @@ export class ChantierDetailsPage implements OnInit {
 
     // 4. Documents DOE
     this.loadDoeDocs();
+
+    // 5. Tâches (NOUVEAU)
+    this.loadTasks();
   }
 
   loadRapports() {
@@ -121,13 +126,55 @@ export class ChantierDetailsPage implements OnInit {
     });
   }
 
+  // --- GESTION TÂCHES (NOUVEAU) ---
+  loadTasks() {
+    this.api.getTasks(this.chantierId).subscribe(data => {
+      this.tasks = data || [];
+    });
+  }
+
+  addTask() {
+    if (!this.newTaskDesc.trim()) return;
+    const payload = {
+      description: this.newTaskDesc,
+      chantier_id: this.chantierId,
+      status: 'TODO',
+      date_prevue: new Date().toISOString()
+    };
+    
+    this.api.addTask(payload).subscribe(newTask => {
+      this.tasks.push(newTask);
+      this.newTaskDesc = ''; // Reset input
+      this.presentToast('Tâche ajoutée ! ✅');
+    });
+  }
+
+  scrollToTasks() {
+    const element = document.getElementById('tasks-section');
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }
+
+  toggleTask(task: any) {
+    const newStatus = task.status === 'DONE' ? 'TODO' : 'DONE';
+    // Optimistic update
+    task.status = newStatus; 
+    
+    this.api.updateTask(task.id, { status: newStatus }).subscribe({
+      error: () => task.status = task.status === 'DONE' ? 'TODO' : 'DONE' // Revert si erreur
+    });
+  }
+
+  deleteTask(task: any) {
+    this.api.deleteTask(task.id).subscribe(() => {
+      this.tasks = this.tasks.filter(t => t.id !== task.id);
+      this.presentToast('Tâche supprimée.');
+    });
+  }
+
   // --- GESTION DOE ---
   loadDoeDocs() {
-    // On réutilise la route documents externes (si elle existe dans ton service)
-    // Sinon, tu dois ajouter cette méthode dans api.service.ts :
-    // getExternalDocs(cid: number) { return this.http.get<any[]>(`${this.apiUrl}/chantiers/${cid}/documents`); }
-    
-    // Ici, j'assume que tu peux faire l'appel HTTP direct si besoin ou ajouter la méthode au service
     this.api.http.get<any[]>(`${this.api.apiUrl}/chantiers/${this.chantierId}/documents`).subscribe(data => {
       this.doeDocs = data;
     });
@@ -160,19 +207,15 @@ export class ChantierDetailsPage implements OnInit {
     await alert.present();
   }
 
-  // 👇 AJOUTEZ LE MOT 'async' ICI
   async onDoeFileSelected(event: any) {
     const file = event.target.files[0];
     if (!file) return;
 
-    // On utilise FormData pour envoyer le fichier ET les infos textuelles proprement
     const formData = new FormData();
     formData.append('file', file);
     
-    // On encode le titre pour éviter les bugs avec les espaces ou accents
     const url = `${this.api.apiUrl}/chantiers/${this.chantierId}/documents?titre=${encodeURIComponent(this.tempTitle)}&categorie=${this.selectedCategory}`;
     
-    // 👇 C'est ici que 'await' posait problème sans le 'async' au dessus
     const loading = await this.loadingCtrl.create({ message: 'Upload en cours...' });
     await loading.present();
 

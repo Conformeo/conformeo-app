@@ -601,4 +601,22 @@ export class ApiService {
   deleteMember(userId: number): Observable<any> {
     return this.http.delete(`${this.apiUrl}/team/${userId}`, this.getOptions());
   }
+
+
+  // TASKS
+  getTasks(chantierId: number): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiUrl}/chantiers/${chantierId}/tasks`);
+  }
+
+  addTask(task: any): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/tasks`, task);
+  }
+
+  updateTask(taskId: number, data: any): Observable<any> {
+    return this.http.put<any>(`${this.apiUrl}/tasks/${taskId}`, data);
+  }
+
+  deleteTask(taskId: number): Observable<any> {
+    return this.http.delete<any>(`${this.apiUrl}/tasks/${taskId}`);
+  }
 }

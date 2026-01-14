@@ -67,6 +67,7 @@ class Chantier(Base):
     ppsps_docs = relationship("PPSPS", back_populates="chantier")
     plans_prevention = relationship("PlanPrevention", back_populates="chantier")
     pic = relationship("PIC", uselist=False, back_populates="chantier")
+    tasks = relationship("Task", back_populates="chantier")
 
 # ==========================
 # 3. MATERIEL
@@ -214,3 +215,19 @@ class DUERPLigne(Base):
     mesures_a_realiser = Column(String)
     
     duerp = relationship("DUERP", back_populates="lignes")
+
+# --- AJOUT TÂCHES ---
+class Task(Base):
+    __tablename__ = "tasks"
+
+    id = Column(Integer, primary_key=True, index=True)
+    description = Column(String, index=True)
+    status = Column(String, default="TODO") # TODO, DONE, PROBLEM
+    date_prevue = Column(DateTime, default=datetime.utcnow)
+    
+    # Liaison Chantier
+    chantier_id = Column(Integer, ForeignKey("chantiers.id"))
+    chantier = relationship("Chantier", back_populates="tasks")
+
+# N'oubliez pas d'ajouter la relation inverse dans la classe Chantier existante :
+# tasks = relationship("Task", back_populates="chantier")

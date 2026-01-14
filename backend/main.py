@@ -962,6 +962,41 @@ def download_duerp_pdf(annee: str, db: Session = Depends(get_db), current_user: 
     # 4. Envoi
     return FileResponse(path, media_type='application/pdf', filename=filename)
 
+# --- ROUTES TÂCHES ---
+
+@app.get("/chantiers/{chantier_id}/tasks", response_model=List[schemas.TaskOut])
+def read_tasks(chantier_id: int, db: Session = Depends(get_db)):
+    return db.query(models.Task).filter(models.Task.chantier_id == chantier_id).all()
+
+@app.post("/tasks", response_model=schemas.TaskOut)
+def create_task(task: schemas.TaskCreate, db: Session = Depends(get_db)):
+    db_task = models.Task(**task.dict())
+    db.add(db_task)
+    db.commit()
+    db.refresh(db_task)
+    return db_task
+
+@app.put("/tasks/{task_id}", response_model=schemas.TaskOut)
+def update_task(task_id: int, task_update: schemas.TaskUpdate, db: Session = Depends(get_db)):
+    task = db.query(models.Task).filter(models.Task.id == task_id).first()
+    if not task: raise HTTPException(404, "Tâche introuvable")
+    
+    if task_update.description: task.description = task_update.description
+    if task_update.status: task.status = task_update.status
+    if task_update.date_prevue: task.date_prevue = task_update.date_prevue
+    
+    db.commit()
+    db.refresh(task)
+    return task
+
+@app.delete("/tasks/{task_id}")
+def delete_task(task_id: int, db: Session = Depends(get_db)):
+    task = db.query(models.Task).filter(models.Task.id == task_id).first()
+    if task:
+        db.delete(task)
+        db.commit()
+    return {"ok": True}
+
 # ==========================================
 # 9. FIX & MIGRATIONS
 # ==========================================

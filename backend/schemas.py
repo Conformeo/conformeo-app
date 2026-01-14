@@ -259,3 +259,26 @@ class DUERPOut(BaseModel):
     lignes: List[DUERPLigneOut] = []
     class Config:
         from_attributes = True
+
+
+# --- TASKS ---
+class TaskCreate(BaseModel):
+    description: str
+    chantier_id: int
+    date_prevue: Optional[datetime] = None
+    status: str = "TODO"
+
+class TaskUpdate(BaseModel):
+    description: Optional[str] = None
+    status: Optional[str] = None
+    date_prevue: Optional[datetime] = None
+
+class TaskOut(BaseModel):
+    id: int
+    description: Optional[str] = "Tâche sans nom"
+    status: Optional[str] = "TODO"
+    date_prevue: Optional[datetime] = None
+    chantier_id: int
+    
+    class Config:
+        from_attributes = True
