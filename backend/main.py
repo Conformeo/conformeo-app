@@ -1233,16 +1233,22 @@ def delete_task(task_id: int, db: Session = Depends(get_db)):
         db.commit()
     return {"ok": True}
 
+# --- ROUTE PERMIS DE FEU ---
 @app.post("/permis-feu", response_model=schemas.PermisFeuOut)
 def create_permis_feu(permis: schemas.PermisFeuCreate, db: Session = Depends(get_db)):
-    db_permis = schemas.PermisFeu(**permis.dict())
+    # 1. Création en BDD
+    db_permis = models.PermisFeu(**permis.dict())
     db.add(db_permis)
     db.commit()
     db.refresh(db_permis)
     
-    # TODO (Optionnel) : Générer un PDF ici et l'ajouter aux documents du chantier
-    
     return db_permis
+
+# --- ROUTE POUR RÉCUPÉRER LES PERMIS D'UN CHANTIER ---
+@app.get("/chantiers/{chantier_id}/permis-feu", response_model=List[schemas.PermisFeuOut])
+def read_permis_feu(chantier_id: int, db: Session = Depends(get_db)):
+    permis = db.query(models.PermisFeu).filter(models.PermisFeu.chantier_id == chantier_id).all()
+    return permis
 
 # ==========================================
 # 9. FIX & MIGRATIONS

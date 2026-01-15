@@ -19,7 +19,7 @@ import {
   checkmarkDoneCircleOutline, documentLockOutline,
   documentTextOutline, archiveOutline, mapOutline, hammerOutline, mail,
   cloudUpload, trash, ribbon, book, construct, download, addCircle,
-  checkboxOutline 
+  checkboxOutline, flame
 } from 'ionicons/icons';
 
 import { PicModalComponent } from './pic-modal/pic-modal.component';
@@ -74,7 +74,8 @@ export class ChantierDetailsPage implements OnInit {
       'mail': mail, 'cloud-upload': cloudUpload, 'trash': trash,
       'ribbon': ribbon, 'book': book, 'construct': construct, 'download': download,
       'add-circle': addCircle,
-      'checkbox-outline': checkboxOutline
+      'checkbox-outline': checkboxOutline,
+      'flame': flame
     });
   }
 
@@ -235,6 +236,23 @@ export class ChantierDetailsPage implements OnInit {
                 action: () => {
                     const url = `${this.api['apiUrl']}/inspections/${audit.id}/pdf`;
                     window.open(url, '_system');
+                }
+            });
+        });
+    });
+
+    // 👇 AJOUT : LES PERMIS DE FEU
+    this.api.getPermisFeuList(this.chantierId).subscribe(permisList => {
+        permisList.forEach(p => {
+            this.documentsList.push({
+                type: 'PERMIS',
+                titre: `Permis Feu - ${p.lieu} (${p.intervenant})`,
+                date: p.date,
+                icon: 'flame', // Icône feu (assurez-vous de l'importer)
+                color: 'danger',
+                action: () => {
+                    // Pour l'instant on affiche une alerte, plus tard on ouvrira un PDF
+                    alert(`Permis délivré à : ${p.intervenant}\nLieu : ${p.lieu}\nDescription : ${p.description}`);
                 }
             });
         });

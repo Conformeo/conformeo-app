@@ -627,4 +627,8 @@ export class ApiService {
   savePermisFeu(data: any) {
     return this.http.post<any>(`${this.apiUrl}/permis-feu`, data);
   }
+
+  getPermisFeuList(chantierId: number) {
+    return this.http.get<any[]>(`${this.apiUrl}/chantiers/${chantierId}/permis-feu`);
+  }
 }
