@@ -30,8 +30,8 @@ class UserUpdateAdmin(BaseModel):
     email: Optional[EmailStr] = None
     password: Optional[str] = None
     role: Optional[str] = None      
-    is_active: Optional[bool] = None 
-    company_id: Optional[int] = None 
+    is_active: Optional[Any] = None # <-- Any pour accepter "true"/bool
+    company_id: Optional[Any] = None # <-- Any pour accepter ""/int
 
 class UserOut(BaseModel):
     id: int
@@ -76,7 +76,16 @@ class MaterielCreate(BaseModel):
     etat: str = "BON" 
     chantier_id: Optional[int] = None
 
-# 👇 VERSION BLINDÉE
+# 👇 NOUVELLE CLASSE UPDATE (Ajoutée pour l'édition)
+class MaterielUpdate(BaseModel):
+    nom: Optional[str] = None
+    reference: Optional[str] = None
+    ref_interne: Optional[str] = None # Au cas où
+    etat: Optional[str] = None
+    chantier_id: Optional[Any] = None # <-- Any pour accepter "" ou 0 (retour dépôt)
+    statut_vgp: Optional[str] = None
+    image_url: Optional[str] = None
+
 class MaterielOut(BaseModel):
     id: int
     nom: str
@@ -101,7 +110,7 @@ class TaskCreate(BaseModel):
 class TaskUpdate(BaseModel):
     description: Optional[str] = None
     status: Optional[str] = None
-    date_prevue: Optional[datetime] = None
+    date_prevue: Optional[Any] = None # <-- Any pour gérer les chaines vides
 
 class TaskOut(BaseModel):
     id: int
@@ -161,16 +170,19 @@ class ChantierCreate(BaseModel):
     nom: str
     adresse: Optional[str] = None
     client: Optional[str] = None
-    date_debut: Optional[Any] = None # <-- Modifié : Any au lieu de date
-    date_fin: Optional[Any] = None   # <-- Modifié : Any au lieu de date
+    date_debut: Optional[Any] = None 
+    date_fin: Optional[Any] = None   
 
 class ChantierUpdate(BaseModel):
     nom: Optional[str] = None
     adresse: Optional[str] = None
-    est_actif: Optional[bool] = None
+    # 👇 On passe en Any pour accepter "true", "True", true, ou 1 sans planter
+    est_actif: Optional[Any] = None 
     client: Optional[str] = None
+    # 👇 On passe en Any pour accepter les chaines vides "" ou les formats ISO
+    date_debut: Optional[Any] = None
+    date_fin: Optional[Any] = None
 
-# --- CHANTIER ---
 class ChantierOut(BaseModel):
     id: int
     nom: Optional[str] = "Chantier sans nom"

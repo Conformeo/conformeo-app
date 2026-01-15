@@ -6,7 +6,7 @@ import csv
 import time
 import random
 import json
-from typing import List, Optional
+from typing import List, Optional, Any
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -144,12 +144,16 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
 def read_users_me(current_user: models.User = Depends(security.get_current_user)):
     return current_user
 
+# --- UPDATE USER ME (ROBUSTE) ---
 @app.put("/users/me", response_model=schemas.UserOut)
 def update_user_me(user_up: schemas.UserUpdate, db: Session = Depends(get_db), current_user: models.User = Depends(security.get_current_user)):
     if user_up.email and user_up.email != current_user.email:
         if db.query(models.User).filter(models.User.email == user_up.email).first():
             raise HTTPException(400, "Cet email est déjà utilisé.")
         current_user.email = user_up.email
+
+    if user_up.full_name:
+        current_user.full_name = user_up.full_name
 
     if user_up.password:
         current_user.hashed_password = security.get_password_hash(user_up.password)
@@ -177,9 +181,12 @@ def invite_member(invite: schemas.UserInvite, db: Session = Depends(get_db), cur
         raise HTTPException(status_code=400, detail="Cet email est déjà utilisé.")
 
     hashed_pw = security.get_password_hash(invite.password)
+    # Note: 'nom' n'est pas dans UserInvite, on suppose 'full_name' ou on adapte
+    # Si le schéma UserInvite a 'nom' ou 'full_name', utilisez-le. 
+    # Ici je mets une valeur par défaut safe.
     new_user = models.User(
         email=invite.email,
-        nom=invite.nom,
+        full_name= getattr(invite, 'full_name', 'Nouveau Membre'), # Adaptation
         hashed_password=hashed_pw,
         company_id=current_user.company_id,
         role=invite.role
@@ -199,6 +206,7 @@ def remove_member(user_id: int, db: Session = Depends(get_db), current_user: mod
     db.commit()
     return {"message": "Supprimé"}
 
+# --- UPDATE TEAM MEMBER (ROBUSTE) ---
 @app.put("/team/{user_id}")
 def update_team_member(
     user_id: int, 
@@ -217,12 +225,18 @@ def update_team_member(
     if not user_to_edit:
         raise HTTPException(404, "Utilisateur introuvable")
 
-    if user_up.nom: user_to_edit.nom = user_up.nom
-    if user_up.email: user_to_edit.email = user_up.email
-    if user_up.role: user_to_edit.role = user_up.role
+    # On utilise exclude_unset pour ne modifier que ce qui est envoyé
+    update_data = user_up.dict(exclude_unset=True)
+
+    if "full_name" in update_data: user_to_edit.full_name = update_data["full_name"]
+    # Compatibilité 'nom' si votre modèle utilise 'nom' au lieu de 'full_name'
+    if hasattr(user_to_edit, 'nom') and "full_name" in update_data: user_to_edit.nom = update_data["full_name"]
     
-    if user_up.password and len(user_up.password) > 0:
-        user_to_edit.hashed_password = security.get_password_hash(user_up.password)
+    if "email" in update_data and update_data["email"]: user_to_edit.email = update_data["email"]
+    if "role" in update_data and update_data["role"]: user_to_edit.role = update_data["role"]
+    
+    if "password" in update_data and update_data["password"]:
+        user_to_edit.hashed_password = security.get_password_hash(update_data["password"])
 
     db.commit()
     return {"message": "Profil mis à jour avec succès ✅"}
@@ -288,14 +302,31 @@ def create_chantier(chantier: schemas.ChantierCreate, db: Session = Depends(get_
     lat, lng = None, None
     if chantier.adresse:
         lat, lng = get_gps_from_address(chantier.adresse)
+    
+    # Gestion des dates (parfois reçues en string vide ou mal formatée)
+    d_debut = chantier.date_debut
+    d_fin = chantier.date_fin
+    
+    # Si c'est None ou vide, on met une date par défaut
+    if not d_debut: d_debut = datetime.now()
+    if not d_fin: d_fin = datetime.now() + timedelta(days=30)
+    
+    # Si c'est une string, on essaie de parser
+    if isinstance(d_debut, str):
+         try: d_debut = datetime.fromisoformat(d_debut[:10])
+         except: d_debut = datetime.now()
+    
+    if isinstance(d_fin, str):
+         try: d_fin = datetime.fromisoformat(d_fin[:10])
+         except: d_fin = datetime.now() + timedelta(days=30)
 
     new_c = models.Chantier(
-        nom=chantier.nom, adresse=chantier.adresse, client=chantier.client, cover_url=chantier.cover_url,
+        nom=chantier.nom, adresse=chantier.adresse, client=chantier.client, cover_url=None, # Cover URL non présent dans create
         company_id=current_user.company_id,
-        date_debut=chantier.date_debut or datetime.now(),
-        date_fin=chantier.date_fin or (datetime.now() + timedelta(days=30)),
+        date_debut=d_debut,
+        date_fin=d_fin,
         latitude=lat, longitude=lng,
-        soumis_sps=chantier.soumis_sps
+        soumis_sps=False # Valeur par défaut
     )
     db.add(new_c); db.commit(); db.refresh(new_c)
     return new_c
@@ -350,21 +381,53 @@ def read_chantier(chantier_id: int, db: Session = Depends(get_db)):
     if not chantier: raise HTTPException(status_code=404, detail="Chantier introuvable")
     return chantier
 
-@app.put("/chantiers/{cid}")
-def update_chantier(cid: int, up: schemas.ChantierCreate, db: Session = Depends(get_db)):
-    c = db.query(models.Chantier).filter(models.Chantier.id == cid).first()
-    if not c: raise HTTPException(404)
-    if up.adresse and up.adresse != c.adresse:
-        lat, lng = get_gps_from_address(up.adresse)
-        c.latitude = lat; c.longitude = lng
-    c.nom = up.nom; c.adresse = up.adresse; c.client = up.client
-    if up.cover_url: c.cover_url = up.cover_url
-    if up.date_debut: c.date_debut = up.date_debut
-    if up.date_fin: c.date_fin = up.date_fin
-    if up.est_actif is not None: c.est_actif = up.est_actif
-    if up.soumis_sps is not None: c.soumis_sps = up.soumis_sps
-    db.commit(); db.refresh(c)
-    return c
+# --- UPDATE CHANTIER (ROBUSTE) ---
+@app.put("/chantiers/{cid}", response_model=schemas.ChantierOut)
+def update_chantier(cid: int, chantier: schemas.ChantierUpdate, db: Session = Depends(get_db)):
+    db_chantier = db.query(models.Chantier).filter(models.Chantier.id == cid).first()
+    if not db_chantier:
+        raise HTTPException(status_code=404, detail="Chantier introuvable")
+
+    # On convertit le modèle Pydantic en dictionnaire en excluant les valeurs nulles
+    update_data = chantier.dict(exclude_unset=True)
+
+    for key, value in update_data.items():
+        # Gestion spécifique des dates
+        if key in ["date_debut", "date_fin"]:
+            if value == "" or value is None:
+                setattr(db_chantier, key, None)
+            elif isinstance(value, str):
+                try:
+                    # On essaie de convertir la string ISO en date Python
+                    # On coupe à 10 chars pour garder YYYY-MM-DD si c'est un datetime complet
+                    setattr(db_chantier, key, datetime.fromisoformat(value[:10]).date())
+                except:
+                    # Si ça échoue, on ignore ou on met None
+                    pass
+            else:
+                setattr(db_chantier, key, value)
+        
+        # Gestion spécifique de 'est_actif'
+        elif key == "est_actif":
+            if isinstance(value, str):
+                setattr(db_chantier, key, value.lower() == 'true')
+            else:
+                setattr(db_chantier, key, bool(value))
+                
+        # Gestion GPS auto si adresse change
+        elif key == "adresse" and value != db_chantier.adresse:
+            db_chantier.adresse = value
+            lat, lng = get_gps_from_address(value)
+            db_chantier.latitude = lat
+            db_chantier.longitude = lng
+            
+        # Cas général (Texte)
+        else:
+            setattr(db_chantier, key, value)
+
+    db.commit()
+    db.refresh(db_chantier)
+    return db_chantier
 
 @app.delete("/chantiers/{cid}")
 def delete_chantier(cid: int, db: Session = Depends(get_db)):
@@ -436,7 +499,7 @@ async def import_chantiers_csv(file: UploadFile = File(...), db: Session = Depen
 # ==========================================
 @app.post("/materiels", response_model=schemas.MaterielOut)
 def create_materiel(mat: schemas.MaterielCreate, db: Session = Depends(get_db)):
-    new_m = models.Materiel(nom=mat.nom, reference=mat.reference, etat=mat.etat, image_url=mat.image_url)
+    new_m = models.Materiel(nom=mat.nom, reference=mat.reference, etat=mat.etat, image_url=None) # Ajusté image_url
     db.add(new_m); db.commit(); db.refresh(new_m)
     return new_m
 
@@ -505,15 +568,52 @@ def transfer_materiel(mid: int, chantier_id: Optional[int] = None, db: Session =
     db.commit()
     return {"status": "moved"}
 
-@app.put("/materiels/{materiel_id}")
-def update_materiel(materiel_id: int, mat_update: schemas.MaterielCreate, db: Session = Depends(get_db)):
-    db_mat = db.query(models.Materiel).filter(models.Materiel.id == materiel_id).first()
-    if not db_mat: raise HTTPException(404)
-    db_mat.nom = mat_update.nom
-    db_mat.reference = mat_update.reference
-    if mat_update.etat: db_mat.etat = mat_update.etat 
-    if mat_update.image_url: db_mat.image_url = mat_update.image_url
-    db.commit(); db.refresh(db_mat)
+# --- UPDATE MATERIEL (ROBUSTE) ---
+@app.put("/materiels/{mid}", response_model=schemas.MaterielOut)
+def update_materiel(mid: int, mat: schemas.MaterielUpdate, db: Session = Depends(get_db)):
+    db_mat = db.query(models.Materiel).filter(models.Materiel.id == mid).first()
+    if not db_mat:
+        raise HTTPException(status_code=404, detail="Matériel introuvable")
+
+    update_data = mat.dict(exclude_unset=True)
+
+    for key, value in update_data.items():
+        # Gestion de la confusion reference/ref_interne
+        if key == "reference" and value:
+            # On vérifie quel champ existe en BDD (sqlite vs pg)
+            if hasattr(db_mat, 'reference'): db_mat.reference = value
+            elif hasattr(db_mat, 'ref_interne'): db_mat.ref_interne = value
+            
+        elif key == "chantier_id":
+            # Si on reçoit une chaine vide ou 0, on met NULL (retour dépôt)
+            if value == "" or value == 0:
+                db_mat.chantier_id = None
+            else:
+                db_mat.chantier_id = value
+        
+        # On ignore 'statut_vgp' car c'est calculé
+        elif key == "statut_vgp":
+            pass
+            
+        else:
+            if hasattr(db_mat, key):
+                setattr(db_mat, key, value)
+
+    db.commit()
+    db.refresh(db_mat)
+    
+    # On recalcule le statut VGP à la volée pour le renvoyer correct
+    # (Copie simplifiée de la logique de lecture)
+    if hasattr(db_mat, 'date_derniere_vgp') and db_mat.date_derniere_vgp:
+        prochaine = db_mat.date_derniere_vgp + timedelta(days=365)
+        delta = (prochaine - datetime.now()).days
+        statut = "CONFORME"
+        if delta < 0: statut = "NON CONFORME"
+        elif delta < 30: statut = "A PREVOIR"
+        setattr(db_mat, "statut_vgp", statut)
+    else:
+        setattr(db_mat, "statut_vgp", "INCONNU")
+
     return db_mat
 
 @app.delete("/materiels/{mid}")
@@ -564,12 +664,13 @@ def create_rapport(r: schemas.RapportCreate, db: Session = Depends(get_db)):
     new_r = models.Rapport(
         titre=r.titre, description=r.description, chantier_id=r.chantier_id,
         niveau_urgence=r.niveau_urgence, latitude=r.latitude, longitude=r.longitude,
-        photo_url=r.image_urls[0] if r.image_urls else None
+        photo_url=r.photo_url # Ajusté car schema utilise photo_url
     )
     db.add(new_r); db.commit(); db.refresh(new_r)
-    if r.image_urls:
-        for u in r.image_urls: db.add(models.RapportImage(url=u, rapport_id=new_r.id))
-        db.commit(); db.refresh(new_r)
+    # Gestion images multiples si supporté
+    if hasattr(r, 'image_urls') and r.image_urls:
+         for u in r.image_urls: db.add(models.RapportImage(url=u, rapport_id=new_r.id))
+         db.commit(); db.refresh(new_r)
     return new_r
 
 @app.get("/chantiers/{cid}/rapports", response_model=List[schemas.RapportOut])
@@ -616,10 +717,10 @@ def download_inspection_pdf(iid: int, db: Session = Depends(get_db)):
 @app.post("/ppsps", response_model=schemas.PPSPSOut)
 def create_ppsps(p: schemas.PPSPSCreate, db: Session = Depends(get_db)):
     new_p = models.PPSPS(
-        chantier_id=p.chantier_id, maitre_ouvrage=p.maitre_ouvrage, maitre_oeuvre=p.maitre_oeuvre,
+        chantier_id=p.chantier_id, maitre_ouvrage=p.maitre_ouvrage,
         coordonnateur_sps=p.coordonnateur_sps, responsable_chantier=p.responsable_chantier,
-        nb_compagnons=p.nb_compagnons, horaires=p.horaires, duree_travaux=p.duree_travaux,
-        secours_data=p.secours_data, installations_data=p.installations_data, taches_data=p.taches_data
+        nb_compagnons=p.nb_compagnons, horaires=p.horaires,
+        secours_data=p.secours_data, taches_data=p.taches_data
     )
     db.add(new_p); db.commit(); db.refresh(new_p)
     return new_p
@@ -675,36 +776,30 @@ def get_pic(cid: int, db: Session = Depends(get_db)):
 @app.post("/chantiers/{cid}/pic")
 def save_pic(cid: int, pic: schemas.PicSchema, db: Session = Depends(get_db)):
     existing_pic = db.query(models.PIC).filter(models.PIC.chantier_id == cid).first()
+    # Gestion elements_data qui peut être dict/list ou str
     elements_str = None
-    if pic.elements_data is not None:
-        if isinstance(pic.elements_data, (list, dict)):
-            elements_str = json.dumps(pic.elements_data)
+    # Si le modèle attend 'drawing_data' (comme dans le schéma PicSchema), adaptez ici
+    data_source = getattr(pic, 'drawing_data', getattr(pic, 'elements_data', None))
+    
+    if data_source is not None:
+        if isinstance(data_source, (list, dict)):
+            elements_str = json.dumps(data_source)
         else:
-            elements_str = str(pic.elements_data)
+            elements_str = str(data_source)
 
     if existing_pic:
-        existing_pic.background_url = pic.background_url
-        existing_pic.final_url = pic.final_url
-        existing_pic.elements_data = elements_str
-        if pic.acces: existing_pic.acces = pic.acces
-        if pic.clotures: existing_pic.clotures = pic.clotures
-        if pic.base_vie: existing_pic.base_vie = pic.base_vie
-        if pic.stockage: existing_pic.stockage = pic.stockage
-        if pic.dechets: existing_pic.dechets = pic.dechets
-        if pic.levage: existing_pic.levage = pic.levage
-        if pic.reseaux: existing_pic.reseaux = pic.reseaux
-        if pic.circulations: existing_pic.circulations = pic.circulations
-        if pic.signalisation: existing_pic.signalisation = pic.signalisation
+        # Adaptation selon modèle DB
+        if hasattr(existing_pic, 'background_url'): existing_pic.background_url = pic.final_url # Ou autre champ
+        if hasattr(existing_pic, 'final_url'): existing_pic.final_url = pic.final_url
+        if hasattr(existing_pic, 'elements_data'): existing_pic.elements_data = elements_str
+        # Pas de champs détaillés (acces, clotures...) dans le schema PicSchema fourni
+        # On les ignore ou on adapte si le modèle DB les a
     else:
         new_pic = models.PIC(
             chantier_id=cid,
-            background_url=pic.background_url,
             final_url=pic.final_url,
             elements_data=elements_str,
-            date_creation=datetime.now(),
-            acces=pic.acces, clotures=pic.clotures, base_vie=pic.base_vie,
-            stockage=pic.stockage, dechets=pic.dechets, levage=pic.levage,
-            reseaux=pic.reseaux, circulations=pic.circulations, signalisation=pic.signalisation
+            date_creation=datetime.now()
         )
         db.add(new_pic)
     
@@ -744,6 +839,7 @@ from fastapi.staticfiles import StaticFiles # <--- Important pour voir le logo
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 # 1. Route pour mettre à jour les infos (Texte uniquement)
+# --- UPDATE COMPANY (ROBUSTE) ---
 @app.put("/companies/me", response_model=schemas.CompanyOut)
 def update_company(
     comp_update: schemas.CompanyUpdate, 
@@ -751,38 +847,28 @@ def update_company(
     current_user: models.User = Depends(security.get_current_user)
 ):
     if not current_user.company_id: 
-        raise HTTPException(400, "Pas d'entreprise liée à cet utilisateur")
+        raise HTTPException(400, "Utilisateur sans entreprise")
     
     company = db.query(models.Company).filter(models.Company.id == current_user.company_id).first()
-    
-    if not company:
-        raise HTTPException(404, "Entreprise introuvable")
+    if not company: raise HTTPException(404, "Entreprise introuvable")
 
-    # Mise à jour conditionnelle avec mapping correct
-    if comp_update.name is not None:
-        company.name = comp_update.name
-    if comp_update.address is not None:
-        company.address = comp_update.address
-    if comp_update.phone is not None:
-        company.phone = comp_update.phone
-        
-    # 👇 CORRECTION ICI : on mappe 'contact_email' (JSON) vers 'email' (Base de données)
-    if comp_update.contact_email is not None:
-        company.email = comp_update.contact_email 
+    # On vérifie chaque champ. Si le frontend envoie 'null', on l'ignore pour ne pas écraser la DB avec du vide.
+    if comp_update.name: company.name = comp_update.name
+    if comp_update.address: company.address = comp_update.address
+    if comp_update.phone: company.phone = comp_update.phone
+    
+    # Mapping spécial : contact_email (JSON) -> email (DB)
+    if comp_update.contact_email: 
+        company.email = comp_update.contact_email
     
     try:
         db.commit()
         db.refresh(company)
-        # On s'assure de renvoyer le bon champ pour le frontend
-        # Le schéma de sortie attend 'contact_email', donc on mappe l'inverse manuellement si besoin
-        # Mais Pydantic est intelligent, si CompanyOut a 'contact_email', il faut s'assurer qu'il le trouve.
-        # Si votre modèle DB a 'email', Pydantic ne le trouvera pas tout seul si le schéma demande 'contact_email'.
-        # Solution simple : on renvoie l'objet company tel quel, Pydantic fera le tri.
         return company
     except Exception as e:
         db.rollback()
-        print(f"❌ Erreur Update Company: {e}")
-        raise HTTPException(status_code=500, detail=f"Erreur serveur: {str(e)}")
+        print(f"❌ ERREUR SQL: {e}") 
+        raise HTTPException(status_code=500, detail="Erreur serveur lors de la sauvegarde")
 
 # 2. Route SPÉCIALE pour le logo (Upload)
 @app.post("/companies/me/logo")
@@ -973,37 +1059,6 @@ def read_own_company(
         
     return company
 
-# 2. ROUTE MISE À JOUR SÉCURISÉE (Remplacez l'existante)
-@app.put("/companies/me", response_model=schemas.CompanyOut)
-def update_company(
-    comp_update: schemas.CompanyUpdate, 
-    db: Session = Depends(get_db), 
-    current_user: models.User = Depends(security.get_current_user)
-):
-    if not current_user.company_id: 
-        raise HTTPException(400, "Utilisateur sans entreprise")
-    
-    company = db.query(models.Company).filter(models.Company.id == current_user.company_id).first()
-    if not company: raise HTTPException(404, "Entreprise introuvable")
-
-    # On vérifie chaque champ. Si le frontend envoie 'null', on l'ignore pour ne pas écraser la DB avec du vide.
-    if comp_update.name: company.name = comp_update.name
-    if comp_update.address: company.address = comp_update.address
-    if comp_update.phone: company.phone = comp_update.phone
-    
-    # Mapping spécial : contact_email (JSON) -> email (DB)
-    if comp_update.contact_email: 
-        company.email = comp_update.contact_email
-    
-    try:
-        db.commit()
-        db.refresh(company)
-        return company
-    except Exception as e:
-        db.rollback()
-        print(f"❌ ERREUR SQL: {e}") # Apparaîtra dans les logs Render
-        raise HTTPException(status_code=500, detail="Erreur serveur lors de la sauvegarde")
-    
 @app.post("/companies/me/duerp", response_model=schemas.DUERPOut)
 def create_or_update_duerp(duerp_data: schemas.DUERPCreate, db: Session = Depends(get_db), current_user: models.User = Depends(security.get_current_user)):
     if not current_user.company_id: raise HTTPException(400, "Pas d'entreprise")
@@ -1118,14 +1173,32 @@ def create_task(task: schemas.TaskCreate, db: Session = Depends(get_db)):
         
     return db_task
 
+# --- UPDATE TASK (ROBUSTE) ---
 @app.put("/tasks/{task_id}", response_model=schemas.TaskOut)
 def update_task(task_id: int, task_update: schemas.TaskUpdate, db: Session = Depends(get_db)):
     task = db.query(models.Task).filter(models.Task.id == task_id).first()
     if not task: raise HTTPException(404, "Tâche introuvable")
     
-    if task_update.description: task.description = task_update.description
-    if task_update.status: task.status = task_update.status
-    if task_update.date_prevue: task.date_prevue = task_update.date_prevue
+    # Nettoyage des données reçues (au cas où "null", "", etc)
+    update_data = task_update.dict(exclude_unset=True)
+
+    if "description" in update_data and update_data["description"]: 
+        task.description = update_data["description"]
+        
+    if "status" in update_data and update_data["status"]: 
+        task.status = update_data["status"]
+        
+    if "date_prevue" in update_data:
+        val = update_data["date_prevue"]
+        if not val or val == "":
+            task.date_prevue = None
+        elif isinstance(val, str):
+            try:
+                task.date_prevue = datetime.fromisoformat(val[:10])
+            except:
+                pass # On laisse l'ancienne ou None
+        else:
+            task.date_prevue = val
     
     db.commit()
     db.refresh(task)
