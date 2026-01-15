@@ -37,6 +37,16 @@
     </ion-item>
 
     <ion-item>
+      <ion-input 
+        label="Dernière VGP" 
+        labelPlacement="stacked" 
+        type="date" 
+        [(ngModel)]="data.date_derniere_vgp" 
+        name="date_vgp">
+      </ion-input>
+    </ion-item>
+
+    <ion-item>
       <ion-select label="État" labelPlacement="stacked" [(ngModel)]="data.etat" placeholder="Sélectionner l'état">
         <ion-select-option value="Bon">🟢 Bon état</ion-select-option>
         <ion-select-option value="Moyen">🟠 État moyen</ion-select-option>
