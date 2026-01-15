@@ -71,5 +71,5 @@ export const routes: Routes = [
   {
     path: 'duerp-form',
     loadComponent: () => import('./pages/company/duerp-form/duerp-form.page').then( m => m.DuerpFormPage)
-  },
+  }
 ];

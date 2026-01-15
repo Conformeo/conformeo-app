@@ -6,8 +6,7 @@ import {
   IonHeader, IonToolbar, IonContent,
   IonButtons, IonButton, IonIcon, IonFab, IonFabButton, 
   AlertController, IonBackButton, IonSearchbar,
-  IonTitle, ModalController, LoadingController, IonBadge ,
-  IonicSafeString
+  IonTitle, ModalController, LoadingController, IonBadge
 } from '@ionic/angular/standalone';
 import { Capacitor } from '@capacitor/core';
 import { addIcons } from 'ionicons';
@@ -15,11 +14,14 @@ import { addIcons } from 'ionicons';
 import { 
   add, hammer, construct, home, swapHorizontal, qrCodeOutline,
   searchOutline, cube, homeOutline, locationOutline, shieldCheckmark,
-  trashOutline, hammerOutline, cloudUploadOutline, createOutline 
+  trashOutline, hammerOutline, cloudUploadOutline, createOutline,
+  printOutline // 👈 Ajout de l'icône d'impression
 } from 'ionicons/icons';
 
-import { ApiService, Materiel, Chantier } from '../../services/api'; // Ensure correct path
+import { ApiService, Materiel, Chantier } from '../../services/api'; 
 import { AddMaterielModalComponent } from './add-materiel-modal/add-materiel-modal.component';
+// 👇 Import de la nouvelle modale QR Code
+import { QrCodeModalComponent } from './qr-code-modal/qr-code-modal.page';
 import { BarcodeScanner, BarcodeFormat } from '@capacitor-mlkit/barcode-scanning';
 
 @Component({
@@ -54,7 +56,8 @@ export class MaterielPage implements OnInit {
       searchOutline, cube, homeOutline, locationOutline, shieldCheckmark, createOutline,
       'trash-outline': trashOutline,
       'hammer-outline': hammerOutline,
-      'cloud-upload-outline': cloudUploadOutline
+      'cloud-upload-outline': cloudUploadOutline,
+      'print-outline': printOutline // 👈 Enregistrement icône
     });
 
     this.checkScreen();
@@ -73,11 +76,11 @@ export class MaterielPage implements OnInit {
     // 1. Load equipment
     this.api.getMateriels().subscribe(mats => {
       this.materiels = mats;
-      this.filterMateriels(); // Apply filter if search is active
+      this.filterMateriels(); 
       if (event) event.target.complete();
     });
 
-    // 2. Load sites (for badge names)
+    // 2. Load sites
     this.api.getChantiers().subscribe(chantiers => {
       this.chantiers = chantiers;
     });
@@ -90,7 +93,8 @@ export class MaterielPage implements OnInit {
     } else {
       this.filteredMateriels = this.materiels.filter(m =>
         m.nom.toLowerCase().includes(term) ||
-        (m.reference && m.reference.toLowerCase().includes(term)) // Safe check
+        (m.reference && m.reference.toLowerCase().includes(term)) ||
+        (m.reference && m.reference.toLowerCase().includes(term)) // 👈 Correction : reference
       );
     }
   }
@@ -106,7 +110,7 @@ export class MaterielPage implements OnInit {
         next: (res) => {
           loading.dismiss();
           alert(res.message);
-          this.loadData(); // Refresh list
+          this.loadData();
         },
         error: (err) => {
           loading.dismiss();
@@ -117,120 +121,91 @@ export class MaterielPage implements OnInit {
     }
   }
 
-  // --- SCANNER ---
+  // --- SCANNER INTELLIGENT ---
   async startScan() {
     try {
+      // 1. Permissions
       const { camera } = await BarcodeScanner.requestPermissions();
       if (camera !== 'granted' && camera !== 'limited') {
         alert("Permission caméra refusée.");
         return;
       }
+
+      // 2. Module Google (Android)
       if (Capacitor.getPlatform() === 'android') {
         const { available } = await BarcodeScanner.isGoogleBarcodeScannerModuleAvailable();
         if (!available) await BarcodeScanner.installGoogleBarcodeScannerModule();
       }
+
+      // 3. UI Hacks pour voir la caméra
+      document.body.classList.add('barcode-scanner-active');
+      const elements = document.querySelectorAll('body > *');
+      elements.forEach((el: any) => {
+        if (el.tagName !== 'APP-ROOT') el.style.display = 'none';
+      });
+
+      // 4. Scan
       const { barcodes } = await BarcodeScanner.scan({ formats: [BarcodeFormat.QrCode] });
+
+      // 5. Restauration UI
+      document.body.classList.remove('barcode-scanner-active');
+      elements.forEach((el: any) => el.style.display = '');
+
+      // 6. Traitement Résultat
       if (barcodes.length > 0) {
-        this.handleScanResult(barcodes[0].rawValue);
+        const scannedData = barcodes[0].rawValue;
+        console.log('Scanned:', scannedData);
+
+        let foundMat = null;
+
+        // Cas A : Format "CONFORME-ID"
+        if (scannedData.startsWith('CONFORME-')) {
+          const parts = scannedData.split('-');
+          if(parts.length > 1) {
+            const id = parseInt(parts[1].trim(), 10); // Trim + Base 10 pour éviter les erreurs
+            foundMat = this.materiels.find(m => m.id === id);
+          }
+        } 
+        // Cas B : Référence classique (Interne ou Externe)
+        else {
+          foundMat = this.materiels.find(m => 
+            (m.reference && m.reference.trim() === scannedData.trim()) || 
+            (m.reference && m.reference.trim() === scannedData.trim())
+          );
+        }
+
+        if (foundMat) {
+          this.openEdit(foundMat);
+        } else {
+          // Aide au débogage
+          console.log('IDs dispos:', this.materiels.map(m => m.id));
+          const alert = await this.alertCtrl.create({
+            header: 'Introuvable',
+            message: `Aucun matériel trouvé pour le code : "${scannedData}"`,
+            buttons: ['Ok']
+          });
+          await alert.present();
+        }
       }
+
     } catch (e: any) {
       console.error(e);
+      document.body.classList.remove('barcode-scanner-active');
+      document.querySelectorAll('body > *').forEach((el: any) => el.style.display = '');
       alert("Erreur Scanner : " + (e.message || JSON.stringify(e)));
     }
   }
 
-  handleScanResult(code: string) {
-    const mat = this.materiels.find(m => m.reference === code);
-    if (mat) this.openTransfer(mat); // Open transfer directly
-    else alert(`Aucun matériel trouvé avec la référence : ${code}`);
-  }
-
-  // --- SHOW QR CODE (PASSEPORT SECURITE) ---
+  // --- SHOW QR CODE (VERSION MODALE) ---
+  // Remplace l'ancienne version AlertController qui posait problème sur mobile
   async showQrCode(mat: any) {
-    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=CONFORME-${mat.id}`;
-    
-    let color = '#7f8c8d'; // Gris
-    let textStatus = 'INCONNU';
-
-    if(mat.statut_vgp === 'CONFORME') { color = '#2dd36f'; textStatus = 'VGP OK'; }
-    if(mat.statut_vgp === 'NON CONFORME') { color = '#eb445a'; textStatus = 'INTERDIT'; }
-    if(mat.statut_vgp === 'A PREVOIR') { color = '#ffc409'; textStatus = 'A PRÉVOIR'; }
-
-    // HTML pour l'affichage écran
-    const htmlContent = `
-      <div id="print-section" style="text-align: center;">
-        <h3 style="margin:0; font-size: 1.2em;">${mat.nom}</h3>
-        <p style="margin:5px 0; color:#666;">${mat.ref_interne || mat.reference || ''}</p>
-        
-        <img src="${qrUrl}" alt="QR Code" style="display: block; margin: 10px auto; width: 150px; height: 150px;">
-        
-        <div style="border: 2px solid ${color}; color: ${color}; padding: 5px 10px; border-radius: 5px; display:inline-block; font-weight:bold; margin-top:5px;">
-          ${textStatus}
-        </div>
-        <p style="font-size: 0.8em; color: gray; margin-top:10px;">Prochaine VGP : ${mat.date_derniere_vgp ? new Date(new Date(mat.date_derniere_vgp).setFullYear(new Date(mat.date_derniere_vgp).getFullYear() + 1)).toLocaleDateString() : 'Non définie'}</p>
-      </div>
-    `;
-
-    const alert = await this.alertCtrl.create({
-      header: 'Passeport Sécurité',
-      message: new IonicSafeString(htmlContent),
-      buttons: [
-        {
-          text: 'Imprimer',
-          cssClass: 'secondary',
-          handler: () => {
-            this.printLabel(mat, qrUrl, color, textStatus);
-            return false; // Garde la fenêtre ouverte
-          }
-        },
-        {
-          text: 'Fermer',
-          role: 'cancel'
-        }
-      ]
+    const modal = await this.modalCtrl.create({
+      component: QrCodeModalComponent,
+      componentProps: { mat: mat },
+      breakpoints: [0, 0.8, 1], // Permet de slider vers le bas sur mobile
+      initialBreakpoint: 0.8
     });
-
-    await alert.present();
-  }
-
-  // 👇 NOUVELLE FONCTION D'IMPRESSION
-  printLabel(mat: any, qrUrl: string, color: string, statusText: string) {
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return alert("Autorisez les pop-ups pour imprimer !");
-
-    const vgpDate = mat.date_derniere_vgp ? new Date(mat.date_derniere_vgp) : new Date();
-    const nextDate = new Date(vgpDate);
-    nextDate.setFullYear(vgpDate.getFullYear() + 1);
-
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>Etiquette ${mat.nom}</title>
-          <style>
-            body { font-family: Arial, sans-serif; text-align: center; padding: 20px; }
-            .label { border: 2px solid black; padding: 10px; width: 300px; margin: 0 auto; border-radius: 10px; }
-            h1 { font-size: 18px; margin: 5px 0; }
-            h2 { font-size: 14px; color: #555; margin-bottom: 10px; }
-            img { width: 120px; height: 120px; }
-            .status { font-weight: bold; font-size: 16px; margin-top: 10px; color: ${color}; border: 2px solid ${color}; display: inline-block; padding: 5px 10px; border-radius: 5px; }
-            .dates { font-size: 10px; margin-top: 10px; color: #333; }
-          </style>
-        </head>
-        <body onload="window.print();window.close()">
-          <div class="label">
-            <h1>${mat.nom}</h1>
-            <h2>Ref: ${mat.ref_interne || mat.reference || '---'}</h2>
-            <img src="${qrUrl}" />
-            <br>
-            <div class="status">${statusText}</div>
-            <div class="dates">
-              Validité jusqu'au : <strong>${nextDate.toLocaleDateString()}</strong>
-            </div>
-          </div>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
+    await modal.present();
   }
 
   // --- CREATION ---
@@ -315,7 +290,6 @@ export class MaterielPage implements OnInit {
        }
        return mat.image_url;
     }
-    // Return empty string to let ngIf handle the fallback icon
     return ''; 
   }
 
@@ -336,10 +310,6 @@ export class MaterielPage implements OnInit {
     return c ? c.nom : 'Inconnu';
   }
   
-  getStatusColor(etat: string | undefined): string {
-    return etat || 'Bon';
-  }
-
   getMaterielsSortis(): number {
     return this.materiels.filter(m => m.chantier_id).length;
   }
