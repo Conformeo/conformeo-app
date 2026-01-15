@@ -1234,38 +1234,15 @@ def delete_task(task_id: int, db: Session = Depends(get_db)):
     return {"ok": True}
 
 @app.post("/permis-feu", response_model=schemas.PermisFeuOut)
-def create_permis_feu(p: schemas.PermisFeuCreate, db: Session = Depends(get_db)):
-    # 1. Sauvegarde de la signature en image
-    sig_filename = f"signature_permis_{datetime.now().timestamp()}.png"
-    sig_path = f"uploads/{sig_filename}"
-    
-    try:
-        # On enlève le header "data:image/png;base64," si présent
-        if "," in p.signature_base64:
-            header, encoded = p.signature_base64.split(",", 1)
-        else:
-            encoded = p.signature_base64
-            
-        with open(sig_path, "wb") as f:
-            f.write(base64.b64decode(encoded))
-    except Exception as e:
-        print(f"Erreur signature: {e}")
-        sig_path = None
-
-    # 2. Sauvegarde en BDD
-    new_permis = models.PermisFeu(
-        chantier_id=p.chantier_id,
-        zone_travail=p.zone_travail,
-        nature_travaux=p.nature_travaux,
-        intervenant_nom=p.intervenant_nom,
-        mesures_preventives=",".join(p.mesures), # On stocke en string simple
-        signature_url=sig_path
-    )
-    db.add(new_permis)
+def create_permis_feu(permis: schemas.PermisFeuCreate, db: Session = Depends(get_db)):
+    db_permis = schemas.PermisFeu(**permis.dict())
+    db.add(db_permis)
     db.commit()
-    db.refresh(new_permis)
+    db.refresh(db_permis)
     
-    return new_permis
+    # TODO (Optionnel) : Générer un PDF ici et l'ajouter aux documents du chantier
+    
+    return db_permis
 
 # ==========================================
 # 9. FIX & MIGRATIONS

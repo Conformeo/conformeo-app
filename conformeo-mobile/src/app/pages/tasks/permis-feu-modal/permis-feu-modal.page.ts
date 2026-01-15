@@ -1,7 +1,8 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, Input, OnInit } from '@angular/core'; // Ajoutez Input
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { IonicModule, ModalController } from '@ionic/angular';
+import { IonicModule, ModalController, ToastController } from '@ionic/angular';
+import { ApiService } from '../../../services/api'; // Importez l'API
 
 @Component({
   selector: 'app-permis-feu-modal',
@@ -12,24 +13,28 @@ import { IonicModule, ModalController } from '@ionic/angular';
 })
 export class PermisFeuModalPage implements OnInit {
   
-  // Données du formulaire
+  @Input() chantierId!: number; // On a besoin de l'ID du chantier !
+
   formData = {
-    date: new Date().toISOString(),
     lieu: '',
-    description: '',
     intervenant: '',
+    description: '',
     mesures: {
       extincteur: false,
       nettoyage: false,
-      surveillance: false,
-      alarme: false
+      surveillance: false
     },
     signature: false
   };
 
-  constructor(private modalCtrl: ModalController) { }
+  constructor(
+    private modalCtrl: ModalController,
+    private api: ApiService,
+    private toastCtrl: ToastController
+  ) { }
 
   ngOnInit() {
+    console.log("Permis Feu pour Chantier ID:", this.chantierId);
   }
 
   close() {
@@ -41,11 +46,33 @@ export class PermisFeuModalPage implements OnInit {
       alert("Veuillez remplir le lieu et l'intervenant.");
       return;
     }
-    
-    // Ici, on enverrait normalement à l'API
-    console.log("Permis validé :", this.formData);
-    
-    // On ferme en renvoyant "success"
-    this.modalCtrl.dismiss({ saved: true }, 'confirm');
+
+    // Préparation des données pour le Backend
+    const payload = {
+      chantier_id: this.chantierId,
+      lieu: this.formData.lieu,
+      intervenant: this.formData.intervenant,
+      description: this.formData.description,
+      extincteur: this.formData.mesures.extincteur,
+      nettoyage: this.formData.mesures.nettoyage,
+      surveillance: this.formData.mesures.surveillance
+    };
+
+    // Envoi API
+    this.api.savePermisFeu(payload).subscribe({
+      next: async (res) => {
+        const toast = await this.toastCtrl.create({
+          message: '✅ Permis de Feu validé et enregistré !',
+          duration: 3000,
+          color: 'success'
+        });
+        toast.present();
+        this.modalCtrl.dismiss({ saved: true }, 'confirm');
+      },
+      error: (err) => {
+        console.error(err);
+        alert("Erreur lors de l'enregistrement.");
+      }
+    });
   }
 }

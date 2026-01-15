@@ -69,7 +69,10 @@ export class TaskListComponent implements OnInit {
 
   async openPermisFeuModal() {
     const modal = await this.modalCtrl.create({
-      component: PermisFeuModalPage
+      component: PermisFeuModalPage,
+      componentProps: { 
+        chantierId: this.chantierId // 👈 ON PASSE L'ID ICI
+      }
     });
     await modal.present();
 

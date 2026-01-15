@@ -621,4 +621,10 @@ export class ApiService {
   deleteTask(taskId: number) {
     return this.http.delete<any>(`${this.apiUrl}/tasks/${taskId}`);
   }
+
+
+  // --- PERMIS FEU ---
+  savePermisFeu(data: any) {
+    return this.http.post<any>(`${this.apiUrl}/permis-feu`, data);
+  }
 }
