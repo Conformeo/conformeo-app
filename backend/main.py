@@ -344,66 +344,6 @@ def read_chantiers(
         print(f"❌ CRITICAL ERROR /chantiers: {str(e)}")
         return [] # On renvoie une liste vide au pire, pas une erreur 500
 
-# --- ROUTE MATERIELS (VERSION "TOUT TERRAIN") ---
-@app.get("/materiels", response_model=List[schemas.MaterielOut])
-def read_materiels(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    try:
-        raw_rows = db.query(models.Materiel).offset(skip).limit(limit).all()
-        valid_rows = []
-        today = datetime.now()
-
-        for row in raw_rows:
-            try:
-                # 1. RECUPERATION SECURISEE (Le fix est ici)
-                # On utilise getattr avec 'None' par défaut si la colonne n'existe pas en BDD
-                date_vgp = getattr(row, "date_derniere_vgp", None)
-
-                # 2. SIMULATION (Si pas de date ou colonne manquante)
-                if not date_vgp:
-                    # On génère une date aléatoire pour la démo
-                    months_back = random.randint(2, 14)
-                    date_vgp = today - timedelta(days=months_back * 30)
-                
-                # Sécurisation format texte éventuel
-                if isinstance(date_vgp, str):
-                    try:
-                        date_vgp = datetime.fromisoformat(str(date_vgp))
-                    except:
-                        date_vgp = today
-
-                # 3. CALCUL DU STATUT
-                prochaine = date_vgp + timedelta(days=365)
-                delta = (prochaine - today).days
-                
-                statut = "CONFORME"
-                if delta < 0: statut = "NON CONFORME"
-                elif delta < 30: statut = "A PREVOIR"
-
-                # 4. CONSTRUCTION DE L'OBJET SORTANT
-                # On force les valeurs calculées
-                mat_out = schemas.MaterielOut(
-                    id=row.id,
-                    nom=row.nom or "Sans nom",
-                    ref_interne=getattr(row, "ref_interne", None),
-                    etat=getattr(row, "etat", "Bon"),
-                    chantier_id=row.chantier_id,
-                    date_derniere_vgp=date_vgp, # On injecte la date simulée/réelle
-                    image_url=row.image_url,
-                    statut_vgp=statut           # On injecte le statut calculé
-                )
-                valid_rows.append(mat_out)
-
-            except Exception as e:
-                # On log l'erreur spécifique mais on continue
-                print(f"⚠️ Erreur de mapping sur matériel {row.id}: {e}")
-                continue
-
-        return valid_rows
-
-    except Exception as e:
-        print(f"❌ CRITICAL ERROR /materiels: {str(e)}")
-        return []
-
 @app.get("/chantiers/{chantier_id}", response_model=schemas.ChantierOut)
 def read_chantier(chantier_id: int, db: Session = Depends(get_db)):
     chantier = db.query(models.Chantier).filter(models.Chantier.id == chantier_id).first()
@@ -500,58 +440,58 @@ def create_materiel(mat: schemas.MaterielCreate, db: Session = Depends(get_db)):
     db.add(new_m); db.commit(); db.refresh(new_m)
     return new_m
 
-# --- ROUTE MATERIEL (CORRIGÉE : VGP vs ETAT) ---
+# --- ROUTE MATERIELS (CORRIGÉE : CHAMP REFERENCE) ---
 @app.get("/materiels", response_model=List[schemas.MaterielOut])
 def read_materiels(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     try:
-        materiels = db.query(models.Materiel).offset(skip).limit(limit).all()
-        
+        raw_rows = db.query(models.Materiel).offset(skip).limit(limit).all()
+        valid_rows = []
         today = datetime.now()
-        valid_materiels = []
 
-        for mat in materiels:
+        for row in raw_rows:
             try:
-                # 1. Simulation date si vide (Demo effect)
-                if not mat.date_derniere_vgp:
+                # 1. Gestion date VGP
+                date_vgp = getattr(row, "date_derniere_vgp", None)
+                if not date_vgp:
                     months_back = random.randint(2, 14)
-                    mat.date_derniere_vgp = today - timedelta(days=months_back * 30)
+                    date_vgp = today - timedelta(days=months_back * 30)
                 
-                # 2. Sécurisation du format de date
-                date_controle = mat.date_derniere_vgp
-                if isinstance(date_controle, str):
+                if isinstance(date_vgp, str):
                     try:
-                        # On tente de convertir si c'est du texte
-                        date_controle = datetime.fromisoformat(str(date_controle))
+                        date_vgp = datetime.fromisoformat(str(date_vgp))
                     except:
-                        # Si échec, on prend aujourd'hui pour ne pas crasher
-                        date_controle = today
+                        date_vgp = today
 
-                # 3. Calcul VGP
-                # On s'assure qu'on a bien un objet datetime pour faire des maths
-                if not isinstance(date_controle, datetime):
-                     # Cas extrême (date en format int/float...)
-                     date_controle = today
-
-                prochaine_vgp = date_controle + timedelta(days=365)
-                jours_restants = (prochaine_vgp - today).days
+                # 2. Calcul Statut
+                prochaine = date_vgp + timedelta(days=365)
+                delta = (prochaine - today).days
                 
-                if jours_restants < 0:
-                    setattr(mat, "statut_vgp", "NON CONFORME")
-                elif jours_restants < 30:
-                    setattr(mat, "statut_vgp", "A PREVOIR")
-                else:
-                    setattr(mat, "statut_vgp", "CONFORME")
-                
-                # On ajoute à la liste validée
-                valid_materiels.append(mat)
+                statut = "CONFORME"
+                if delta < 0: statut = "NON CONFORME"
+                elif delta < 30: statut = "A PREVOIR"
 
-            except Exception as e_inner:
-                print(f"⚠️ Erreur sur matériel {mat.id}: {e_inner}")
-                # On l'ajoute quand même pour qu'il s'affiche !
-                setattr(mat, "statut_vgp", "INCONNU")
-                valid_materiels.append(mat)
-            
-        return valid_materiels
+                # 3. Construction objet (CORRECTION ICI)
+                # On essaie de récupérer 'reference' ou 'ref_interne' dans la BDD
+                # Mais on l'assigne bien au champ 'reference' du schéma !
+                ref_value = getattr(row, "reference", getattr(row, "ref_interne", None))
+
+                mat_out = schemas.MaterielOut(
+                    id=row.id,
+                    nom=row.nom or "Sans nom",
+                    reference=ref_value, # 👈 C'est ici la correction
+                    etat=getattr(row, "etat", "Bon"),
+                    chantier_id=row.chantier_id,
+                    date_derniere_vgp=date_vgp,
+                    image_url=row.image_url,
+                    statut_vgp=statut
+                )
+                valid_rows.append(mat_out)
+
+            except Exception as e:
+                print(f"⚠️ Erreur mapping matériel {row.id}: {e}")
+                continue
+
+        return valid_rows
 
     except Exception as e:
         print(f"❌ CRITICAL ERROR /materiels: {str(e)}")

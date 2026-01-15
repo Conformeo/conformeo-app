@@ -90,7 +90,7 @@
 
           <div class="text-info">
             <h3 class="tool-name">{{ mat.nom }}</h3>
-            <p class="tool-ref">{{ mat.reference }}</p>
+            <p class="tool-ref">{{ mat.reference || 'Aucune réf.' }}</p>
             
             <div class="location-row">
                <ion-icon [name]="mat.chantier_id ? 'location-outline' : 'home-outline'" size="small"></ion-icon>
@@ -186,7 +186,7 @@
 
         <div class="equip-info">
           <h3>{{ mat.nom }}</h3>
-          <p class="ref">{{ mat.reference }}</p>
+          <p class="ref">{{ mat.reference || 'Aucune réf.' }}</p>
 
           <div class="location-tag" [class.out]="mat.chantier_id">
             {{ mat.chantier_id ? 'Sur Chantier' : 'Au Dépôt' }}
