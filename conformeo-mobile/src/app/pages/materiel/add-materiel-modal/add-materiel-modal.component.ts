@@ -34,7 +34,8 @@ export class AddMaterielModalComponent implements OnInit {
     nom: '',
     reference: '',
     etat: 'Bon', // Physical state (manual)
-    image_url: ''
+    image_url: '',
+    date_derniere_vgp: '' // Nouveau champ
   };
   
   processedImage: string | null = null;
@@ -56,7 +57,8 @@ export class AddMaterielModalComponent implements OnInit {
         nom: this.existingItem.nom,
         reference: this.existingItem.reference,
         etat: this.existingItem.etat || 'Bon',
-        image_url: this.existingItem.image_url
+        image_url: this.existingItem.image_url,
+        date_derniere_vgp: this.existingItem.date_derniere_vgp ? this.existingItem.date_derniere_vgp.split('T')[0] : ''
       };
       this.processedImage = this.existingItem.image_url;
     }
@@ -136,8 +138,9 @@ export class AddMaterielModalComponent implements OnInit {
       reference: this.data.reference,
       etat: this.data.etat,
       image_url: imageUrl,
+      date_derniere_vgp: this.data.date_derniere_vgp,
       // 👇 IMPORTANT: Add required field for TypeScript/Backend validation
-      statut_vgp: this.existingItem ? this.existingItem.statut_vgp : 'INCONNU' 
+      statut_vgp: this.existingItem ? this.existingItem.statut_vgp : 'INCONNU'
     };
 
     if (this.existingItem) {

@@ -75,16 +75,20 @@ class MaterielCreate(BaseModel):
     reference: Optional[str] = None
     etat: str = "BON" 
     chantier_id: Optional[int] = None
+    # 👇 On ajoute le champ pour la création
+    date_derniere_vgp: Optional[Any] = None 
+    image_url: Optional[str] = None
 
-# 👇 NOUVELLE CLASSE UPDATE (Ajoutée pour l'édition)
 class MaterielUpdate(BaseModel):
     nom: Optional[str] = None
     reference: Optional[str] = None
-    ref_interne: Optional[str] = None # Au cas où
+    ref_interne: Optional[str] = None
     etat: Optional[str] = None
-    chantier_id: Optional[Any] = None # <-- Any pour accepter "" ou 0 (retour dépôt)
+    chantier_id: Optional[Any] = None
     statut_vgp: Optional[str] = None
     image_url: Optional[str] = None
+    # 👇 On ajoute le champ pour la modification
+    date_derniere_vgp: Optional[Any] = None
 
 class MaterielOut(BaseModel):
     id: int

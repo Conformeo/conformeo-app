@@ -499,11 +499,25 @@ async def import_chantiers_csv(file: UploadFile = File(...), db: Session = Depen
 # ==========================================
 @app.post("/materiels", response_model=schemas.MaterielOut)
 def create_materiel(mat: schemas.MaterielCreate, db: Session = Depends(get_db)):
-    new_m = models.Materiel(nom=mat.nom, reference=mat.reference, etat=mat.etat, image_url=None) # Ajusté image_url
+    # Gestion de la date reçue
+    d_vgp = mat.date_derniere_vgp
+    if isinstance(d_vgp, str) and d_vgp.strip():
+        try: d_vgp = datetime.fromisoformat(d_vgp[:10])
+        except: d_vgp = None
+    else:
+        d_vgp = None # Pas de date par défaut si rien n'est envoyé
+
+    new_m = models.Materiel(
+        nom=mat.nom, 
+        reference=mat.reference, 
+        etat=mat.etat, 
+        image_url=mat.image_url,
+        date_derniere_vgp=d_vgp # 👈 On enregistre la vraie date
+    )
     db.add(new_m); db.commit(); db.refresh(new_m)
     return new_m
 
-# --- ROUTE MATERIELS (CORRIGÉE : CHAMP REFERENCE) ---
+# --- ROUTE MATERIELS (VERSION RÉELLE - SANS SIMULATION) ---
 @app.get("/materiels", response_model=List[schemas.MaterielOut])
 def read_materiels(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     try:
@@ -513,40 +527,37 @@ def read_materiels(skip: int = 0, limit: int = 100, db: Session = Depends(get_db
 
         for row in raw_rows:
             try:
-                # 1. Gestion date VGP
+                # 1. Récupération de la VRAIE date (pas de simulation)
                 date_vgp = getattr(row, "date_derniere_vgp", None)
-                if not date_vgp:
-                    months_back = random.randint(2, 14)
-                    date_vgp = today - timedelta(days=months_back * 30)
-                
-                if isinstance(date_vgp, str):
-                    try:
-                        date_vgp = datetime.fromisoformat(str(date_vgp))
-                    except:
-                        date_vgp = today
+                statut = "INCONNU" # Par défaut, c'est gris
 
-                # 2. Calcul Statut
-                prochaine = date_vgp + timedelta(days=365)
-                delta = (prochaine - today).days
-                
-                statut = "CONFORME"
-                if delta < 0: statut = "NON CONFORME"
-                elif delta < 30: statut = "A PREVOIR"
+                # 2. Si une date existe, on calcule le vrai statut
+                if date_vgp:
+                    # Sécurisation format
+                    if isinstance(date_vgp, str):
+                        try: date_vgp = datetime.fromisoformat(str(date_vgp))
+                        except: date_vgp = None
+                    
+                    if date_vgp:
+                        prochaine = date_vgp + timedelta(days=365) # Règle 1 an
+                        delta = (prochaine - today).days
+                        
+                        if delta < 0: statut = "NON CONFORME"
+                        elif delta < 30: statut = "A PREVOIR"
+                        else: statut = "CONFORME"
 
-                # 3. Construction objet (CORRECTION ICI)
-                # On essaie de récupérer 'reference' ou 'ref_interne' dans la BDD
-                # Mais on l'assigne bien au champ 'reference' du schéma !
+                # 3. Construction objet
                 ref_value = getattr(row, "reference", getattr(row, "ref_interne", None))
 
                 mat_out = schemas.MaterielOut(
                     id=row.id,
                     nom=row.nom or "Sans nom",
-                    reference=ref_value, # 👈 C'est ici la correction
+                    reference=ref_value,
                     etat=getattr(row, "etat", "Bon"),
                     chantier_id=row.chantier_id,
                     date_derniere_vgp=date_vgp,
                     image_url=row.image_url,
-                    statut_vgp=statut
+                    statut_vgp=statut # Le vrai statut calculé
                 )
                 valid_rows.append(mat_out)
 
@@ -591,6 +602,14 @@ def update_materiel(mid: int, mat: schemas.MaterielUpdate, db: Session = Depends
             else:
                 db_mat.chantier_id = value
         
+        # 👇 AJOUTEZ CECI : Gestion de la date VGP
+        elif key == "date_derniere_vgp":
+            if value and isinstance(value, str):
+                try: setattr(db_mat, key, datetime.fromisoformat(value[:10]))
+                except: pass
+            else:
+                setattr(db_mat, key, value)
+
         # On ignore 'statut_vgp' car c'est calculé
         elif key == "statut_vgp":
             pass
