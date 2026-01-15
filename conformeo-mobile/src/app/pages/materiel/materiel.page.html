@@ -160,13 +160,12 @@
              [class.border-orange]="mat.statut_vgp === 'A PREVOIR'"
              [class.border-red]="mat.statut_vgp === 'NON CONFORME'"
              [class.border-gray]="!mat.statut_vgp || mat.statut_vgp === 'INCONNU'"
-             style="position: relative;">
+             style="border-bottom-width: 4px; border-bottom-style: solid; position: relative;">
           
           <img 
             *ngIf="getImageUrl(mat)" 
             [src]="getThumbUrl(getImageUrl(mat))"
             crossorigin="anonymous"
-            style="width:100%; height:100%; object-fit:contain;"
           >
           <ion-icon 
             *ngIf="!getImageUrl(mat)"
@@ -179,7 +178,7 @@
                [class.bg-orange]="mat.statut_vgp === 'A PREVOIR'"
                [class.bg-red]="mat.statut_vgp === 'NON CONFORME'"
                [class.bg-gray]="!mat.statut_vgp || mat.statut_vgp === 'INCONNU'"
-               style="position: absolute; top: 10px; left: 10px; padding: 4px 8px; border-radius: 12px; color: white; font-weight: bold; font-size: 0.7rem; display: flex; align-items: center; gap: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
+               style="position: absolute; top: 10px; left: 10px; padding: 4px 8px; border-radius: 12px; font-weight: bold; font-size: 0.7rem; display: flex; align-items: center; gap: 4px;">
             <ion-icon name="shield-checkmark"></ion-icon>
             {{ mat.statut_vgp || 'INCONNU' }}
           </div>

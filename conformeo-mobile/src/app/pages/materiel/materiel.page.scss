@@ -408,3 +408,46 @@
 .border-gray {
   border-color: #95a5a6;
 }
+
+// --- COULEURS VGP ---
+
+// Fonds pour les badges
+.bg-green { background-color: #2dd36f !important; color: white; }
+.bg-orange { background-color: #ffc409 !important; color: black; } // Noir pour le contraste sur l'orange
+.bg-red { background-color: #eb445a !important; color: white; }
+.bg-gray { background-color: #95a5a6 !important; color: white; }
+
+// Bordures pour les images
+.border-green { border-color: #2dd36f !important; }
+.border-orange { border-color: #ffc409 !important; }
+.border-red { border-color: #eb445a !important; }
+.border-gray { border-color: #95a5a6 !important; }
+
+// --- STYLES DESKTOP ---
+.desktop-only {
+  .equip-card {
+    // Pour que l'image ne soit pas écrasée
+    .equip-image {
+      height: 200px; // Hauteur fixe pour le conteneur
+      width: 100%;
+      background-color: #f8f9fa; // Fond gris clair pour les images détourées
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden; // Cache ce qui dépasse au cas où
+
+      img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain; // L'image garde ses proportions et rentre dans la boîte
+      }
+    }
+    
+    // Amélioration de la lisibilité du badge
+    .vgp-badge {
+      z-index: 10; // S'assure qu'il est au-dessus de l'image
+      box-shadow: 0 2px 5px rgba(0,0,0,0.3) !important; // Ombre plus marquée
+      text-shadow: 0 1px 2px rgba(0,0,0,0.5); // Légère ombre portée sur le texte
+    }
+  }
+}
