@@ -1,8 +1,8 @@
 .photo-zone {
   width: 100%;
-  height: 200px;
-  // background: #f4f5f8; // 👈 SUPPRIMÉ : Plus de fond gris
-  border: 2px dashed #ccc; // Bordure en pointillés pour l'état "vide"
+  height: 220px; /* Un peu plus de hauteur pour le confort */
+  background-color: #f9f9f9; /* Fond très clair par défaut */
+  border: 2px dashed #ccc; /* Bordure pointillée par défaut */
   border-radius: 12px;
   display: flex;
   justify-content: center;
@@ -11,12 +11,16 @@
   margin-bottom: 20px;
   position: relative;
   cursor: pointer;
+  transition: all 0.3s ease;
 
+  // Quand une image est chargée (classe ajoutée dynamiquement)
   &.has-image {
-    border: none; // On enlève la bordure en pointillés quand il y a une image
-    // border-bottom: 4px solid #ccc; // 👈 SUPPRIMÉ : Plus de bordure en bas
+    border: none !important; // On supprime la bordure pointillée
+    background-color: transparent !important; // On supprime le fond gris
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1); // Optionnel : petite ombre jolie
   }
 
+  // Le texte et l'icône "Prendre une photo"
   .placeholder {
     text-align: center;
     color: #666;
@@ -24,6 +28,7 @@
     flex-direction: column;
     align-items: center;
     gap: 10px;
+    z-index: 2; // S'assure qu'il est au dessus si bug d'affichage
 
     .icon-circle {
       background: #e0e0e0;
@@ -42,15 +47,30 @@
     small { color: var(--ion-color-primary); font-weight: bold; }
   }
 
+  // Animation de chargement IA
   .processing {
     text-align: center;
     p { margin-top: 15px; font-weight: 500; color: #666; }
   }
 
+  // L'IMAGE ELLE-MÊME (C'est ici la correction critique)
   .preview-img {
     width: 100%;
     height: 100%;
-    // 👇 CORRECTION : 'contain' pour voir toute l'image sans la rogner
-    object-fit: contain; 
+    // 👇 FORCE L'IMAGE ENTIÈRE (Pas de rognage)
+    object-fit: contain !important; 
+    display: block;
+    background-color: white; // Fond blanc propre derrière l'image détourée
   }
+}
+
+// Petits ajustements pour la liste en dessous
+ion-list {
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+ion-item {
+  --padding-start: 0;
+  margin-bottom: 10px;
 }
