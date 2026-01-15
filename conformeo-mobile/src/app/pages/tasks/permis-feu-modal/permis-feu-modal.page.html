@@ -1,0 +1,66 @@
+<ion-header>
+  <ion-toolbar color="danger">
+    <ion-title>🔥 Permis de Feu</ion-title>
+    <ion-buttons slot="end">
+      <ion-button (click)="close()">Fermer</ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  
+  <div class="intro-box">
+    <ion-icon name="alert-circle-outline"></ion-icon>
+    <p>Obligatoire pour tous travaux par points chauds (soudure, meulage, découpe...).</p>
+  </div>
+
+  <ion-list>
+    <ion-item-group>
+      <ion-item-divider>
+        <ion-label>Détails Intervention</ion-label>
+      </ion-item-divider>
+
+      <ion-item>
+        <ion-input label="Lieu exact" labelPlacement="stacked" placeholder="Ex: Zone A, Toiture..." [(ngModel)]="formData.lieu"></ion-input>
+      </ion-item>
+      <ion-item>
+        <ion-input label="Intervenant" labelPlacement="stacked" placeholder="Nom du soudeur" [(ngModel)]="formData.intervenant"></ion-input>
+      </ion-item>
+      <ion-item>
+        <ion-textarea label="Travaux" labelPlacement="stacked" placeholder="Description..." [(ngModel)]="formData.description"></ion-textarea>
+      </ion-item>
+    </ion-item-group>
+
+    <ion-item-group>
+      <ion-item-divider>
+        <ion-label>Mesures de Sécurité (Cochez)</ion-label>
+      </ion-item-divider>
+
+      <ion-item>
+        <ion-checkbox slot="start" [(ngModel)]="formData.mesures.extincteur"></ion-checkbox>
+        <ion-label>Extincteur à portée de main</ion-label>
+      </ion-item>
+      <ion-item>
+        <ion-checkbox slot="start" [(ngModel)]="formData.mesures.nettoyage"></ion-checkbox>
+        <ion-label>Zone nettoyée (matériaux inflammables)</ion-label>
+      </ion-item>
+      <ion-item>
+        <ion-checkbox slot="start" [(ngModel)]="formData.mesures.surveillance"></ion-checkbox>
+        <ion-label>Surveillance post-intervention (2h)</ion-label>
+      </ion-item>
+    </ion-item-group>
+
+    <ion-item lines="none" class="signature-item">
+      <ion-checkbox slot="start" color="danger" [(ngModel)]="formData.signature"></ion-checkbox>
+      <ion-label>
+        <strong>Je certifie avoir pris connaissance des risques.</strong>
+      </ion-label>
+    </ion-item>
+
+  </ion-list>
+
+  <ion-button expand="block" color="danger" class="ion-margin-top" (click)="savePermis()" [disabled]="!formData.signature">
+    VALIDER LE PERMIS
+  </ion-button>
+
+</ion-content>

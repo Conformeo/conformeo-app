@@ -5,6 +5,8 @@ import { IonicModule, AlertController, ToastController } from '@ionic/angular';
 import { ApiService } from '../../services/api';
 import { add, trashOutline, checkboxOutline, squareOutline, alertCircleOutline } from 'ionicons/icons';
 import { addIcons } from 'ionicons';
+import { ModalController } from '@ionic/angular';
+import { PermisFeuModalPage } from '../../pages/tasks/permis-feu-modal/permis-feu-modal.page';
 
 @Component({
   selector: 'app-task-list',
@@ -22,7 +24,8 @@ export class TaskListComponent implements OnInit {
   constructor(
     private api: ApiService,
     private alertCtrl: AlertController,
-    private toastCtrl: ToastController
+    private toastCtrl: ToastController,
+    private modalCtrl: ModalController
   ) {
     addIcons({ add, trashOutline, checkboxOutline, squareOutline, alertCircleOutline });
   }
@@ -64,6 +67,18 @@ export class TaskListComponent implements OnInit {
     });
   }
 
+  async openPermisFeuModal() {
+    const modal = await this.modalCtrl.create({
+      component: PermisFeuModalPage
+    });
+    await modal.present();
+
+    const { role } = await modal.onWillDismiss();
+    if (role === 'confirm') {
+      this.presentToast("✅ Permis de Feu généré et archivé !", "success");
+    }
+  }
+
   // Nouvelle méthode pour gérer l'alerte reçue du serveur
   async handleRiskAlert(task: any) {
     
@@ -78,9 +93,7 @@ export class TaskListComponent implements OnInit {
           { 
             text: '📄 Créer Permis de Feu', 
             handler: () => {
-              // ICI : On redirigera vers le formulaire Permis de Feu
-              console.log("-> Redirection vers Permis Feu pour chantier : " + this.chantierId);
-              // TODO: Navigation vers la page PermisFeu
+              this.openPermisFeuModal(); // 👈 Appel de la fonction
             }
           }
         ]

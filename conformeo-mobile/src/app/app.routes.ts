@@ -75,5 +75,9 @@ export const routes: Routes = [
   {
     path: 'permis-feu-modal',
     loadComponent: () => import('./pages/tasks/permis-feu-modal/permis-feu-modal.page').then( m => m.PermisFeuModalPage)
+  },
+  {
+    path: 'permis-feu-modal',
+    loadComponent: () => import('./pages/tasks/permis-feu-modal/permis-feu-modal.page').then( m => m.PermisFeuModalPage)
   }
 ];
