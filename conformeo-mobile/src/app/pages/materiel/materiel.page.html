@@ -160,7 +160,7 @@
              [class.border-orange]="mat.statut_vgp === 'A PREVOIR'"
              [class.border-red]="mat.statut_vgp === 'NON CONFORME'"
              [class.border-gray]="!mat.statut_vgp || mat.statut_vgp === 'INCONNU'"
-             style="border-bottom-width: 4px; border-bottom-style: solid; position: relative;">
+             style="position: relative;">
           
           <img 
             *ngIf="getImageUrl(mat)" 
