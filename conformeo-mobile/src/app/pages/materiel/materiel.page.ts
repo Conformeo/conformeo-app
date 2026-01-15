@@ -149,32 +149,88 @@ export class MaterielPage implements OnInit {
   async showQrCode(mat: any) {
     const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=CONFORME-${mat.id}`;
     
-    // On force la couleur en hexadécimal pour être sûr que le style passe
-    let color = '#7f8c8d'; // Gris par défaut
-    if(mat.statut_vgp === 'CONFORME') color = '#2dd36f'; // Vert
-    if(mat.statut_vgp === 'NON CONFORME') color = '#eb445a'; // Rouge
-    if(mat.statut_vgp === 'A PREVOIR') color = '#ffc409'; // Orange
+    let color = '#7f8c8d'; // Gris
+    let textStatus = 'INCONNU';
 
-    // Construction de la chaîne sécurisée
+    if(mat.statut_vgp === 'CONFORME') { color = '#2dd36f'; textStatus = 'VGP OK'; }
+    if(mat.statut_vgp === 'NON CONFORME') { color = '#eb445a'; textStatus = 'INTERDIT'; }
+    if(mat.statut_vgp === 'A PREVOIR') { color = '#ffc409'; textStatus = 'A PRÉVOIR'; }
+
+    // HTML pour l'affichage écran
     const htmlContent = `
-      <div style="text-align: center;">
-        <img src="${qrUrl}" alt="QR Code" style="display: block; margin: 10px auto; width: 150px; height: 150px; border-radius: 8px;">
-        <p style="margin-top: 10px; font-size: 1.1em;">
-          Statut: <strong style="color: ${color};">${mat.statut_vgp || 'INCONNU'}</strong>
-        </p>
-        <p style="color: #666; font-size: 0.9em;">Scannez pour le rapport</p>
+      <div id="print-section" style="text-align: center;">
+        <h3 style="margin:0; font-size: 1.2em;">${mat.nom}</h3>
+        <p style="margin:5px 0; color:#666;">${mat.ref_interne || mat.reference || ''}</p>
+        
+        <img src="${qrUrl}" alt="QR Code" style="display: block; margin: 10px auto; width: 150px; height: 150px;">
+        
+        <div style="border: 2px solid ${color}; color: ${color}; padding: 5px 10px; border-radius: 5px; display:inline-block; font-weight:bold; margin-top:5px;">
+          ${textStatus}
+        </div>
+        <p style="font-size: 0.8em; color: gray; margin-top:10px;">Prochaine VGP : ${mat.date_derniere_vgp ? new Date(new Date(mat.date_derniere_vgp).setFullYear(new Date(mat.date_derniere_vgp).getFullYear() + 1)).toLocaleDateString() : 'Non définie'}</p>
       </div>
     `;
 
     const alert = await this.alertCtrl.create({
-      header: mat.nom,
-      subHeader: 'Passeport de Conformité',
-      message: new IonicSafeString(htmlContent), // 👈 Utilisation explicite
-      buttons: ['Fermer'],
-      cssClass: 'qr-alert' // Classe optionnelle si vous voulez styliser plus tard
+      header: 'Passeport Sécurité',
+      message: new IonicSafeString(htmlContent),
+      buttons: [
+        {
+          text: 'Imprimer',
+          cssClass: 'secondary',
+          handler: () => {
+            this.printLabel(mat, qrUrl, color, textStatus);
+            return false; // Garde la fenêtre ouverte
+          }
+        },
+        {
+          text: 'Fermer',
+          role: 'cancel'
+        }
+      ]
     });
 
     await alert.present();
+  }
+
+  // 👇 NOUVELLE FONCTION D'IMPRESSION
+  printLabel(mat: any, qrUrl: string, color: string, statusText: string) {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return alert("Autorisez les pop-ups pour imprimer !");
+
+    const vgpDate = mat.date_derniere_vgp ? new Date(mat.date_derniere_vgp) : new Date();
+    const nextDate = new Date(vgpDate);
+    nextDate.setFullYear(vgpDate.getFullYear() + 1);
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Etiquette ${mat.nom}</title>
+          <style>
+            body { font-family: Arial, sans-serif; text-align: center; padding: 20px; }
+            .label { border: 2px solid black; padding: 10px; width: 300px; margin: 0 auto; border-radius: 10px; }
+            h1 { font-size: 18px; margin: 5px 0; }
+            h2 { font-size: 14px; color: #555; margin-bottom: 10px; }
+            img { width: 120px; height: 120px; }
+            .status { font-weight: bold; font-size: 16px; margin-top: 10px; color: ${color}; border: 2px solid ${color}; display: inline-block; padding: 5px 10px; border-radius: 5px; }
+            .dates { font-size: 10px; margin-top: 10px; color: #333; }
+          </style>
+        </head>
+        <body onload="window.print();window.close()">
+          <div class="label">
+            <h1>${mat.nom}</h1>
+            <h2>Ref: ${mat.ref_interne || mat.reference || '---'}</h2>
+            <img src="${qrUrl}" />
+            <br>
+            <div class="status">${statusText}</div>
+            <div class="dates">
+              Validité jusqu'au : <strong>${nextDate.toLocaleDateString()}</strong>
+            </div>
+          </div>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
   }
 
   // --- CREATION ---
