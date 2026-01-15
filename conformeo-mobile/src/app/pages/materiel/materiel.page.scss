@@ -13,7 +13,7 @@
 // --- HEADER MOBILE ---
 .header-section {
   background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); // Bleu Profond
-  padding: 60px 20px 80px 20px; // De la place en bas pour la barre flottante
+  padding: 60px 20px 80px 20px; 
   border-bottom-left-radius: 30px;
   border-bottom-right-radius: 30px;
   color: white;
@@ -48,7 +48,7 @@
 
 // --- RECHERCHE MOBILE ---
 .search-container {
-  margin: -35px 20px 20px 20px; // Remonte sur le header
+  margin: -35px 20px 20px 20px;
   display: flex;
   gap: 10px;
   position: relative;
@@ -75,10 +75,7 @@
     font-size: 14px;
     color: #000000 !important; 
     background: transparent;
-    
-    &::placeholder { 
-      color: #999 !important; 
-    }
+    &::placeholder { color: #999 !important; }
   }
 }
 
@@ -94,7 +91,6 @@
   align-items: center;
   justify-content: center;
   box-shadow: 0 8px 20px rgba(0,0,0,0.15);
-  
   &:active { transform: scale(0.95); }
 }
 
@@ -118,34 +114,26 @@
   box-shadow: 0 4px 10px rgba(0,0,0,0.03);
   transition: transform 0.1s;
   
-  /* --- GESTION DES COULEURS DE FOND (Opacité 15%) --- */
-  background: #fff; /* Fallback */
-  border-left: 5px solid #ccc; /* Bordure gauche colorée */
+  background: #fff; 
+  border-left: 5px solid #ccc; 
 
   &.Bon { border-left-color: #22c55e; }
   &.Moyen { border-left-color: #f59e0b; }
-  &.Mauvais {
-    background-color: rgba(239, 68, 68, 0.10); /* Rouge clair */
-    border-left-color: #ef4444;
-  }
-  &.Panne {
-    background-color: rgba(30, 41, 59, 0.10); /* Gris foncé clair */
-    border-left-color: #1e293b;
-  }
+  &.Mauvais { background-color: rgba(239, 68, 68, 0.10); border-left-color: #ef4444; }
+  &.Panne { background-color: rgba(30, 41, 59, 0.10); border-left-color: #1e293b; }
 
   &:active { transform: scale(0.98); background: #fcfcfc; }
 
-  /* --- GAUCHE : CONTENU PRINCIPAL --- */
   .card-main {
     display: flex;
     align-items: center;
     gap: 12px;
-    flex: 1; /* Prend toute la place disponible */
-    cursor: pointer; /* Indique qu'on peut cliquer */
+    flex: 1;
+    cursor: pointer;
   }
 
   .img-wrapper {
-    width: 80px;  /* Un peu plus grand pour l'aperçu */
+    width: 80px;
     height: 80px;
     border-radius: 8px;
     background: #f8f9fa;
@@ -188,30 +176,28 @@
       font-size: 11px;
       font-weight: 600;
       color: #475569;
-      
       ion-icon { font-size: 12px; color: #3b82f6; }
     }
 
-    // 👇 CORRECTION MOBILE : BOUTON PLEINE LARGEUR
+    // 👇 CORRECTION MOBILE : TAILLE FIXE
     .qr-btn-mobile {
-      width: 100%;            /* Force la largeur totale */
+      width: 160px;           /* Taille fixe (comme le carré rouge) */
       margin-top: 8px;
-      height: 28px;           /* Hauteur fixe harmonisée */
-      --padding-start: 0;     /* Maximise l'espace pour le texte */
+      height: 28px;
+      --padding-start: 0;
       --padding-end: 0;
-      font-size: 0.7rem;      /* Texte lisible */
+      font-size: 0.7rem;
     }
   }
 
-  /* --- DROITE : BOUTONS D'ACTION --- */
   .card-side-actions {
     display: flex;
-    flex-direction: column; /* Boutons l'un sur l'autre pour gagner de la place */
+    flex-direction: column;
     justify-content: center;
     align-items: center;
     gap: 0px;
     padding-left: 5px;
-    border-left: 1px solid rgba(0,0,0,0.05); /* Petite séparation subtile */
+    border-left: 1px solid rgba(0,0,0,0.05);
 
     ion-button {
       margin: 0;
@@ -244,15 +230,9 @@
 /* --- 2. SUR GRAND ÉCRAN (DESKTOP) --- */
 @media (min-width: 992px) {
   
-  .mobile-only {
-    display: none; 
-  }
-  .desktop-only {
-    display: block; 
-    height: 100%;
-  }
+  .mobile-only { display: none; }
+  .desktop-only { display: block; height: 100%; }
 
-  /* Styles spécifiques Desktop */
   .desktop-header {
     padding: 40px 60px 20px 60px;
     display: flex; justify-content: space-between; align-items: center;
@@ -264,11 +244,10 @@
 
   .equipment-grid {
     display: grid;
-    // Grille responsive
     grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
     gap: 30px;
     padding: 20px 60px;
-    align-items: stretch; // IMPORTANT : Toutes les cartes ont la même hauteur
+    align-items: stretch; // Force la même hauteur pour toutes les cartes
   }
 
   .equip-card {
@@ -281,10 +260,10 @@
     border: 1px solid transparent;
     overflow: hidden;
 
-    // 👇 FLEXBOX VERTICAL POUR LA CARTE ENTIÈRE
+    // Structure verticale pour pousser le bouton en bas
     display: flex; 
     flex-direction: column; 
-    height: 100%; // Prend toute la hauteur de la grille
+    height: 100%;
 
     &:hover {
       transform: translateY(-5px);
@@ -293,58 +272,57 @@
     }
 
     .equip-image {
-      height: 200px; // Hauteur fixe pour le conteneur
+      height: 200px; 
       width: 100%;
-      background-color: #f8f9fa; // Fond gris clair pour les images détourées
+      background-color: #f8f9fa;
       display: flex;
       align-items: center;
       justify-content: center;
-      flex-shrink: 0; // Empêche l'image de rétrécir
+      flex-shrink: 0;
 
-      img {
-        width: 100%;
-        height: 100%;
-        object-fit: contain; // L'image garde ses proportions et rentre dans la boîte
-        padding: 10px;
-      }
+      img { width: 100%; height: 100%; object-fit: contain; padding: 10px; }
     }
     
-    // Amélioration de la lisibilité du badge
     .vgp-badge {
-      z-index: 10; // S'assure qu'il est au-dessus de l'image
-      box-shadow: 0 2px 5px rgba(0,0,0,0.3) !important; // Ombre plus marquée
-      text-shadow: 0 1px 2px rgba(0,0,0,0.5); // Légère ombre portée sur le texte
+      z-index: 10;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.3) !important;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.5);
     }
 
     .equip-info {
       padding: 20px;
       text-align: center;
       
-      // 👇 C'EST ICI LA MAGIE DE L'ALIGNEMENT
+      // La zone de texte prend tout l'espace disponible
+      flex: 1;
       display: flex;
       flex-direction: column;
-      flex-grow: 1; // Remplit tout l'espace restant
 
       h3 { 
         font-size: 18px; font-weight: 700; margin: 0 0 5px; color: #333;
-        min-height: 44px; // Force 2 lignes pour aligner les titres courts/longs
-        display: flex;
-        align-items: center;
-        justify-content: center;
+        min-height: 44px; // Alignement des titres
+        display: flex; align-items: center; justify-content: center;
       }
       
       .ref { 
         font-size: 12px; color: #999; margin: 0 0 15px; text-transform: uppercase; 
       }
 
-      .location-tag {
-        display: inline-block; padding: 6px 12px; border-radius: 8px;
-        font-size: 12px; font-weight: 600;
-        background: #e8f5e9; color: #2e7d32; /* Vert Dépôt */
-        align-self: center; /* Centre le tag */
-        margin-bottom: 5px;
+      // 👇 CORRECTION BADGES : Taille ajustée au contenu, centrés
+      .location-tag, ion-badge {
+        align-self: center; /* Centre le badge horizontalement */
+        width: fit-content; /* Ne prend que la largeur nécessaire */
         
-        &.out { background: #fff3e0; color: #ef6c00; } /* Orange Chantier */
+        display: inline-block; 
+        padding: 6px 12px; 
+        border-radius: 8px;
+        font-size: 12px; font-weight: 600;
+        margin-bottom: 5px;
+      }
+      
+      .location-tag {
+        background: #e8f5e9; color: #2e7d32;
+        &.out { background: #fff3e0; color: #ef6c00; }
       }
 
       .chantier-name {
@@ -352,10 +330,10 @@
         white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
       }
 
-      // Force le bouton "Passeport" tout en bas de la carte
+      // 👇 CORRECTION BOUTON DESKTOP : Tout en bas, pleine largeur
       ion-button {
-        margin-top: auto; // Pousse le bouton vers le bas
-        width: 100%;
+        margin-top: auto; /* Pousse le bouton tout en bas */
+        width: 100%;      /* Prend toute la largeur */
         --border-radius: 8px;
         font-weight: 600;
         letter-spacing: 0.5px;
