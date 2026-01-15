@@ -186,24 +186,26 @@
 
         <div class="equip-info">
           <h3>{{ mat.nom }}</h3>
-          <p class="ref">{{ mat.reference || 'Aucune réf.' }}</p>
+          <p class="ref">{{ mat.reference || mat.reference || '&nbsp;' }}</p> <div class="bottom-info-group">
+            
+            <div class="location-tag" [class.out]="mat.chantier_id">
+              {{ mat.chantier_id ? 'Sur Chantier' : 'Au Dépôt' }}
+            </div>
 
-          <div class="location-tag" [class.out]="mat.chantier_id">
-            {{ mat.chantier_id ? 'Sur Chantier' : 'Au Dépôt' }}
+            <p class="chantier-name">
+              {{ mat.chantier_id ? getChantierName(mat.chantier_id) : '&nbsp;' }}
+            </p>
+            
+            <ion-badge [color]="mat.etat === 'Bon' ? 'success' : (mat.etat === 'Moyen' ? 'warning' : 'danger')">
+              {{ mat.etat || 'Bon' }}
+            </ion-badge>
+
+            <ion-button expand="block" fill="outline" size="small" (click)="$event.stopPropagation(); showQrCode(mat)">
+              <ion-icon name="qr-code-outline" slot="start"></ion-icon>
+              Passeport Sécurité
+            </ion-button>
+            
           </div>
-
-          <p class="chantier-name" *ngIf="mat.chantier_id">
-            {{ getChantierName(mat.chantier_id) }}
-          </p>
-          
-          <ion-badge color="medium" style="margin-top: 5px;">
-            {{ mat.etat || 'Bon' }}
-          </ion-badge>
-
-          <ion-button expand="block" fill="outline" size="small" (click)="$event.stopPropagation(); showQrCode(mat)" style="margin-top: 10px;">
-            <ion-icon name="qr-code-outline" slot="start"></ion-icon>
-            Passeport Sécurité
-          </ion-button>
         </div>
 
       </div>
