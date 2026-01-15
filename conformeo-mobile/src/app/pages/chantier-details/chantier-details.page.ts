@@ -43,9 +43,6 @@ export class ChantierDetailsPage implements OnInit {
   ppspsList: PPSPS[] = [];
   materielsSurSite: Materiel[] = []; 
 
-  tasks: any[] = []; 
-  newTaskDesc = '';
-
   segment = 'suivi'; 
   doeDocs: any[] = [];
   selectedCategory = '';
@@ -106,9 +103,6 @@ export class ChantierDetailsPage implements OnInit {
       this.materielsSurSite = allMat.filter(m => m.chantier_id === this.chantierId);
     });
     this.loadDoeDocs();
-    
-    // 👇 CORRECTION : On appelle directement la fonction
-    this.loadTasks(); 
   }
 
   loadRapports() {
@@ -117,85 +111,6 @@ export class ChantierDetailsPage implements OnInit {
         new Date(b.date_creation || 0).getTime() - new Date(a.date_creation || 0).getTime()
       );
     });
-  }
-
-  // --- TASK MANAGEMENT ---
-  loadTasks() {
-    this.api.getTasks(this.chantierId).subscribe(data => {
-      this.tasks = data || [];
-    });
-  }
-
-  addTask() {
-    if (!this.newTaskDesc.trim()) return;
-    const payload = {
-      description: this.newTaskDesc,
-      chantier_id: this.chantierId,
-      status: 'TODO',
-      date_prevue: new Date().toISOString()
-    };
-    
-    // Note: We use 'any' type for newTask to access alert_message easily
-    this.api.createTask(payload).subscribe(async (newTask: any) => {
-      this.tasks.push(newTask);
-      this.newTaskDesc = ''; 
-      
-      // 👇 INTELLIGENCE ALERT TRIGGER
-      if (newTask.alert_message) {
-          const alert = await this.alertCtrl.create({
-            header: 'Conformité Automatique 🛡️',
-            subHeader: 'Risque détecté',
-            message: newTask.alert_message,
-            cssClass: 'risk-alert',
-            buttons: [
-              { text: 'Ignorer', role: 'cancel' },
-              { 
-                text: 'Agir (Voir Document)', 
-                handler: () => {
-                   this.handleRiskAction(newTask.alert_type);
-                }
-              }
-            ]
-          });
-          await alert.present();
-      } else {
-          this.presentToast('Tâche ajoutée ! ✅');
-      }
-    });
-  }
-
-  handleRiskAction(type: string) {
-      if (type === 'PERMIS_FEU') {
-          // Future: Redirect to Permit Form
-          this.presentToast("Ouverture du Permis de Feu... (Module à venir)");
-      } else if (type === 'DUERP') {
-          this.presentToast("Risque ajouté au DUERP.");
-      } else {
-          this.presentToast("Rappel de sécurité noté.");
-      }
-  }
-
-  toggleTask(task: any) {
-    const newStatus = task.status === 'DONE' ? 'TODO' : 'DONE';
-    task.status = newStatus; 
-    
-    this.api.updateTask(task.id, { status: newStatus }).subscribe({
-      error: () => task.status = task.status === 'DONE' ? 'TODO' : 'DONE'
-    });
-  }
-
-  deleteTask(task: any) {
-    this.api.deleteTask(task.id).subscribe(() => {
-      this.tasks = this.tasks.filter(t => t.id !== task.id);
-      this.presentToast('Tâche supprimée.');
-    });
-  }
-
-  scrollToTasks() {
-    const element = document.getElementById('tasks-section');
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
   }
 
   // --- DOE MANAGEMENT ---
