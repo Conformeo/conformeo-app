@@ -9,6 +9,7 @@ import { Platform } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
 import { IonBackButton, IonButtons } from '@ionic/angular/standalone';
 import { AddChantierModalComponent } from 'src/app/home/add-chantier-modal/add-chantier-modal.component';
+import { TaskListComponent } from '../../components/task-list/task-list.component';
 
 import { 
   camera, time, warning, documentText, create, navigate, 
@@ -31,7 +32,7 @@ import { SignatureModalComponent } from './signature-modal/signature-modal.compo
   templateUrl: './chantier-details.page.html',
   styleUrls: ['./chantier-details.page.scss'],
   standalone: true,
-  imports: [IonicModule, CommonModule, FormsModule, IonButtons, IonBackButton, RouterLink]
+  imports: [IonicModule, CommonModule, FormsModule, IonButtons, IonBackButton, RouterLink, TaskListComponent]
 })
 export class ChantierDetailsPage implements OnInit {
   chantierId: number = 0;
@@ -135,7 +136,7 @@ export class ChantierDetailsPage implements OnInit {
     };
     
     // Note: We use 'any' type for newTask to access alert_message easily
-    this.api.addTask(payload).subscribe(async (newTask: any) => {
+    this.api.createTask(payload).subscribe(async (newTask: any) => {
       this.tasks.push(newTask);
       this.newTaskDesc = ''; 
       

@@ -1,0 +1,49 @@
+<div class="tasks-container">
+  <div class="section-header">
+    <h3>✅ Tâches & Planification</h3>
+    <ion-badge color="light" mode="ios">IA Ready 🤖</ion-badge>
+  </div>
+
+  <div class="input-group">
+    <ion-input 
+      placeholder="Nouvelle tâche (ex: Soudure support, Pose toiture...)" 
+      [(ngModel)]="newTaskDesc"
+      (keyup.enter)="addTask()">
+    </ion-input>
+    <ion-button (click)="addTask()" size="small">
+      <ion-icon name="add"></ion-icon>
+    </ion-button>
+  </div>
+
+  <ion-list lines="none">
+    <ion-item-sliding *ngFor="let t of tasks">
+      
+      <ion-item class="task-item" [class.done]="t.status === 'DONE'">
+        <ion-icon 
+          slot="start" 
+          [name]="t.status === 'DONE' ? 'checkbox-outline' : 'square-outline'"
+          [color]="t.status === 'DONE' ? 'success' : 'medium'"
+          (click)="toggleTask(t)">
+        </ion-icon>
+        
+        <ion-label>
+          <h2>{{ t.description }}</h2>
+          <p>{{ t.date_prevue | date:'dd/MM/yyyy' }}</p>
+        </ion-label>
+
+        <ion-icon *ngIf="t.alert_type" name="alert-circle-outline" color="warning" slot="end"></ion-icon>
+      </ion-item>
+
+      <ion-item-options side="end">
+        <ion-item-option color="danger" (click)="deleteTask(t)">
+          <ion-icon name="trash-outline"></ion-icon>
+        </ion-item-option>
+      </ion-item-options>
+
+    </ion-item-sliding>
+    
+    <div *ngIf="tasks.length === 0" class="empty-state">
+      <p>Aucune tâche planifiée.</p>
+    </div>
+  </ion-list>
+</div>

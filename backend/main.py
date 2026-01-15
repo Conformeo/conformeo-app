@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 import csv 
 import time
 import random
+import base64
 import json
 from typing import List, Optional, Any
 
@@ -1144,26 +1145,25 @@ def download_duerp_pdf(annee: str, db: Session = Depends(get_db), current_user: 
 def read_tasks(chantier_id: int, db: Session = Depends(get_db)):
     return db.query(models.Task).filter(models.Task.chantier_id == chantier_id).all()
 
-# --- INTELLIGENCE ENGINE (RISK DETECTION) ---
 # --- MOTEUR D'INTELLIGENCE (RISQUES) ---
 def analyze_task_risks(description: str):
     desc = description.lower()
     
-    # Règle 1 : Points Chauds
+    # Règle 1 : Points Chauds (Permis de Feu)
     if any(x in desc for x in ["soudure", "meuleuse", "chalumeau", "étincelle", "feu", "découpe"]):
         return {
             "msg": "🔥 Travaux par points chauds détectés. Le Permis de Feu est-il signé ?",
             "type": "PERMIS_FEU"
         }
     
-    # Règle 2 : Hauteur
+    # Règle 2 : Hauteur (DUERP)
     if any(x in desc for x in ["toiture", "échafaudage", "échelle", "nacelle", "hauteur", "bardage"]):
         return {
             "msg": "🪜 Travail en hauteur identifié. Vérification harnais/échafaudage requise.",
             "type": "DUERP"
         }
 
-    # Règle 3 : Poussières / Amiante
+    # Règle 3 : Poussières / Amiante (EPI)
     if any(x in desc for x in ["amiante", "démolition", "perçage", "ponçage", "béton", "chimique"]):
         return {
             "msg": "😷 Risque poussières/inhalation. Port du masque FFP3 obligatoire.",
@@ -1172,10 +1172,10 @@ def analyze_task_risks(description: str):
         
     return None
 
-# --- UPDATED CREATE TASK ROUTE ---
+# --- ROUTE CRÉATION TÂCHE (INTELLIGENTE) ---
 @app.post("/tasks", response_model=schemas.TaskOut)
 def create_task(task: schemas.TaskCreate, db: Session = Depends(get_db)):
-    # 1. Création standard
+    # 1. Création standard en base de données
     db_task = models.Task(**task.dict())
     db.add(db_task)
     db.commit()
@@ -1185,12 +1185,14 @@ def create_task(task: schemas.TaskCreate, db: Session = Depends(get_db)):
     analysis = analyze_task_risks(db_task.description)
     
     # 3. Injection de l'alerte (virtuelle) dans la réponse
+    # On n'enregistre pas l'alerte en BDD pour l'instant, on la renvoie juste au mobile pour info
     if analysis:
-        # On attache manuellement les attributs à l'objet réponse
+        # On attache manuellement les attributs à l'objet réponse (Pydantic le gérera)
         setattr(db_task, "alert_message", analysis["msg"])
         setattr(db_task, "alert_type", analysis["type"])
         
     return db_task
+        
 
 # --- UPDATE TASK (ROBUSTE) ---
 @app.put("/tasks/{task_id}", response_model=schemas.TaskOut)
@@ -1230,6 +1232,40 @@ def delete_task(task_id: int, db: Session = Depends(get_db)):
         db.delete(task)
         db.commit()
     return {"ok": True}
+
+@app.post("/permis-feu", response_model=schemas.PermisFeuOut)
+def create_permis_feu(p: schemas.PermisFeuCreate, db: Session = Depends(get_db)):
+    # 1. Sauvegarde de la signature en image
+    sig_filename = f"signature_permis_{datetime.now().timestamp()}.png"
+    sig_path = f"uploads/{sig_filename}"
+    
+    try:
+        # On enlève le header "data:image/png;base64," si présent
+        if "," in p.signature_base64:
+            header, encoded = p.signature_base64.split(",", 1)
+        else:
+            encoded = p.signature_base64
+            
+        with open(sig_path, "wb") as f:
+            f.write(base64.b64decode(encoded))
+    except Exception as e:
+        print(f"Erreur signature: {e}")
+        sig_path = None
+
+    # 2. Sauvegarde en BDD
+    new_permis = models.PermisFeu(
+        chantier_id=p.chantier_id,
+        zone_travail=p.zone_travail,
+        nature_travaux=p.nature_travaux,
+        intervenant_nom=p.intervenant_nom,
+        mesures_preventives=",".join(p.mesures), # On stocke en string simple
+        signature_url=sig_path
+    )
+    db.add(new_permis)
+    db.commit()
+    db.refresh(new_permis)
+    
+    return new_permis
 
 # ==========================================
 # 9. FIX & MIGRATIONS
@@ -1336,6 +1372,11 @@ def fix_users_table(db: Session = Depends(get_db)):
     except Exception as e:
         return {"error": str(e)}
 
+# N'oubliez pas de lancer /fix_everything pour créer la table si vous n'avez pas Alembic
+@app.get("/fix_permis_feu_table")
+def fix_permis_table(db: Session = Depends(get_db)):
+    models.Base.metadata.create_all(bind=engine)
+    return {"msg": "Table Permis Feu créée !"}
 
 @app.get("/fix_company_docs_signature")
 def fix_company_docs_signature(db: Session = Depends(get_db)):

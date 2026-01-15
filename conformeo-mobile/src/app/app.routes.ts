@@ -71,5 +71,9 @@ export const routes: Routes = [
   {
     path: 'duerp-form',
     loadComponent: () => import('./pages/company/duerp-form/duerp-form.page').then( m => m.DuerpFormPage)
+  },
+  {
+    path: 'permis-feu-modal',
+    loadComponent: () => import('./pages/tasks/permis-feu-modal/permis-feu-modal.page').then( m => m.PermisFeuModalPage)
   }
 ];

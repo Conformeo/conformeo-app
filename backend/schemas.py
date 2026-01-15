@@ -320,3 +320,19 @@ class PicOut(PicSchema):
     date_creation: datetime
     class Config:
         from_attributes = True
+
+class PermisFeuCreate(BaseModel):
+    chantier_id: int
+    zone_travail: str
+    nature_travaux: str
+    intervenant_nom: str
+    mesures: List[str] = [] # Liste des cases cochées
+    signature_base64: str # L'image brute de la signature
+
+class PermisFeuOut(BaseModel):
+    id: int
+    nature_travaux: str
+    date_creation: datetime
+    signature_url: Optional[str] = None
+    class Config:
+        from_attributes = True

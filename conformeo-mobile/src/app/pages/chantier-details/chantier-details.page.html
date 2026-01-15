@@ -62,10 +62,6 @@
       </ion-card>
 
       <div class="actions-grid">
-        <div class="action-btn" (click)="scrollToTasks()">
-          <div class="icon-circle bg-tasks"><ion-icon name="checkbox-outline"></ion-icon></div>
-          <span>Tâches</span>
-        </div>
         <div class="action-btn" (click)="downloadPdf()">
           <div class="icon-circle bg-pdf"><ion-icon name="document-text"></ion-icon></div>
           <span>PDF</span>
@@ -84,8 +80,13 @@
         </div>
       </div>
 
-      <div class="section-header" id="tasks-section">
-        <h3>Tâches & Planification</h3>
+      <div class="content-wrapper">
+  
+        <app-task-list 
+          *ngIf="chantier" 
+          [chantierId]="chantier.id || 0">
+        </app-task-list>
+
       </div>
       
       <ion-card class="task-input-card">

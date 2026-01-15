@@ -231,5 +231,28 @@ class Task(Base):
     chantier_id = Column(Integer, ForeignKey("chantiers.id"))
     chantier = relationship("Chantier", back_populates="tasks")
 
-# N'oubliez pas d'ajouter la relation inverse dans la classe Chantier existante :
-# tasks = relationship("Task", back_populates="chantier")
+# ... vos autres modèles ...
+
+class PermisFeu(Base):
+    __tablename__ = "permis_feu"
+
+    id = Column(Integer, primary_key=True, index=True)
+    chantier_id = Column(Integer, ForeignKey("chantiers.id"))
+    
+    # Infos pré-remplies
+    date_debut = Column(DateTime, default=datetime.now)
+    date_fin = Column(DateTime)
+    zone_travail = Column(String) # Lieu précis
+    nature_travaux = Column(String) # Ex: Soudure sur tuyauterie
+    
+    # Intervenants
+    entreprise = Column(String)
+    intervenant_nom = Column(String)
+    
+    # Checklist Sécurité (Sauvegardée en JSON ou texte simple)
+    mesures_preventives = Column(String) # Ex: "Extincteur:OK, Zone nettoyée:OK"
+    
+    # Signature
+    signature_url = Column(String) # Chemin de l'image signature
+    
+    date_creation = Column(DateTime, default=datetime.now)

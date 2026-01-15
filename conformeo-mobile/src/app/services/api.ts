@@ -604,20 +604,21 @@ export class ApiService {
   }
 
 
-  // TASKS
-  getTasks(chantierId: number): Observable<any[]> {
+  // --- GESTION DES TÂCHES ---
+  
+  getTasks(chantierId: number) {
     return this.http.get<any[]>(`${this.apiUrl}/chantiers/${chantierId}/tasks`);
   }
 
-  addTask(task: any): Observable<any> {
+  createTask(task: any) {
     return this.http.post<any>(`${this.apiUrl}/tasks`, task);
   }
 
-  updateTask(taskId: number, data: any): Observable<any> {
+  updateTask(taskId: number, data: any) {
     return this.http.put<any>(`${this.apiUrl}/tasks/${taskId}`, data);
   }
 
-  deleteTask(taskId: number): Observable<any> {
+  deleteTask(taskId: number) {
     return this.http.delete<any>(`${this.apiUrl}/tasks/${taskId}`);
   }
 }
