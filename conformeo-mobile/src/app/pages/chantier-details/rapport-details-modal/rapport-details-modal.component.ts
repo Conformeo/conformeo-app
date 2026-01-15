@@ -66,7 +66,7 @@ register();
         <p class="description-text">{{ rapport.description }}</p>
 
         <div *ngIf="rapport.latitude" class="map-section">
-          <ion-button expand="block" color="secondary" (click)="openMap()">
+          <ion-button expand="block" (click)="openMap(rapport.latitude, rapport.longitude)">
             <ion-icon name="map-outline" slot="start"></ion-icon>
             Voir la position
           </ion-button>
@@ -147,10 +147,15 @@ export class RapportDetailsModalComponent {
     modal.present();
   }
 
-  openMap() {
-    if (this.rapport.latitude) {
-      const url = `http://googleusercontent.com/maps.google.com/?q=${this.rapport.latitude},${this.rapport.longitude}`;
-      window.open(url, '_system');
-    }
-  }
+  // Fonction pour ouvrir la carte
+openMap(lat: any, lng: any) {
+  if (!lat || !lng) return;
+  
+  // 1. On construit l'URL complète avec https://
+  const url = `https://www.google.com/maps/search/?api=1&query=${this.rapport.latitude},${this.rapport.longitude}`;
+  
+  // 2. On ouvre avec '_system' pour forcer l'ouverture dans l'app Maps ou le navigateur externe
+  // (Sinon Ionic essaie de l'ouvrir dans l'application et ça échoue)
+  window.open(url, '_system');
+}
 }
