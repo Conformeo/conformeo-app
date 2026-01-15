@@ -332,6 +332,6 @@ class PermisFeuCreate(BaseModel):
 
 class PermisFeuOut(PermisFeuCreate):
     id: int
-    date: datetime.datetime
+    date: datetime
     class Config:
         orm_mode = True
