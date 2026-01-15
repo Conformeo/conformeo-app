@@ -1379,3 +1379,14 @@ def sign_company_doc(
     })
     db.commit()
     return {"message": "Document signé avec succès"}
+
+@app.get("/fix_vgp_database")
+def fix_vgp_database(db: Session = Depends(get_db)):
+    try:
+        # Cette commande SQL force l'ajout de la colonne dans la vraie table
+        # On utilise TIMESTAMP pour être compatible avec le format datetime de Python
+        db.execute(text("ALTER TABLE materiels ADD COLUMN IF NOT EXISTS date_derniere_vgp TIMESTAMP"))
+        db.commit()
+        return {"message": "✅ SUCCÈS : Colonne date_derniere_vgp ajoutée à la base de données !"}
+    except Exception as e:
+        return {"error": f"Erreur lors de la migration : {str(e)}"}

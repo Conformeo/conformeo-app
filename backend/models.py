@@ -80,6 +80,8 @@ class Materiel(Base):
     reference = Column(String)
     etat = Column(String, default="Bon")
     image_url = Column(String, nullable=True)
+
+    date_derniere_vgp = Column(DateTime, nullable=True)
     
     company_id = Column(Integer, ForeignKey("companies.id"), nullable=True)
     company = relationship("Company", back_populates="materiels")
