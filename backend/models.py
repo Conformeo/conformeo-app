@@ -244,7 +244,7 @@ class Task(Base):
     chantier = relationship("Chantier", back_populates="tasks")
 
 class PermisFeu(Base):
-    __tablename__ = "permis_feu"
+    __tablename__ = "permis_feu_v2"
 
     id = Column(Integer, primary_key=True, index=True)
     chantier_id = Column(Integer, ForeignKey("chantiers.id"))
