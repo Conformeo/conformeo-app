@@ -73,8 +73,6 @@
     width: 100%;
     height: 100%;
     font-size: 14px;
-    
-    // 👇 CORRECTION TEXTE VISIBLE
     color: #000000 !important; 
     background: transparent;
     
@@ -102,189 +100,6 @@
 
 // --- LISTE MOBILE ---
 .list-container {
-  padding: 0 20px 20px 20px;
-}
-
-.tool-card {
-  background: white;
-  border-radius: 16px;
-  padding: 15px;
-  margin-bottom: 12px;
-  display: flex;
-  align-items: center;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.03);
-  transition: transform 0.1s;
-  position: relative; /* Important pour le bouton poubelle absolu */
-
-  &:active { transform: scale(0.98); background: #fcfcfc; }
-}
-
-.tool-icon {
-  width: 50px;
-  height: 50px;
-  background: #eefbf3; // Vert très clair
-  color: #2dd36f;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 24px;
-  margin-right: 15px;
-  flex-shrink: 0;
-
-  &.out { // Si sorti
-    background: #fff8e6; // Jaune très clair
-    color: #ffc409;
-  }
-}
-
-.tool-info {
-  flex-grow: 1;
-  overflow: hidden;
-
-  .tool-name { margin: 0 0 4px; font-size: 16px; font-weight: 700; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .tool-ref { margin: 0; font-size: 12px; color: #999; font-family: monospace; letter-spacing: 0.5px; }
-}
-
-.tool-status {
-  text-align: right;
-  min-width: 80px;
-
-  .status-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    padding: 4px 8px;
-    border-radius: 6px;
-    font-size: 10px;
-    font-weight: 700;
-    text-transform: uppercase;
-    background: #eefbf3; color: #2dd36f; // Vert par défaut
-
-    &.out { background: #fff8e6; color: #ffc409; } // Orange si sorti
-  }
-
-  .chantier-name {
-    margin: 4px 0 0;
-    font-size: 10px;
-    color: #999;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 100px;
-  }
-}
-
-.empty-state {
-  text-align: center; color: #ccc; margin-top: 50px;
-  ion-icon { font-size: 60px; margin-bottom: 10px; }
-  p { font-size: 16px; }
-}
-
-
-/* --- 2. SUR GRAND ÉCRAN (DESKTOP) --- */
-@media (min-width: 992px) {
-  
-  .mobile-only {
-    display: none; /* Cache le mobile */
-  }
-  .desktop-only {
-    display: block; /* Affiche le desktop */
-    height: 100%;
-  }
-
-  /* Styles spécifiques Desktop */
-  .desktop-bg {
-    --background: #f8f9fa; 
-  }
-
-  .desktop-header {
-    padding: 40px 60px 20px 60px;
-    display: flex; justify-content: space-between; align-items: center;
-    
-    h1 { font-size: 32px; font-weight: 800; color: #1a1a1a; }
-    .actions { display: flex; gap: 20px; width: 400px; }
-  }
-
-  .equipment-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-    gap: 30px;
-    padding: 20px 60px;
-  }
-
-  .equip-card {
-    background: white;
-    border-radius: 20px;
-    padding: 25px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.04);
-    transition: all 0.2s ease;
-    cursor: pointer;
-    position: relative;
-    border: 1px solid transparent;
-
-    &:hover {
-      transform: translateY(-5px);
-      box-shadow: 0 15px 40px rgba(0,0,0,0.08);
-      border-color: var(--ion-color-primary);
-    }
-  }
-
-  .status-dot {
-    position: absolute; top: 20px; left: 20px;
-    width: 30px; height: 30px; border-radius: 50%;
-    background: #e0f7fa; color: #00bcd4;
-    display: flex; align-items: center; justify-content: center;
-    
-    &.active { background: #fff3e0; color: #ff9800; }
-  }
-
-  .equip-image {
-    height: 120px; 
-    display: flex; 
-    align-items: center; 
-    justify-content: center;
-    margin-bottom: 20px;
-
-
-    img {
-      max-width: 100%;
-      max-height: 100%;
-      object-fit: contain;
-    }
-  }
-
-  .equip-info {
-    text-align: center;
-    h3 { font-size: 18px; font-weight: 700; margin: 0 0 5px; color: #333; }
-    .ref { font-size: 12px; color: #999; margin: 0 0 15px; text-transform: uppercase; }
-  }
-
-  .location-tag {
-    display: inline-block; padding: 6px 12px; border-radius: 8px;
-    font-size: 12px; font-weight: 600;
-    background: #e8f5e9; color: #2e7d32; /* Vert Dépôt */
-    
-    &.out { background: #fff3e0; color: #ef6c00; } /* Orange Chantier */
-  }
-}
-
-/* Style du bouton poubelle mobile */
-.delete-tool-btn {
-  position: absolute;
-  top: 5px;
-  right: 5px;
-  z-index: 10;
-  padding: 8px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.9);
-  color: #eb445a;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-}
-
-/* ... (Gardez le début de votre fichier) ... */
-
-.list-container {
   padding: 10px 15px;
   display: flex;
   flex-direction: column;
@@ -300,19 +115,15 @@
   min-height: 80px;
   position: relative;
   overflow: hidden;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.03);
+  transition: transform 0.1s;
   
   /* --- GESTION DES COULEURS DE FOND (Opacité 15%) --- */
   background: #fff; /* Fallback */
   border-left: 5px solid #ccc; /* Bordure gauche colorée */
 
-  &.Bon {
-    // background-color: rgba(34, 197, 94, 0.05); /* Vert clair */
-    border-left-color: #22c55e;
-  }
-  &.Moyen {
-    // background-color: rgba(245, 158, 11, 0.05); /* Orange clair */
-    border-left-color: #f59e0b;
-  }
+  &.Bon { border-left-color: #22c55e; }
+  &.Moyen { border-left-color: #f59e0b; }
   &.Mauvais {
     background-color: rgba(239, 68, 68, 0.10); /* Rouge clair */
     border-left-color: #ef4444;
@@ -321,6 +132,8 @@
     background-color: rgba(30, 41, 59, 0.10); /* Gris foncé clair */
     border-left-color: #1e293b;
   }
+
+  &:active { transform: scale(0.98); background: #fcfcfc; }
 
   /* --- GAUCHE : CONTENU PRINCIPAL --- */
   .card-main {
@@ -332,10 +145,10 @@
   }
 
   .img-wrapper {
-    width: 60px;
-    height: 60px;
-    border-radius: 10px;
-    // background: rgba(255,255,255,0.6); /* Un peu de blanc derrière l'image */
+    width: 80px;  /* Un peu plus grand pour l'aperçu */
+    height: 80px;
+    border-radius: 8px;
+    background: #f8f9fa;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -351,6 +164,7 @@
     display: flex;
     flex-direction: column;
     justify-content: center;
+    flex: 1;
     
     .tool-name {
       margin: 0;
@@ -377,6 +191,16 @@
       
       ion-icon { font-size: 12px; color: #3b82f6; }
     }
+
+    // 👇 CORRECTION MOBILE : BOUTON PLEINE LARGEUR
+    .qr-btn-mobile {
+      width: 100%;            /* Force la largeur totale */
+      margin-top: 8px;
+      height: 28px;           /* Hauteur fixe harmonisée */
+      --padding-start: 0;     /* Maximise l'espace pour le texte */
+      --padding-end: 0;
+      font-size: 0.7rem;      /* Texte lisible */
+    }
   }
 
   /* --- DROITE : BOUTONS D'ACTION --- */
@@ -399,46 +223,89 @@
   }
 }
 
-/* Ajoutez ceci avec les autres classes .bg-green, .bg-red... */
-.bg-gray {
-  background: #95a5a6; /* Gris neutre */
-}
-
-/* Idem pour la bordure */
-.border-gray {
-  border-color: #95a5a6;
+.empty-state {
+  text-align: center; color: #ccc; margin-top: 50px;
+  ion-icon { font-size: 60px; margin-bottom: 10px; }
+  p { font-size: 16px; }
 }
 
 // --- COULEURS VGP ---
-
-// Fonds pour les badges
 .bg-green { background-color: #2dd36f !important; color: white; }
-.bg-orange { background-color: #ffc409 !important; color: black; } // Noir pour le contraste sur l'orange
+.bg-orange { background-color: #ffc409 !important; color: black; }
 .bg-red { background-color: #eb445a !important; color: white; }
 .bg-gray { background-color: #95a5a6 !important; color: white; }
 
-// Bordures pour les images
 .border-green { border-color: #2dd36f !important; }
 .border-orange { border-color: #ffc409 !important; }
 .border-red { border-color: #eb445a !important; }
 .border-gray { border-color: #95a5a6 !important; }
 
-// --- STYLES DESKTOP ---
-.desktop-only {
+
+/* --- 2. SUR GRAND ÉCRAN (DESKTOP) --- */
+@media (min-width: 992px) {
+  
+  .mobile-only {
+    display: none; 
+  }
+  .desktop-only {
+    display: block; 
+    height: 100%;
+  }
+
+  /* Styles spécifiques Desktop */
+  .desktop-header {
+    padding: 40px 60px 20px 60px;
+    display: flex; justify-content: space-between; align-items: center;
+    
+    h1 { font-size: 32px; font-weight: 800; color: #1a1a1a; }
+    .actions { display: flex; gap: 20px; align-items: center; }
+    ion-searchbar { width: 300px; --background: white; --border-radius: 8px; --box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+  }
+
+  .equipment-grid {
+    display: grid;
+    // Grille responsive
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 30px;
+    padding: 20px 60px;
+    align-items: stretch; // IMPORTANT : Toutes les cartes ont la même hauteur
+  }
+
   .equip-card {
-    // Pour que l'image ne soit pas écrasée
+    background: white;
+    border-radius: 20px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.04);
+    transition: all 0.2s ease;
+    cursor: pointer;
+    position: relative;
+    border: 1px solid transparent;
+    overflow: hidden;
+
+    // 👇 FLEXBOX VERTICAL POUR LA CARTE ENTIÈRE
+    display: flex; 
+    flex-direction: column; 
+    height: 100%; // Prend toute la hauteur de la grille
+
+    &:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 15px 40px rgba(0,0,0,0.08);
+      border-color: var(--ion-color-primary);
+    }
+
     .equip-image {
       height: 200px; // Hauteur fixe pour le conteneur
       width: 100%;
+      background-color: #f8f9fa; // Fond gris clair pour les images détourées
       display: flex;
       align-items: center;
       justify-content: center;
-      // overflow: hidden; // Cache ce qui dépasse au cas où
+      flex-shrink: 0; // Empêche l'image de rétrécir
 
       img {
         width: 100%;
         height: 100%;
         object-fit: contain; // L'image garde ses proportions et rentre dans la boîte
+        padding: 10px;
       }
     }
     
@@ -447,6 +314,52 @@
       z-index: 10; // S'assure qu'il est au-dessus de l'image
       box-shadow: 0 2px 5px rgba(0,0,0,0.3) !important; // Ombre plus marquée
       text-shadow: 0 1px 2px rgba(0,0,0,0.5); // Légère ombre portée sur le texte
+    }
+
+    .equip-info {
+      padding: 20px;
+      text-align: center;
+      
+      // 👇 C'EST ICI LA MAGIE DE L'ALIGNEMENT
+      display: flex;
+      flex-direction: column;
+      flex-grow: 1; // Remplit tout l'espace restant
+
+      h3 { 
+        font-size: 18px; font-weight: 700; margin: 0 0 5px; color: #333;
+        min-height: 44px; // Force 2 lignes pour aligner les titres courts/longs
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      
+      .ref { 
+        font-size: 12px; color: #999; margin: 0 0 15px; text-transform: uppercase; 
+      }
+
+      .location-tag {
+        display: inline-block; padding: 6px 12px; border-radius: 8px;
+        font-size: 12px; font-weight: 600;
+        background: #e8f5e9; color: #2e7d32; /* Vert Dépôt */
+        align-self: center; /* Centre le tag */
+        margin-bottom: 5px;
+        
+        &.out { background: #fff3e0; color: #ef6c00; } /* Orange Chantier */
+      }
+
+      .chantier-name {
+        font-size: 0.9rem; color: #34495e; margin: 5px 0 10px;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      }
+
+      // Force le bouton "Passeport" tout en bas de la carte
+      ion-button {
+        margin-top: auto; // Pousse le bouton vers le bas
+        width: 100%;
+        --border-radius: 8px;
+        font-weight: 600;
+        letter-spacing: 0.5px;
+      }
     }
   }
 }
