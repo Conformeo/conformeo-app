@@ -1693,3 +1693,65 @@ def fix_vgp_database(db: Session = Depends(get_db)):
     except Exception as e:
         return {"error": f"Erreur lors de la migration : {str(e)}"}
     
+
+
+
+# ==========================================
+# 🔄 MIGRATION CHANTIERS (ANCIEN -> NOUVEAU)
+# ==========================================
+
+
+@app.get("/system/migrate-chantiers")
+def migrate_chantiers_data(db: Session = Depends(get_db)):
+    try:
+        # 1. Lire les anciens chantiers
+        old_items = db.query(models.OldChantier).all()
+        count = 0
+        errors = 0
+        
+        for item in old_items:
+            # 2. Vérifier si l'ID existe déjà dans la nouvelle table v2
+            exists = db.query(models.Chantier).filter(models.Chantier.id == item.id).first()
+            
+            if not exists:
+                try:
+                    # 3. Copier dans la nouvelle table
+                    new_chantier = models.Chantier(
+                        id=item.id, # IMPORTANT : On garde le même ID pour ne pas casser les liens !
+                        nom=item.nom,
+                        adresse=item.adresse,
+                        client=item.client,
+                        est_actif=item.est_actif,
+                        date_creation=item.date_creation,
+                        signature_url=item.signature_url,
+                        cover_url=item.cover_url,
+                        latitude=item.latitude,
+                        longitude=item.longitude,
+                        date_debut=item.date_debut,
+                        date_fin=item.date_fin,
+                        statut_planning=item.statut_planning,
+                        company_id=item.company_id,
+                        
+                        # 👇 La nouvelle colonne (valeur par défaut)
+                        soumis_sps=False 
+                    )
+                    
+                    db.add(new_chantier)
+                    count += 1
+                except Exception as e:
+                    print(f"Erreur chantier {item.id}: {e}")
+                    errors += 1
+        
+        # 4. Valider
+        db.commit()
+        
+        return {
+            "status": "Succès", 
+            "transferred": count, 
+            "total_found": len(old_items),
+            "errors": errors,
+            "message": "Migration Chantiers terminée. Rechargez l'application."
+        }
+
+    except Exception as e:
+        return {"status": "Erreur Globale", "detail": str(e)}

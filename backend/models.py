@@ -262,3 +262,23 @@ class PermisFeu(Base):
     signature = Column(Boolean, default=True) 
     
     chantier = relationship("Chantier", back_populates="permis_feu")
+
+
+# 1. Définition temporaire de l'ancienne table pour lecture
+class OldChantier(Base):
+    __tablename__ = "chantiers" # 👈 On cible l'ancienne table
+    id = Column(Integer, primary_key=True, index=True)
+    nom = Column(String)
+    adresse = Column(String)
+    client = Column(String)
+    est_actif = Column(Boolean)
+    date_creation = Column(DateTime)
+    signature_url = Column(String)
+    cover_url = Column(String)
+    latitude = Column(Float)
+    longitude = Column(Float)
+    date_debut = Column(DateTime)
+    date_fin = Column(DateTime)
+    statut_planning = Column(String)
+    company_id = Column(Integer)
+    # Note : Pas de 'soumis_sps' ici car il n'existait pas
