@@ -1307,7 +1307,7 @@ def get_permis_pdf_route(permis_id: int, db: Session = Depends(get_db)):
     return StreamingResponse(
         pdf_buffer, 
         media_type="application/pdf", 
-        headers={"Content-Disposition": f"attachment; filename={filename}"}
+        headers={"Content-Disposition": f"inline; filename={filename}"}
     )
 
 # ==========================================
