@@ -82,7 +82,6 @@ class MaterielCreate(BaseModel):
 class MaterielUpdate(BaseModel):
     nom: Optional[str] = None
     reference: Optional[str] = None
-    ref_interne: Optional[str] = None
     etat: Optional[str] = None
     chantier_id: Optional[Any] = None
     statut_vgp: Optional[str] = None
