@@ -70,7 +70,7 @@ origins = [
     "http://localhost:4200",
     "http://localhost",
     "capacitor://localhost",
-    "https://conformeo-app.vercel.app",
+    "https://conformeo-app.vercel.app"
 ]
 
 app.add_middleware(
@@ -245,55 +245,94 @@ def update_team_member(
 # ==========================================
 # 3. DASHBOARD
 # ==========================================
+from datetime import datetime, timedelta # Assurez-vous d'avoir ces imports
+
+# ...
+
 @app.get("/dashboard/stats")
 def get_stats(db: Session = Depends(get_db)):
-    total = db.query(models.Chantier).count()
-    actifs = db.query(models.Chantier).filter(models.Chantier.est_actif == True).count()
-    rap = db.query(models.Rapport).count()
-    alert = db.query(models.Rapport).filter(models.Rapport.niveau_urgence.in_(['Critique', 'Moyen'])).count()
+    try:
+        # --- 1. KPIs GÉNÉRAUX ---
+        total = db.query(models.Chantier).count()
+        actifs = db.query(models.Chantier).filter(models.Chantier.est_actif == True).count()
+        rap = db.query(models.Rapport).count()
+        alert = db.query(models.Rapport).filter(models.Rapport.niveau_urgence.in_(['Critique', 'Moyen'])).count()
+        mat_sorti = db.query(models.Materiel).filter(models.Materiel.chantier_id != None).count()
 
-    today = datetime.now().date()
-    labels, values = [], []
-    for i in range(6, -1, -1):
-        day = today - timedelta(days=i)
-        labels.append(day.strftime("%d/%m"))
-        start = datetime.combine(day, datetime.min.time())
-        end = datetime.combine(day, datetime.max.time())
-        cnt = db.query(models.Rapport).filter(models.Rapport.date_creation >= start, models.Rapport.date_creation <= end).count()
-        values.append(cnt)
+        # --- 2. NOUVEAUX KPIs (Avec sécurité si table inexistante) ---
+        try:
+            # Compte les permis (si vous avez renommé la table en _v2, assurez-vous que le modèle pointe dessus)
+            nb_permis = db.query(models.PermisFeu).count()
+        except:
+            nb_permis = 0
 
-    recents = db.query(models.Rapport).order_by(models.Rapport.date_creation.desc()).limit(5).all()
-    rec_fmt = []
-    for r in recents:
-        c_nom = r.chantier.nom if r.chantier else "Inconnu"
-        rec_fmt.append({
-            "titre": r.titre, 
-            "date_creation": r.date_creation, 
-            "chantier_nom": c_nom, 
-            "niveau_urgence": r.niveau_urgence
-        })
+        try:
+            # Compte les tâches à faire
+            nb_tasks = db.query(models.Task).filter(models.Task.status == 'TODO').count()
+        except:
+            nb_tasks = 0
 
-    map_data = []
-    chantiers = db.query(models.Chantier).filter(models.Chantier.est_actif == True).all()
-    for c in chantiers:
-        lat, lng = c.latitude, c.longitude
-        if not lat:
-            last_gps = db.query(models.Rapport).filter(models.Rapport.chantier_id == c.id, models.Rapport.latitude != None).first()
-            if last_gps:
-                lat, lng = last_gps.latitude, last_gps.longitude
-        if lat and lng:
-            map_data.append({"id": c.id, "nom": c.nom, "client": c.client, "lat": lat, "lng": lng})
+        # --- 3. GRAPHIQUE (7 derniers jours) ---
+        today = datetime.now().date()
+        labels, values = [], []
+        for i in range(6, -1, -1):
+            day = today - timedelta(days=i)
+            labels.append(day.strftime("%d/%m"))
+            start = datetime.combine(day, datetime.min.time())
+            end = datetime.combine(day, datetime.max.time())
+            cnt = db.query(models.Rapport).filter(models.Rapport.date_creation >= start, models.Rapport.date_creation <= end).count()
+            values.append(cnt)
 
-    return {
-        "kpis": {
-            "total_chantiers": total, "actifs": actifs, 
-            "rapports": rap, "alertes": alert,
-            "materiel_sorti": db.query(models.Materiel).filter(models.Materiel.chantier_id != None).count()
-        },
-        "chart": { "labels": labels, "values": values },
-        "recents": rec_fmt,
-        "map": map_data
-    }
+        # --- 4. ACTIVITÉ RÉCENTE ---
+        recents = db.query(models.Rapport).order_by(models.Rapport.date_creation.desc()).limit(5).all()
+        rec_fmt = []
+        for r in recents:
+            c_nom = r.chantier.nom if r.chantier else "Chantier Inconnu"
+            rec_fmt.append({
+                "titre": r.titre, 
+                "date_creation": r.date_creation, 
+                "chantier_nom": c_nom, 
+                "niveau_urgence": r.niveau_urgence
+            })
+
+        # --- 5. CARTE (Géolocalisation) ---
+        map_data = []
+        chantiers = db.query(models.Chantier).filter(models.Chantier.est_actif == True).all()
+        for c in chantiers:
+            lat, lng = c.latitude, c.longitude
+            # Si pas de GPS sur le chantier, on prend le dernier rapport géolocalisé
+            if not lat:
+                last_gps = db.query(models.Rapport).filter(models.Rapport.chantier_id == c.id, models.Rapport.latitude != None).first()
+                if last_gps:
+                    lat, lng = last_gps.latitude, last_gps.longitude
+            
+            if lat and lng:
+                map_data.append({"id": c.id, "nom": c.nom, "client": c.client, "lat": lat, "lng": lng})
+
+        return {
+            "kpis": {
+                "total_chantiers": total, 
+                "actifs": actifs, 
+                "rapports": rap, 
+                "alertes": alert,
+                "materiel_sorti": mat_sorti,
+                "permis_feu": nb_permis, # 👈 Nouveau
+                "taches_todo": nb_tasks  # 👈 Nouveau
+            },
+            "chart": { "labels": labels, "values": values },
+            "recents": rec_fmt,
+            "map": map_data
+        }
+
+    except Exception as e:
+        print(f"❌ Erreur Dashboard Stats: {str(e)}")
+        # On retourne une structure vide pour ne pas faire planter le front
+        return {
+            "kpis": {"total_chantiers": 0, "actifs": 0, "rapports": 0, "alertes": 0, "materiel_sorti": 0},
+            "chart": {"labels": [], "values": []},
+            "recents": [],
+            "map": []
+        }
 
 # ==========================================
 # 4. CHANTIERS
