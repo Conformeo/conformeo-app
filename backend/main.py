@@ -24,6 +24,7 @@ from fastapi_mail import FastMail, MessageSchema, ConnectionConfig, MessageType
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
+from io import BytesIO
 
 # 👇 IMPORTATION DES MODULES LOCAUX
 import models
@@ -799,32 +800,76 @@ def download_ppsps_pdf(pid: int, db: Session = Depends(get_db)):
     pdf_generator.generate_ppsps_pdf(c, p, path, company=comp)
     return FileResponse(path, media_type='application/pdf')
 
-@app.get("/chantiers/{cid}/plans-prevention", response_model=List[schemas.PlanPreventionOut])
+# --- ROUTES PLAN DE PRÉVENTION (Optimisées) ---
+
+@app.get("/chantiers/{cid}/plans-prevention", response_model=List[schemas.PdpOut])
 def read_pdps(cid: int, db: Session = Depends(get_db)):
     return db.query(models.PlanPrevention).filter(models.PlanPrevention.chantier_id == cid).all()
 
-@app.post("/plans-prevention", response_model=schemas.PlanPreventionOut)
-def create_pdp(p: schemas.PlanPreventionCreate, db: Session = Depends(get_db)):
+@app.post("/plans-prevention", response_model=schemas.PdpOut)
+def create_pdp(p: schemas.PdpCreate, db: Session = Depends(get_db)):
+    # Note: Assurez-vous que schemas.PdpCreate correspond bien à votre schéma (parfois appelé PlanPreventionCreate)
     new_p = models.PlanPrevention(
         chantier_id=p.chantier_id,
         entreprise_utilisatrice=p.entreprise_utilisatrice,
         entreprise_exterieure=p.entreprise_exterieure,
         date_inspection_commune=p.date_inspection_commune,
-        risques_interferents=p.risques_interferents,
-        consignes_securite=p.consignes_securite
+        # Utilisation de p.dict() ou accès direct selon votre schéma Pydantic
+        risques_interferents=p.risques_interferents, 
+        consignes_securite=p.consignes_securite,
+        # Gestion signatures
+        signature_eu=getattr(p, 'signature_eu', None),
+        signature_ee=getattr(p, 'signature_ee', None)
     )
-    db.add(new_p); db.commit(); db.refresh(new_p)
+    db.add(new_p)
+    db.commit()
+    db.refresh(new_p)
     return new_p
 
 @app.get("/plans-prevention/{pid}/pdf")
-def download_pdp_pdf(pid: int, db: Session = Depends(get_db)):
-    p = db.query(models.PlanPrevention).filter(models.PlanPrevention.id == pid).first()
-    if not p: raise HTTPException(404)
-    c = db.query(models.Chantier).filter(models.Chantier.id == p.chantier_id).first()
-    comp = get_company_for_chantier(db, c.id)
-    path = f"uploads/PdP_{pid}.pdf"
-    pdf_generator.generate_pdp_pdf(c, p, path, company=comp)
-    return FileResponse(path, media_type='application/pdf')
+def download_pdp_pdf(
+    pid: int, 
+    # 👇 1. On accepte le token dans l'URL pour le mobile
+    token: str = Query(None), 
+    db: Session = Depends(get_db)
+):
+    # 👇 2. Sécurité Manuelle (Validation du token URL)
+    user = None
+    if token:
+        payload = security.decode_access_token(token) # Utilise la fonction ajoutée dans security.py
+        if payload:
+            user = db.query(models.User).filter(models.User.email == payload.get("sub")).first()
+    
+    if not user:
+        raise HTTPException(status_code=401, detail="Non authentifié ou token invalide")
+
+    # 3. Récupération des données
+    pdp = db.query(models.PlanPrevention).filter(models.PlanPrevention.id == pid).first()
+    if not pdp:
+        raise HTTPException(status_code=404, detail="Plan de prévention introuvable")
+
+    chantier = db.query(models.Chantier).filter(models.Chantier.id == pdp.chantier_id).first()
+    
+    # On récupère l'entreprise liée à l'utilisateur ou au chantier
+    company = db.query(models.Company).filter(models.Company.id == user.company_id).first()
+
+    # 4. Génération en MÉMOIRE (Pas de fichier uploads/)
+    buffer = BytesIO()
+    
+    # On passe le 'buffer' à la place du chemin de fichier 'path'
+    # ReportLab est intelligent : si on lui donne un buffer, il écrit dedans.
+    pdf_generator.generate_pdp_pdf(chantier, pdp, buffer, company=company)
+    
+    # 5. Préparation de l'envoi
+    buffer.seek(0)
+    filename = f"PDP_{chantier.nom}_{pid}.pdf"
+    
+    return StreamingResponse(
+        buffer, 
+        media_type='application/pdf', 
+        # 'inline' permet l'ouverture dans le navigateur mobile
+        headers={"Content-Disposition": f"inline; filename={filename}"}
+    )
 
 # PIC
 @app.get("/chantiers/{cid}/pic")
