@@ -36,7 +36,7 @@ export interface DocExterne {
   titre: string;
   categorie: string;
   url: string;
-  date_ajout: string;
+  date_ajout: string; // Mis à jour pour correspondre au backend (date_upload -> date_ajout)
 }
 
 export interface Chantier {
@@ -75,8 +75,10 @@ export interface Materiel {
   id?: number;
   nom: string;
   reference: string;
+  ref_interne?: string; // Ajouté
   etat: string;
   statut_vgp: string;
+  date_derniere_vgp?: string; // Ajouté
   image_url?: string | null;
   chantier_id?: number | null;
 }
@@ -85,7 +87,7 @@ export interface Inspection {
   id?: number;
   titre: string;
   type: string;
-  data: any[]; 
+  data: any; // Peut être un objet ou une liste selon le backend
   chantier_id: number;
   createur: string;
   date_creation?: string;
@@ -138,6 +140,19 @@ export interface User {
   nom?: string;
   company_id?: number;
 }
+
+export interface PermisFeu {
+    id?: number;
+    chantier_id: number;
+    lieu: string;
+    intervenant: string;
+    description: string;
+    extincteur: boolean;
+    nettoyage: boolean;
+    surveillance: boolean;
+    date?: string;
+}
+
 
 export interface UserLogin { email?: string; username?: string; password: string; }
 export interface Token { access_token: string; token_type: string; }
@@ -629,6 +644,6 @@ export class ApiService {
   }
 
   getPermisFeuList(chantierId: number) {
-    return this.http.get<any[]>(`${this.apiUrl}/chantiers/${chantierId}/permis-feu`);
+    return this.http.get<any[]>(`${this.apiUrl}/chantiers/${chantierId}/permis-feu`, this.getOptions()); // Header ajouté pour la sécu
   }
 }

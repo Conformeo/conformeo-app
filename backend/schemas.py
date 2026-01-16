@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr, Field
-from typing import List, Optional, Any, Dict
+from typing import List, Optional, Any, Dict, Union
 from datetime import datetime, date
 
 # --- AUTH ---
@@ -154,7 +154,7 @@ class DocExterneOut(BaseModel):
     titre: str
     url: str
     categorie: Optional[str] = "Autre"
-    date_upload: datetime
+    date_ajout: datetime
     chantier_id: Optional[int] = None
     class Config:
         from_attributes = True

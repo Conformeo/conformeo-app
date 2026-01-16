@@ -83,7 +83,7 @@ class Materiel(Base):
     id = Column(Integer, primary_key=True, index=True)
     nom = Column(String, index=True)
     reference = Column(String) # Ref constructeur
-    ref_interne = Column(String, nullable=True) # Ref interne (ex: CONFORME-51)
+    reference = Column(String, nullable=True) # Ref interne (ex: CONFORME-51)
     
     etat = Column(String, default="Bon") # Ex: Bon, Panne, A réparer
     statut_vgp = Column(String, default="CONFORME") # CONFORME, NON CONFORME, A PREVOIR
