@@ -19,7 +19,7 @@ from fastapi import FastAPI, Depends, HTTPException, status, File, UploadFile
 from fastapi.staticfiles import StaticFiles
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi_mail import FastMail, MessageSchema, ConnectionConfig, MessageType
 
 from sqlalchemy import text
@@ -30,6 +30,7 @@ import models
 import schemas 
 import security
 import pdf_generator
+from pdf_generator import generate_permis_pdf
 from database import engine, get_db
 
 # Création des tables
@@ -1288,6 +1289,26 @@ def create_permis_feu(permis: schemas.PermisFeuCreate, db: Session = Depends(get
 def read_permis_feu(chantier_id: int, db: Session = Depends(get_db)):
     permis = db.query(models.PermisFeu).filter(models.PermisFeu.chantier_id == chantier_id).all()
     return permis
+
+@app.get("/permis-feu/{permis_id}/pdf")
+def get_permis_pdf_route(permis_id: int, db: Session = Depends(get_db)):
+    # 1. Récupération des données
+    permis = db.query(models.PermisFeu).filter(models.PermisFeu.id == permis_id).first()
+    if not permis:
+        raise HTTPException(status_code=404, detail="Permis introuvable")
+    
+    chantier = db.query(models.Chantier).filter(models.Chantier.id == permis.chantier_id).first()
+    
+    # 2. Appel du générateur externe (Code propre !)
+    pdf_buffer = generate_permis_pdf(permis, chantier)
+    
+    # 3. Envoi du fichier
+    filename = f"Permis_Feu_{permis_id}.pdf"
+    return StreamingResponse(
+        pdf_buffer, 
+        media_type="application/pdf", 
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
 
 # ==========================================
 # 9. FIX & MIGRATIONS

@@ -572,3 +572,98 @@ def generate_duerp_pdf(company, duerp, filepath):
     except Exception as e:
         print(f"❌ Erreur PDF DUERP : {e}")
         raise e
+    
+# PERMIS FEU
+
+
+def generate_permis_pdf(permis, chantier):
+    """
+    Génère le fichier PDF du Permis de Feu et retourne un buffer.
+    """
+    chantier_nom = chantier.nom if chantier else "Chantier Inconnu"
+    
+    # Création du buffer mémoire
+    buffer = BytesIO()
+    c = canvas.Canvas(buffer, pagesize=A4)
+    width, height = A4
+    
+    # --- EN-TÊTE ROUGE ---
+    c.setFillColor(colors.firebrick)
+    c.rect(0, height - 3*cm, width, 3*cm, fill=1, stroke=0)
+    
+    c.setFillColor(colors.white)
+    c.setFont("Helvetica-Bold", 24)
+    c.drawCentredString(width / 2, height - 1.5*cm, "PERMIS DE FEU")
+    c.setFont("Helvetica", 12)
+    c.drawCentredString(width / 2, height - 2.2*cm, "Autorisation de travail par points chauds")
+
+    # --- INFORMATIONS GÉNÉRALES ---
+    c.setFillColor(colors.black)
+    y = height - 4*cm
+    
+    # Cadre Info
+    c.rect(1*cm, y - 3*cm, width - 2*cm, 3*cm)
+    
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(1.5*cm, y - 0.8*cm, f"CHANTIER : {chantier_nom}")
+    c.drawString(1.5*cm, y - 1.5*cm, f"Date : {permis.date.strftime('%d/%m/%Y')}")
+    c.drawString(1.5*cm, y - 2.2*cm, f"Lieu d'intervention : {permis.lieu}")
+    
+    c.drawString(11*cm, y - 0.8*cm, f"N° Permis : #PF-{permis.id}")
+    c.drawString(11*cm, y - 1.5*cm, f"Intervenant : {permis.intervenant}")
+    
+    y -= 4*cm
+    
+    # --- DESCRIPTION ---
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(1*cm, y, "NATURE DES TRAVAUX")
+    c.line(1*cm, y-0.2*cm, 7*cm, y-0.2*cm)
+    
+    y -= 1*cm
+    c.setFont("Helvetica", 12)
+    c.drawString(1.5*cm, y, f"Description : {permis.description}")
+    
+    y -= 2*cm
+    
+    # --- SÉCURITÉ & MESURES ---
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(1*cm, y, "MESURES DE SÉCURITÉ OBLIGATOIRES")
+    c.line(1*cm, y-0.2*cm, 10*cm, y-0.2*cm)
+    y -= 1*cm
+    
+    def draw_checkbox(c, x, y, checked, label):
+        c.rect(x, y, 0.5*cm, 0.5*cm)
+        c.setFont("Helvetica", 12)
+        c.drawString(x + 0.8*cm, y+0.15*cm, label)
+        if checked:
+            c.setFont("Helvetica-Bold", 14)
+            c.drawCentredString(x + 0.25*cm, y + 0.15*cm, "X")
+
+    draw_checkbox(c, 2*cm, y, permis.extincteur, "Extincteur à portée de main immédiate")
+    y -= 1*cm
+    draw_checkbox(c, 2*cm, y, permis.nettoyage, "Zone nettoyée (absence matériaux inflammables)")
+    y -= 1*cm
+    draw_checkbox(c, 2*cm, y, permis.surveillance, "Surveillance stricte après intervention (2h)")
+    
+    # --- SIGNATURE ---
+    y -= 3*cm
+    c.setFillColor(colors.lightgrey)
+    c.rect(1*cm, y - 4*cm, width - 2*cm, 4*cm, fill=1, stroke=0)
+    c.setFillColor(colors.black)
+    
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(2*cm, y - 1*cm, "VISA DE L'INTERVENANT")
+    c.drawString(11*cm, y - 1*cm, "VISA DU CHEF DE CHANTIER")
+    
+    if permis.signature:
+        c.setFont("Courier", 10)
+        c.drawString(2*cm, y - 2.5*cm, f"Signé numériquement le {permis.date.strftime('%d/%m/%Y %H:%M')}")
+        c.drawString(2*cm, y - 3*cm, f"ID: {permis.intervenant}")
+        
+        c.drawString(11*cm, y - 2.5*cm, "VALIDÉ PAR CONFORMÉO")
+
+    c.showPage()
+    c.save()
+    
+    buffer.seek(0)
+    return buffer
