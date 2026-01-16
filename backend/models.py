@@ -265,16 +265,3 @@ class PermisFeu(Base):
     signature = Column(Boolean, default=True) # Preuve simple
     
     chantier = relationship("Chantier", back_populates="permis_feu")
-
-
-# Définition temporaire de l'ancienne table pour pouvoir la lire
-class OldMateriel(Base):
-    __tablename__ = "materiels" # 👈 On cible l'ancienne table
-    id = Column(Integer, primary_key=True, index=True)
-    nom = Column(String)
-    reference = Column(String)
-    etat = Column(String)
-    image_url = Column(String)
-    date_derniere_vgp = Column(DateTime)
-    company_id = Column(Integer)
-    chantier_id = Column(Integer)

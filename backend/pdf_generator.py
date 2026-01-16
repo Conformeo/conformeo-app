@@ -2,7 +2,7 @@ from reportlab.lib.pagesizes import A4, landscape
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import cm
 from reportlab.lib.utils import ImageReader
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image as ReportLabImage
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib import colors
 from PIL import Image, ImageOps
@@ -49,120 +49,78 @@ def get_optimized_image(path_or_url):
     return None
 
 def draw_footer(c, width, height, chantier, titre_doc):
-    """Pied de page remonté pour éviter les débordements"""
+    """Pied de page"""
     c.saveState()
-    
-    # On remonte le footer à 2cm du bas (au lieu de 1cm) pour éviter la coupure
     footer_y = 2 * cm 
-    
     c.setStrokeColorRGB(0.8, 0.8, 0.8); c.setLineWidth(0.5)
-    c.line(1*cm, footer_y + 0.5*cm, width-1*cm, footer_y + 0.5*cm) # Ligne
-    
+    c.line(1*cm, footer_y + 0.5*cm, width-1*cm, footer_y + 0.5*cm)
     c.setFont(FONT_TEXT, 8); c.setFillColorRGB(0.5, 0.5, 0.5)
     c.drawString(1*cm, footer_y, f"Conforméo - {titre_doc} - {chantier.nom}")
     c.drawRightString(width-1*cm, footer_y, f"Page {c.getPageNumber()}")
     c.restoreState()
 
 def draw_cover_page(c, chantier, titre_principal, sous_titre, company=None):
+    """Page de garde standardisée"""
     width, height = A4
-    
-    # --- MISE EN PAGE : LOGO LIBRE ET GRAND ---
-    
-    # On définit le centre vertical pour le bloc logo
-    # On le remonte un peu pour laisser de la place aux titres
     logo_center_y = height / 2 + 3 * cm 
     
-    # 1. Insertion du Logo (SANS CADRE)
+    # 1. Logo
     logo_source = None
     if company and company.logo_url: logo_source = company.logo_url
     elif hasattr(chantier, 'company') and chantier.company: logo_source = chantier.company.logo_url
 
-    logo_drawn = False
     if logo_source:
         img = get_optimized_image(logo_source)
         if img:
-            # --- MODIFICATION TAILLE ---
-            # On autorise une taille beaucoup plus grande (12cm de large ou 8cm de haut)
-            max_im_w = 12 * cm  # Avant c'était ~10cm avec marges
-            max_im_h = 8 * cm   # Avant c'était ~5cm
-            
+            max_im_w = 12 * cm
+            max_im_h = 8 * cm
             iw, ih = img.size
             ratio = min(max_im_w/iw, max_im_h/ih)
             new_w = iw * ratio
             new_h = ih * ratio
-            
-            # Centrage horizontal
             pos_x = (width - new_w) / 2
-            # Centrage vertical autour de logo_center_y
             pos_y = logo_center_y - (new_h / 2)
-            
             try:
                 c.drawImage(ImageReader(img), pos_x, pos_y, width=new_w, height=new_h, mask='auto', preserveAspectRatio=True)
-                logo_drawn = True
-            except Exception as e:
-                print(f"Erreur rendu logo PDF: {e}")
+            except: pass
 
-    # Si pas de logo, on ne met rien ou un texte discret
-    if not logo_drawn:
-        c.setFillColorRGB(0.7, 0.7, 0.7); c.setFont(FONT_TEXT, 10)
-        c.drawCentredString(width/2, logo_center_y, "")
-
-    # ... (Code du logo inchangé) ...
-
-    # 2. Titres (SOUS le logo)
+    # 2. Titres
     y_text = logo_center_y - 5 * cm 
-    
     c.setFillColorRGB(*COLOR_PRIMARY); c.setFont(FONT_TITLE, 24)
     c.drawCentredString(width/2, y_text, titre_principal)
-    
     y_text -= 1.2 * cm
     c.setFillColorRGB(*COLOR_SECONDARY); c.setFont(FONT_TEXT, 14)
     c.drawCentredString(width/2, y_text, sous_titre)
     
-    # 3. Ligne de séparation (ALIGNÉE À GAUCHE MAINTENANT)
+    # 3. Ligne
     y_text -= 2 * cm
     c.setStrokeColorRGB(0.8, 0.8, 0.8); c.setLineWidth(0.5)
-    # 👇 On commence la ligne à 2*cm (Marge gauche) jusqu'à width-2*cm (Marge droite)
     c.line(2*cm, y_text, width-2*cm, y_text)
 
-    # 4. Infos Projet (ALIGNÉES À GAUCHE)
+    # 4. Infos
     y_info = y_text - 3 * cm
-    
-    # 👇 C'est ici que ça se joue : 2*cm c'est le bord gauche du contenu
     x_labels = 2 * cm 
     x_values = 6 * cm 
-    
     c.setFillColorRGB(0, 0, 0)
     
-    # Projet
-    c.setFont(FONT_TITLE, 14)
-    c.drawString(x_labels, y_info, "PROJET :")
-    c.setFont(FONT_TEXT, 14)
-    c.drawString(x_values, y_info, chantier.nom or "Non défini")
+    c.setFont(FONT_TITLE, 14); c.drawString(x_labels, y_info, "PROJET :")
+    c.setFont(FONT_TEXT, 14); c.drawString(x_values, y_info, chantier.nom or "Non défini")
     
-    # Adresse
     y_info -= 1.5 * cm
-    c.setFont(FONT_TITLE, 14)
-    c.drawString(x_labels, y_info, "ADRESSE :")
-    c.setFont(FONT_TEXT, 14)
-    c.drawString(x_values, y_info, chantier.adresse or "Non définie")
+    c.setFont(FONT_TITLE, 14); c.drawString(x_labels, y_info, "ADRESSE :")
+    c.setFont(FONT_TEXT, 14); c.drawString(x_values, y_info, chantier.adresse or "Non définie")
     
-    # Réalisé par
     if company:
         y_info -= 2.5 * cm
         c.setFont(FONT_TITLE, 12); c.setFillColorRGB(*COLOR_SECONDARY)
         c.drawString(x_labels, y_info, "RÉALISÉ PAR :")
-        c.setFont(FONT_TEXT, 12)
-        c.drawString(x_values, y_info, company.name)
+        c.setFont(FONT_TEXT, 12); c.drawString(x_values, y_info, company.name)
 
-    # Date en bas (Alignée avec Réalisé par)
     date_str = datetime.now().strftime('%d/%m/%Y')
     c.setFont(FONT_TEXT, 10); c.setFillColorRGB(0.5, 0.5, 0.5)
-    # Alignée à droite
     c.drawRightString(width-2*cm, y_info, f"Édité le {date_str}")
-    
     c.showPage()
-    
+
 # ==========================================
 # 2. GENERATEUR JOURNAL DE BORD 
 # ==========================================
@@ -174,7 +132,7 @@ def generate_pdf(chantier, rapports, inspections, output_path, company=None):
     draw_cover_page(c, chantier, "JOURNAL DE BORD", "Suivi d'exécution & Rapports", company)
 
     y = height - 3 * cm
-    bottom_limit = 3 * cm # Limite de sécurité
+    bottom_limit = 3 * cm 
 
     def check_space(needed_height):
         nonlocal y
@@ -507,61 +465,46 @@ def generate_pdp_pdf(chantier, pdp, output_path, company=None):
     return output_path
 
 # ==========================================
-# 6. GENERATEUR DUERP
+# 6. GENERATEUR DUERP (Tableau Dynamique)
 # ==========================================
-# 1. AJOUTEZ CES IMPORTS EN HAUT (Importants pour les tableaux)
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.lib import colors
-from reportlab.lib.pagesizes import A4, landscape # On se met en format Paysage pour avoir de la place
-from io import BytesIO
-
-# ... (Laissez votre fonction generate_permis_pdf telle quelle) ...
-
-# 2. AJOUTEZ CETTE NOUVELLE FONCTION À LA FIN
 def generate_duerp_pdf(duerp, company, lignes):
     """
     Génère le Document Unique (DUERP) complet en PDF (Format Paysage)
     """
     buffer = BytesIO()
     # On utilise SimpleDocTemplate qui est plus puissant pour les tableaux multipages
-    doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=18)
+    doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), rightMargin=20, leftMargin=20, topMargin=20, bottomMargin=20)
     
     elements = []
     styles = getSampleStyleSheet()
+    style_normal = styles['Normal']
+    style_title = styles['Title']
     
-    # --- TITRE DU DOCUMENT ---
-    titre = f"DOCUMENT UNIQUE (DUERP) - ANNÉE {duerp.annee}"
-    elements.append(Paragraph(titre, styles['Title']))
+    # Titre
+    elements.append(Paragraph(f"DOCUMENT UNIQUE (DUERP) - {duerp.annee}", style_title))
+    elements.append(Spacer(1, 10))
+    elements.append(Paragraph(f"Entreprise : {company.name} | Mis à jour le : {duerp.date_mise_a_jour.strftime('%d/%m/%Y')}", style_normal))
     elements.append(Spacer(1, 20))
     
-    # --- INFO ENTREPRISE ---
-    info = f"<b>Entreprise :</b> {company.name}<br/><b>Date de mise à jour :</b> {duerp.date_mise_a_jour.strftime('%d/%m/%Y')}"
-    elements.append(Paragraph(info, styles['Normal']))
-    elements.append(Spacer(1, 20))
-    
-    # --- PRÉPARATION DES DONNÉES DU TABLEAU ---
-    # En-têtes
+    # Données du tableau
     data = [['Unité de Travail / Tâche', 'Risque Identifié', 'Gravité', 'Mesures de Prévention', 'État']]
     
-    # Remplissage des lignes
     for l in lignes:
-        # On utilise Paragraph pour que le texte revienne à la ligne dans la case
-        tache = Paragraph(l.tache, styles['Normal'])
-        risque = Paragraph(l.risque, styles['Normal'])
-        mesures = Paragraph(f"<b>À FAIRE :</b> {l.mesures_a_realiser}<br/><br/><i>FAIT : {l.mesures_realisees}</i>", styles['Normal'])
+        # Paragraph permet le retour à la ligne automatique dans les cellules
+        tache = Paragraph(l.tache, style_normal)
+        risque = Paragraph(l.risque, style_normal)
         
-        # Gestion couleur Gravité
-        gravite_str = str(l.gravite)
+        # Mise en forme des mesures
+        mesures_text = f"<b>À FAIRE :</b> {l.mesures_a_realiser or '-'}<br/><br/><i>FAIT : {l.mesures_realisees or '-'}</i>"
+        mesures = Paragraph(mesures_text, style_normal)
         
-        data.append([tache, risque, gravite_str, mesures, "EN COURS"])
+        data.append([tache, risque, str(l.gravite), mesures, "EN COURS"])
 
-    # --- STYLE DU TABLEAU ---
-    # Largeurs des colonnes (Total approx 750 points en paysage)
-    col_widths = [150, 150, 60, 300, 80]
+    # Style du tableau
+    # Largeurs colonnes : Total ~800 points en paysage
+    col_widths = [180, 150, 60, 330, 80]
     
     t = Table(data, colWidths=col_widths)
-    
     t.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.navy),       # En-tête bleu marine
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),  # Texte blanc
@@ -575,7 +518,6 @@ def generate_duerp_pdf(duerp, company, lignes):
         ('BOX', (0, 0), (-1, -1), 2, colors.black),         # Cadre extérieur épais
     ]))
     
-    
     elements.append(t)
     
     # --- GÉNÉRATION ---
@@ -583,99 +525,75 @@ def generate_duerp_pdf(duerp, company, lignes):
     
     buffer.seek(0)
     return buffer
-    
-# ==========================================
-# 6. GENERATEUR PERMIS FEU
-# ==========================================
 
+# ==========================================
+# 7. GENERATEUR PERMIS FEU (Canvas)
+# ==========================================
 def generate_permis_pdf(permis, chantier):
     """
     Génère le fichier PDF du Permis de Feu et retourne un buffer.
     """
     chantier_nom = chantier.nom if chantier else "Chantier Inconnu"
-    
-    # Création du buffer mémoire
     buffer = BytesIO()
     c = canvas.Canvas(buffer, pagesize=A4)
     width, height = A4
     
-    # --- EN-TÊTE ROUGE ---
+    # En-tête Rouge
     c.setFillColor(colors.firebrick)
     c.rect(0, height - 3*cm, width, 3*cm, fill=1, stroke=0)
-    
     c.setFillColor(colors.white)
     c.setFont("Helvetica-Bold", 24)
     c.drawCentredString(width / 2, height - 1.5*cm, "PERMIS DE FEU")
     c.setFont("Helvetica", 12)
     c.drawCentredString(width / 2, height - 2.2*cm, "Autorisation de travail par points chauds")
 
-    # --- INFORMATIONS GÉNÉRALES ---
+    # Info
     c.setFillColor(colors.black)
     y = height - 4*cm
-    
-    # Cadre Info
     c.rect(1*cm, y - 3*cm, width - 2*cm, 3*cm)
-    
     c.setFont("Helvetica-Bold", 12)
     c.drawString(1.5*cm, y - 0.8*cm, f"CHANTIER : {chantier_nom}")
     c.drawString(1.5*cm, y - 1.5*cm, f"Date : {permis.date.strftime('%d/%m/%Y')}")
-    c.drawString(1.5*cm, y - 2.2*cm, f"Lieu d'intervention : {permis.lieu}")
-    
-    c.drawString(11*cm, y - 0.8*cm, f"N° Permis : #PF-{permis.id}")
+    c.drawString(1.5*cm, y - 2.2*cm, f"Lieu : {permis.lieu}")
     c.drawString(11*cm, y - 1.5*cm, f"Intervenant : {permis.intervenant}")
     
     y -= 4*cm
-    
-    # --- DESCRIPTION ---
     c.setFont("Helvetica-Bold", 14)
     c.drawString(1*cm, y, "NATURE DES TRAVAUX")
-    c.line(1*cm, y-0.2*cm, 7*cm, y-0.2*cm)
-    
     y -= 1*cm
     c.setFont("Helvetica", 12)
     c.drawString(1.5*cm, y, f"Description : {permis.description}")
     
     y -= 2*cm
-    
-    # --- SÉCURITÉ & MESURES ---
     c.setFont("Helvetica-Bold", 14)
-    c.drawString(1*cm, y, "MESURES DE SÉCURITÉ OBLIGATOIRES")
-    c.line(1*cm, y-0.2*cm, 10*cm, y-0.2*cm)
+    c.drawString(1*cm, y, "SÉCURITÉ")
     y -= 1*cm
     
-    def draw_checkbox(c, x, y, checked, label):
-        c.rect(x, y, 0.5*cm, 0.5*cm)
+    # Checkboxes
+    def draw_check(txt, val, cur_y):
+        c.rect(1.5*cm, cur_y, 0.5*cm, 0.5*cm)
         c.setFont("Helvetica", 12)
-        c.drawString(x + 0.8*cm, y+0.15*cm, label)
-        if checked:
+        c.drawString(2.5*cm, cur_y+0.15*cm, txt)
+        if val: 
             c.setFont("Helvetica-Bold", 14)
-            c.drawCentredString(x + 0.25*cm, y + 0.15*cm, "X")
-
-    draw_checkbox(c, 2*cm, y, permis.extincteur, "Extincteur à portée de main immédiate")
+            c.drawString(1.65*cm, cur_y+0.15*cm, "X")
+            
+    draw_check("Extincteur à portée", permis.extincteur, y)
     y -= 1*cm
-    draw_checkbox(c, 2*cm, y, permis.nettoyage, "Zone nettoyée (absence matériaux inflammables)")
+    draw_check("Zone nettoyée", permis.nettoyage, y)
     y -= 1*cm
-    draw_checkbox(c, 2*cm, y, permis.surveillance, "Surveillance stricte après intervention (2h)")
+    draw_check("Surveillance (2h)", permis.surveillance, y)
     
-    # --- SIGNATURE ---
+    # Signature
     y -= 3*cm
     c.setFillColor(colors.lightgrey)
-    c.rect(1*cm, y - 4*cm, width - 2*cm, 4*cm, fill=1, stroke=0)
+    c.rect(1*cm, y - 3*cm, width - 2*cm, 3*cm, fill=1, stroke=0)
     c.setFillColor(colors.black)
-    
-    c.setFont("Helvetica-Bold", 12)
-    c.drawString(2*cm, y - 1*cm, "VISA DE L'INTERVENANT")
-    c.drawString(11*cm, y - 1*cm, "VISA DU CHEF DE CHANTIER")
-    
     if permis.signature:
         c.setFont("Courier", 10)
-        c.drawString(2*cm, y - 2.5*cm, f"Signé numériquement le {permis.date.strftime('%d/%m/%Y %H:%M')}")
-        c.drawString(2*cm, y - 3*cm, f"ID: {permis.intervenant}")
-        
-        c.drawString(11*cm, y - 2.5*cm, "VALIDÉ PAR CONFORMÉO")
+        c.drawString(2*cm, y - 1.5*cm, f"Signé numériquement par {permis.intervenant} le {permis.date.strftime('%d/%m/%Y')}")
 
     c.showPage()
     c.save()
-    
     buffer.seek(0)
     return buffer
