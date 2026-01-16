@@ -2,12 +2,16 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Platform } from '@ionic/angular/standalone'; 
+// 👇 AJOUT DES COMPOSANTS UI MANQUANTS (Listes, Cards, Items...)
 import { 
   IonHeader, IonToolbar, IonContent,
   IonButtons, IonButton, IonIcon, IonFab, IonFabButton, 
   AlertController, IonBackButton, IonSearchbar,
   IonTitle, ModalController, LoadingController, IonBadge, 
-  IonRefresher, IonRefresherContent // ✅ Nécessaire pour le pull-to-refresh
+  IonRefresher, IonRefresherContent,
+  IonList, IonItem, IonLabel, IonAvatar, IonThumbnail,
+  IonCard, IonCardHeader, IonCardSubtitle, IonCardTitle, IonCardContent,
+  IonSkeletonText, IonNote, IonItemSliding, IonItemOptions, IonItemOption
 } from '@ionic/angular/standalone';
 import { Capacitor } from '@capacitor/core';
 import { addIcons } from 'ionicons';
@@ -29,12 +33,16 @@ import { BarcodeScanner, BarcodeFormat } from '@capacitor-mlkit/barcode-scanning
   templateUrl: './materiel.page.html',
   styleUrls: ['./materiel.page.scss'],
   standalone: true,
+  // 👇 ICI : On ajoute tous les composants utilisés dans le HTML
   imports: [
     CommonModule, FormsModule, IonHeader, IonSearchbar,
     IonToolbar, IonContent, IonTitle,
     IonButtons, IonButton, IonIcon, IonFab,
     IonFabButton, IonBackButton, IonBadge,
-    IonRefresher, IonRefresherContent
+    IonRefresher, IonRefresherContent,
+    IonList, IonItem, IonLabel, IonAvatar, IonThumbnail,
+    IonCard, IonCardHeader, IonCardSubtitle, IonCardTitle, IonCardContent,
+    IonSkeletonText, IonNote, IonItemSliding, IonItemOptions, IonItemOption
   ]
 })
 export class MaterielPage implements OnInit {
@@ -307,13 +315,11 @@ export class MaterielPage implements OnInit {
     return mat.image_url;
   }
 
-  // 👇 LA FONCTION MANQUANTE QUI PROVOQUAIT L'ERREUR
+  // ✅ FONCTION RESTAURÉE
   getThumbUrl(url: string): string {
     if (!url) return '';
     if (url.startsWith('http:')) url = url.replace('http:', 'https:');
-    
-    if (url.includes('cloudinary.com') && url.includes('/upload/')) {
-      if (url.includes('w_')) return url;
+    if (url.includes('cloudinary.com') && !url.includes('w_')) {
       return url.replace('/upload/', '/upload/w_250,h_250,c_fit,q_auto,f_auto/');
     }
     return url;
