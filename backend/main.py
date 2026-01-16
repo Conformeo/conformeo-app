@@ -1768,3 +1768,29 @@ def debug_counts(db: Session = Depends(get_db)):
         "NOUVELLE_TABLE_V2": new_count,
         "status": "Si ANCIENNE > NOUVELLE, il manque des données."
     }
+
+# ==========================================
+# 🛠️ FIX : RÉATTRIBUER TOUS LES CHANTIERS À MOI
+# ==========================================
+@app.get("/system/assign-all-chantiers-to-me")
+def assign_all_to_me(
+    db: Session = Depends(get_db),
+    # On a besoin de savoir qui vous êtes pour récupérer votre ID entreprise
+    current_user: models.User = Depends(security.get_current_user) 
+):
+    if not current_user.company_id:
+        return {"error": "Votre utilisateur n'est lié à aucune entreprise !"}
+
+    # 1. Mise à jour de TOUS les chantiers vers votre Company ID
+    result = db.query(models.Chantier).update(
+        {models.Chantier.company_id: current_user.company_id},
+        synchronize_session=False
+    )
+    
+    db.commit()
+    
+    return {
+        "status": "Succès",
+        "message": f"{result} chantiers sont maintenant visibles pour l'entreprise {current_user.company_id}",
+        "user": current_user.email
+    }
