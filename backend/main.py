@@ -1755,3 +1755,16 @@ def migrate_chantiers_data(db: Session = Depends(get_db)):
 
     except Exception as e:
         return {"status": "Erreur Globale", "detail": str(e)}
+    
+@app.get("/system/debug-counts")
+def debug_counts(db: Session = Depends(get_db)):
+    # Compte dans l'ancienne table (sauvegarde)
+    old_count = db.query(OldChantier).count()
+    # Compte dans la nouvelle table (visible appli)
+    new_count = db.query(models.Chantier).count()
+    
+    return {
+        "ANCIENNE_TABLE": old_count,
+        "NOUVELLE_TABLE_V2": new_count,
+        "status": "Si ANCIENNE > NOUVELLE, il manque des données."
+    }
