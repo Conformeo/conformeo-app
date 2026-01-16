@@ -905,8 +905,8 @@ def send_pdp_email(
     # Pour Gmail : utilisez un "Mot de passe d'application" (App Password), pas votre vrai mot de passe
     SMTP_SERVER = "smtp.gmail.com"
     SMTP_PORT = 587
-    SMTP_USER = "votre.email@gmail.com" # 👈 METTEZ VOTRE EMAIL ICI
-    SMTP_PASSWORD = "xxxx xxxx xxxx xxxx" # 👈 METTEZ VOTRE MOT DE PASSE D'APPLICATION ICI
+    SMTP_USER = "michelgmv7@gmail.com" # 👈 METTEZ VOTRE EMAIL ICI
+    SMTP_PASSWORD = "xzqs zuxm lcma jhfm" # 👈 METTEZ VOTRE MOT DE PASSE D'APPLICATION ICI
 
     try:
         # Création du message
