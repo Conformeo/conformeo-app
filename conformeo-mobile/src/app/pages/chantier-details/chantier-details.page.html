@@ -123,11 +123,29 @@
     </div>
 
     <div *ngIf="segment === 'doe'" class="animate-fade">
+      
       <div class="doe-intro">
         <ion-icon name="archive-outline" size="large" color="primary"></ion-icon>
         <p>Dossier de fin de chantier</p>
       </div>
 
+      <div class="section-header" *ngIf="documentsList.length > 0">
+        <h3>Documents Sécurité & Suivi</h3>
+      </div>
+
+      <ion-list inset="true" *ngIf="documentsList.length > 0" class="security-docs-list">
+        <ion-item *ngFor="let doc of documentsList" button (click)="doc.action()" detail="false">
+          <div slot="start" class="doc-icon-circle" [ngClass]="'bg-' + doc.color">
+            <ion-icon [name]="doc.icon" color="light"></ion-icon>
+          </div>
+          <ion-label>
+            <h3>{{ doc.titre }}</h3>
+            <p>{{ doc.date | date:'dd/MM/yyyy' }}</p>
+          </ion-label>
+          <ion-icon name="download-outline" slot="end" color="medium"></ion-icon>
+        </ion-item>
+      </ion-list>
+      
       <ion-accordion-group expand="inset" class="doe-accordion">
         
         <ion-accordion value="PLANS">
