@@ -1186,51 +1186,124 @@ def read_tasks(chantier_id: int, db: Session = Depends(get_db)):
     return db.query(models.Task).filter(models.Task.chantier_id == chantier_id).all()
 
 # --- MOTEUR D'INTELLIGENCE (RISQUES) ---
-def analyze_task_risks(description: str):
+# N'oubliez pas d'importer datetime si ce n'est pas fait
+from datetime import datetime
+
+# --- MOTEUR D'INTELLIGENCE DUERP & ALERTES ---
+def get_risk_analysis(description: str):
     desc = description.lower()
     
-    # Règle 1 : Points Chauds (Permis de Feu)
+    # Règle 1 : Hauteur (Déclenche DUERP)
+    if any(x in desc for x in ["toiture", "charpente", "échelle", "échafaudage", "nacelle", "hauteur", "bardage"]):
+        return {
+            "type_alert": "DUERP",
+            "msg": "🪜 Travail en hauteur détecté. Ligne ajoutée au DUERP.",
+            "data": {
+                "risque": "Chute de hauteur",
+                "gravite": 4,
+                "mesures_a_realiser": "Installation garde-corps, Vérification échafaudage, Port du harnais",
+                "mesures_realisees": "Formation travail en hauteur"
+            }
+        }
+
+    # Règle 2 : Feu (Déclenche Permis Feu + DUERP)
     if any(x in desc for x in ["soudure", "meuleuse", "chalumeau", "étincelle", "feu", "découpe"]):
         return {
-            "msg": "🔥 Travaux par points chauds détectés. Le Permis de Feu est-il signé ?",
-            "type": "PERMIS_FEU"
-        }
-    
-    # Règle 2 : Hauteur (DUERP)
-    if any(x in desc for x in ["toiture", "échafaudage", "échelle", "nacelle", "hauteur", "bardage"]):
-        return {
-            "msg": "🪜 Travail en hauteur identifié. Vérification harnais/échafaudage requise.",
-            "type": "DUERP"
-        }
-
-    # Règle 3 : Poussières / Amiante (EPI)
-    if any(x in desc for x in ["amiante", "démolition", "perçage", "ponçage", "béton", "chimique"]):
-        return {
-            "msg": "😷 Risque poussières/inhalation. Port du masque FFP3 obligatoire.",
-            "type": "EPI"
+            "type_alert": "PERMIS_FEU",
+            "msg": "🔥 Risque Incendie. Permis de feu requis + DUERP mis à jour.",
+            "data": {
+                "risque": "Incendie / Brûlures",
+                "gravite": 4,
+                "mesures_a_realiser": "Permis de feu obligatoire, Extincteur à proximité, Éloignement combustibles",
+                "mesures_realisees": "Extincteurs vérifiés"
+            }
         }
         
+    # Règle 3 : Poussières / Amiante / Chimique
+    if any(x in desc for x in ["amiante", "démolition", "perçage", "ponçage", "béton", "silice", "chimique"]):
+        return {
+            "type_alert": "EPI",
+            "msg": "😷 Risque Inhalation. Port du masque FFP3 ajouté au DUERP.",
+            "data": {
+                "risque": "Inhalation poussières nocives",
+                "gravite": 3,
+                "mesures_a_realiser": "Port masque FFP3, Arrosage pour abattre poussières",
+                "mesures_realisees": "Fourniture EPI"
+            }
+        }
+    
+    # Règle 4 : Électricité
+    if any(x in desc for x in ["câblage", "tableau", "électrique", "tension", "raccordement"]):
+        return {
+            "type_alert": "EPI",
+            "msg": "⚡ Risque Électrique. Habilitation requise.",
+            "data": {
+                "risque": "Électrisation / Électrocution",
+                "gravite": 4,
+                "mesures_a_realiser": "Consignation, Port visière anti-UV, Tapis isolant",
+                "mesures_realisees": "Habilitation électrique à jour"
+            }
+        }
+
     return None
 
-# --- ROUTE CRÉATION TÂCHE (INTELLIGENTE) ---
+# --- ROUTE CRÉATION TÂCHE (INTELLIGENTE + ÉCRITURE BDD) ---
 @app.post("/tasks", response_model=schemas.TaskOut)
 def create_task(task: schemas.TaskCreate, db: Session = Depends(get_db)):
-    # 1. Création standard en base de données
+    # 1. Création standard de la tâche
     db_task = models.Task(**task.dict())
     db.add(db_task)
     db.commit()
     db.refresh(db_task)
     
     # 2. Analyse Intelligence
-    analysis = analyze_task_risks(db_task.description)
+    analysis = get_risk_analysis(db_task.description)
     
-    # 3. Injection de l'alerte (virtuelle) dans la réponse
-    # On n'enregistre pas l'alerte en BDD pour l'instant, on la renvoie juste au mobile pour info
     if analysis:
-        # On attache manuellement les attributs à l'objet réponse (Pydantic le gérera)
+        # A. On prépare la réponse pour le Mobile (Toast/Popup)
         setattr(db_task, "alert_message", analysis["msg"])
-        setattr(db_task, "alert_type", analysis["type"])
+        setattr(db_task, "alert_type", analysis["type_alert"])
         
+        # B. AUTOMATISATION DUERP : On écrit dans la base de données !
+        # On récupère le chantier pour trouver l'entreprise
+        chantier = db.query(models.Chantier).filter(models.Chantier.id == task.chantier_id).first()
+        
+        if chantier and chantier.company_id:
+            # Chercher le DUERP de l'année en cours
+            annee_courante = str(datetime.now().year)
+            duerp = db.query(models.DUERP).filter(
+                models.DUERP.company_id == chantier.company_id,
+                models.DUERP.annee == annee_courante
+            ).first()
+            
+            # Si pas de DUERP pour cette année, on le crée
+            if not duerp:
+                duerp = models.DUERP(company_id=chantier.company_id, annee=annee_courante)
+                db.add(duerp)
+                db.commit()
+                db.refresh(duerp)
+            
+            # C. Éviter les doublons : On vérifie si ce risque existe déjà pour cette tâche exacte
+            risk_data = analysis["data"]
+            existing_line = db.query(models.DUERPLigne).filter(
+                models.DUERPLigne.duerp_id == duerp.id,
+                models.DUERPLigne.tache == db_task.description
+            ).first()
+            
+            if not existing_line:
+                # Ajout de la ligne automatique
+                ligne = models.DUERPLigne(
+                    duerp_id=duerp.id,
+                    tache=db_task.description,     # Ex: "Pose toiture"
+                    risque=risk_data["risque"],    # Ex: "Chute de hauteur"
+                    gravite=risk_data["gravite"],  # Ex: 4
+                    mesures_a_realiser=risk_data["mesures_a_realiser"],
+                    mesures_realisees=risk_data["mesures_realisees"]
+                )
+                db.add(ligne)
+                db.commit()
+                print(f"✅ DUERP Mis à jour : {risk_data['risque']} ajouté.")
+
     return db_task
         
 
