@@ -1158,26 +1158,43 @@ def get_duerp(annee: str, db: Session = Depends(get_db), current_user: models.Us
     if not d: return {"id": 0, "annee": annee, "date_mise_a_jour": datetime.now(), "lignes": []}
     return d
 
-@app.get("/companies/me/duerp/{annee}/pdf")
-def download_duerp_pdf(annee: str, db: Session = Depends(get_db), current_user: models.User = Depends(security.get_current_user)):
-    # 1. Récupération des données
-    d = db.query(models.DUERP).filter(models.DUERP.company_id == current_user.company_id, models.DUERP.annee == annee).first()
-    if not d: raise HTTPException(404, "DUERP introuvable")
-    
-    comp = db.query(models.Company).filter(models.Company.id == current_user.company_id).first()
-    
-    # 2. Création du dossier uploads s'il n'existe pas (Important sur Render)
-    if not os.path.exists("uploads"):
-        os.makedirs("uploads")
+from fastapi.responses import StreamingResponse # Assure-toi d'avoir cet import en haut
+import pdf_generator # Assure-toi d'avoir importé ton générateur
 
-    # 3. Génération
-    filename = f"DUERP_{comp.name.replace(' ', '_')}_{annee}.pdf"
-    path = f"uploads/{filename}"
+@app.get("/companies/me/duerp/{annee}/pdf")
+def download_duerp_pdf(
+    annee: str, 
+    db: Session = Depends(get_db), 
+    current_user: models.User = Depends(security.get_current_user)
+):
+    # 1. Récupération du DUERP
+    duerp = db.query(models.DUERP).filter(
+        models.DUERP.company_id == current_user.company_id, 
+        models.DUERP.annee == annee
+    ).first()
     
-    pdf_generator.generate_duerp_pdf(comp, d, path)
+    if not duerp:
+        raise HTTPException(status_code=404, detail="DUERP introuvable pour cette année")
     
-    # 4. Envoi
-    return FileResponse(path, media_type='application/pdf', filename=filename)
+    # 2. Récupération de l'entreprise
+    company = db.query(models.Company).filter(models.Company.id == current_user.company_id).first()
+    
+    # 3. Récupération des lignes (CRUCIAL : c'est ça qui remplit le tableau !)
+    lignes = db.query(models.DUERPLigne).filter(models.DUERPLigne.duerp_id == duerp.id).all()
+    
+    # 4. Génération en mémoire (via pdf_generator.py)
+    # On passe bien les 3 arguments attendus par la fonction que nous avons créée juste avant
+    pdf_buffer = pdf_generator.generate_duerp_pdf(duerp, company, lignes)
+    
+    # 5. Envoi immédiat (Streaming)
+    filename = f"DUERP_{company.name.replace(' ', '_')}_{annee}.pdf"
+    
+    return StreamingResponse(
+        pdf_buffer,
+        media_type='application/pdf',
+        # "inline" permet de l'afficher dans le navigateur. Mets "attachment" pour forcer le téléchargement.
+        headers={"Content-Disposition": f"inline; filename={filename}"}
+    )
 
 # --- ROUTES TÂCHES ---
 

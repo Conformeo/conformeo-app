@@ -509,72 +509,83 @@ def generate_pdp_pdf(chantier, pdp, output_path, company=None):
 # ==========================================
 # 6. GENERATEUR DUERP
 # ==========================================
-def generate_duerp_pdf(company, duerp, filepath):
-    doc = SimpleDocTemplate(filepath, pagesize=landscape(A4), rightMargin=20, leftMargin=20, topMargin=20, bottomMargin=20)
+# 1. AJOUTEZ CES IMPORTS EN HAUT (Importants pour les tableaux)
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4, landscape # On se met en format Paysage pour avoir de la place
+from io import BytesIO
+
+# ... (Laissez votre fonction generate_permis_pdf telle quelle) ...
+
+# 2. AJOUTEZ CETTE NOUVELLE FONCTION À LA FIN
+def generate_duerp_pdf(duerp, company, lignes):
+    """
+    Génère le Document Unique (DUERP) complet en PDF (Format Paysage)
+    """
+    buffer = BytesIO()
+    # On utilise SimpleDocTemplate qui est plus puissant pour les tableaux multipages
+    doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=18)
+    
     elements = []
     styles = getSampleStyleSheet()
-
-    if company and company.logo_url:
-        try:
-            pil_img = get_optimized_image(company.logo_url)
-            if pil_img:
-                temp_logo_path = "temp_logo_duerp.jpg"
-                pil_img.save(temp_logo_path)
-                logo = ReportLabImage(temp_logo_path)
-                max_h = 4 * cm
-                img_w, img_h = pil_img.size
-                aspect = img_w / float(img_h)
-                logo.drawHeight = max_h
-                logo.drawWidth = max_h * aspect
-                logo.hAlign = 'LEFT'
-                elements.append(logo)
-                elements.append(Spacer(1, 10))
-        except: pass
-
-    title = f"<b>DOCUMENT UNIQUE (DUERP) - {duerp.annee}</b>"
-    elements.append(Paragraph(title, styles['Title']))
-    elements.append(Spacer(1, 10))
-    if company: elements.append(Paragraph(f"Entreprise : {company.name}", styles['Normal']))
-    date_str = duerp.date_mise_a_jour.strftime('%d/%m/%Y') if duerp.date_mise_a_jour else "N/A"
-    elements.append(Paragraph(f"Mis à jour le : {date_str}", styles['Normal']))
-    elements.append(Spacer(1, 20))
-
-    headers = ["1. Tâches effectuées", "2. Identification des risques", "3. Gravité\n(1-3)", "4. Mesures réalisées", "5. Mesures à réaliser"]
-    data = [headers]
-    for l in duerp.lignes:
-        row = [
-            Paragraph(l.tache or "", styles['Normal']),
-            Paragraph(l.risque or "", styles['Normal']),
-            str(l.gravite),
-            Paragraph(l.mesures_realisees or "", styles['Normal']),
-            Paragraph(l.mesures_a_realiser or "", styles['Normal'])
-        ]
-        data.append(row)
-
-    col_widths = [140, 140, 50, 200, 200] 
-    t = Table(data, colWidths=col_widths)
-    t.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.white),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
-        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-        ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
-        ('ALIGN', (2, 1), (2, -1), 'CENTER'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 10),
-        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-        ('GRID', (0, 0), (-1, -1), 1, colors.black),
-        ('BOX', (0, 0), (-1, -1), 2, colors.black),
-    ]))
-    elements.append(t)
-    try:
-        doc.build(elements)
-        print(f"✅ PDF DUERP généré : {filepath}")
-    except Exception as e:
-        print(f"❌ Erreur PDF DUERP : {e}")
-        raise e
     
-# PERMIS FEU
+    # --- TITRE DU DOCUMENT ---
+    titre = f"DOCUMENT UNIQUE (DUERP) - ANNÉE {duerp.annee}"
+    elements.append(Paragraph(titre, styles['Title']))
+    elements.append(Spacer(1, 20))
+    
+    # --- INFO ENTREPRISE ---
+    info = f"<b>Entreprise :</b> {company.name}<br/><b>Date de mise à jour :</b> {duerp.date_mise_a_jour.strftime('%d/%m/%Y')}"
+    elements.append(Paragraph(info, styles['Normal']))
+    elements.append(Spacer(1, 20))
+    
+    # --- PRÉPARATION DES DONNÉES DU TABLEAU ---
+    # En-têtes
+    data = [['Unité de Travail / Tâche', 'Risque Identifié', 'Gravité', 'Mesures de Prévention', 'État']]
+    
+    # Remplissage des lignes
+    for l in lignes:
+        # On utilise Paragraph pour que le texte revienne à la ligne dans la case
+        tache = Paragraph(l.tache, styles['Normal'])
+        risque = Paragraph(l.risque, styles['Normal'])
+        mesures = Paragraph(f"<b>À FAIRE :</b> {l.mesures_a_realiser}<br/><br/><i>FAIT : {l.mesures_realisees}</i>", styles['Normal'])
+        
+        # Gestion couleur Gravité
+        gravite_str = str(l.gravite)
+        
+        data.append([tache, risque, gravite_str, mesures, "EN COURS"])
 
+    # --- STYLE DU TABLEAU ---
+    # Largeurs des colonnes (Total approx 750 points en paysage)
+    col_widths = [150, 150, 60, 300, 80]
+    
+    t = Table(data, colWidths=col_widths)
+    
+    t.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.navy),       # En-tête bleu marine
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),  # Texte blanc
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),                # Texte aligné en haut
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 12),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),     # Fond des lignes beige clair
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),        # Grille noire
+        ('BOX', (0, 0), (-1, -1), 2, colors.black),         # Cadre extérieur épais
+    ]))
+    
+    elements.append(t)
+    
+    # --- GÉNÉRATION ---
+    doc.build(elements)
+    
+    buffer.seek(0)
+    return buffer
+    
+# ==========================================
+# 6. GENERATEUR PERMIS FEU
+# ==========================================
 
 def generate_permis_pdf(permis, chantier):
     """
