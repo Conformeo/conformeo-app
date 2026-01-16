@@ -78,7 +78,7 @@ class Chantier(Base):
 # 3. MATERIEL
 # ==========================
 class Materiel(Base):
-    __tablename__ = "materiels"
+    __tablename__ = "materiels_v2"
 
     id = Column(Integer, primary_key=True, index=True)
     nom = Column(String, index=True)
