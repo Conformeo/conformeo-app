@@ -1561,3 +1561,62 @@ def fix_vgp_database(db: Session = Depends(get_db)):
         return {"message": "✅ SUCCÈS : Colonne date_derniere_vgp ajoutée à la base de données !"}
     except Exception as e:
         return {"error": f"Erreur lors de la migration : {str(e)}"}
+    
+
+
+# ==========================================
+# 🔄 ROUTE DE MIGRATION (A SUPPRIMER APRES USAGE)
+# ==========================================
+
+
+    # Note : On ne met PAS ref_interne ni statut_vgp car ils n'existent pas dans l'ancienne
+
+@app.get("/system/migrate-materiels")
+def migrate_old_data(db: Session = Depends(get_db)):
+    try:
+        # 1. Lire les anciennes données
+        old_items = db.query(models.OldMateriel).all()
+        count = 0
+        errors = 0
+        
+        for item in old_items:
+            # 2. Vérifier si l'ID existe déjà dans la nouvelle table pour éviter les doublons
+            exists = db.query(models.Materiel).filter(models.Materiel.id == item.id).first()
+            
+            if not exists:
+                try:
+                    # 3. Créer le nouvel objet avec les valeurs par défaut pour les nouvelles colonnes
+                    new_mat = models.Materiel(
+                        id=item.id, # On garde le même ID pour ne pas casser les liens
+                        nom=item.nom,
+                        reference=item.reference,
+                        etat=item.etat,
+                        image_url=item.image_url,
+                        date_derniere_vgp=item.date_derniere_vgp,
+                        company_id=item.company_id,
+                        chantier_id=item.chantier_id,
+                        
+                        # 👇 Valeurs par défaut pour les nouvelles colonnes manquantes
+                        ref_interne=f"OLD-{item.id}", 
+                        statut_vgp="INCONNU" 
+                    )
+                    
+                    db.add(new_mat)
+                    count += 1
+                except Exception as e:
+                    print(f"Erreur item {item.id}: {e}")
+                    errors += 1
+        
+        # 4. Valider la transaction
+        db.commit()
+        
+        return {
+            "status": "Succès", 
+            "transferred": count, 
+            "total_found": len(old_items),
+            "errors": errors,
+            "message": "Migration terminée. Rechargez votre application."
+        }
+
+    except Exception as e:
+        return {"status": "Erreur", "detail": str(e)}
