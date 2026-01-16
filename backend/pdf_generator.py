@@ -575,6 +575,7 @@ def generate_duerp_pdf(duerp, company, lignes):
         ('BOX', (0, 0), (-1, -1), 2, colors.black),         # Cadre extérieur épais
     ]))
     
+    
     elements.append(t)
     
     # --- GÉNÉRATION ---

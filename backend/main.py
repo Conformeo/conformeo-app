@@ -1202,9 +1202,6 @@ def download_duerp_pdf(
 def read_tasks(chantier_id: int, db: Session = Depends(get_db)):
     return db.query(models.Task).filter(models.Task.chantier_id == chantier_id).all()
 
-# --- MOTEUR D'INTELLIGENCE (RISQUES) ---
-# N'oubliez pas d'importer datetime si ce n'est pas fait
-from datetime import datetime
 
 # --- MOTEUR D'INTELLIGENCE DUERP & ALERTES ---
 def get_risk_analysis(description: str):
