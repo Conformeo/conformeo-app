@@ -2,7 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { IonicModule, ToastController, NavController } from '@ionic/angular';
-import { ApiService } from 'src/app/services/api'; // Assurez-vous que c'est .service si nécessaire
+import { ApiService } from 'src/app/services/api';
 import { addIcons } from 'ionicons';
 import { add, trash, save, cloudDownload, arrowBack, documentText } from 'ionicons/icons';
 
@@ -41,22 +41,21 @@ export class DuerpFormPage implements OnInit {
           this.lignes = data.lignes;
         } else {
           this.lignes = [];
-          this.addLine(); // ✅ Renommé pour matcher le HTML
+          this.addLine();
         }
         this.isLoading = false;
       },
       error: (err) => {
         console.error("Erreur chargement DUERP", err);
-        if(err.status === 401) this.presentToast('Session expirée', 'warning');
-        
+        // On ne vide pas forcément la liste en cas d'erreur réseau, 
+        // mais ici on initialise pour éviter un écran vide.
         this.lignes = [];
-        this.addLine(); // ✅ Renommé pour matcher le HTML
+        this.addLine(); 
         this.isLoading = false;
       }
     });
   }
 
-  // 👇 RENOMMÉ : addRow -> addLine (pour correspondre au HTML)
   addLine() {
     this.lignes.push({ 
       tache: '', 
@@ -67,7 +66,6 @@ export class DuerpFormPage implements OnInit {
     });
   }
 
-  // 👇 RENOMMÉ : removeRow -> removeLine (pour correspondre au HTML et corriger l'erreur)
   removeLine(index: number) {
     this.lignes.splice(index, 1);
   }
@@ -75,9 +73,15 @@ export class DuerpFormPage implements OnInit {
   save() {
     this.isLoading = true;
     
+    // Conversion de gravite en int pour être sûr (l'input peut renvoyer une string)
+    const lignesPropres = this.lignes.map(l => ({
+        ...l,
+        gravite: parseInt(l.gravite) || 1
+    }));
+
     const payload = { 
-      annee: this.annee, 
-      lignes: this.lignes 
+      annee: parseInt(this.annee), 
+      lignes: lignesPropres 
     };
 
     this.api.saveDuerp(payload).subscribe({
@@ -93,28 +97,24 @@ export class DuerpFormPage implements OnInit {
     });
   }
 
+  // 👇 MODIFICATION MAJEURE ICI
   downloadPdf() {
-    this.presentToast('Génération du PDF en cours...', 'primary');
+    this.presentToast('Ouverture du PDF...', 'primary');
     
-    this.api.downloadDuerpPdf(this.annee).subscribe({
-      next: (blob: any) => {
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `DUERP_${this.annee}.pdf`;
-        document.body.appendChild(link);
-        link.click();
-        
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(url);
-        
-        this.presentToast('PDF téléchargé ! 📄', 'success');
-      },
-      error: (err) => {
-        console.error("Erreur PDF:", err);
-        this.presentToast('Impossible de générer le PDF', 'danger');
-      }
-    });
+    // 1. On récupère le token stocké (le sésame)
+    const token = localStorage.getItem('access_token') || localStorage.getItem('token');
+    
+    if (!token) {
+        this.presentToast('Erreur : Non connecté', 'danger');
+        return;
+    }
+
+    // 2. On construit l'URL avec le token en paramètre (?token=...)
+    const url = `${this.api.apiUrl}/companies/me/duerp/${this.annee}/pdf?token=${token}`;
+    
+    // 3. On ouvre ! 
+    // '_system' force le navigateur du téléphone (Safari/Chrome) qui gère parfaitement les PDF
+    window.open(url, '_system');
   }
 
   goBack() {

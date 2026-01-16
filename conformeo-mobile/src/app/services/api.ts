@@ -548,11 +548,16 @@ export class ApiService {
     return this.http.post(`${this.apiUrl}/companies/me/duerp`, data, this.getOptions());
   }
 
-  // DUERP PDF Download
-  downloadDuerpPdf(annee: string) {
+  // DUERP PDF Download (Correction pour récupérer le Blob)
+  downloadDuerpPdf(annee: string): Observable<Blob> {
     const url = `${this.apiUrl}/companies/me/duerp/${annee}/pdf`;
-    const headers = this.getOptions().headers;
-    return this.http.get(url, { headers, responseType: 'blob' as 'json' });
+    
+    // On utilise getOptions() pour inclure le Token, 
+    // et on force responseType: 'blob' pour dire à Angular que c'est un fichier
+    return this.http.get(url, { 
+      headers: this.getOptions().headers, 
+      responseType: 'blob' 
+    });
   }
 
   // PLAN PREVENTION

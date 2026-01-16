@@ -15,7 +15,7 @@ load_dotenv()
 import requests
 import cloudinary
 import cloudinary.uploader
-from fastapi import FastAPI, Depends, HTTPException, status, File, UploadFile
+from fastapi import FastAPI, Depends, HTTPException, status, File, UploadFile, Query
 from fastapi.staticfiles import StaticFiles
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
@@ -1158,40 +1158,54 @@ def get_duerp(annee: str, db: Session = Depends(get_db), current_user: models.Us
     if not d: return {"id": 0, "annee": annee, "date_mise_a_jour": datetime.now(), "lignes": []}
     return d
 
-from fastapi.responses import StreamingResponse # Assure-toi d'avoir cet import en haut
-import pdf_generator # Assure-toi d'avoir importé ton générateur
-
 @app.get("/companies/me/duerp/{annee}/pdf")
 def download_duerp_pdf(
     annee: str, 
-    db: Session = Depends(get_db), 
-    current_user: models.User = Depends(security.get_current_user)
+    # 👇 On accepte le token dans l'URL (Query) OU via le Header (automatique)
+    token: str = Query(None),
+    db: Session = Depends(get_db),
+    # On rend la dépendance "current_user" optionnelle pour gérer le cas URL manuellement
+    current_user: models.User = Depends(security.get_current_user_optional) 
 ):
+    user = current_user
+
+    # SI pas d'user via le Header, on essaie via le token URL
+    if not user and token:
+        try:
+            # On décode manuellement le token de l'URL
+            payload = security.decode_access_token(token) # Assurez-vous que cette fonction existe dans security.py
+            if payload:
+                 email = payload.get("sub")
+                 user = db.query(models.User).filter(models.User.email == email).first()
+        except Exception as e:
+            print(f"Erreur Token URL: {e}")
+            pass
+    
+    # Si toujours pas d'user, c'est un piratage -> 401
+    if not user:
+        raise HTTPException(status_code=401, detail="Non authentifié")
+
     # 1. Récupération du DUERP
     duerp = db.query(models.DUERP).filter(
-        models.DUERP.company_id == current_user.company_id, 
+        models.DUERP.company_id == user.company_id, 
         models.DUERP.annee == annee
     ).first()
     
     if not duerp:
-        raise HTTPException(status_code=404, detail="DUERP introuvable pour cette année")
+        raise HTTPException(status_code=404, detail="DUERP introuvable")
     
-    # 2. Récupération de l'entreprise
-    company = db.query(models.Company).filter(models.Company.id == current_user.company_id).first()
-    
-    # 3. Récupération des lignes (CRUCIAL : c'est ça qui remplit le tableau !)
+    # 2. Récupération Entreprise & Lignes
+    company = db.query(models.Company).filter(models.Company.id == user.company_id).first()
     lignes = db.query(models.DUERPLigne).filter(models.DUERPLigne.duerp_id == duerp.id).all()
     
-    # 4. Génération en mémoire (via pdf_generator.py)
-    # On passe bien les 3 arguments attendus par la fonction que nous avons créée juste avant
-    pdf_buffer = pdf_generator.generate_duerp_pdf(duerp, company, lignes)    
-    # 5. Envoi immédiat (Streaming)
-    filename = f"DUERP_{annee}.pdf"    
+    # 3. Génération
+    pdf_buffer = pdf_generator.generate_duerp_pdf(duerp, company, lignes)
+    
+    filename = f"DUERP_{annee}.pdf"
     
     return StreamingResponse(
         pdf_buffer,
         media_type='application/pdf',
-        # Inline pour ouvrir dans le navigateur
         headers={"Content-Disposition": f"inline; filename={filename}"}
     )
 

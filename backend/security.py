@@ -10,17 +10,17 @@ from database import get_db
 import os
 
 # --- CONFIGURATION ---
-# ⚠️ TRES IMPORTANT : Sur Render, assurez-vous que la variable d'environnement SECRET_KEY 
-# est définie. Si elle n'est pas définie, ce code utilisera la valeur par défaut.
-# Si vous redémarrez le serveur et que cette clé change, tous les anciens tokens deviennent invalides.
 SECRET_KEY = os.getenv("SECRET_KEY", "votre_super_secret_key_changez_moi")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7 # 1 semaine
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-# C'est ce schéma qui permet à FastAPI de savoir où chercher le token (Header Authorization: Bearer ...)
+# 1. Schéma Standard (Bloquant) : Renvoie 401 si pas de token
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
+# 2. Schéma Optionnel (Non bloquant) : Renvoie None si pas de token (Pour le PDF)
+oauth2_scheme_optional = OAuth2PasswordBearer(tokenUrl="token", auto_error=False)
 
 # --- UTILITAIRES ---
 
@@ -41,42 +41,63 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
-# --- AUTHENTIFICATION & DEBUG ---
+# --- NOUVELLE FONCTION (Pour main.py) ---
+def decode_access_token(token: str):
+    """
+    Tente de décoder un token manuellement.
+    Retourne le payload (dict) si valide, ou None si invalide.
+    """
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        return payload
+    except JWTError:
+        return None
+
+# --- AUTHENTIFICATION ---
 
 async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
-    # On prépare l'exception standard
+    """
+    Authentification standard stricte.
+    """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Impossible de valider les identifiants",
         headers={"WWW-Authenticate": "Bearer"},
     )
 
-    try:
-        # 🔍 DEBUG : On loggue le début de la vérification
-        # print(f"🔒 AUTH DEBUG: Token reçu (début) : {token[:10]}...")
+    # On utilise notre nouvelle fonction interne
+    payload = decode_access_token(token)
+    
+    if payload is None:
+        raise credentials_exception
 
-        # Tentative de décodage avec la SECRET_KEY actuelle
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        
-        # 🔍 DEBUG : Si on arrive ici, la signature est valide
-        # print(f"🔓 AUTH DEBUG: Payload décodé avec succès : {payload}")
-
-        email: str = payload.get("sub")
-        
-        if email is None:
-            print("❌ AUTH ERROR: Le token ne contient pas de champ 'sub' (email).")
-            raise credentials_exception
-            
-    except JWTError as e:
-        # C'est souvent ici que ça casse si la SECRET_KEY a changé ou si le token est mal formé
-        print(f"❌ AUTH ERROR: Erreur de décodage JWT : {e}")
+    email: str = payload.get("sub")
+    if email is None:
         raise credentials_exception
     
-    # Vérification en base de données
     user = db.query(models.User).filter(models.User.email == email).first()
     if user is None:
-        print(f"❌ AUTH ERROR: Utilisateur '{email}' introuvable dans la base de données.")
         raise credentials_exception
     
-    # print(f"✅ AUTH SUCCESS: Utilisateur authentifié : {user.email}")
     return user
+
+async def get_current_user_optional(
+    token: Optional[str] = Depends(oauth2_scheme_optional), 
+    db: Session = Depends(get_db)
+):
+    """
+    Authentification "douce".
+    Si le header est présent, on vérifie.
+    Si le header est absent, on renvoie None (au lieu de planter).
+    Cela permet à la route PDF de vérifier ensuite le paramètre ?token=...
+    """
+    if not token:
+        return None
+    
+    try:
+        # On réutilise la logique standard
+        return await get_current_user(token, db)
+    except HTTPException:
+        # Si le token du header est invalide, on renvoie None 
+        # (peut-être que le token URL sera valide, lui)
+        return None
