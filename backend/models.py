@@ -40,7 +40,8 @@ class User(Base):
 # 2. CHANTIERS
 # ==========================
 class Chantier(Base):
-    __tablename__ = "chantiers"
+    # 👇 RENOMMAGE V2 POUR FORCER LA CRÉATION DE LA COLONNE 'soumis_sps'
+    __tablename__ = "chantiers_v2"
 
     id = Column(Integer, primary_key=True, index=True)
     nom = Column(String, index=True)
@@ -57,6 +58,8 @@ class Chantier(Base):
     date_debut = Column(DateTime, nullable=True)
     date_fin = Column(DateTime, nullable=True)
     statut_planning = Column(String, default="prevu")
+    
+    # 👇 NOUVELLE COLONNE POUR LE TOGGLE SPS
     soumis_sps = Column(Boolean, default=False)
     
     company_id = Column(Integer, ForeignKey("companies.id"), nullable=True)
@@ -70,7 +73,6 @@ class Chantier(Base):
     plans_prevention = relationship("PlanPrevention", back_populates="chantier")
     pic = relationship("PIC", uselist=False, back_populates="chantier")
     
-    # Nouvelles relations
     tasks = relationship("Task", back_populates="chantier")
     permis_feu = relationship("PermisFeu", back_populates="chantier")
 
@@ -78,16 +80,15 @@ class Chantier(Base):
 # 3. MATERIEL
 # ==========================
 class Materiel(Base):
-    # 👇 RE-NOMMAGE V2 POUR FORCER LA MISE À JOUR DES COLONNES
     __tablename__ = "materiels_v2"
 
     id = Column(Integer, primary_key=True, index=True)
     nom = Column(String, index=True)
-    reference = Column(String) # Ref constructeur
-    ref_interne = Column(String, nullable=True) # Ref interne (ex: CONFORME-51)
+    reference = Column(String) 
+    ref_interne = Column(String, nullable=True) 
     
-    etat = Column(String, default="Bon") # Ex: Bon, Panne, A réparer
-    statut_vgp = Column(String, default="CONFORME") # CONFORME, NON CONFORME, A PREVOIR
+    etat = Column(String, default="Bon") 
+    statut_vgp = Column(String, default="CONFORME") 
     
     image_url = Column(String, nullable=True)
     date_derniere_vgp = Column(DateTime, nullable=True)
@@ -95,7 +96,7 @@ class Materiel(Base):
     company_id = Column(Integer, ForeignKey("companies.id"), nullable=True)
     company = relationship("Company", back_populates="materiels")
     
-    chantier_id = Column(Integer, ForeignKey("chantiers.id"), nullable=True)
+    chantier_id = Column(Integer, ForeignKey("chantiers_v2.id"), nullable=True) # 👈 Notez le lien vers chantiers_v2
     chantier = relationship("Chantier", back_populates="materiels")
 
 # ==========================
@@ -117,7 +118,7 @@ class Rapport(Base):
     titre = Column(String)
     description = Column(String)
     photo_url = Column(String, nullable=True) 
-    chantier_id = Column(Integer, ForeignKey("chantiers.id"))
+    chantier_id = Column(Integer, ForeignKey("chantiers_v2.id")) # 👈 Lien mis à jour
     date_creation = Column(DateTime, default=datetime.utcnow)
     niveau_urgence = Column(String, default="Faible")
     latitude = Column(Float, nullable=True)
@@ -133,7 +134,7 @@ class Inspection(Base):
     titre = Column(String)
     type = Column(String)
     data = Column(JSON) 
-    chantier_id = Column(Integer, ForeignKey("chantiers.id"))
+    chantier_id = Column(Integer, ForeignKey("chantiers_v2.id")) # 👈 Lien mis à jour
     date_creation = Column(DateTime, default=datetime.utcnow)
     createur = Column(String)
 
@@ -146,7 +147,7 @@ class PPSPS(Base):
     __tablename__ = "ppsps"
 
     id = Column(Integer, primary_key=True, index=True)
-    chantier_id = Column(Integer, ForeignKey("chantiers.id"))
+    chantier_id = Column(Integer, ForeignKey("chantiers_v2.id")) # 👈 Lien mis à jour
     maitre_ouvrage = Column(String)
     maitre_oeuvre = Column(String)
     coordonnateur_sps = Column(String)
@@ -165,7 +166,7 @@ class PlanPrevention(Base):
     __tablename__ = "plans_prevention"
 
     id = Column(Integer, primary_key=True, index=True)
-    chantier_id = Column(Integer, ForeignKey("chantiers.id"))
+    chantier_id = Column(Integer, ForeignKey("chantiers_v2.id")) # 👈 Lien mis à jour
     entreprise_utilisatrice = Column(String) 
     entreprise_exterieure = Column(String)   
     date_inspection_commune = Column(DateTime, default=datetime.utcnow)
@@ -181,7 +182,7 @@ class PIC(Base):
     __tablename__ = "pics"
 
     id = Column(Integer, primary_key=True, index=True)
-    chantier_id = Column(Integer, ForeignKey("chantiers.id"))
+    chantier_id = Column(Integer, ForeignKey("chantiers_v2.id")) # 👈 Lien mis à jour
     
     acces = Column(String, nullable=True)          
     clotures = Column(String, nullable=True)       
@@ -237,31 +238,27 @@ class Task(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     description = Column(String, index=True)
-    status = Column(String, default="TODO") # TODO, DONE, PROBLEM
+    status = Column(String, default="TODO") 
     date_prevue = Column(DateTime, default=datetime.utcnow)
     
-    # Liaison Chantier
-    chantier_id = Column(Integer, ForeignKey("chantiers.id"))
+    chantier_id = Column(Integer, ForeignKey("chantiers_v2.id")) # 👈 Lien mis à jour
     chantier = relationship("Chantier", back_populates="tasks")
 
 class PermisFeu(Base):
-    # 👇 V2 POUR ÉVITER CONFLITS
     __tablename__ = "permis_feu_v2"
 
     id = Column(Integer, primary_key=True, index=True)
-    chantier_id = Column(Integer, ForeignKey("chantiers.id"))
+    chantier_id = Column(Integer, ForeignKey("chantiers_v2.id")) # 👈 Lien mis à jour
     date = Column(DateTime, default=datetime.utcnow)
     
-    # Infos Formulaire Mobile
     lieu = Column(String)
     intervenant = Column(String)
     description = Column(String)
     
-    # Mesures de sécurité (Checkboxes)
     extincteur = Column(Boolean, default=False)
     nettoyage = Column(Boolean, default=False)
     surveillance = Column(Boolean, default=False)
     
-    signature = Column(Boolean, default=True) # Preuve simple
+    signature = Column(Boolean, default=True) 
     
     chantier = relationship("Chantier", back_populates="permis_feu")
