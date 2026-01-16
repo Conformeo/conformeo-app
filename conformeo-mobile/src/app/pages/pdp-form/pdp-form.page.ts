@@ -11,9 +11,9 @@ import {
 import { SignatureModalComponent } from '../chantier-details/signature-modal/signature-modal.component';
 import { ActivatedRoute, Router } from '@angular/router';
 import { AlertController } from '@ionic/angular/standalone';
-import { ApiService, PlanPrevention } from '../../services/api'
+import { ApiService, PlanPrevention } from '../../services/api';
 import { addIcons } from 'ionicons';
-import { add, trash, save, download, mail } from 'ionicons/icons';
+import { add, trash, save, download, mail, arrowBack, documentText } from 'ionicons/icons';
 
 @Component({
   selector: 'app-pdp-form',
@@ -59,7 +59,8 @@ export class PdpFormPage implements OnInit {
     private modalCtrl: ModalController,
     private alertCtrl: AlertController
   ) {
-    addIcons({ add, trash, save, download, mail });
+    // Ajout des icônes manquantes
+    addIcons({ add, trash, save, download, mail, arrowBack, documentText });
   }
 
   ngOnInit() {
@@ -74,17 +75,29 @@ export class PdpFormPage implements OnInit {
         this.pdp = list[0]; // On prend le premier PdP trouvé
         this.isExisting = true;
         
-        // Sécuriser les champs JSON s'ils sont null
+        // Sécuriser les champs JSON s'ils sont null pour éviter les erreurs template
         if (!this.pdp.risques_interferents) this.pdp.risques_interferents = [];
-        if (!this.pdp.consignes_securite) this.pdp.consignes_securite = {};
+        if (!this.pdp.consignes_securite) {
+            this.pdp.consignes_securite = {
+              urgence: '15 / 18',
+              rassemblement: '',
+              sanitaires: 'Accès autorisé',
+              fumeur: 'Non',
+              permis_feu: 'Non'
+            };
+        }
       } else {
-        // Pré-remplissage intelligent
-        this.api.getChantiers().subscribe(chantiers => { // Optimisation possible : getChantier(id)
+        // Pré-remplissage intelligent si nouveau
+        this.api.getChantiers().subscribe(chantiers => { 
             const c = chantiers.find(x => x.id === this.chantierId);
             if(c) {
-                this.pdp.entreprise_utilisatrice = c.client; // Le client est souvent l'EU
-                // On pourrait aussi pré-remplir "entreprise_exterieure" avec le nom de notre boite
+                this.pdp.entreprise_utilisatrice = c.client; 
             }
+        });
+        
+        // Pré-remplir avec le nom de ma compagnie
+        this.api.getMyCompany().subscribe(comp => {
+            if(comp) this.pdp.entreprise_exterieure = comp.name;
         });
       }
     });
@@ -104,7 +117,7 @@ export class PdpFormPage implements OnInit {
       component: SignatureModalComponent,
       componentProps: {
         chantierId: this.chantierId,
-        type: 'generic' // 👈 On dit : "Renvoie-moi juste l'URL"
+        type: 'generic' // On demande juste l'URL
       }
     });
 
@@ -113,9 +126,8 @@ export class PdpFormPage implements OnInit {
     const { data, role } = await modal.onWillDismiss();
 
     if (role === 'confirm' && data) {
-      // 'data' contient l'URL Cloudinary de la signature
-      this.pdp.signature_eu = data;
-      this.presentToast('Signature Client enregistrée ✍️');
+      this.pdp.signature_eu = data; // data contient l'URL Cloudinary
+      this.presentToast('Signature Client enregistrée ✍️', 'success');
     }
   }
 
@@ -129,19 +141,22 @@ export class PdpFormPage implements OnInit {
         this.pdp = res; // Mise à jour avec l'ID créé
         this.isExisting = true;
         load.dismiss();
-        this.presentToast('Plan de Prévention sauvegardé ✅');
+        this.presentToast('Plan de Prévention sauvegardé ✅', 'success');
       },
       error: (err) => {
         console.error(err);
         load.dismiss();
-        this.presentToast('Erreur lors de la sauvegarde');
+        this.presentToast('Erreur lors de la sauvegarde', 'danger');
       }
     });
   }
 
-  // 👇 FONCTION D'ENVOI
+  // --- ENVOI EMAIL ---
   async sendEmail() {
-    if (!this.pdp.id) return;
+    if (!this.pdp.id) {
+        this.presentToast("Veuillez d'abord enregistrer le document.", "warning");
+        return;
+    }
 
     const alert = await this.alertCtrl.create({
       header: 'Envoyer par Email',
@@ -151,7 +166,6 @@ export class PdpFormPage implements OnInit {
           name: 'email',
           type: 'email',
           placeholder: 'client@exemple.com',
-          // On essaie de pré-remplir avec l'email du client s'il est connu (optionnel)
           value: '' 
         }
       ],
@@ -177,23 +191,50 @@ export class PdpFormPage implements OnInit {
     this.api.sendPdpEmail(this.pdp.id!, email).subscribe({
       next: () => {
         load.dismiss();
-        this.presentToast('Email envoyé avec succès ! 📧');
+        this.presentToast('Email envoyé avec succès ! 📧', 'success');
       },
       error: () => {
         load.dismiss();
-        this.presentToast('Erreur lors de l\'envoi (Vérifiez la config SMTP)');
+        this.presentToast('Erreur lors de l\'envoi (Vérifiez config SMTP)', 'danger');
       }
     });
   }
 
-  downloadPdf() {
-    if (!this.pdp.id) return;
-    const url = this.api.getPdpPdfUrl(this.pdp.id);
+  // --- TÉLÉCHARGEMENT PDF ---
+  // Rendu optionnel : si pas d'ID passé, on prend celui du PdP courant
+  downloadPdf(pdpId?: number) {
+    const targetId = pdpId || this.pdp.id;
+    
+    if (!targetId) {
+        this.presentToast("Document non enregistré.", "warning");
+        return;
+    }
+
+    this.presentToast('Ouverture du PDF...', 'primary');
+
+    // 1. Récupérer le token d'authentification
+    const token = localStorage.getItem('access_token') || localStorage.getItem('token');
+
+    if (!token) {
+      this.presentToast('Erreur : Vous n\'êtes pas connecté', 'danger');
+      return;
+    }
+
+    // 2. Construire l'URL avec le token en paramètre
+    const url = `${this.api.apiUrl}/plans-prevention/${targetId}/pdf?token=${token}`;
+
+    // 3. Ouvrir dans le navigateur système
     window.open(url, '_system');
   }
 
-  async presentToast(msg: string) {
-    const t = await this.toastCtrl.create({ message: msg, duration: 2000, position: 'bottom' });
+  // 👇 CORRECTION : Ajout du paramètre 'color' (optionnel avec valeur par défaut)
+  async presentToast(msg: string, color: string = 'dark') {
+    const t = await this.toastCtrl.create({ 
+        message: msg, 
+        duration: 2000, 
+        position: 'bottom',
+        color: color // Utilisation de la couleur passée
+    });
     t.present();
   }
 }

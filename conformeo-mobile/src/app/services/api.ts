@@ -577,8 +577,9 @@ export class ApiService {
   // 📧 ENVOI EMAILS
   // ==========================================
 
-  sendPdpEmail(pdpId: number, email: string) {
-    return this.http.post(`${this.apiUrl}/plans-prevention/${pdpId}/send-email?email_dest=${email}`, {}, this.getOptions());
+  // Envoi du PdP par email
+  sendPdpEmail(pdpId: number, emailDestinataire: string) {
+    return this.http.post(`${this.apiUrl}/plans-prevention/${pdpId}/email`, { email: emailDestinataire }, this.getOptions());
   }
 
   sendJournalEmail(chantierId: number, email: string) {

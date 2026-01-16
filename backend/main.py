@@ -34,6 +34,12 @@ import pdf_generator
 from pdf_generator import generate_permis_pdf
 from database import engine, get_db
 
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.application import MIMEApplication
+from pydantic import BaseModel
+
 # Création des tables
 models.Base.metadata.create_all(bind=engine)
 
@@ -870,6 +876,73 @@ def download_pdp_pdf(
         # 'inline' permet l'ouverture dans le navigateur mobile
         headers={"Content-Disposition": f"inline; filename={filename}"}
     )
+
+# Modèle pour recevoir l'email du corps de la requête
+class EmailRequest(BaseModel):
+    email: str
+
+@app.post("/plans-prevention/{pid}/email")
+def send_pdp_email(
+    pid: int, 
+    req: EmailRequest, 
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(security.get_current_user)
+):
+    # 1. Récupération des données
+    pdp = db.query(models.PlanPrevention).filter(models.PlanPrevention.id == pid).first()
+    if not pdp: raise HTTPException(404, detail="PdP introuvable")
+    
+    chantier = db.query(models.Chantier).filter(models.Chantier.id == pdp.chantier_id).first()
+    company = db.query(models.Company).filter(models.Company.id == current_user.company_id).first()
+
+    # 2. Génération du PDF en mémoire (RAM)
+    pdf_buffer = BytesIO()
+    pdf_generator.generate_pdp_pdf(chantier, pdp, pdf_buffer, company=company)
+    pdf_buffer.seek(0)
+    pdf_bytes = pdf_buffer.read()
+
+    # 3. Configuration SMTP (A ADAPTER AVEC VOS INFOS)
+    # Pour Gmail : utilisez un "Mot de passe d'application" (App Password), pas votre vrai mot de passe
+    SMTP_SERVER = "smtp.gmail.com"
+    SMTP_PORT = 587
+    SMTP_USER = "votre.email@gmail.com" # 👈 METTEZ VOTRE EMAIL ICI
+    SMTP_PASSWORD = "xxxx xxxx xxxx xxxx" # 👈 METTEZ VOTRE MOT DE PASSE D'APPLICATION ICI
+
+    try:
+        # Création du message
+        msg = MIMEMultipart()
+        msg['Subject'] = f"Plan de Prévention - Chantier {chantier.nom}"
+        msg['From'] = SMTP_USER
+        msg['To'] = req.email
+
+        # Corps du message
+        body = f"""
+        Bonjour,
+        
+        Veuillez trouver ci-joint le Plan de Prévention concernant le chantier "{chantier.nom}".
+        
+        Cordialement,
+        {company.name}
+        """
+        msg.attach(MIMEText(body, 'plain'))
+
+        # Pièce jointe (PDF)
+        filename = f"PDP_{chantier.nom}.pdf"
+        part = MIMEApplication(pdf_bytes, Name=filename)
+        part['Content-Disposition'] = f'attachment; filename="{filename}"'
+        msg.attach(part)
+
+        # Envoi effectif
+        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+            server.starttls() # Sécurisation
+            server.login(SMTP_USER, SMTP_PASSWORD)
+            server.send_message(msg)
+
+        return {"message": "Email envoyé avec succès"}
+
+    except Exception as e:
+        print(f"Erreur SMTP: {e}")
+        raise HTTPException(status_code=500, detail="Erreur lors de l'envoi de l'email")
 
 # PIC
 @app.get("/chantiers/{cid}/pic")
