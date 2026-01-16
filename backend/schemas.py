@@ -73,7 +73,7 @@ class CompanyOut(BaseModel):
 class MaterielCreate(BaseModel):
     nom: str
     reference: Optional[str] = None
-    ref_interne: Optional[str] = None # ✅ Ajouté
+    ref_interne: Optional[str] = None 
     etat: str = "BON" 
     chantier_id: Optional[int] = None
     date_derniere_vgp: Optional[Any] = None 
@@ -82,10 +82,10 @@ class MaterielCreate(BaseModel):
 class MaterielUpdate(BaseModel):
     nom: Optional[str] = None
     reference: Optional[str] = None
-    ref_interne: Optional[str] = None # ✅ Ajouté
+    ref_interne: Optional[str] = None 
     etat: Optional[str] = None
     chantier_id: Optional[Any] = None
-    statut_vgp: Optional[str] = None # ✅ Ajouté
+    statut_vgp: Optional[str] = None 
     image_url: Optional[str] = None
     date_derniere_vgp: Optional[Any] = None
 
@@ -93,7 +93,7 @@ class MaterielOut(BaseModel):
     id: int
     nom: str
     reference: Optional[str] = None
-    ref_interne: Optional[str] = None # ✅ Ajouté pour le scan QR
+    ref_interne: Optional[str] = None 
     etat: Optional[str] = "BON" 
     chantier_id: Optional[int] = None
     date_derniere_vgp: Optional[Any] = None
@@ -153,7 +153,6 @@ class DocExterneOut(BaseModel):
     titre: str
     url: str
     categorie: Optional[str] = "Autre"
-    # 👇 CORRECTION MAJEURE : La DB renvoie date_ajout (pas date_upload)
     date_ajout: datetime 
     chantier_id: Optional[int] = None
     class Config:
@@ -170,33 +169,33 @@ class CompanyDocOut(BaseModel):
         from_attributes = True
 
 # --- CHANTIER ---
-class ChantierCreate(BaseModel):
+class ChantierBase(BaseModel):
     nom: str
     adresse: Optional[str] = None
     client: Optional[str] = None
-    date_debut: Optional[Any] = None 
-    date_fin: Optional[Any] = None   
+    date_debut: Optional[date] = None 
+    date_fin: Optional[date] = None   
+    soumis_sps: bool = False # ✅ Ajouté pour la coordination SPS
+
+class ChantierCreate(ChantierBase):
+    pass
 
 class ChantierUpdate(BaseModel):
     nom: Optional[str] = None
     adresse: Optional[str] = None
-    est_actif: Optional[Any] = None 
+    est_actif: Optional[bool] = None 
     client: Optional[str] = None
     date_debut: Optional[Any] = None
     date_fin: Optional[Any] = None
+    soumis_sps: Optional[bool] = None # ✅ Ajouté
 
-class ChantierOut(BaseModel):
+class ChantierOut(ChantierBase):
     id: int
-    nom: Optional[str] = "Chantier sans nom"
-    adresse: Optional[str] = None
-    client: Optional[str] = None
-    date_debut: Optional[Any] = None 
-    date_fin: Optional[Any] = None
     est_actif: bool = True 
     cover_url: Optional[str] = None
-    company_id: Optional[int] = None
     signature_url: Optional[str] = None
-    date_creation: Optional[Any] = None
+    date_creation: Optional[datetime] = None
+    company_id: Optional[int] = None
     
     class Config:
         from_attributes = True
@@ -228,7 +227,6 @@ class RapportOut(RapportCreate):
 class InspectionCreate(BaseModel):
     titre: str
     type: str
-    # 👇 CORRECTION : Accepte Dict OU Liste (pour éviter erreur 500)
     data: Union[List[Any], Dict[str, Any], Any] = None
     chantier_id: int
     createur: str
@@ -237,7 +235,6 @@ class InspectionOut(BaseModel):
     id: int
     titre: Optional[str] = "Inspection"
     type: Optional[str] = "Standard"
-    # 👇 CORRECTION : Pareil ici pour la lecture
     data: Union[List[Any], Dict[str, Any], Any] = None
     createur: Optional[str] = "Non renseigné"
     date_creation: Optional[datetime] = None
@@ -271,12 +268,12 @@ class PlanPreventionCreate(BaseModel):
     date_inspection_commune: Optional[datetime] = None
     consignes_securite: Optional[Dict[str, Any]] = None
     risques_interferents: Optional[List[Dict[str, Any]]] = None
+    signature_eu: Optional[str] = None
+    signature_ee: Optional[str] = None
 
 class PlanPreventionOut(PlanPreventionCreate):
     id: int
     date_creation: datetime
-    signature_eu: Optional[str] = None
-    signature_ee: Optional[str] = None
     class Config:
         from_attributes = True
 
@@ -331,7 +328,6 @@ class PermisFeuCreate(BaseModel):
 
 class PermisFeuOut(PermisFeuCreate):
     id: int
-    # 👇 Utilisation directe de datetime (corrige datetime.datetime)
     date: datetime
     class Config:
         from_attributes = True

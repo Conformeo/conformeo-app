@@ -52,7 +52,7 @@ export interface Chantier {
   date_debut?: string;
   date_fin?: string;
   statut_planning?: string;
-  soumis_sps: boolean;
+  soumis_sps?: boolean;
   latitude?: number;
   longitude?: number;
 }

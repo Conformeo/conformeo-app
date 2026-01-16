@@ -70,10 +70,23 @@
           <div class="icon-circle bg-mail"><ion-icon name="mail"></ion-icon></div>
           <span>Envoyer</span>
         </div>
-        <div class="action-btn" [routerLink]="['/pdp-form', chantierId]">
-          <div class="icon-circle bg-pdp"><ion-icon name="document-lock-outline"></ion-icon></div>
-          <span>PdP</span>
-        </div>
+        
+        <ng-container *ngIf="chantier?.soumis_sps; else pdpButton">
+          <div class="action-btn" [routerLink]="['/ppsps-form', chantierId]">
+            <div class="icon-circle bg-warning" style="background-color: #fff3e0; color: #ff9800;">
+              <ion-icon name="shield-checkmark"></ion-icon>
+            </div>
+            <span>PPSPS</span>
+          </div>
+        </ng-container>
+
+        <ng-template #pdpButton>
+          <div class="action-btn" [routerLink]="['/pdp-form', chantierId]">
+            <div class="icon-circle bg-pdp"><ion-icon name="document-lock-outline"></ion-icon></div>
+            <span>PdP</span>
+          </div>
+        </ng-template>
+        
         <div class="action-btn" (click)="openSignature()">
           <div class="icon-circle bg-sign"><ion-icon name="create"></ion-icon></div>
           <span>Signer</span>
@@ -128,7 +141,7 @@
         <ion-icon name="archive-outline" size="large" color="primary"></ion-icon>
         <p>Dossier de fin de chantier</p>
       </div>
-
+      
       <div class="section-header" *ngIf="documentsList.length > 0">
         <h3>Documents Sécurité & Suivi</h3>
       </div>
