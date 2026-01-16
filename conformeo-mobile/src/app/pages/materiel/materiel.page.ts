@@ -6,7 +6,8 @@ import {
   IonHeader, IonToolbar, IonContent,
   IonButtons, IonButton, IonIcon, IonFab, IonFabButton, 
   AlertController, IonBackButton, IonSearchbar,
-  IonTitle, ModalController, LoadingController, IonBadge, IonRefresher, IonRefresherContent
+  IonTitle, ModalController, LoadingController, IonBadge, 
+  IonRefresher, IonRefresherContent // ✅ Nécessaire pour le pull-to-refresh
 } from '@ionic/angular/standalone';
 import { Capacitor } from '@capacitor/core';
 import { addIcons } from 'ionicons';
@@ -33,7 +34,7 @@ import { BarcodeScanner, BarcodeFormat } from '@capacitor-mlkit/barcode-scanning
     IonToolbar, IonContent, IonTitle,
     IonButtons, IonButton, IonIcon, IonFab,
     IonFabButton, IonBackButton, IonBadge,
-    IonRefresher, IonRefresherContent // ✅ Ajout des imports pour le Pull-to-refresh
+    IonRefresher, IonRefresherContent
   ]
 })
 export class MaterielPage implements OnInit {
@@ -87,7 +88,7 @@ export class MaterielPage implements OnInit {
       },
       error: (err) => {
         console.error(err);
-        if (event) event.target.complete(); // ✅ Important : stop le chargement même en cas d'erreur
+        if (event) event.target.complete();
       }
     });
   }
@@ -100,8 +101,6 @@ export class MaterielPage implements OnInit {
       this.filteredMateriels = this.materiels.filter(m =>
         m.nom.toLowerCase().includes(term) ||
         (m.reference && m.reference.toLowerCase().includes(term)) ||
-        // 👇 CORRECTION : J'ai remplacé la ligne dupliquée par ref_interne
-        // Assurez-vous que ref_interne existe dans votre interface Materiel
         (m.ref_interne && m.ref_interne.toLowerCase().includes(term)) 
       );
     }
@@ -145,18 +144,17 @@ export class MaterielPage implements OnInit {
         if (!available) await BarcodeScanner.installGoogleBarcodeScannerModule();
       }
 
-      // 3. UI Hacks (Masquer le contenu pour voir la caméra derrière la WebView)
+      // 3. UI Hacks
       document.body.classList.add('barcode-scanner-active');
       const elements = document.querySelectorAll('body > *');
       elements.forEach((el: any) => {
-        // On ne masque pas le composant racine app-root totalement sinon l'app disparaît
         if (el.tagName !== 'APP-ROOT') el.style.display = 'none';
       });
 
       // 4. Scan
       const { barcodes } = await BarcodeScanner.scan({ formats: [BarcodeFormat.QrCode] });
 
-      // 5. Restauration UI (IMPORTANT : Toujours restaurer)
+      // 5. Restauration UI
       document.body.classList.remove('barcode-scanner-active');
       elements.forEach((el: any) => el.style.display = '');
 
@@ -167,7 +165,7 @@ export class MaterielPage implements OnInit {
 
         let foundMat = null;
 
-        // Cas A : Format "CONFORME-ID" (ex: CONFORME-52)
+        // Cas A : Format "CONFORME-ID"
         if (scannedData.startsWith('CONFORME-')) {
           const parts = scannedData.split('-');
           if(parts.length > 1) {
@@ -175,12 +173,11 @@ export class MaterielPage implements OnInit {
             foundMat = this.materiels.find(m => m.id === id);
           }
         } 
-        // Cas B : Référence classique (Interne ou Externe)
+        // Cas B : Référence classique
         else {
           const searchRef = scannedData.trim().toLowerCase();
           foundMat = this.materiels.find(m => 
             (m.reference && m.reference.trim().toLowerCase() === searchRef) || 
-            // 👇 CORRECTION : Recherche aussi sur ref_interne
             (m.ref_interne && m.ref_interne.trim().toLowerCase() === searchRef)
           );
         }
@@ -194,11 +191,9 @@ export class MaterielPage implements OnInit {
 
     } catch (e: any) {
       console.error(e);
-      // Sécurité : On s'assure que l'UI est restaurée même en cas d'erreur
       document.body.classList.remove('barcode-scanner-active');
       document.querySelectorAll('body > *').forEach((el: any) => el.style.display = '');
       
-      // On ignore l'erreur si l'utilisateur annule le scan
       if (!e.message?.includes('canceled')) {
          this.presentAlert('Erreur Scanner', e.message || JSON.stringify(e));
       }
@@ -210,7 +205,7 @@ export class MaterielPage implements OnInit {
     const modal = await this.modalCtrl.create({
       component: QrCodeModalComponent,
       componentProps: { mat: mat },
-      breakpoints: [0, 0.85], // Un peu plus haut pour être confortable
+      breakpoints: [0, 0.85],
       initialBreakpoint: 0.85
     });
     await modal.present();
@@ -243,7 +238,6 @@ export class MaterielPage implements OnInit {
       { type: 'radio', label: '🏠 Retour au Dépôt', value: null, checked: !mat.chantier_id }
     ];
     
-    // Trier les chantiers par nom pour faciliter la recherche visuelle
     this.chantiers.sort((a,b) => a.nom.localeCompare(b.nom)).forEach(c => {
       inputs.push({
         type: 'radio', 
@@ -261,9 +255,7 @@ export class MaterielPage implements OnInit {
         {
           text: 'Valider',
           handler: (chantierId) => {
-            // Pas de changement ? On ne fait rien.
             if (mat.chantier_id === chantierId) return;
-
             this.api.transferMateriel(mat.id!, chantierId).subscribe(() => {
               this.loadData();
             });
@@ -282,7 +274,7 @@ export class MaterielPage implements OnInit {
         { text: 'Annuler', role: 'cancel' },
         {
           text: 'Supprimer',
-          role: 'destructive', // Affiche le bouton en rouge sur iOS
+          role: 'destructive',
           handler: () => {
             this.api.deleteMateriel(mat.id!).subscribe(() => {
               this.loadData();
@@ -294,7 +286,7 @@ export class MaterielPage implements OnInit {
     await alert.present();
   }
 
-  // --- HELPERS ---
+  // --- HELPERS VISUELS ---
 
   async presentAlert(header: string, message: string) {
     const alert = await this.alertCtrl.create({
@@ -305,18 +297,26 @@ export class MaterielPage implements OnInit {
     await alert.present();
   }
 
-  // Optimisation de l'affichage image (plus robuste)
   getImageUrl(mat: Materiel): string {
     if (!mat.image_url || mat.image_url.trim() === '') return '';
-    
-    // Optimisation Cloudinary si utilisé
     if (mat.image_url.includes('cloudinary.com') && mat.image_url.includes('/upload/')) {
-       // Si l'URL contient déjà des transformations, on ne touche pas, sinon on ajoute
        if (!mat.image_url.includes('/w_')) {
           return mat.image_url.replace('/upload/', '/upload/w_200,h_200,c_fill,q_auto,f_auto/');
        }
     }
     return mat.image_url;
+  }
+
+  // 👇 LA FONCTION MANQUANTE QUI PROVOQUAIT L'ERREUR
+  getThumbUrl(url: string): string {
+    if (!url) return '';
+    if (url.startsWith('http:')) url = url.replace('http:', 'https:');
+    
+    if (url.includes('cloudinary.com') && url.includes('/upload/')) {
+      if (url.includes('w_')) return url;
+      return url.replace('/upload/', '/upload/w_250,h_250,c_fit,q_auto,f_auto/');
+    }
+    return url;
   }
   
   getChantierName(id: number | null | undefined): string {
