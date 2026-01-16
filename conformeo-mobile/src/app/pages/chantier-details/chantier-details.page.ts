@@ -242,17 +242,23 @@ export class ChantierDetailsPage implements OnInit {
     });
 
     // 👇 AJOUT : LES PERMIS DE FEU
+    // 👇 MODIFICATION ICI
     this.api.getPermisFeuList(this.chantierId).subscribe(permisList => {
         permisList.forEach(p => {
             this.documentsList.push({
                 type: 'PERMIS',
-                titre: `Permis Feu - ${p.lieu} (${p.intervenant})`,
+                titre: `Permis Feu - ${p.lieu}`,
                 date: p.date,
-                icon: 'flame', // Icône feu (assurez-vous de l'importer)
+                icon: 'flame',
                 color: 'danger',
+                // 👇 C'EST ICI QUE ÇA CHANGE
                 action: () => {
-                    // Pour l'instant on affiche une alerte, plus tard on ouvrira un PDF
-                    alert(`Permis délivré à : ${p.intervenant}\nLieu : ${p.lieu}\nDescription : ${p.description}`);
+                    // On construit l'URL vers le PDF généré
+                    // (Assurez-vous que apiUrl ne finit pas par un slash, sinon retirez le / avant permis-feu)
+                    const url = `${this.api.apiUrl}/permis-feu/${p.id}/pdf`;
+                    
+                    // On ouvre dans le navigateur système pour pouvoir télécharger/imprimer
+                    window.open(url, '_system');
                 }
             });
         });
