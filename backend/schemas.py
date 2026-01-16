@@ -30,8 +30,8 @@ class UserUpdateAdmin(BaseModel):
     email: Optional[EmailStr] = None
     password: Optional[str] = None
     role: Optional[str] = None      
-    is_active: Optional[Any] = None # <-- Any pour accepter "true"/bool
-    company_id: Optional[Any] = None # <-- Any pour accepter ""/int
+    is_active: Optional[Any] = None 
+    company_id: Optional[Any] = None 
 
 class UserOut(BaseModel):
     id: int
@@ -73,29 +73,29 @@ class CompanyOut(BaseModel):
 class MaterielCreate(BaseModel):
     nom: str
     reference: Optional[str] = None
+    ref_interne: Optional[str] = None # ✅ Ajouté
     etat: str = "BON" 
     chantier_id: Optional[int] = None
-    # 👇 On ajoute le champ pour la création
     date_derniere_vgp: Optional[Any] = None 
     image_url: Optional[str] = None
 
 class MaterielUpdate(BaseModel):
     nom: Optional[str] = None
     reference: Optional[str] = None
+    ref_interne: Optional[str] = None # ✅ Ajouté
     etat: Optional[str] = None
     chantier_id: Optional[Any] = None
-    statut_vgp: Optional[str] = None
+    statut_vgp: Optional[str] = None # ✅ Ajouté
     image_url: Optional[str] = None
-    # 👇 On ajoute le champ pour la modification
     date_derniere_vgp: Optional[Any] = None
 
 class MaterielOut(BaseModel):
     id: int
     nom: str
     reference: Optional[str] = None
+    ref_interne: Optional[str] = None # ✅ Ajouté pour le scan QR
     etat: Optional[str] = "BON" 
     chantier_id: Optional[int] = None
-    # On accepte tout format pour éviter l'erreur 500
     date_derniere_vgp: Optional[Any] = None
     image_url: Optional[str] = None
     statut_vgp: Optional[str] = "INCONNU" 
@@ -113,7 +113,7 @@ class TaskCreate(BaseModel):
 class TaskUpdate(BaseModel):
     description: Optional[str] = None
     status: Optional[str] = None
-    date_prevue: Optional[Any] = None # <-- Any pour gérer les chaines vides
+    date_prevue: Optional[Any] = None 
 
 class TaskOut(BaseModel):
     id: int
@@ -153,7 +153,8 @@ class DocExterneOut(BaseModel):
     titre: str
     url: str
     categorie: Optional[str] = "Autre"
-    date_ajout: datetime
+    # 👇 CORRECTION MAJEURE : La DB renvoie date_ajout (pas date_upload)
+    date_ajout: datetime 
     chantier_id: Optional[int] = None
     class Config:
         from_attributes = True
@@ -179,10 +180,8 @@ class ChantierCreate(BaseModel):
 class ChantierUpdate(BaseModel):
     nom: Optional[str] = None
     adresse: Optional[str] = None
-    # 👇 On passe en Any pour accepter "true", "True", true, ou 1 sans planter
     est_actif: Optional[Any] = None 
     client: Optional[str] = None
-    # 👇 On passe en Any pour accepter les chaines vides "" ou les formats ISO
     date_debut: Optional[Any] = None
     date_fin: Optional[Any] = None
 
@@ -191,7 +190,6 @@ class ChantierOut(BaseModel):
     nom: Optional[str] = "Chantier sans nom"
     adresse: Optional[str] = None
     client: Optional[str] = None
-    # On accepte tout type de date pour éviter le crash 500
     date_debut: Optional[Any] = None 
     date_fin: Optional[Any] = None
     est_actif: bool = True 
@@ -230,7 +228,8 @@ class RapportOut(RapportCreate):
 class InspectionCreate(BaseModel):
     titre: str
     type: str
-    data: Optional[Dict[str, Any]] = None 
+    # 👇 CORRECTION : Accepte Dict OU Liste (pour éviter erreur 500)
+    data: Union[List[Any], Dict[str, Any], Any] = None
     chantier_id: int
     createur: str
 
@@ -238,7 +237,8 @@ class InspectionOut(BaseModel):
     id: int
     titre: Optional[str] = "Inspection"
     type: Optional[str] = "Standard"
-    data: Optional[Dict[str, Any]] = None 
+    # 👇 CORRECTION : Pareil ici pour la lecture
+    data: Union[List[Any], Dict[str, Any], Any] = None
     createur: Optional[str] = "Non renseigné"
     date_creation: Optional[datetime] = None
     chantier_id: int
@@ -283,7 +283,7 @@ class PlanPreventionOut(PlanPreventionCreate):
 PdpCreate = PlanPreventionCreate
 PdpOut = PlanPreventionOut
 
-# --- DUERP (RENOMMÉ EN MAJUSCULES) ---
+# --- DUERP ---
 class DUERPRow(BaseModel):
     tache: str
     risque: str
@@ -303,7 +303,6 @@ class DUERPOut(BaseModel):
     class Config:
         from_attributes = True
 
-# Alias de compatibilité au cas où
 DuerpRow = DUERPRow
 DuerpCreate = DUERPCreate
 DuerpOut = DUERPOut
@@ -320,6 +319,7 @@ class PicOut(PicSchema):
     class Config:
         from_attributes = True
 
+# --- PERMIS FEU ---
 class PermisFeuCreate(BaseModel):
     chantier_id: int
     lieu: str
@@ -331,6 +331,7 @@ class PermisFeuCreate(BaseModel):
 
 class PermisFeuOut(PermisFeuCreate):
     id: int
+    # 👇 Utilisation directe de datetime (corrige datetime.datetime)
     date: datetime
     class Config:
-        orm_mode = True
+        from_attributes = True

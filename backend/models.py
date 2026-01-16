@@ -22,7 +22,7 @@ class Company(Base):
     users = relationship("User", back_populates="company")
     chantiers = relationship("Chantier", back_populates="company")
     materiels = relationship("Materiel", back_populates="company")
-    duerps = relationship("DUERP", back_populates="company") # Ajout relation DUERP
+    duerps = relationship("DUERP", back_populates="company") 
 
 class User(Base):
     __tablename__ = "users"
@@ -78,12 +78,13 @@ class Chantier(Base):
 # 3. MATERIEL
 # ==========================
 class Materiel(Base):
+    # 👇 RE-NOMMAGE V2 POUR FORCER LA MISE À JOUR DES COLONNES
     __tablename__ = "materiels_v2"
 
     id = Column(Integer, primary_key=True, index=True)
     nom = Column(String, index=True)
     reference = Column(String) # Ref constructeur
-    reference = Column(String, nullable=True) # Ref interne (ex: CONFORME-51)
+    ref_interne = Column(String, nullable=True) # Ref interne (ex: CONFORME-51)
     
     etat = Column(String, default="Bon") # Ex: Bon, Panne, A réparer
     statut_vgp = Column(String, default="CONFORME") # CONFORME, NON CONFORME, A PREVOIR
@@ -244,6 +245,7 @@ class Task(Base):
     chantier = relationship("Chantier", back_populates="tasks")
 
 class PermisFeu(Base):
+    # 👇 V2 POUR ÉVITER CONFLITS
     __tablename__ = "permis_feu_v2"
 
     id = Column(Integer, primary_key=True, index=True)
