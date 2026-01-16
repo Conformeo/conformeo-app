@@ -1759,7 +1759,7 @@ def migrate_chantiers_data(db: Session = Depends(get_db)):
 @app.get("/system/debug-counts")
 def debug_counts(db: Session = Depends(get_db)):
     # Compte dans l'ancienne table (sauvegarde)
-    old_count = db.query(OldChantier).count()
+    old_count = db.query(models.OldChantier).count()
     # Compte dans la nouvelle table (visible appli)
     new_count = db.query(models.Chantier).count()
     
