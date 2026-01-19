@@ -1772,25 +1772,50 @@ def debug_counts(db: Session = Depends(get_db)):
 # ==========================================
 # 🛠️ FIX : RÉATTRIBUER TOUS LES CHANTIERS À MOI
 # ==========================================
+# @app.get("/system/assign-all-chantiers-to-me")
+# def assign_all_to_me(
+#     db: Session = Depends(get_db),
+#     # On a besoin de savoir qui vous êtes pour récupérer votre ID entreprise
+#     current_user: models.User = Depends(security.get_current_user) 
+# ):
+#     if not current_user.company_id:
+#         return {"error": "Votre utilisateur n'est lié à aucune entreprise !"}
+
+#     # 1. Mise à jour de TOUS les chantiers vers votre Company ID
+#     result = db.query(models.Chantier).update(
+#         {models.Chantier.company_id: current_user.company_id},
+#         synchronize_session=False
+#     )
+    
+#     db.commit()
+    
+#     return {
+#         "status": "Succès",
+#         "message": f"{result} chantiers sont maintenant visibles pour l'entreprise {current_user.company_id}",
+#         "user": current_user.email
+#     }
+
+# Version modifiée pour accepter le ?token=... dans l'URL
 @app.get("/system/assign-all-chantiers-to-me")
 def assign_all_to_me(
-    db: Session = Depends(get_db),
-    # On a besoin de savoir qui vous êtes pour récupérer votre ID entreprise
-    current_user: models.User = Depends(security.get_current_user) 
+    token: str = Query(None), # 👈 Ajout
+    db: Session = Depends(get_db)
 ):
-    if not current_user.company_id:
-        return {"error": "Votre utilisateur n'est lié à aucune entreprise !"}
+    # Auth manuelle rapide
+    user = None
+    if token:
+        payload = security.decode_access_token(token)
+        if payload:
+            user = db.query(models.User).filter(models.User.email == payload.get("sub")).first()
+            
+    if not user or not user.company_id:
+        return {"error": "Non authentifié ou pas d'entreprise"}
 
-    # 1. Mise à jour de TOUS les chantiers vers votre Company ID
+    # Update
     result = db.query(models.Chantier).update(
-        {models.Chantier.company_id: current_user.company_id},
+        {models.Chantier.company_id: user.company_id},
         synchronize_session=False
     )
-    
     db.commit()
     
-    return {
-        "status": "Succès",
-        "message": f"{result} chantiers sont maintenant visibles pour l'entreprise {current_user.company_id}",
-        "user": current_user.email
-    }
+    return {"status": "Succès", "chantiers_recuperes": result}
