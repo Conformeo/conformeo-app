@@ -78,12 +78,13 @@ origins = [
     "http://localhost:4200",
     "http://localhost",
     "capacitor://localhost",
-    "https://conformeo-app.vercel.app"
+    "https://conformeo-app.vercel.app",
+    "*"
 ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,          # ← évite "*" si allow_credentials=True
+    allow_origins=["*"], 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -427,16 +428,27 @@ def create_chantier(chantier: schemas.ChantierCreate, db: Session = Depends(get_
 @app.get("/chantiers", response_model=List[schemas.ChantierOut])
 def read_chantiers(
     skip: int = 0,
-    limit: int = 1000, # 👈 On augmente la limite par défaut
+    limit: int = 1000,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(security.get_current_user)
 ):
-    # On récupère TOUS les chantiers de l'entreprise, sans filtre "actif/inactif" pour tester
-    chantiers = db.query(models.Chantier).filter(
-        models.Chantier.company_id == current_user.company_id
-    ).order_by(models.Chantier.date_creation.desc()).all()
+    try:
+        # 1. Récupération brute
+        chantiers = db.query(models.Chantier).filter(
+            models.Chantier.company_id == current_user.company_id
+        ).order_by(models.Chantier.date_creation.desc()).all()
+        
+        # 2. Log pour le serveur (visible dans les logs Render)
+        print(f"✅ {len(chantiers)} chantiers trouvés pour l'user {current_user.email}")
+        
+        return chantiers
+
+    except Exception as e:
+        # 3. En cas de crash, on l'affiche proprement au lieu de faire une erreur 500 muette
+        print(f"❌ ERREUR CRITIQUE /chantiers : {e}")
+        # On renvoie une liste vide pour ne pas bloquer l'appli, ou on laisse l'erreur 500 mais avec des logs
+        raise HTTPException(status_code=500, detail=f"Erreur serveur: {str(e)}")
     
-    return chantiers
 
 @app.get("/chantiers/{chantier_id}", response_model=schemas.ChantierOut)
 def read_chantier(chantier_id: int, db: Session = Depends(get_db)):
