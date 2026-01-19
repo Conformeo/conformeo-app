@@ -173,8 +173,8 @@ class ChantierBase(BaseModel):
     nom: str
     adresse: Optional[str] = None
     client: Optional[str] = None
-    date_debut: Optional[date] = None 
-    date_fin: Optional[date] = None   
+    date_debut: Optional[datetime] = None 
+    datetime_fin: Optional[date] = None   
     soumis_sps: bool = False # ✅ Ajouté pour la coordination SPS
 
 class ChantierCreate(ChantierBase):
