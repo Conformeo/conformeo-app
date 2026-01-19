@@ -8,7 +8,7 @@ import {
   IonChip, IonIcon, IonLabel, IonFab, IonFabButton, 
   IonRefresher, IonRefresherContent, ModalController,
   IonButtons, IonButton, IonBadge, NavController, IonSearchbar, 
-  LoadingController // <--- AJOUT
+  LoadingController, AlertController // <--- AJOUT AlertController
 } from '@ionic/angular/standalone';
 
 import { addIcons } from 'ionicons';
@@ -16,7 +16,7 @@ import {
   business, location, checkmarkCircle, alertCircle, add, 
   statsChartOutline, hammerOutline, cloudDone, cloudOffline, 
   syncOutline, construct, documentTextOutline, locationOutline,
-  chevronForwardOutline, cloudUploadOutline, searchOutline // <--- AJOUTS
+  chevronForwardOutline, cloudUploadOutline, searchOutline 
 } from 'ionicons/icons'; 
 
 import { ApiService, Chantier } from '../services/api';
@@ -40,14 +40,14 @@ import * as L from 'leaflet';
 })
 export class HomePage implements OnInit {
   chantiers: Chantier[] = [];
-  filteredChantiers: Chantier[] = []; // Liste filtrée pour la recherche
+  filteredChantiers: Chantier[] = [];
   searchTerm: string = '';
   isOnline = true;
 
   stats: any = {
     kpis: { total_chantiers: 0, actifs: 0, rapports: 0, alertes: 0, materiel_sorti: 0 },
     recents: [],
-    map: [] // La liste des points GPS
+    map: [] 
   };
 
   map: L.Map | undefined;
@@ -58,7 +58,8 @@ export class HomePage implements OnInit {
     public offline: OfflineService,
     private navCtrl: NavController,
     private loadingCtrl: LoadingController,
-    private router: Router,   // 👈 Pour naviguer
+    private alertCtrl: AlertController, // <--- Injection
+    private router: Router,
     private ngZone: NgZone
   ) {
     addIcons({ 
@@ -67,7 +68,7 @@ export class HomePage implements OnInit {
       syncOutline, construct, documentTextOutline, locationOutline,
       chevronForwardOutline, cloudUploadOutline, searchOutline
     });
-    // 👇 1. PASSERELLE MAGIQUE (Pour relier le HTML de la carte à Angular)
+
     (window as any).openChantier = (id: number) => {
       this.ngZone.run(() => {
         this.router.navigate(['/chantiers', id]);
@@ -93,14 +94,13 @@ export class HomePage implements OnInit {
     this.api.getStats().subscribe({
       next: (data) => {
         this.stats = data;
-        this.initMap(data.map); // On lance la carte avec les données reçues
+        this.initMap(data.map); 
       },
       error: (err) => console.error(err)
     });
   }
 
   initMap(sites: any[]) {
-    // Nettoyage
     if (this.map) {
       this.map.remove();
       this.map = undefined;
@@ -118,9 +118,9 @@ export class HomePage implements OnInit {
 
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap'
-      }).addTo(this.map!); // Le '!' dit à TypeScript que map existe bien
+      }).addTo(this.map!);
 
-      // Icône par défaut
+      // Configurer les icônes Leaflet correctement
       const iconDefault = L.icon({
         iconUrl: 'assets/icon/marker-icon.png', 
         shadowUrl: 'assets/icon/marker-shadow.png',
@@ -130,12 +130,10 @@ export class HomePage implements OnInit {
       });
 
       sites.forEach(site => {
-        // On vérifie que les coordonnées existent
         if (site.lat && site.lng) {
-          const marker = L.marker([site.lat, site.lng]); // Ajoutez {icon: iconDefault} si besoin
+          // Utilisation de l'icône configurée
+          const marker = L.marker([site.lat, site.lng], { icon: iconDefault });
 
-          // 👇 2. CONTENU HTML SIMPLE (Avec le onclick qui appelle notre passerelle)
-          // Notez l'utilisation de onclick="window.openChantier(...)"
           const popupHtml = `
             <div style="text-align: center; font-family: sans-serif;">
               <b style="font-size: 14px; color: #333;">${site.nom}</b><br>
@@ -154,29 +152,43 @@ export class HomePage implements OnInit {
     }, 200);
   }
 
+  // loadChantiers(event?: any) {
+  //   this.api.getChantiers().subscribe(data => {
+  //     this.chantiers = data.reverse();
+  //     this.filterChantiers(); 
+  //     if (event) event.target.complete();
+  //   });
+  // }
+
   loadChantiers(event?: any) {
     this.api.getChantiers().subscribe(data => {
+      
+      // 👇 AJOUTEZ CES LOGS
+      console.log("-------------------------------------------------");
+      console.log("🔎 DEBUG CHANTIERS REÇUS API:", data.length);
+      console.log("📋 LISTE:", data);
+      console.log("-------------------------------------------------");
+
       this.chantiers = data.reverse();
-      this.filterChantiers(); // On applique le filtre tout de suite
+      this.filterChantiers();
+      
       if (event) event.target.complete();
     });
   }
 
-  // 👇 MOTEUR DE RECHERCHE
   filterChantiers() {
     const term = this.searchTerm.toLowerCase();
     if (!term) {
       this.filteredChantiers = this.chantiers;
     } else {
       this.filteredChantiers = this.chantiers.filter(c => 
-        c.nom.toLowerCase().includes(term) || 
-        c.client.toLowerCase().includes(term) ||
-        c.adresse.toLowerCase().includes(term)
+        (c.nom?.toLowerCase() || '').includes(term) || 
+        (c.client?.toLowerCase() || '').includes(term) ||
+        (c.adresse?.toLowerCase() || '').includes(term)
       );
     }
   }
 
-  // 👇 IMPORT CSV
   async onCSVSelected(event: any) {
     const file = event.target.files[0];
     if (file) {
@@ -184,14 +196,26 @@ export class HomePage implements OnInit {
       await loading.present();
 
       this.api.importChantiersCSV(file).subscribe({
-        next: (res) => {
+        next: async (res) => {
           loading.dismiss();
-          alert(res.message);
-          this.loadChantiers(); // Rafraîchir la liste
+          const alert = await this.alertCtrl.create({
+            header: 'Succès',
+            message: res.message,
+            buttons: ['OK']
+          });
+          await alert.present();
+          this.loadChantiers();
         },
-        error: (err) => {
+        error: async (err) => {
           loading.dismiss();
-alert("Erreur Serveur : " + (err.error?.detail || err.message || JSON.stringify(err)));        }
+          const errorMsg = err.error?.detail || err.message || JSON.stringify(err);
+          const alert = await this.alertCtrl.create({
+            header: 'Erreur Serveur',
+            message: errorMsg,
+            buttons: ['OK']
+          });
+          await alert.present();
+        }
       });
     }
   }

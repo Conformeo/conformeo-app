@@ -380,48 +380,63 @@ def create_chantier(chantier: schemas.ChantierCreate, db: Session = Depends(get_
     return new_c
 
 # --- ROUTE CHANTIERS (ROBUST VERSION) ---
+# @app.get("/chantiers", response_model=List[schemas.ChantierOut])
+# def read_chantiers(
+#     skip: int = 0, 
+#     limit: int = 100, 
+#     db: Session = Depends(get_db),
+#     current_user: models.User = Depends(security.get_current_user)
+# ):
+#     try:
+#         # On récupère tout sans filtrer d'abord pour éviter les erreurs de requête
+#         query = db.query(models.Chantier)
+#         if current_user.company_id:
+#             query = query.filter(models.Chantier.company_id == current_user.company_id)
+            
+#         raw_rows = query.offset(skip).limit(limit).all()
+#         valid_rows = []
+
+#         for row in raw_rows:
+#             try:
+#                 # Construction manuelle sécurisée
+#                 # On utilise 'or' pour fournir des valeurs par défaut si None
+#                 valid_rows.append(schemas.ChantierOut(
+#                     id=row.id,
+#                     nom=row.nom or "Sans nom",
+#                     adresse=row.adresse,
+#                     client=row.client,
+#                     date_debut=row.date_debut, # Le schéma accepte Any
+#                     date_fin=row.date_fin,     # Le schéma accepte Any
+#                     est_actif=True if row.est_actif is None else row.est_actif,
+#                     cover_url=row.cover_url,
+#                     company_id=row.company_id,
+#                     signature_url=row.signature_url,
+#                     date_creation=row.date_creation
+#                 ))
+#             except Exception as e:
+#                 print(f"⚠️ Chantier {row.id} ignoré (donnée corrompue): {e}")
+#                 continue # On passe au suivant sans planter
+                
+#         return valid_rows
+
+#     except Exception as e:
+#         print(f"❌ CRITICAL ERROR /chantiers: {str(e)}")
+#         return [] # On renvoie une liste vide au pire, pas une erreur 500
+
+
 @app.get("/chantiers", response_model=List[schemas.ChantierOut])
 def read_chantiers(
-    skip: int = 0, 
-    limit: int = 100, 
+    skip: int = 0,
+    limit: int = 1000, # 👈 On augmente la limite par défaut
     db: Session = Depends(get_db),
     current_user: models.User = Depends(security.get_current_user)
 ):
-    try:
-        # On récupère tout sans filtrer d'abord pour éviter les erreurs de requête
-        query = db.query(models.Chantier)
-        if current_user.company_id:
-            query = query.filter(models.Chantier.company_id == current_user.company_id)
-            
-        raw_rows = query.offset(skip).limit(limit).all()
-        valid_rows = []
-
-        for row in raw_rows:
-            try:
-                # Construction manuelle sécurisée
-                # On utilise 'or' pour fournir des valeurs par défaut si None
-                valid_rows.append(schemas.ChantierOut(
-                    id=row.id,
-                    nom=row.nom or "Sans nom",
-                    adresse=row.adresse,
-                    client=row.client,
-                    date_debut=row.date_debut, # Le schéma accepte Any
-                    date_fin=row.date_fin,     # Le schéma accepte Any
-                    est_actif=True if row.est_actif is None else row.est_actif,
-                    cover_url=row.cover_url,
-                    company_id=row.company_id,
-                    signature_url=row.signature_url,
-                    date_creation=row.date_creation
-                ))
-            except Exception as e:
-                print(f"⚠️ Chantier {row.id} ignoré (donnée corrompue): {e}")
-                continue # On passe au suivant sans planter
-                
-        return valid_rows
-
-    except Exception as e:
-        print(f"❌ CRITICAL ERROR /chantiers: {str(e)}")
-        return [] # On renvoie une liste vide au pire, pas une erreur 500
+    # On récupère TOUS les chantiers de l'entreprise, sans filtre "actif/inactif" pour tester
+    chantiers = db.query(models.Chantier).filter(
+        models.Chantier.company_id == current_user.company_id
+    ).order_by(models.Chantier.date_creation.desc()).all()
+    
+    return chantiers
 
 @app.get("/chantiers/{chantier_id}", response_model=schemas.ChantierOut)
 def read_chantier(chantier_id: int, db: Session = Depends(get_db)):
