@@ -282,3 +282,20 @@ class OldChantier(Base):
     statut_planning = Column(String)
     company_id = Column(Integer)
     # Note : Pas de 'soumis_sps' ici car il n'existait pas
+
+# ==========================
+# 8. DOCUMENTS EXTERNES (DOE / GED)
+# ==========================
+class DocExterne(Base):
+    __tablename__ = "docs_externes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    chantier_id = Column(Integer, ForeignKey("chantiers_v2.id"))
+    
+    titre = Column(String)       # Ex: "Plan RDC", "Notice Chaudière"
+    url = Column(String)         # L'URL Cloudinary ou locale
+    categorie = Column(String)   # "PLANS", "NOTICES", "MAINTENANCE", "GARANTIES", "DECHETS"
+    date_ajout = Column(DateTime, default=datetime.utcnow)
+    
+    # Lien vers le chantier
+    chantier = relationship("Chantier", backref="docs_externes")

@@ -27,6 +27,15 @@ import { NewRapportModalComponent } from './new-rapport-modal/new-rapport-modal.
 import { RapportDetailsModalComponent } from './rapport-details-modal/rapport-details-modal.component';
 import { SignatureModalComponent } from './signature-modal/signature-modal.component';
 
+// Interface locale pour l'affichage (match avec le backend)
+interface DocExterne {
+  id: number;
+  titre: string;
+  url: string;
+  categorie: string; 
+  date_ajout: string;
+}
+
 @Component({
   selector: 'app-chantier-details',
   templateUrl: './chantier-details.page.html',
@@ -44,9 +53,10 @@ export class ChantierDetailsPage implements OnInit {
   materielsSurSite: Materiel[] = []; 
 
   segment = 'suivi'; 
-  doeDocs: any[] = [];
-  selectedCategory = '';
-  tempTitle = '';
+  
+  // --- GESTION DOE ---
+  docsExternes: DocExterne[] = []; // Liste typée
+  currentUploadCategory = ''; // Catégorie en cours d'upload
   
   @ViewChild('doeFileInput') fileInput!: ElementRef;
   
@@ -95,14 +105,21 @@ export class ChantierDetailsPage implements OnInit {
   }
 
   loadData() {
+    // 1. Infos Chantier
     this.api.getChantierById(this.chantierId).subscribe(data => {
       this.chantier = data;
       this.buildDocumentsList(); 
     });
+
+    // 2. Rapports
     this.loadRapports();
+
+    // 3. Matériel
     this.api.getMateriels().subscribe(allMat => {
       this.materielsSurSite = allMat.filter(m => m.chantier_id === this.chantierId);
     });
+
+    // 4. DOE (Documents Externes)
     this.loadDoeDocs();
   }
 
@@ -114,81 +131,126 @@ export class ChantierDetailsPage implements OnInit {
     });
   }
 
-  // --- DOE MANAGEMENT ---
+  // ==========================================
+  // 📂 GESTION DOE (DOCUMENTS EXTERNES)
+  // ==========================================
+
   loadDoeDocs() {
-    this.api.http.get<any[]>(`${this.api.apiUrl}/chantiers/${this.chantierId}/documents`).subscribe(data => {
-      this.doeDocs = data;
+    this.api.getChantierDocs(this.chantierId).subscribe(data => {
+      this.docsExternes = data;
     });
   }
 
+  // Helpers pour le HTML
   getDocs(cat: string) {
-    return this.doeDocs.filter(d => d.categorie === cat);
+    return this.docsExternes.filter(d => d.categorie === cat);
   }
   
   getCount(cat: string) {
     return this.getDocs(cat).length;
   }
 
-  async uploadDoeDoc(category: string) {
-    this.selectedCategory = category;
+  // 1. Déclenche l'ouverture de l'explorateur de fichiers
+  uploadDoeDoc(category: string) {
+    this.currentUploadCategory = category;
+    // On clique virtuellement sur l'input caché dans le HTML
+    if (this.fileInput) {
+        this.fileInput.nativeElement.click();
+    }
+  }
+
+  // 2. Une fois le fichier choisi, on demande le nom
+  async onDoeFileSelected(event: any) {
+    const file = event.target.files[0];
+    if (!file) return;
+
     const alert = await this.alertCtrl.create({
-      header: 'Nouveau Document',
-      inputs: [ { name: 'titre', type: 'text', placeholder: 'Nom du fichier (ex: Plan RDC)' } ],
+      header: 'Nom du document',
+      inputs: [ 
+        { 
+          name: 'titre', 
+          type: 'text', 
+          placeholder: 'Ex: Plan RDC', 
+          value: file.name 
+        } 
+      ],
       buttons: [
-        { text: 'Annuler', role: 'cancel' },
-        { text: 'Choisir Fichier', handler: (data) => {
-            if(!data.titre) return false;
-            this.tempTitle = data.titre;
-            this.fileInput.nativeElement.click(); 
-            return true;
-        }}
+        { 
+          text: 'Annuler', 
+          role: 'cancel',
+          handler: () => { event.target.value = ''; } // Reset input
+        },
+        { 
+          text: 'Envoyer', 
+          handler: (data) => {
+            const titre = data.titre || file.name;
+            this.processUpload(file, titre, event);
+          }
+        }
       ]
     });
     await alert.present();
   }
 
-  async onDoeFileSelected(event: any) {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    const formData = new FormData();
-    formData.append('file', file);
-    
-    const url = `${this.api.apiUrl}/chantiers/${this.chantierId}/documents?titre=${encodeURIComponent(this.tempTitle)}&categorie=${this.selectedCategory}`;
-    
-    const loading = await this.loadingCtrl.create({ message: 'Upload en cours...' });
+  // 3. Envoi au serveur via ApiService
+  async processUpload(file: File, titre: string, eventInput: any) {
+    const loading = await this.loadingCtrl.create({ message: 'Envoi en cours...' });
     await loading.present();
 
-    this.api.http.post(url, formData).subscribe({
-      next: () => {
-        this.loadDoeDocs(); 
-        event.target.value = null; 
+    this.api.uploadChantierDoc(this.chantierId, file, this.currentUploadCategory, titre).subscribe({
+      next: (newDoc) => {
+        // On ajoute directement à la liste locale pour éviter un rechargement complet
+        this.docsExternes.push(newDoc);
         loading.dismiss();
-        this.presentToast('Document ajouté au DOE ! ✅');
+        this.presentToast('Document ajouté au DOE ! 📂', 'success');
+        eventInput.target.value = ''; // Reset de l'input file
       },
       error: (err) => {
         console.error(err);
         loading.dismiss();
-        this.presentToast('Erreur lors de l\'envoi ❌');
+        this.presentToast('Erreur lors de l\'envoi ❌', 'danger');
+        eventInput.target.value = '';
       }
     });
   }
 
-  deleteDoc(id: number) {
-      this.api.http.delete(`${this.api.apiUrl}/documents/${id}`).subscribe(() => {
-        this.loadDoeDocs();
-        this.presentToast('Document supprimé.');
+  async deleteDoc(docId: number) {
+    const alert = await this.alertCtrl.create({
+        header: 'Supprimer ?',
+        message: 'Ce document sera définitivement effacé.',
+        buttons: [
+          { text: 'Annuler', role: 'cancel' },
+          {
+            text: 'Supprimer',
+            role: 'destructive',
+            handler: () => {
+              this.api.deleteDoc(docId).subscribe({
+                next: () => {
+                    this.docsExternes = this.docsExternes.filter(d => d.id !== docId);
+                    this.presentToast('Document supprimé', 'dark');
+                },
+                error: () => this.presentToast('Erreur suppression', 'danger')
+              });
+            }
+          }
+        ]
       });
+      await alert.present();
   }
 
   downloadFullDoe() {
+    this.presentToast('Préparation du ZIP DOE...', 'primary');
     const url = `${this.api.apiUrl}/chantiers/${this.chantierId}/doe`;
     window.open(url, '_system');
   }
 
-  // --- BUILD DOCUMENTS LIST ---
+  // ==========================================
+  // 📄 LISTE DOCUMENTS SÉCURITÉ (Onglet DOE)
+  // ==========================================
   buildDocumentsList() {
     this.documentsList = [];
+    
+    // 1. Journal
     this.documentsList.push({
         type: 'RAPPORT',
         titre: 'Journal de Bord (Photos & QHSE)',
@@ -198,6 +260,7 @@ export class ChantierDetailsPage implements OnInit {
         action: () => this.downloadPdf()
     });
 
+    // 2. PPSPS
     this.api.getPPSPSList(this.chantierId).subscribe(docs => {
         this.ppspsList = docs;
         docs.forEach(doc => {
@@ -212,6 +275,26 @@ export class ChantierDetailsPage implements OnInit {
         });
     });
 
+    // 3. Plan de Prévention (PdP)
+    // On ajoute aussi les PdP s'ils existent
+    this.api.getPdp(this.chantierId).subscribe(pdps => {
+        pdps.forEach(pdp => {
+            this.documentsList.push({
+                type: 'PDP',
+                titre: 'Plan de Prévention',
+                date: pdp.date_creation,
+                icon: 'document-lock-outline',
+                color: 'tertiary',
+                action: () => {
+                    const token = localStorage.getItem('access_token') || '';
+                    const url = `${this.api.apiUrl}/plans-prevention/${pdp.id}/pdf?token=${token}`;
+                    window.open(url, '_system');
+                }
+            });
+        });
+    });
+
+    // 4. PIC
     this.api.getPIC(this.chantierId).subscribe(pic => {
         if (pic && pic.final_url) {
             this.documentsList.push({
@@ -225,6 +308,7 @@ export class ChantierDetailsPage implements OnInit {
         }
     });
 
+    // 5. Audits
     this.api.getInspections(this.chantierId).subscribe(audits => {
         audits.forEach(audit => {
             this.documentsList.push({
@@ -234,15 +318,14 @@ export class ChantierDetailsPage implements OnInit {
                 icon: 'checkmark-done-circle-outline', 
                 color: 'success',
                 action: () => {
-                    const url = `${this.api['apiUrl']}/inspections/${audit.id}/pdf`;
+                    const url = `${this.api.apiUrl}/inspections/${audit.id}/pdf`;
                     window.open(url, '_system');
                 }
             });
         });
     });
 
-    // 👇 AJOUT : LES PERMIS DE FEU
-    // 👇 MODIFICATION ICI
+    // 6. Permis Feu
     this.api.getPermisFeuList(this.chantierId).subscribe(permisList => {
         permisList.forEach(p => {
             this.documentsList.push({
@@ -251,19 +334,15 @@ export class ChantierDetailsPage implements OnInit {
                 date: p.date,
                 icon: 'flame',
                 color: 'danger',
-                // 👇 C'EST ICI QUE ÇA CHANGE
                 action: () => {
-                    // On construit l'URL vers le PDF généré
-                    // (Assurez-vous que apiUrl ne finit pas par un slash, sinon retirez le / avant permis-feu)
                     const url = `${this.api.apiUrl}/permis-feu/${p.id}/pdf`;
-                    
-                    // On ouvre dans le navigateur système pour pouvoir télécharger/imprimer
                     window.open(url, '_system');
                 }
             });
         });
     });
 
+    // 7. Signature Client
     if (this.chantier && this.chantier.signature_url) {
         this.documentsList.push({
             type: 'SIGNATURE',
@@ -276,7 +355,10 @@ export class ChantierDetailsPage implements OnInit {
     }
   }
 
-  // --- ACTIONS ---
+  // ==========================================
+  // ⚙️ ACTIONS DIVERSES
+  // ==========================================
+
   async takePhoto() {
     try {
       const image = await Camera.getPhoto({
@@ -358,17 +440,16 @@ export class ChantierDetailsPage implements OnInit {
   }
   
   downloadPdf() {
-    const url = `${this.api['apiUrl']}/chantiers/${this.chantierId}/pdf`;
+    // Note: Utilisation token URL pour accès mobile facile
+    const token = localStorage.getItem('access_token');
+    const url = `${this.api.apiUrl}/chantiers/${this.chantierId}/pdf?token=${token}`;
     window.open(url, '_system');
   }
 
   downloadPPSPS(docId: number) {
-    const url = `${this.api['apiUrl']}/ppsps/${docId}/pdf`;
+    const token = localStorage.getItem('access_token');
+    const url = `${this.api.apiUrl}/ppsps/${docId}/pdf?token=${token}`;
     window.open(url, '_system');
-  }
-
-  downloadDOE() {
-    this.api.downloadDOE(this.chantierId);
   }
 
   async openPIC() {
@@ -399,9 +480,9 @@ export class ChantierDetailsPage implements OnInit {
     modal.present();
   }
 
-  async presentToast(message: string) {
+  async presentToast(message: string, color: string = 'dark') {
     const toast = await this.toastCtrl.create({
-      message: message, duration: 2000, position: 'bottom', color: 'dark'
+      message: message, duration: 2000, position: 'bottom', color: color
     });
     toast.present();
   }
@@ -424,7 +505,7 @@ export class ChantierDetailsPage implements OnInit {
     await load.present();
     this.api.sendJournalEmail(this.chantierId, email).subscribe({
       next: () => { load.dismiss(); this.presentToast('Rapport envoyé avec succès ! 📧'); },
-      error: () => { load.dismiss(); this.presentToast('Erreur lors de l\'envoi'); }
+      error: () => { load.dismiss(); this.presentToast('Erreur lors de l\'envoi', 'danger'); }
     });
   }
 
@@ -450,10 +531,15 @@ export class ChantierDetailsPage implements OnInit {
 
   getFullUrl(path: string | undefined) {
     if (!path) return '';
-    if (path.startsWith('http') && path.includes('cloudinary.com')) {
-      return path.replace('/upload/', '/upload/w_500,f_auto,q_auto/');
+    if (path.startsWith('http')) {
+      // Optimisation Cloudinary si possible
+      if (path.includes('cloudinary.com')) {
+        return path.replace('/upload/', '/upload/w_500,f_auto,q_auto/');
+      }
+      return path;
     }
-    return 'https://conformeo-api.onrender.com' + path;
+    // Si chemin relatif
+    return `${this.api.apiUrl}${path}`; 
   }
 
   hasImage(rap: Rapport): boolean {

@@ -121,6 +121,7 @@ export interface PlanPrevention {
   entreprise_utilisatrice: string;
   entreprise_exterieure: string;
   date_inspection_commune: string;
+  date_creation?: string;
   signature_eu?: string | null;
   signature_ee?: string | null;
   risques_interferents: { tache: string; risque: string; mesure: string }[];
@@ -373,22 +374,31 @@ export class ApiService {
     return this.http.get<Chantier>(`${this.apiUrl}/chantiers/${id}`, this.getOptions());
   }
 
-  // --- GED CHANTIER (DOCS EXTERNES) ---
+  // --- GESTION DOE ---
   
-  getChantierDocs(chantierId: number): Observable<DocExterne[]> {
-    return this.http.get<DocExterne[]>(`${this.apiUrl}/chantiers/${chantierId}/documents`, this.getOptions());
+  getChantierDocs(chantierId: number) {
+    return this.http.get<any[]>(`${this.apiUrl}/chantiers/${chantierId}/docs`, this.getOptions());
   }
 
-  uploadChantierDoc(chantierId: number, file: File, titre: string, categorie: string): Observable<DocExterne> {
+  uploadChantierDoc(chantierId: number, file: File, categorie: string, titre: string) {
     const formData = new FormData();
     formData.append('file', file);
-    const url = `${this.apiUrl}/chantiers/${chantierId}/documents?titre=${encodeURIComponent(titre)}&categorie=${encodeURIComponent(categorie)}`;
-    const headers = this.getOptions().headers?.delete('Content-Type');
-    return this.http.post<DocExterne>(url, formData, { headers });
+    formData.append('categorie', categorie);
+    formData.append('titre', titre);
+
+    // Note : Pour l'upload de fichiers, on ne met PAS 'Content-Type': 'application/json'
+    // Angular gère le Content-Type automatiquement quand on passe un FormData
+    const token = localStorage.getItem('token') || localStorage.getItem('access_token') || '';
+    const headers = new HttpHeaders({
+      'Authorization': `Bearer ${token}`
+      // Pas de Content-Type ici !
+    });
+
+    return this.http.post<any>(`${this.apiUrl}/chantiers/${chantierId}/docs`, formData, { headers });
   }
 
-  deleteChantierDoc(docId: number): Observable<any> {
-    return this.http.delete(`${this.apiUrl}/documents/${docId}`, this.getOptions());
+  deleteDoc(docId: number) {
+    return this.http.delete(`${this.apiUrl}/docs/${docId}`, this.getOptions());
   }
 
   // ==========================================
@@ -535,6 +545,8 @@ export class ApiService {
     const url = `${this.apiUrl}/chantiers/${id}/doe`;
     window.open(url, '_system');
   }
+
+  
 
   // --- GESTION DUERP ---
 

@@ -152,23 +152,9 @@ export class HomePage implements OnInit {
     }, 200);
   }
 
-  // loadChantiers(event?: any) {
-  //   this.api.getChantiers().subscribe(data => {
-  //     this.chantiers = data.reverse();
-  //     this.filterChantiers(); 
-  //     if (event) event.target.complete();
-  //   });
-  // }
-
   loadChantiers(event?: any) {
     this.api.getChantiers().subscribe(data => {
-      
-      // 👇 AJOUTEZ CES LOGS
-      console.log("-------------------------------------------------");
-      console.log("🔎 DEBUG CHANTIERS REÇUS API:", data.length);
-      console.log("📋 LISTE:", data);
-      console.log("-------------------------------------------------");
-
+      // On remet la liste au propre sans logs
       this.chantiers = data.reverse();
       this.filterChantiers();
       

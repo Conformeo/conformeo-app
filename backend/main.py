@@ -1,7 +1,7 @@
 import os
 import shutil
 import zipfile
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 import csv 
 import time
 import random
@@ -15,7 +15,7 @@ load_dotenv()
 import requests
 import cloudinary
 import cloudinary.uploader
-from fastapi import FastAPI, Depends, HTTPException, status, File, UploadFile, Query
+from fastapi import FastAPI, Depends, HTTPException, status, File, UploadFile, Query, Form
 from fastapi.staticfiles import StaticFiles
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
@@ -76,7 +76,7 @@ app.mount("/static", StaticFiles(directory="uploads"), name="static")
 origins = [
     "http://localhost:8100",
     "http://localhost:4200",
-    "http://localhost",
+    "http://localhost:8000",
     "capacitor://localhost",
     "https://conformeo-app.vercel.app",
     "*"
@@ -191,12 +191,9 @@ def invite_member(invite: schemas.UserInvite, db: Session = Depends(get_db), cur
         raise HTTPException(status_code=400, detail="Cet email est déjà utilisé.")
 
     hashed_pw = security.get_password_hash(invite.password)
-    # Note: 'nom' n'est pas dans UserInvite, on suppose 'full_name' ou on adapte
-    # Si le schéma UserInvite a 'nom' ou 'full_name', utilisez-le. 
-    # Ici je mets une valeur par défaut safe.
     new_user = models.User(
         email=invite.email,
-        full_name= getattr(invite, 'full_name', 'Nouveau Membre'), # Adaptation
+        full_name= getattr(invite, 'full_name', 'Nouveau Membre'), 
         hashed_password=hashed_pw,
         company_id=current_user.company_id,
         role=invite.role
@@ -239,7 +236,6 @@ def update_team_member(
     update_data = user_up.dict(exclude_unset=True)
 
     if "full_name" in update_data: user_to_edit.full_name = update_data["full_name"]
-    # Compatibilité 'nom' si votre modèle utilise 'nom' au lieu de 'full_name'
     if hasattr(user_to_edit, 'nom') and "full_name" in update_data: user_to_edit.nom = update_data["full_name"]
     
     if "email" in update_data and update_data["email"]: user_to_edit.email = update_data["email"]
@@ -254,9 +250,6 @@ def update_team_member(
 # ==========================================
 # 3. DASHBOARD
 # ==========================================
-from datetime import datetime, timedelta # Assurez-vous d'avoir ces imports
-
-# ...
 
 @app.get("/dashboard/stats")
 def get_stats(db: Session = Depends(get_db)):
@@ -268,15 +261,13 @@ def get_stats(db: Session = Depends(get_db)):
         alert = db.query(models.Rapport).filter(models.Rapport.niveau_urgence.in_(['Critique', 'Moyen'])).count()
         mat_sorti = db.query(models.Materiel).filter(models.Materiel.chantier_id != None).count()
 
-        # --- 2. NOUVEAUX KPIs (Avec sécurité si table inexistante) ---
+        # --- 2. NOUVEAUX KPIs ---
         try:
-            # Compte les permis (si vous avez renommé la table en _v2, assurez-vous que le modèle pointe dessus)
             nb_permis = db.query(models.PermisFeu).count()
         except:
             nb_permis = 0
 
         try:
-            # Compte les tâches à faire
             nb_tasks = db.query(models.Task).filter(models.Task.status == 'TODO').count()
         except:
             nb_tasks = 0
@@ -309,7 +300,6 @@ def get_stats(db: Session = Depends(get_db)):
         chantiers = db.query(models.Chantier).filter(models.Chantier.est_actif == True).all()
         for c in chantiers:
             lat, lng = c.latitude, c.longitude
-            # Si pas de GPS sur le chantier, on prend le dernier rapport géolocalisé
             if not lat:
                 last_gps = db.query(models.Rapport).filter(models.Rapport.chantier_id == c.id, models.Rapport.latitude != None).first()
                 if last_gps:
@@ -325,8 +315,8 @@ def get_stats(db: Session = Depends(get_db)):
                 "rapports": rap, 
                 "alertes": alert,
                 "materiel_sorti": mat_sorti,
-                "permis_feu": nb_permis, # 👈 Nouveau
-                "taches_todo": nb_tasks  # 👈 Nouveau
+                "permis_feu": nb_permis,
+                "taches_todo": nb_tasks
             },
             "chart": { "labels": labels, "values": values },
             "recents": rec_fmt,
@@ -335,7 +325,6 @@ def get_stats(db: Session = Depends(get_db)):
 
     except Exception as e:
         print(f"❌ Erreur Dashboard Stats: {str(e)}")
-        # On retourne une structure vide pour ne pas faire planter le front
         return {
             "kpis": {"total_chantiers": 0, "actifs": 0, "rapports": 0, "alertes": 0, "materiel_sorti": 0},
             "chart": {"labels": [], "values": []},
@@ -352,15 +341,12 @@ def create_chantier(chantier: schemas.ChantierCreate, db: Session = Depends(get_
     if chantier.adresse:
         lat, lng = get_gps_from_address(chantier.adresse)
     
-    # Gestion des dates (parfois reçues en string vide ou mal formatée)
     d_debut = chantier.date_debut
     d_fin = chantier.date_fin
     
-    # Si c'est None ou vide, on met une date par défaut
     if not d_debut: d_debut = datetime.now()
     if not d_fin: d_fin = datetime.now() + timedelta(days=30)
     
-    # Si c'est une string, on essaie de parser
     if isinstance(d_debut, str):
          try: d_debut = datetime.fromisoformat(d_debut[:10])
          except: d_debut = datetime.now()
@@ -370,60 +356,17 @@ def create_chantier(chantier: schemas.ChantierCreate, db: Session = Depends(get_
          except: d_fin = datetime.now() + timedelta(days=30)
 
     new_c = models.Chantier(
-        nom=chantier.nom, adresse=chantier.adresse, client=chantier.client, cover_url=None, # Cover URL non présent dans create
+        nom=chantier.nom, adresse=chantier.adresse, client=chantier.client, cover_url=None, 
         company_id=current_user.company_id,
         date_debut=d_debut,
         date_fin=d_fin,
         latitude=lat, longitude=lng,
-        soumis_sps=False # Valeur par défaut
+        soumis_sps=False 
     )
     db.add(new_c); db.commit(); db.refresh(new_c)
     return new_c
 
-# --- ROUTE CHANTIERS (ROBUST VERSION) ---
-# @app.get("/chantiers", response_model=List[schemas.ChantierOut])
-# def read_chantiers(
-#     skip: int = 0, 
-#     limit: int = 100, 
-#     db: Session = Depends(get_db),
-#     current_user: models.User = Depends(security.get_current_user)
-# ):
-#     try:
-#         # On récupère tout sans filtrer d'abord pour éviter les erreurs de requête
-#         query = db.query(models.Chantier)
-#         if current_user.company_id:
-#             query = query.filter(models.Chantier.company_id == current_user.company_id)
-            
-#         raw_rows = query.offset(skip).limit(limit).all()
-#         valid_rows = []
-
-#         for row in raw_rows:
-#             try:
-#                 # Construction manuelle sécurisée
-#                 # On utilise 'or' pour fournir des valeurs par défaut si None
-#                 valid_rows.append(schemas.ChantierOut(
-#                     id=row.id,
-#                     nom=row.nom or "Sans nom",
-#                     adresse=row.adresse,
-#                     client=row.client,
-#                     date_debut=row.date_debut, # Le schéma accepte Any
-#                     date_fin=row.date_fin,     # Le schéma accepte Any
-#                     est_actif=True if row.est_actif is None else row.est_actif,
-#                     cover_url=row.cover_url,
-#                     company_id=row.company_id,
-#                     signature_url=row.signature_url,
-#                     date_creation=row.date_creation
-#                 ))
-#             except Exception as e:
-#                 print(f"⚠️ Chantier {row.id} ignoré (donnée corrompue): {e}")
-#                 continue # On passe au suivant sans planter
-                
-#         return valid_rows
-
-#     except Exception as e:
-#         print(f"❌ CRITICAL ERROR /chantiers: {str(e)}")
-#         return [] # On renvoie une liste vide au pire, pas une erreur 500
-
+# --- ROUTE CHANTIERS ---
 
 @app.get("/chantiers", response_model=List[schemas.ChantierOut])
 def read_chantiers(
@@ -438,15 +381,22 @@ def read_chantiers(
             models.Chantier.company_id == current_user.company_id
         ).order_by(models.Chantier.date_creation.desc()).all()
         
-        # 2. Log pour le serveur (visible dans les logs Render)
+        # 2. Log pour le serveur 
         print(f"✅ {len(chantiers)} chantiers trouvés pour l'user {current_user.email}")
+        
+        # 3. FIX CRITIQUE : Conversion DateTime -> Date pour Pydantic
+        # Si Pydantic attend 'date' et reçoit 'datetime' non vide, il peut planter.
+        # On nettoie les objets avant le retour.
+        for c in chantiers:
+            if isinstance(c.date_debut, datetime):
+                c.date_debut = c.date_debut.date()
+            if isinstance(c.date_fin, datetime):
+                c.date_fin = c.date_fin.date()
         
         return chantiers
 
     except Exception as e:
-        # 3. En cas de crash, on l'affiche proprement au lieu de faire une erreur 500 muette
         print(f"❌ ERREUR CRITIQUE /chantiers : {e}")
-        # On renvoie une liste vide pour ne pas bloquer l'appli, ou on laisse l'erreur 500 mais avec des logs
         raise HTTPException(status_code=500, detail=f"Erreur serveur: {str(e)}")
     
 
@@ -463,40 +413,32 @@ def update_chantier(cid: int, chantier: schemas.ChantierUpdate, db: Session = De
     if not db_chantier:
         raise HTTPException(status_code=404, detail="Chantier introuvable")
 
-    # On convertit le modèle Pydantic en dictionnaire en excluant les valeurs nulles
     update_data = chantier.dict(exclude_unset=True)
 
     for key, value in update_data.items():
-        # Gestion spécifique des dates
         if key in ["date_debut", "date_fin"]:
             if value == "" or value is None:
                 setattr(db_chantier, key, None)
             elif isinstance(value, str):
                 try:
-                    # On essaie de convertir la string ISO en date Python
-                    # On coupe à 10 chars pour garder YYYY-MM-DD si c'est un datetime complet
                     setattr(db_chantier, key, datetime.fromisoformat(value[:10]).date())
                 except:
-                    # Si ça échoue, on ignore ou on met None
                     pass
             else:
                 setattr(db_chantier, key, value)
         
-        # Gestion spécifique de 'est_actif'
         elif key == "est_actif":
             if isinstance(value, str):
                 setattr(db_chantier, key, value.lower() == 'true')
             else:
                 setattr(db_chantier, key, bool(value))
                 
-        # Gestion GPS auto si adresse change
         elif key == "adresse" and value != db_chantier.adresse:
             db_chantier.adresse = value
             lat, lng = get_gps_from_address(value)
             db_chantier.latitude = lat
             db_chantier.longitude = lng
             
-        # Cas général (Texte)
         else:
             setattr(db_chantier, key, value)
 
@@ -574,25 +516,23 @@ async def import_chantiers_csv(file: UploadFile = File(...), db: Session = Depen
 # ==========================================
 @app.post("/materiels", response_model=schemas.MaterielOut)
 def create_materiel(mat: schemas.MaterielCreate, db: Session = Depends(get_db)):
-    # Gestion de la date reçue
     d_vgp = mat.date_derniere_vgp
     if isinstance(d_vgp, str) and d_vgp.strip():
         try: d_vgp = datetime.fromisoformat(d_vgp[:10])
         except: d_vgp = None
     else:
-        d_vgp = None # Pas de date par défaut si rien n'est envoyé
+        d_vgp = None 
 
     new_m = models.Materiel(
         nom=mat.nom, 
         reference=mat.reference, 
         etat=mat.etat, 
         image_url=mat.image_url,
-        date_derniere_vgp=d_vgp # 👈 On enregistre la vraie date
+        date_derniere_vgp=d_vgp 
     )
     db.add(new_m); db.commit(); db.refresh(new_m)
     return new_m
 
-# --- ROUTE MATERIELS (VERSION RÉELLE - SANS SIMULATION) ---
 @app.get("/materiels", response_model=List[schemas.MaterielOut])
 def read_materiels(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     try:
@@ -602,26 +542,22 @@ def read_materiels(skip: int = 0, limit: int = 100, db: Session = Depends(get_db
 
         for row in raw_rows:
             try:
-                # 1. Récupération de la VRAIE date (pas de simulation)
                 date_vgp = getattr(row, "date_derniere_vgp", None)
-                statut = "INCONNU" # Par défaut, c'est gris
+                statut = "INCONNU" 
 
-                # 2. Si une date existe, on calcule le vrai statut
                 if date_vgp:
-                    # Sécurisation format
                     if isinstance(date_vgp, str):
                         try: date_vgp = datetime.fromisoformat(str(date_vgp))
                         except: date_vgp = None
                     
                     if date_vgp:
-                        prochaine = date_vgp + timedelta(days=365) # Règle 1 an
+                        prochaine = date_vgp + timedelta(days=365) 
                         delta = (prochaine - today).days
                         
                         if delta < 0: statut = "NON CONFORME"
                         elif delta < 30: statut = "A PREVOIR"
                         else: statut = "CONFORME"
 
-                # 3. Construction objet
                 ref_value = getattr(row, "reference", getattr(row, "ref_interne", None))
 
                 mat_out = schemas.MaterielOut(
@@ -632,7 +568,7 @@ def read_materiels(skip: int = 0, limit: int = 100, db: Session = Depends(get_db
                     chantier_id=row.chantier_id,
                     date_derniere_vgp=date_vgp,
                     image_url=row.image_url,
-                    statut_vgp=statut # Le vrai statut calculé
+                    statut_vgp=statut 
                 )
                 valid_rows.append(mat_out)
 
@@ -654,7 +590,6 @@ def transfer_materiel(mid: int, chantier_id: Optional[int] = None, db: Session =
     db.commit()
     return {"status": "moved"}
 
-# --- UPDATE MATERIEL (ROBUSTE) ---
 @app.put("/materiels/{mid}", response_model=schemas.MaterielOut)
 def update_materiel(mid: int, mat: schemas.MaterielUpdate, db: Session = Depends(get_db)):
     db_mat = db.query(models.Materiel).filter(models.Materiel.id == mid).first()
@@ -664,20 +599,16 @@ def update_materiel(mid: int, mat: schemas.MaterielUpdate, db: Session = Depends
     update_data = mat.dict(exclude_unset=True)
 
     for key, value in update_data.items():
-        # Gestion de la confusion reference/ref_interne
         if key == "reference" and value:
-            # On vérifie quel champ existe en BDD (sqlite vs pg)
             if hasattr(db_mat, 'reference'): db_mat.reference = value
             elif hasattr(db_mat, 'ref_interne'): db_mat.ref_interne = value
             
         elif key == "chantier_id":
-            # Si on reçoit une chaine vide ou 0, on met NULL (retour dépôt)
             if value == "" or value == 0:
                 db_mat.chantier_id = None
             else:
                 db_mat.chantier_id = value
         
-        # 👇 AJOUTEZ CECI : Gestion de la date VGP
         elif key == "date_derniere_vgp":
             if value and isinstance(value, str):
                 try: setattr(db_mat, key, datetime.fromisoformat(value[:10]))
@@ -685,7 +616,6 @@ def update_materiel(mid: int, mat: schemas.MaterielUpdate, db: Session = Depends
             else:
                 setattr(db_mat, key, value)
 
-        # On ignore 'statut_vgp' car c'est calculé
         elif key == "statut_vgp":
             pass
             
@@ -696,8 +626,6 @@ def update_materiel(mid: int, mat: schemas.MaterielUpdate, db: Session = Depends
     db.commit()
     db.refresh(db_mat)
     
-    # On recalcule le statut VGP à la volée pour le renvoyer correct
-    # (Copie simplifiée de la logique de lecture)
     if hasattr(db_mat, 'date_derniere_vgp') and db_mat.date_derniere_vgp:
         prochaine = db_mat.date_derniere_vgp + timedelta(days=365)
         delta = (prochaine - datetime.now()).days
@@ -758,10 +686,9 @@ def create_rapport(r: schemas.RapportCreate, db: Session = Depends(get_db)):
     new_r = models.Rapport(
         titre=r.titre, description=r.description, chantier_id=r.chantier_id,
         niveau_urgence=r.niveau_urgence, latitude=r.latitude, longitude=r.longitude,
-        photo_url=r.photo_url # Ajusté car schema utilise photo_url
+        photo_url=r.photo_url 
     )
     db.add(new_r); db.commit(); db.refresh(new_r)
-    # Gestion images multiples si supporté
     if hasattr(r, 'image_urls') and r.image_urls:
          for u in r.image_urls: db.add(models.RapportImage(url=u, rapport_id=new_r.id))
          db.commit(); db.refresh(new_r)
@@ -788,14 +715,10 @@ def read_inspections(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(security.get_current_user)
 ):
-    # 1. Check if chantier exists
     chantier = db.query(models.Chantier).filter(models.Chantier.id == chantier_id).first()
     if not chantier:
         raise HTTPException(status_code=404, detail="Chantier introuvable")
-
-    # 2. Retrieve inspections
     inspections = db.query(models.Inspection).filter(models.Inspection.chantier_id == chantier_id).all()
-    
     return inspections
 
 @app.get("/inspections/{iid}/pdf")
@@ -833,7 +756,7 @@ def download_ppsps_pdf(pid: int, db: Session = Depends(get_db)):
     pdf_generator.generate_ppsps_pdf(c, p, path, company=comp)
     return FileResponse(path, media_type='application/pdf')
 
-# --- ROUTES PLAN DE PRÉVENTION (Optimisées) ---
+# --- ROUTES PLAN DE PRÉVENTION ---
 
 @app.get("/chantiers/{cid}/plans-prevention", response_model=List[schemas.PdpOut])
 def read_pdps(cid: int, db: Session = Depends(get_db)):
@@ -841,16 +764,13 @@ def read_pdps(cid: int, db: Session = Depends(get_db)):
 
 @app.post("/plans-prevention", response_model=schemas.PdpOut)
 def create_pdp(p: schemas.PdpCreate, db: Session = Depends(get_db)):
-    # Note: Assurez-vous que schemas.PdpCreate correspond bien à votre schéma (parfois appelé PlanPreventionCreate)
     new_p = models.PlanPrevention(
         chantier_id=p.chantier_id,
         entreprise_utilisatrice=p.entreprise_utilisatrice,
         entreprise_exterieure=p.entreprise_exterieure,
         date_inspection_commune=p.date_inspection_commune,
-        # Utilisation de p.dict() ou accès direct selon votre schéma Pydantic
         risques_interferents=p.risques_interferents, 
         consignes_securite=p.consignes_securite,
-        # Gestion signatures
         signature_eu=getattr(p, 'signature_eu', None),
         signature_ee=getattr(p, 'signature_ee', None)
     )
@@ -862,49 +782,36 @@ def create_pdp(p: schemas.PdpCreate, db: Session = Depends(get_db)):
 @app.get("/plans-prevention/{pid}/pdf")
 def download_pdp_pdf(
     pid: int, 
-    # 👇 1. On accepte le token dans l'URL pour le mobile
     token: str = Query(None), 
     db: Session = Depends(get_db)
 ):
-    # 👇 2. Sécurité Manuelle (Validation du token URL)
     user = None
     if token:
-        payload = security.decode_access_token(token) # Utilise la fonction ajoutée dans security.py
+        payload = security.decode_access_token(token)
         if payload:
             user = db.query(models.User).filter(models.User.email == payload.get("sub")).first()
     
     if not user:
         raise HTTPException(status_code=401, detail="Non authentifié ou token invalide")
 
-    # 3. Récupération des données
     pdp = db.query(models.PlanPrevention).filter(models.PlanPrevention.id == pid).first()
     if not pdp:
         raise HTTPException(status_code=404, detail="Plan de prévention introuvable")
 
     chantier = db.query(models.Chantier).filter(models.Chantier.id == pdp.chantier_id).first()
-    
-    # On récupère l'entreprise liée à l'utilisateur ou au chantier
     company = db.query(models.Company).filter(models.Company.id == user.company_id).first()
 
-    # 4. Génération en MÉMOIRE (Pas de fichier uploads/)
     buffer = BytesIO()
-    
-    # On passe le 'buffer' à la place du chemin de fichier 'path'
-    # ReportLab est intelligent : si on lui donne un buffer, il écrit dedans.
     pdf_generator.generate_pdp_pdf(chantier, pdp, buffer, company=company)
-    
-    # 5. Préparation de l'envoi
     buffer.seek(0)
     filename = f"PDP_{chantier.nom}_{pid}.pdf"
     
     return StreamingResponse(
         buffer, 
         media_type='application/pdf', 
-        # 'inline' permet l'ouverture dans le navigateur mobile
         headers={"Content-Disposition": f"inline; filename={filename}"}
     )
 
-# Modèle pour recevoir l'email du corps de la requête
 class EmailRequest(BaseModel):
     email: str
 
@@ -915,34 +822,28 @@ def send_pdp_email(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(security.get_current_user)
 ):
-    # 1. Récupération des données
     pdp = db.query(models.PlanPrevention).filter(models.PlanPrevention.id == pid).first()
     if not pdp: raise HTTPException(404, detail="PdP introuvable")
     
     chantier = db.query(models.Chantier).filter(models.Chantier.id == pdp.chantier_id).first()
     company = db.query(models.Company).filter(models.Company.id == current_user.company_id).first()
 
-    # 2. Génération du PDF en mémoire (RAM)
     pdf_buffer = BytesIO()
     pdf_generator.generate_pdp_pdf(chantier, pdp, pdf_buffer, company=company)
     pdf_buffer.seek(0)
     pdf_bytes = pdf_buffer.read()
 
-    # 3. Configuration SMTP (A ADAPTER AVEC VOS INFOS)
-    # Pour Gmail : utilisez un "Mot de passe d'application" (App Password), pas votre vrai mot de passe
     SMTP_SERVER = "smtp.gmail.com"
     SMTP_PORT = 587
-    SMTP_USER = "michelgmv7@gmail.com" # 👈 METTEZ VOTRE EMAIL ICI
-    SMTP_PASSWORD = "xzqs zuxm lcma jhfm" # 👈 METTEZ VOTRE MOT DE PASSE D'APPLICATION ICI
+    SMTP_USER = "michelgmv7@gmail.com"
+    SMTP_PASSWORD = "xzqs zuxm lcma jhfm" 
 
     try:
-        # Création du message
         msg = MIMEMultipart()
         msg['Subject'] = f"Plan de Prévention - Chantier {chantier.nom}"
         msg['From'] = SMTP_USER
         msg['To'] = req.email
 
-        # Corps du message
         body = f"""
         Bonjour,
         
@@ -953,15 +854,13 @@ def send_pdp_email(
         """
         msg.attach(MIMEText(body, 'plain'))
 
-        # Pièce jointe (PDF)
         filename = f"PDP_{chantier.nom}.pdf"
         part = MIMEApplication(pdf_bytes, Name=filename)
         part['Content-Disposition'] = f'attachment; filename="{filename}"'
         msg.attach(part)
 
-        # Envoi effectif
         with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
-            server.starttls() # Sécurisation
+            server.starttls()
             server.login(SMTP_USER, SMTP_PASSWORD)
             server.send_message(msg)
 
@@ -981,9 +880,7 @@ def get_pic(cid: int, db: Session = Depends(get_db)):
 @app.post("/chantiers/{cid}/pic")
 def save_pic(cid: int, pic: schemas.PicSchema, db: Session = Depends(get_db)):
     existing_pic = db.query(models.PIC).filter(models.PIC.chantier_id == cid).first()
-    # Gestion elements_data qui peut être dict/list ou str
     elements_str = None
-    # Si le modèle attend 'drawing_data' (comme dans le schéma PicSchema), adaptez ici
     data_source = getattr(pic, 'drawing_data', getattr(pic, 'elements_data', None))
     
     if data_source is not None:
@@ -993,12 +890,9 @@ def save_pic(cid: int, pic: schemas.PicSchema, db: Session = Depends(get_db)):
             elements_str = str(data_source)
 
     if existing_pic:
-        # Adaptation selon modèle DB
-        if hasattr(existing_pic, 'background_url'): existing_pic.background_url = pic.final_url # Ou autre champ
+        if hasattr(existing_pic, 'background_url'): existing_pic.background_url = pic.final_url 
         if hasattr(existing_pic, 'final_url'): existing_pic.final_url = pic.final_url
         if hasattr(existing_pic, 'elements_data'): existing_pic.elements_data = elements_str
-        # Pas de champs détaillés (acces, clotures...) dans le schema PicSchema fourni
-        # On les ignore ou on adapte si le modèle DB les a
     else:
         new_pic = models.PIC(
             chantier_id=cid,
@@ -1014,36 +908,41 @@ def save_pic(cid: int, pic: schemas.PicSchema, db: Session = Depends(get_db)):
 # ==========================================
 # 8. DOCUMENTS EXTERNES, ENTREPRISE & DOE
 # ==========================================
-@app.post("/chantiers/{cid}/documents", response_model=schemas.DocExterneOut)
-def upload_external_doc(cid: int, titre: str, categorie: str, file: UploadFile = File(...), db: Session = Depends(get_db)):
+
+# ⚠️ CORRECTION : Routes unifiées avec le Frontend (/docs au lieu de /documents)
+
+@app.post("/chantiers/{cid}/docs", response_model=schemas.DocExterneOut)
+def upload_chantier_doc(
+    cid: int, 
+    file: UploadFile = File(...), 
+    categorie: str = Form(...), 
+    titre: str = Form(...), 
+    db: Session = Depends(get_db)
+):
     try:
         res = cloudinary.uploader.upload(file.file, folder="conformeo_docs", resource_type="auto")
         url = res.get("secure_url")
     except Exception as e: raise HTTPException(500, f"Erreur Upload: {e}")
+    
     sql = text("INSERT INTO documents_externes (titre, categorie, url, chantier_id, date_ajout) VALUES (:t, :c, :u, :cid, :d) RETURNING id")
     result = db.execute(sql, {"t": titre, "c": categorie, "u": url, "cid": cid, "d": datetime.now()})
     new_id = result.fetchone()[0]
     db.commit()
-    return {"id": new_id, "titre": titre, "categorie": categorie, "url": url, "date_ajout": datetime.now()}
+    
+    return {"id": new_id, "titre": titre, "categorie": categorie, "url": url, "date_ajout": datetime.now(), "chantier_id": cid}
 
-@app.get("/chantiers/{cid}/documents", response_model=List[schemas.DocExterneOut])
-def get_external_docs(cid: int, db: Session = Depends(get_db)):
+@app.get("/chantiers/{cid}/docs", response_model=List[schemas.DocExterneOut])
+def get_chantier_docs(cid: int, db: Session = Depends(get_db)):
     sql = text("SELECT id, titre, categorie, url, date_ajout FROM documents_externes WHERE chantier_id = :cid")
     result = db.execute(sql, {"cid": cid}).fetchall()
-    return [{"id": r[0], "titre": r[1], "categorie": r[2], "url": r[3], "date_ajout": r[4]} for r in result]
+    return [{"id": r[0], "titre": r[1], "categorie": r[2], "url": r[3], "date_ajout": r[4], "chantier_id": cid} for r in result]
 
-@app.delete("/documents/{did}")
-def delete_external_doc(did: int, db: Session = Depends(get_db)):
+@app.delete("/docs/{did}")
+def delete_doc(did: int, db: Session = Depends(get_db)):
     db.execute(text("DELETE FROM documents_externes WHERE id = :did"), {"did": did})
     db.commit()
     return {"status": "deleted"}
 
-from fastapi.staticfiles import StaticFiles # <--- Important pour voir le logo
-
-# Ajoutez ceci si ce n'est pas déjà fait pour lire les images stockées
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
-
-# 1. Route pour mettre à jour les infos (Texte uniquement)
 # --- UPDATE COMPANY (ROBUSTE) ---
 @app.put("/companies/me", response_model=schemas.CompanyOut)
 def update_company(
@@ -1057,12 +956,10 @@ def update_company(
     company = db.query(models.Company).filter(models.Company.id == current_user.company_id).first()
     if not company: raise HTTPException(404, "Entreprise introuvable")
 
-    # On vérifie chaque champ. Si le frontend envoie 'null', on l'ignore pour ne pas écraser la DB avec du vide.
     if comp_update.name: company.name = comp_update.name
     if comp_update.address: company.address = comp_update.address
     if comp_update.phone: company.phone = comp_update.phone
     
-    # Mapping spécial : contact_email (JSON) -> email (DB)
     if comp_update.contact_email: 
         company.email = comp_update.contact_email
     
@@ -1084,30 +981,22 @@ def upload_logo(
 ):
     if not current_user.company_id: raise HTTPException(400, "Pas d'entreprise")
     
-    # 1. Création du dossier uploads s'il n'existe pas
     if not os.path.exists("uploads"):
         os.makedirs("uploads")
     
-    # 2. Nom de fichier propre et unique (force l'extension .png pour simplifier)
-    # On ajoute un timestamp pour éviter que le navigateur garde l'ancien logo en cache
     import time
     timestamp = int(time.time())
     filename = f"logo_{current_user.company_id}_{timestamp}.png"
     file_location = f"uploads/{filename}"
     
-    # 3. Sauvegarde physique
     with open(file_location, "wb+") as file_object:
         shutil.copyfileobj(file.file, file_object)
     
-    # 4. Mise à jour Base de données
     company = db.query(models.Company).filter(models.Company.id == current_user.company_id).first()
-    
-    # Si on avait un ancien logo, on pourrait le supprimer ici pour nettoyer, mais gardons simple
     company.logo_url = file_location 
     db.commit()
     db.refresh(company)
     
-    # Retourne l'URL relative que le frontend pourra utiliser
     return {"url": file_location}
 
 @app.post("/companies/me/documents", response_model=schemas.CompanyDocOut)
@@ -1224,38 +1113,12 @@ async def send_journal_email(cid: int, email_dest: str, db: Session = Depends(ge
     except Exception as e:
         print(e); raise HTTPException(500, "Erreur envoi email")
 
-@app.post("/plans-prevention/{pid}/send-email")
-async def send_pdp_email(pid: int, email_dest: str, db: Session = Depends(get_db)):
-    p = db.query(models.PlanPrevention).filter(models.PlanPrevention.id == pid).first()
-    if not p: raise HTTPException(404, "PdP introuvable")
-    c = db.query(models.Chantier).filter(models.Chantier.id == p.chantier_id).first()
-    comp = get_company_for_chantier(db, c.id)
-
-    filename = f"PdP_{c.nom}_{datetime.now().strftime('%Y%m%d')}.pdf"
-    filename = "".join([c for c in filename if c.isalpha() or c.isdigit() or c in (' ', '.', '_')]).strip()
-    path = f"uploads/{filename}"
-    pdf_generator.generate_pdp_pdf(c, p, path, company=comp)
-
-    html = f"""
-    <p>Bonjour,</p>
-    <p>Veuillez trouver ci-joint le <b>Plan de Prévention</b> concernant le chantier <b>{c.nom}</b>.</p>
-    <p>Cordialement,<br>{comp.name if comp else "L'équipe"}</p>
-    """
-    message = MessageSchema(subject=f"Plan de Prévention - {c.nom}", recipients=[email_dest], body=html, subtype=MessageType.html, attachments=[path])
-    fm = FastMail(mail_conf)
-    try:
-        await fm.send_message(message)
-        return {"message": "Email envoyé avec succès ! 📧"}
-    except Exception as e:
-        print(e); raise HTTPException(500, "Erreur lors de l'envoi de l'email")
-
 @app.get("/companies/me", response_model=schemas.CompanyOut)
 def read_own_company(
     db: Session = Depends(get_db), 
     current_user: models.User = Depends(security.get_current_user)
 ):
     if not current_user.company_id:
-        # Si l'utilisateur n'a pas d'entreprise, on renvoie une 404 que le frontend gérera
         raise HTTPException(status_code=404, detail="Aucune entreprise liée")
         
     company = db.query(models.Company).filter(models.Company.id == current_user.company_id).first()
@@ -1268,14 +1131,12 @@ def read_own_company(
 def create_or_update_duerp(duerp_data: schemas.DUERPCreate, db: Session = Depends(get_db), current_user: models.User = Depends(security.get_current_user)):
     if not current_user.company_id: raise HTTPException(400, "Pas d'entreprise")
     
-    # On cherche s'il existe déjà un DUERP pour cette année
     existing = db.query(models.DUERP).filter(
         models.DUERP.company_id == current_user.company_id, 
         models.DUERP.annee == duerp_data.annee
     ).first()
 
     if existing:
-        # On supprime les anciennes lignes pour remettre les nouvelles (Mise à jour simple)
         db.query(models.DUERPLigne).filter(models.DUERPLigne.duerp_id == existing.id).delete()
         existing.date_mise_a_jour = datetime.now()
         db_duerp = existing
@@ -1285,7 +1146,6 @@ def create_or_update_duerp(duerp_data: schemas.DUERPCreate, db: Session = Depend
         db.commit()
         db.refresh(db_duerp)
 
-    # Ajout des lignes
     for l in duerp_data.lignes:
         new_line = models.DUERPLigne(
             duerp_id=db_duerp.id,
@@ -1306,19 +1166,15 @@ def get_duerp(annee: str, db: Session = Depends(get_db), current_user: models.Us
 @app.get("/companies/me/duerp/{annee}/pdf")
 def download_duerp_pdf(
     annee: str, 
-    # 👇 On accepte le token dans l'URL (Query) OU via le Header (automatique)
     token: str = Query(None),
     db: Session = Depends(get_db),
-    # On rend la dépendance "current_user" optionnelle pour gérer le cas URL manuellement
     current_user: models.User = Depends(security.get_current_user_optional) 
 ):
     user = current_user
 
-    # SI pas d'user via le Header, on essaie via le token URL
     if not user and token:
         try:
-            # On décode manuellement le token de l'URL
-            payload = security.decode_access_token(token) # Assurez-vous que cette fonction existe dans security.py
+            payload = security.decode_access_token(token) 
             if payload:
                  email = payload.get("sub")
                  user = db.query(models.User).filter(models.User.email == email).first()
@@ -1326,11 +1182,9 @@ def download_duerp_pdf(
             print(f"Erreur Token URL: {e}")
             pass
     
-    # Si toujours pas d'user, c'est un piratage -> 401
     if not user:
         raise HTTPException(status_code=401, detail="Non authentifié")
 
-    # 1. Récupération du DUERP
     duerp = db.query(models.DUERP).filter(
         models.DUERP.company_id == user.company_id, 
         models.DUERP.annee == annee
@@ -1339,13 +1193,10 @@ def download_duerp_pdf(
     if not duerp:
         raise HTTPException(status_code=404, detail="DUERP introuvable")
     
-    # 2. Récupération Entreprise & Lignes
     company = db.query(models.Company).filter(models.Company.id == user.company_id).first()
     lignes = db.query(models.DUERPLigne).filter(models.DUERPLigne.duerp_id == duerp.id).all()
     
-    # 3. Génération
     pdf_buffer = pdf_generator.generate_duerp_pdf(duerp, company, lignes)
-    
     filename = f"DUERP_{annee}.pdf"
     
     return StreamingResponse(
@@ -1365,7 +1216,6 @@ def read_tasks(chantier_id: int, db: Session = Depends(get_db)):
 def get_risk_analysis(description: str):
     desc = description.lower()
     
-    # Règle 1 : Hauteur (Déclenche DUERP)
     if any(x in desc for x in ["toiture", "charpente", "échelle", "échafaudage", "nacelle", "hauteur", "bardage"]):
         return {
             "type_alert": "DUERP",
@@ -1378,7 +1228,6 @@ def get_risk_analysis(description: str):
             }
         }
 
-    # Règle 2 : Feu (Déclenche Permis Feu + DUERP)
     if any(x in desc for x in ["soudure", "meuleuse", "chalumeau", "étincelle", "feu", "découpe"]):
         return {
             "type_alert": "PERMIS_FEU",
@@ -1391,7 +1240,6 @@ def get_risk_analysis(description: str):
             }
         }
         
-    # Règle 3 : Poussières / Amiante / Chimique
     if any(x in desc for x in ["amiante", "démolition", "perçage", "ponçage", "béton", "silice", "chimique"]):
         return {
             "type_alert": "EPI",
@@ -1404,7 +1252,6 @@ def get_risk_analysis(description: str):
             }
         }
     
-    # Règle 4 : Électricité
     if any(x in desc for x in ["câblage", "tableau", "électrique", "tension", "raccordement"]):
         return {
             "type_alert": "EPI",
@@ -1419,43 +1266,34 @@ def get_risk_analysis(description: str):
 
     return None
 
-# --- ROUTE CRÉATION TÂCHE (INTELLIGENTE + ÉCRITURE BDD) ---
 @app.post("/tasks", response_model=schemas.TaskOut)
 def create_task(task: schemas.TaskCreate, db: Session = Depends(get_db)):
-    # 1. Création standard de la tâche
     db_task = models.Task(**task.dict())
     db.add(db_task)
     db.commit()
     db.refresh(db_task)
     
-    # 2. Analyse Intelligence
     analysis = get_risk_analysis(db_task.description)
     
     if analysis:
-        # A. On prépare la réponse pour le Mobile (Toast/Popup)
         setattr(db_task, "alert_message", analysis["msg"])
         setattr(db_task, "alert_type", analysis["type_alert"])
         
-        # B. AUTOMATISATION DUERP : On écrit dans la base de données !
-        # On récupère le chantier pour trouver l'entreprise
         chantier = db.query(models.Chantier).filter(models.Chantier.id == task.chantier_id).first()
         
         if chantier and chantier.company_id:
-            # Chercher le DUERP de l'année en cours
             annee_courante = str(datetime.now().year)
             duerp = db.query(models.DUERP).filter(
                 models.DUERP.company_id == chantier.company_id,
                 models.DUERP.annee == annee_courante
             ).first()
             
-            # Si pas de DUERP pour cette année, on le crée
             if not duerp:
                 duerp = models.DUERP(company_id=chantier.company_id, annee=annee_courante)
                 db.add(duerp)
                 db.commit()
                 db.refresh(duerp)
             
-            # C. Éviter les doublons : On vérifie si ce risque existe déjà pour cette tâche exacte
             risk_data = analysis["data"]
             existing_line = db.query(models.DUERPLigne).filter(
                 models.DUERPLigne.duerp_id == duerp.id,
@@ -1463,12 +1301,11 @@ def create_task(task: schemas.TaskCreate, db: Session = Depends(get_db)):
             ).first()
             
             if not existing_line:
-                # Ajout de la ligne automatique
                 ligne = models.DUERPLigne(
                     duerp_id=duerp.id,
-                    tache=db_task.description,     # Ex: "Pose toiture"
-                    risque=risk_data["risque"],    # Ex: "Chute de hauteur"
-                    gravite=risk_data["gravite"],  # Ex: 4
+                    tache=db_task.description,     
+                    risque=risk_data["risque"],    
+                    gravite=risk_data["gravite"],  
                     mesures_a_realiser=risk_data["mesures_a_realiser"],
                     mesures_realisees=risk_data["mesures_realisees"]
                 )
@@ -1479,13 +1316,11 @@ def create_task(task: schemas.TaskCreate, db: Session = Depends(get_db)):
     return db_task
         
 
-# --- UPDATE TASK (ROBUSTE) ---
 @app.put("/tasks/{task_id}", response_model=schemas.TaskOut)
 def update_task(task_id: int, task_update: schemas.TaskUpdate, db: Session = Depends(get_db)):
     task = db.query(models.Task).filter(models.Task.id == task_id).first()
     if not task: raise HTTPException(404, "Tâche introuvable")
     
-    # Nettoyage des données reçues (au cas où "null", "", etc)
     update_data = task_update.dict(exclude_unset=True)
 
     if "description" in update_data and update_data["description"]: 
@@ -1502,7 +1337,7 @@ def update_task(task_id: int, task_update: schemas.TaskUpdate, db: Session = Dep
             try:
                 task.date_prevue = datetime.fromisoformat(val[:10])
             except:
-                pass # On laisse l'ancienne ou None
+                pass 
         else:
             task.date_prevue = val
     
@@ -1521,7 +1356,6 @@ def delete_task(task_id: int, db: Session = Depends(get_db)):
 # --- ROUTE PERMIS DE FEU ---
 @app.post("/permis-feu", response_model=schemas.PermisFeuOut)
 def create_permis_feu(permis: schemas.PermisFeuCreate, db: Session = Depends(get_db)):
-    # 1. Création en BDD
     db_permis = models.PermisFeu(**permis.dict())
     db.add(db_permis)
     db.commit()
@@ -1529,7 +1363,6 @@ def create_permis_feu(permis: schemas.PermisFeuCreate, db: Session = Depends(get
     
     return db_permis
 
-# --- ROUTE POUR RÉCUPÉRER LES PERMIS D'UN CHANTIER ---
 @app.get("/chantiers/{chantier_id}/permis-feu", response_model=List[schemas.PermisFeuOut])
 def read_permis_feu(chantier_id: int, db: Session = Depends(get_db)):
     permis = db.query(models.PermisFeu).filter(models.PermisFeu.chantier_id == chantier_id).all()
@@ -1537,17 +1370,14 @@ def read_permis_feu(chantier_id: int, db: Session = Depends(get_db)):
 
 @app.get("/permis-feu/{permis_id}/pdf")
 def get_permis_pdf_route(permis_id: int, db: Session = Depends(get_db)):
-    # 1. Récupération des données
     permis = db.query(models.PermisFeu).filter(models.PermisFeu.id == permis_id).first()
     if not permis:
         raise HTTPException(status_code=404, detail="Permis introuvable")
     
     chantier = db.query(models.Chantier).filter(models.Chantier.id == permis.chantier_id).first()
     
-    # 2. Appel du générateur externe (Code propre !)
     pdf_buffer = generate_permis_pdf(permis, chantier)
     
-    # 3. Envoi du fichier
     filename = f"Permis_Feu_{permis_id}.pdf"
     return StreamingResponse(
         pdf_buffer, 
@@ -1576,7 +1406,7 @@ def migrate_docs_ext(db: Session = Depends(get_db)):
                 titre VARCHAR NOT NULL,
                 categorie VARCHAR NOT NULL,
                 url VARCHAR NOT NULL,
-                chantier_id INTEGER REFERENCES chantiers(id),
+                chantier_id INTEGER REFERENCES chantiers_v2(id),
                 date_ajout TIMESTAMP DEFAULT NOW()
             )
         """))
@@ -1630,10 +1460,10 @@ def debug_fix_pic(db: Session = Depends(get_db)):
 def fix_everything(db: Session = Depends(get_db)):
     logs = []
     corrections = [
-        ("chantiers", "signature_url", "VARCHAR"),
-        ("chantiers", "cover_url", "VARCHAR"),
-        ("chantiers", "latitude", "FLOAT"), ("chantiers", "longitude", "FLOAT"),
-        ("chantiers", "soumis_sps", "BOOLEAN DEFAULT FALSE"),
+        ("chantiers_v2", "signature_url", "VARCHAR"),
+        ("chantiers_v2", "cover_url", "VARCHAR"),
+        ("chantiers_v2", "latitude", "FLOAT"), ("chantiers_v2", "longitude", "FLOAT"),
+        ("chantiers_v2", "soumis_sps", "BOOLEAN DEFAULT FALSE"),
         ("pics", "acces", "VARCHAR DEFAULT ''"), ("pics", "clotures", "VARCHAR DEFAULT ''"),
         ("pics", "base_vie", "VARCHAR DEFAULT ''"), ("pics", "stockage", "VARCHAR DEFAULT ''"),
         ("pics", "dechets", "VARCHAR DEFAULT ''"), ("pics", "levage", "VARCHAR DEFAULT ''"),
@@ -1653,14 +1483,12 @@ def fix_everything(db: Session = Depends(get_db)):
 @app.get("/fix_users_table")
 def fix_users_table(db: Session = Depends(get_db)):
     try:
-        # Ajoute la colonne 'nom' si elle n'existe pas
         db.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS nom VARCHAR"))
         db.commit()
         return {"message": "✅ Colonne 'nom' ajoutée à la table Users !"}
     except Exception as e:
         return {"error": str(e)}
 
-# N'oubliez pas de lancer /fix_everything pour créer la table si vous n'avez pas Alembic
 @app.get("/fix_permis_feu_table")
 def fix_permis_table(db: Session = Depends(get_db)):
     models.Base.metadata.create_all(bind=engine)
@@ -1669,7 +1497,6 @@ def fix_permis_table(db: Session = Depends(get_db)):
 @app.get("/fix_company_docs_signature")
 def fix_company_docs_signature(db: Session = Depends(get_db)):
     try:
-        # Ajout des colonnes pour la signature
         db.execute(text("ALTER TABLE company_documents ADD COLUMN IF NOT EXISTS signature_url VARCHAR"))
         db.execute(text("ALTER TABLE company_documents ADD COLUMN IF NOT EXISTS nom_signataire VARCHAR"))
         db.commit()
@@ -1680,22 +1507,19 @@ def fix_company_docs_signature(db: Session = Depends(get_db)):
 @app.post("/companies/documents/{doc_id}/sign")
 def sign_company_doc(
     doc_id: int, 
-    payload: dict, # On attend { "signature_url": "...", "nom_signataire": "..." }
+    payload: dict, 
     db: Session = Depends(get_db),
     current_user: models.User = Depends(security.get_current_user)
 ):
     if not current_user.company_id:
         raise HTTPException(400, "Pas d'entreprise")
     
-    # On cherche le document
-    # Note: On vérifie que le document appartient bien à l'entreprise de l'utilisateur
     sql = text("SELECT id FROM company_documents WHERE id = :did AND company_id = :cid")
     doc = db.execute(sql, {"did": doc_id, "cid": current_user.company_id}).first()
     
     if not doc:
         raise HTTPException(404, "Document introuvable")
 
-    # Mise à jour
     update_sql = text("""
         UPDATE company_documents 
         SET signature_url = :url, nom_signataire = :nom 
@@ -1712,8 +1536,6 @@ def sign_company_doc(
 @app.get("/fix_vgp_database")
 def fix_vgp_database(db: Session = Depends(get_db)):
     try:
-        # Cette commande SQL force l'ajout de la colonne dans la vraie table
-        # On utilise TIMESTAMP pour être compatible avec le format datetime de Python
         db.execute(text("ALTER TABLE materiels ADD COLUMN IF NOT EXISTS date_derniere_vgp TIMESTAMP"))
         db.commit()
         return {"message": "✅ SUCCÈS : Colonne date_derniere_vgp ajoutée à la base de données !"}
@@ -1721,30 +1543,24 @@ def fix_vgp_database(db: Session = Depends(get_db)):
         return {"error": f"Erreur lors de la migration : {str(e)}"}
     
 
-
-
 # ==========================================
 # 🔄 MIGRATION CHANTIERS (ANCIEN -> NOUVEAU)
 # ==========================================
 
-
 @app.get("/system/migrate-chantiers")
 def migrate_chantiers_data(db: Session = Depends(get_db)):
     try:
-        # 1. Lire les anciens chantiers
         old_items = db.query(models.OldChantier).all()
         count = 0
         errors = 0
         
         for item in old_items:
-            # 2. Vérifier si l'ID existe déjà dans la nouvelle table v2
             exists = db.query(models.Chantier).filter(models.Chantier.id == item.id).first()
             
             if not exists:
                 try:
-                    # 3. Copier dans la nouvelle table
                     new_chantier = models.Chantier(
-                        id=item.id, # IMPORTANT : On garde le même ID pour ne pas casser les liens !
+                        id=item.id,
                         nom=item.nom,
                         adresse=item.adresse,
                         client=item.client,
@@ -1758,8 +1574,6 @@ def migrate_chantiers_data(db: Session = Depends(get_db)):
                         date_fin=item.date_fin,
                         statut_planning=item.statut_planning,
                         company_id=item.company_id,
-                        
-                        # 👇 La nouvelle colonne (valeur par défaut)
                         soumis_sps=False 
                     )
                     
@@ -1769,7 +1583,6 @@ def migrate_chantiers_data(db: Session = Depends(get_db)):
                     print(f"Erreur chantier {item.id}: {e}")
                     errors += 1
         
-        # 4. Valider
         db.commit()
         
         return {
@@ -1785,9 +1598,7 @@ def migrate_chantiers_data(db: Session = Depends(get_db)):
     
 @app.get("/system/debug-counts")
 def debug_counts(db: Session = Depends(get_db)):
-    # Compte dans l'ancienne table (sauvegarde)
     old_count = db.query(models.OldChantier).count()
-    # Compte dans la nouvelle table (visible appli)
     new_count = db.query(models.Chantier).count()
     
     return {
@@ -1796,39 +1607,12 @@ def debug_counts(db: Session = Depends(get_db)):
         "status": "Si ANCIENNE > NOUVELLE, il manque des données."
     }
 
-# ==========================================
-# 🛠️ FIX : RÉATTRIBUER TOUS LES CHANTIERS À MOI
-# ==========================================
-# @app.get("/system/assign-all-chantiers-to-me")
-# def assign_all_to_me(
-#     db: Session = Depends(get_db),
-#     # On a besoin de savoir qui vous êtes pour récupérer votre ID entreprise
-#     current_user: models.User = Depends(security.get_current_user) 
-# ):
-#     if not current_user.company_id:
-#         return {"error": "Votre utilisateur n'est lié à aucune entreprise !"}
-
-#     # 1. Mise à jour de TOUS les chantiers vers votre Company ID
-#     result = db.query(models.Chantier).update(
-#         {models.Chantier.company_id: current_user.company_id},
-#         synchronize_session=False
-#     )
-    
-#     db.commit()
-    
-#     return {
-#         "status": "Succès",
-#         "message": f"{result} chantiers sont maintenant visibles pour l'entreprise {current_user.company_id}",
-#         "user": current_user.email
-#     }
-
 # Version modifiée pour accepter le ?token=... dans l'URL
 @app.get("/system/assign-all-chantiers-to-me")
 def assign_all_to_me(
     token: str = Query(None), # 👈 Ajout
     db: Session = Depends(get_db)
 ):
-    # Auth manuelle rapide
     user = None
     if token:
         payload = security.decode_access_token(token)
@@ -1838,7 +1622,6 @@ def assign_all_to_me(
     if not user or not user.company_id:
         return {"error": "Non authentifié ou pas d'entreprise"}
 
-    # Update
     result = db.query(models.Chantier).update(
         {models.Chantier.company_id: user.company_id},
         synchronize_session=False
@@ -1852,7 +1635,6 @@ def force_activate_all(
     token: str = Query(None), 
     db: Session = Depends(get_db)
 ):
-    # Auth manuelle
     user = None
     if token:
         payload = security.decode_access_token(token)
@@ -1861,7 +1643,6 @@ def force_activate_all(
             
     if not user: return {"error": "Token invalide"}
 
-    # On force TOUS les chantiers de l'entreprise à "est_actif = True"
     result = db.query(models.Chantier).filter(
         models.Chantier.company_id == user.company_id
     ).update(
@@ -1871,34 +1652,3 @@ def force_activate_all(
     
     db.commit()
     return {"status": "Succès", "chantiers_reactives": result}
-
-# ==========================================
-# ⚡️ FIX : FORCER TOUT EN "ACTIF"
-# ==========================================
-@app.get("/system/force-activate-all")
-def force_activate_all(
-    token: str = Query(None), 
-    db: Session = Depends(get_db)
-):
-    # 1. Auth rapide
-    user = None
-    if token:
-        payload = security.decode_access_token(token)
-        if payload:
-            user = db.query(models.User).filter(models.User.email == payload.get("sub")).first()
-            
-    if not user: return {"error": "Token invalide ou utilisateur introuvable"}
-
-    # 2. Mise à jour massive : Tout le monde devient ACTIF (True)
-    result = db.query(models.Chantier).filter(
-        models.Chantier.company_id == user.company_id
-    ).update(
-        {models.Chantier.est_actif: True}, 
-        synchronize_session=False
-    )
-    
-    db.commit()
-    return {
-        "status": "Succès", 
-        "message": f"{result} chantiers sont maintenant ACTIFS (En cours) 🟢"
-    }
