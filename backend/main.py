@@ -1819,3 +1819,28 @@ def assign_all_to_me(
     db.commit()
     
     return {"status": "Succès", "chantiers_recuperes": result}
+
+@app.get("/system/force-activate-all")
+def force_activate_all(
+    token: str = Query(None), 
+    db: Session = Depends(get_db)
+):
+    # Auth manuelle
+    user = None
+    if token:
+        payload = security.decode_access_token(token)
+        if payload:
+            user = db.query(models.User).filter(models.User.email == payload.get("sub")).first()
+            
+    if not user: return {"error": "Token invalide"}
+
+    # On force TOUS les chantiers de l'entreprise à "est_actif = True"
+    result = db.query(models.Chantier).filter(
+        models.Chantier.company_id == user.company_id
+    ).update(
+        {models.Chantier.est_actif: True}, 
+        synchronize_session=False
+    )
+    
+    db.commit()
+    return {"status": "Succès", "chantiers_reactives": result}
