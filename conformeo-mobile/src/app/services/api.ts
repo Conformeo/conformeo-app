@@ -301,14 +301,14 @@ export class ApiService {
     return this.http.put(`${this.apiUrl}/companies/me`, data, this.getOptions());
   }
 
-  // Uploader le logo (Notez l'absence de headers manuels, Angular gère le Multipart)
+  // Uploader le logo (Angular gère le Content-Type Multipart)
   uploadLogo(file: File): Observable<any> {
     const formData = new FormData();
     formData.append('file', file);
     
-    // On doit passer le token, mais PAS le Content-Type (le navigateur le fera)
+    const token = localStorage.getItem('access_token');
     const headers = new HttpHeaders({
-      'Authorization': `Bearer ${this.token}`
+      'Authorization': `Bearer ${token}`
     });
 
     return this.http.post(`${this.apiUrl}/companies/me/logo`, formData, { headers });
@@ -325,13 +325,27 @@ export class ApiService {
     formData.append('type_doc', type_doc);
     if (date_expiration) formData.append('date_expiration', date_expiration);
 
-    const headers = this.getOptions().headers?.delete('Content-Type'); 
+    // IMPORTANT : On retire le Content-Type 'application/json' pour laisser le navigateur mettre le boundary
+    const token = localStorage.getItem('access_token');
+    const headers = new HttpHeaders({
+      'Authorization': `Bearer ${token}`
+    });
+
     return this.http.post<CompanyDoc>(`${this.apiUrl}/companies/me/documents`, formData, { headers });
   }
 
   deleteCompanyDoc(docId: number): Observable<any> {
     return this.http.delete(`${this.apiUrl}/companies/me/documents/${docId}`, this.getOptions());
   }
+
+  // 👇 AJOUT POUR LA SIGNATURE
+  // signCompanyDoc(docId: number, nomSignataire: string, signatureUrl: string): Observable<any> {
+  //   return this.http.post(
+  //     `${this.apiUrl}/companies/documents/${docId}/sign`,
+  //     { nom_signataire: nomSignataire, signature_url: signatureUrl },
+  //     this.getOptions()
+  //   );
+  // }
 
   // ==========================================
   // 🏗️ CHANTIERS

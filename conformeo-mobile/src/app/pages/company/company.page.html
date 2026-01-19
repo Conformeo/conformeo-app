@@ -2,17 +2,20 @@
   <ion-toolbar color="primary">
     <ion-buttons slot="start">
       <ion-menu-button auto-hide="false"></ion-menu-button>
+      <ion-back-button defaultHref="/home"></ion-back-button>
     </ion-buttons>
     <ion-title>Mon Entreprise</ion-title>
   </ion-toolbar>
   
   <ion-toolbar color="primary">
-    <ion-segment [(ngModel)]="segment" value="docs" color="light">
-      <ion-segment-button value="docs">
-        <ion-label>GED <ion-icon *ngIf="hasExpiredDocs" name="warning" color="warning"></ion-icon></ion-label>
-      </ion-segment-button>
+    <ion-segment [(ngModel)]="segment" color="light">
       <ion-segment-button value="infos">
         <ion-label>Infos</ion-label>
+      </ion-segment-button>
+      <ion-segment-button value="docs">
+        <ion-label>
+          GED <ion-icon *ngIf="hasExpiredDocs" name="warning" color="warning" style="vertical-align: sub;"></ion-icon>
+        </ion-label>
       </ion-segment-button>
     </ion-segment>
   </ion-toolbar>
@@ -21,15 +24,16 @@
 <ion-content class="bg-light ion-padding">
 
   <div *ngIf="segment === 'docs'">
+    
     <div class="alert-banner" *ngIf="hasExpiredDocs">
       <ion-icon name="warning"></ion-icon>
-      <span>Certains documents sont périmés !</span>
+      <span>Attention : Certains documents sont périmés !</span>
     </div>
 
     <div class="ion-padding-bottom">
-      <ion-button expand="block" color="tertiary" [routerLink]="['/duerp-form']" style="margin-bottom: 15px;">
+      <ion-button expand="block" color="tertiary" routerLink="/duerp-form" style="margin-bottom: 15px; --border-radius: 12px;">
         <ion-icon name="list" slot="start"></ion-icon>
-        Gérer le DUERP (Digital)
+        Gérer le DUERP (Document Unique)
         <ion-icon name="chevron-forward" slot="end"></ion-icon>
       </ion-button>
     </div>
@@ -43,12 +47,14 @@
           <ion-label>
             <h2>{{ doc.titre }}</h2>
             <p><ion-badge color="light">{{ doc.type_doc }}</ion-badge></p>
-            <div *ngIf="doc.date_expiration" class="exp-badge">
+            
+            <div *ngIf="doc.date_expiration" class="expiration-badge">
               <ion-badge [color]="getExpirationStatus(doc.date_expiration).color">
                 {{ getExpirationStatus(doc.date_expiration).text }}
               </ion-badge>
             </div>
           </ion-label>
+          
           <div slot="end">
             <ion-button fill="clear" color="dark" (click)="signDocument(doc)">
               <ion-icon name="pencil" slot="icon-only"></ion-icon>
@@ -58,6 +64,7 @@
             </ion-button>
           </div>
         </ion-item>
+
         <ion-item-options side="end">
           <ion-item-option color="danger" (click)="deleteDoc(doc)">
             <ion-icon name="trash" slot="icon-only"></ion-icon>
@@ -69,6 +76,7 @@
     <div *ngIf="docs.length === 0 && !isLoading" class="empty-state">
       <ion-icon name="folder-open" color="medium"></ion-icon>
       <p>Aucun document pour le moment.</p>
+      <p class="sub">Ajoutez votre Kbis, Assurance, etc.</p>
     </div>
 
     <ion-fab vertical="bottom" horizontal="end" slot="fixed">
@@ -79,7 +87,7 @@
   </div>
 
   <div *ngIf="segment === 'infos' && company">
-    <ion-card class="info-card">
+    <ion-card class="ios-card">
       <ion-card-content>
         
         <div class="logo-container">
@@ -90,12 +98,12 @@
                (dragleave)="onLogoDragLeave($event)"
                (drop)="onLogoDrop($event)">
             
-            <img *ngIf="company.logo_url" 
-                 [src]="company.logo_url.startsWith('data') ? company.logo_url : api.apiUrl + '/' + company.logo_url" 
+            <img *ngIf="company.logo_url_display" 
+                 [src]="company.logo_url_display" 
                  class="logo-preview" 
-                 onError="this.style.display='none'"/>
+                 alt="Logo Entreprise"/>
             
-            <div *ngIf="!company.logo_url" class="placeholder-logo">
+            <div *ngIf="!company.logo_url_display" class="placeholder-logo">
                <ion-icon name="image" style="font-size: 40px; color: #ccc;"></ion-icon>
             </div>
 
@@ -110,25 +118,36 @@
         
         <ion-list lines="full">
           <ion-item>
+            <ion-icon name="business" slot="start" color="medium"></ion-icon>
             <ion-input label="Nom Société" labelPlacement="stacked" [(ngModel)]="company.name"></ion-input>
           </ion-item>
           <ion-item>
+            <ion-icon name="location" slot="start" color="medium"></ion-icon>
             <ion-input label="Adresse" labelPlacement="stacked" [(ngModel)]="company.address"></ion-input>
           </ion-item>
           <ion-item>
-            <ion-input label="Email Contact" labelPlacement="stacked" [(ngModel)]="company.contact_email"></ion-input>
+            <ion-icon name="mail" slot="start" color="medium"></ion-icon>
+            <ion-input label="Email Contact" labelPlacement="stacked" [(ngModel)]="company.contact_email" type="email"></ion-input>
           </ion-item>
           <ion-item>
-            <ion-input label="Téléphone" labelPlacement="stacked" [(ngModel)]="company.phone"></ion-input>
+            <ion-icon name="call" slot="start" color="medium"></ion-icon>
+            <ion-input label="Téléphone" labelPlacement="stacked" [(ngModel)]="company.phone" type="tel"></ion-input>
           </ion-item>
         </ion-list>
         
-        <ion-button expand="block" class="ion-margin-top" (click)="saveInfos()">Enregistrer les modifications</ion-button>
+        <ion-button expand="block" size="large" class="ion-margin-top" (click)="saveInfos()">
+          Enregistrer les modifications
+        </ion-button>
+
+        <div class="footer-note ion-text-center ion-padding-top">
+          Ces informations apparaîtront sur vos rapports PDF.
+        </div>
+
       </ion-card-content>
     </ion-card>
   </div>
 
-  <ion-modal [isOpen]="isUploadModalOpen" (didDismiss)="closeUploadModal()" [initialBreakpoint]="0.75" [breakpoints]="[0, 0.75]">
+  <ion-modal [isOpen]="isUploadModalOpen" (didDismiss)="closeUploadModal()" [initialBreakpoint]="0.85" [breakpoints]="[0, 0.85]">
     <ng-template>
       <ion-header>
         <ion-toolbar>
@@ -137,23 +156,24 @@
         </ion-toolbar>
       </ion-header>
       <ion-content class="ion-padding">
+        
         <ion-item fill="outline" class="mb-15">
           <ion-label position="floating">Titre du document</ion-label>
-          <ion-input [(ngModel)]="newDoc.titre"></ion-input>
+          <ion-input [(ngModel)]="newDoc.titre" placeholder="Ex: Assurance 2025"></ion-input>
         </ion-item>
         
         <ion-item fill="outline" class="mb-15">
           <ion-label>Type de document</ion-label>
           <ion-select [(ngModel)]="newDoc.type_doc" interface="popover">
-            <ion-select-option value="DUERP">🛡️ DUERP (Scan PDF)</ion-select-option>
             <ion-select-option value="ASSURANCE">📄 Assurance Décennale</ion-select-option>
             <ion-select-option value="KBIS">🏢 Kbis</ion-select-option>
+            <ion-select-option value="DUERP">🛡️ DUERP (Scan)</ion-select-option>
             <ion-select-option value="AUTRE">📂 Autre</ion-select-option>
           </ion-select>
         </ion-item>
         
         <ion-item fill="outline" class="mb-15">
-          <ion-label>Date d'Expiration</ion-label>
+          <ion-label>Date d'Expiration (Optionnel)</ion-label>
           <ion-datetime-button datetime="datetime"></ion-datetime-button>
           <ion-modal [keepContentsMounted]="true">
             <ng-template>
@@ -163,12 +183,12 @@
         </ion-item>
 
         <div class="file-box" (click)="fileInput.click()" [class.has-file]="selectedFile">
-          <input #fileInput type="file" (change)="onFileSelected($event)" hidden accept=".pdf,.jpg,.png">
+          <input #fileInput type="file" (change)="onFileSelected($event)" hidden accept=".pdf,.jpg,.png,.jpeg">
           <ion-icon [name]="selectedFile ? 'document-text' : 'cloud-upload'" size="large"></ion-icon>
-          <p>{{ selectedFile ? selectedFile.name : 'Choisir un fichier (PDF, JPG)' }}</p>
+          <p>{{ selectedFile ? selectedFile.name : 'Cliquez pour choisir un fichier (PDF, JPG)' }}</p>
         </div>
 
-        <ion-button expand="block" class="ion-margin-top" (click)="uploadDoc()" [disabled]="!selectedFile || !newDoc.titre">
+        <ion-button expand="block" size="large" class="ion-margin-top" (click)="uploadDoc()" [disabled]="!selectedFile || !newDoc.titre">
           Uploader le document
         </ion-button>
       </ion-content>
