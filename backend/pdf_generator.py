@@ -29,31 +29,38 @@ def get_optimized_image(path_or_url):
             # Gestion Cloudinary ou URL externe
             optimized_url = path_or_url
             if "cloudinary.com" in path_or_url and "/upload/" in path_or_url:
+                # On demande une image optimisée (largeur 1000px max, qualité auto)
                 optimized_url = path_or_url.replace("/upload/", "/upload/w_1000,q_auto,f_jpg/")
+            
             response = requests.get(optimized_url, stream=True, timeout=5)
             if response.status_code == 200:
                 return Image.open(BytesIO(response.content))
         else:
             # Gestion fichier local (Uploads)
+            # On nettoie le chemin (parfois stocké avec un slash devant)
             clean_path = path_or_url.strip("/")
+            
             possible_paths = [
                 clean_path,
                 os.path.join("uploads", os.path.basename(clean_path)),
                 os.path.join(os.getcwd(), clean_path)
             ]
+            
             for p in possible_paths:
                 if os.path.exists(p):
                     return Image.open(p)
+                    
     except Exception as e:
         print(f"❌ Erreur image: {e}")
     return None
 
 def draw_footer(c, width, height, chantier, titre_doc):
-    """Pied de page"""
+    """Pied de page standardisé"""
     c.saveState()
     footer_y = 2 * cm 
     c.setStrokeColorRGB(0.8, 0.8, 0.8); c.setLineWidth(0.5)
     c.line(1*cm, footer_y + 0.5*cm, width-1*cm, footer_y + 0.5*cm)
+    
     c.setFont(FONT_TEXT, 8); c.setFillColorRGB(0.5, 0.5, 0.5)
     c.drawString(1*cm, footer_y, f"Conforméo - {titre_doc} - {chantier.nom}")
     c.drawRightString(width-1*cm, footer_y, f"Page {c.getPageNumber()}")
@@ -72,14 +79,17 @@ def draw_cover_page(c, chantier, titre_principal, sous_titre, company=None):
     if logo_source:
         img = get_optimized_image(logo_source)
         if img:
+            # Dimensions max du logo
             max_im_w = 12 * cm
             max_im_h = 8 * cm
             iw, ih = img.size
             ratio = min(max_im_w/iw, max_im_h/ih)
             new_w = iw * ratio
             new_h = ih * ratio
+            
             pos_x = (width - new_w) / 2
             pos_y = logo_center_y - (new_h / 2)
+            
             try:
                 c.drawImage(ImageReader(img), pos_x, pos_y, width=new_w, height=new_h, mask='auto', preserveAspectRatio=True)
             except: pass
@@ -88,16 +98,17 @@ def draw_cover_page(c, chantier, titre_principal, sous_titre, company=None):
     y_text = logo_center_y - 5 * cm 
     c.setFillColorRGB(*COLOR_PRIMARY); c.setFont(FONT_TITLE, 24)
     c.drawCentredString(width/2, y_text, titre_principal)
+    
     y_text -= 1.2 * cm
     c.setFillColorRGB(*COLOR_SECONDARY); c.setFont(FONT_TEXT, 14)
     c.drawCentredString(width/2, y_text, sous_titre)
     
-    # 3. Ligne
+    # 3. Ligne de séparation
     y_text -= 2 * cm
     c.setStrokeColorRGB(0.8, 0.8, 0.8); c.setLineWidth(0.5)
     c.line(2*cm, y_text, width-2*cm, y_text)
 
-    # 4. Infos
+    # 4. Infos Chantier
     y_info = y_text - 3 * cm
     x_labels = 2 * cm 
     x_values = 6 * cm 
@@ -116,9 +127,11 @@ def draw_cover_page(c, chantier, titre_principal, sous_titre, company=None):
         c.drawString(x_labels, y_info, "RÉALISÉ PAR :")
         c.setFont(FONT_TEXT, 12); c.drawString(x_values, y_info, company.name)
 
+    # Date génération
     date_str = datetime.now().strftime('%d/%m/%Y')
     c.setFont(FONT_TEXT, 10); c.setFillColorRGB(0.5, 0.5, 0.5)
     c.drawRightString(width-2*cm, y_info, f"Édité le {date_str}")
+    
     c.showPage()
 
 # ==========================================
@@ -165,16 +178,21 @@ def generate_pdf(chantier, rapports, inspections, output_path, company=None):
             if hasattr(rap, 'images') and rap.images: imgs = [i.url for i in rap.images]
             elif hasattr(rap, 'photo_url') and rap.photo_url: imgs = [rap.photo_url]
 
+            # Grille 2 colonnes pour les images
             img_w, img_h, gap = 8*cm, 6*cm, 1*cm
             for i in range(0, len(imgs), 2):
                 check_space(img_h + 0.5*cm)
+                
+                # Image 1
                 url1 = imgs[i]
                 pil1 = get_optimized_image(url1)
                 if pil1:
                     try:
-                        pil1 = ImageOps.exif_transpose(pil1)
+                        pil1 = ImageOps.exif_transpose(pil1) # Rotation auto selon EXIF
                         c.drawImage(ImageReader(pil1), margin, y-img_h, width=img_w, height=img_h, preserveAspectRatio=True)
                     except: pass
+                
+                # Image 2 (si existe)
                 if i+1 < len(imgs):
                     url2 = imgs[i+1]
                     pil2 = get_optimized_image(url2)
@@ -183,7 +201,9 @@ def generate_pdf(chantier, rapports, inspections, output_path, company=None):
                             pil2 = ImageOps.exif_transpose(pil2)
                             c.drawImage(ImageReader(pil2), margin+img_w+gap, y-img_h, width=img_w, height=img_h, preserveAspectRatio=True)
                         except: pass
+                
                 y -= (img_h + 0.5*cm)
+            
             y -= 0.5*cm
 
     # --- INSPECTIONS ---
@@ -218,6 +238,7 @@ def generate_pdf(chantier, rapports, inspections, output_path, company=None):
                 y -= 0.5*cm
             y -= 0.5*cm
 
+    # --- SIGNATURE ---
     check_space(5*cm)
     y -= 1*cm; c.setStrokeColorRGB(0,0,0); c.setLineWidth(1)
     c.line(margin, y, width-margin, y)
@@ -438,6 +459,7 @@ def generate_pdp_pdf(chantier, pdp, output_path, company=None):
     c.drawString(margin + col_w, y, "Pour l'Entreprise Extérieure (Nous) :")
     y_sig_start = y - 3.5*cm
 
+    # Signatures
     if pdp.signature_eu:
         sig_eu = get_optimized_image(pdp.signature_eu)
         if sig_eu:
