@@ -414,51 +414,68 @@ def update_chantier(cid: int, chantier: schemas.ChantierUpdate, db: Session = De
     if not db_chantier:
         raise HTTPException(status_code=404, detail="Chantier introuvable")
 
-    # 2. Conversion des données reçues (on ignore ce qui n'a pas été envoyé)
+    # 2. Conversion des données (exclude_unset est important pour le PATCH partiel)
     update_data = chantier.dict(exclude_unset=True)
 
     for key, value in update_data.items():
+        
         # --- GESTION DES DATES ---
         if key in ["date_debut", "date_fin"]:
-            if value == "" or value is None:
+            # Cas A : La valeur est None (on vide le champ)
+            if value is None:
                 setattr(db_chantier, key, None)
-            elif isinstance(value, str):
-                try:
-                    # On coupe à 10 char pour garder YYYY-MM-DD et ignorer l'heure
-                    clean_date = datetime.fromisoformat(value[:10]).date()
-                    setattr(db_chantier, key, clean_date)
-                except ValueError:
-                    pass # On garde l'ancienne date si format invalide
-            else:
+            
+            # Cas B : C'est déjà un objet 'date' ou 'datetime' (Pydantic a fait le travail)
+            elif isinstance(value, (date, datetime)):
                 setattr(db_chantier, key, value)
-        
-        # --- GESTION DES BOOLÉENS (Actif & SPS) ---
+            
+            # Cas C : C'est une chaîne de caractères (str)
+            elif isinstance(value, str):
+                if value.strip() == "":
+                    setattr(db_chantier, key, None) # Chaîne vide = suppression
+                else:
+                    try:
+                        # On coupe à 10 char pour "YYYY-MM-DD"
+                        clean_date = datetime.fromisoformat(value[:10]).date()
+                        setattr(db_chantier, key, clean_date)
+                    except ValueError:
+                        # IMPORTANT : Ne pas ignorer l'erreur silencieusement en dev
+                        print(f"ERREUR FORMAT DATE pour {key}: {value}")
+                        # On lève une erreur pour avertir le client que le format est mauvais
+                        raise HTTPException(status_code=400, detail=f"Format de date invalide pour {key}. Attendu: YYYY-MM-DD")
+
+        # --- GESTION DES BOOLÉENS ---
         elif key in ["est_actif", "soumis_sps"]:
             if isinstance(value, str):
-                # Convertit "true"/"True" en True, le reste en False
                 setattr(db_chantier, key, value.lower() == 'true')
             else:
                 setattr(db_chantier, key, bool(value))
-                
+
         # --- GESTION ADRESSE & GPS ---
         elif key == "adresse":
-            # On ne recalcule le GPS que si l'adresse a changé
             if value != db_chantier.adresse:
                 db_chantier.adresse = value
                 try:
+                    # Assure-toi que cette fonction est importée et existe
                     lat, lng = get_gps_from_address(value)
                     db_chantier.latitude = lat
                     db_chantier.longitude = lng
-                except:
-                    print("Erreur géocodage, on garde les anciennes coordonnées ou None")
-            
-        # --- AUTRES CHAMPS (Nom, Client, Cover_URL...) ---
+                except Exception as e:
+                    print(f"Erreur géocodage: {e}")
+                    # On ne bloque pas la mise à jour, mais on log l'erreur
+
+        # --- AUTRES CHAMPS ---
         else:
             setattr(db_chantier, key, value)
 
     # 3. Sauvegarde
-    db.commit()
-    db.refresh(db_chantier)
+    try:
+        db.commit()
+        db.refresh(db_chantier)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Erreur lors de la sauvegarde: {str(e)}")
+
     return db_chantier
 
 @app.delete("/chantiers/{cid}")

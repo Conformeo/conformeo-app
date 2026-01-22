@@ -67,33 +67,23 @@
         </ion-list-header>
     
         <ion-item>
-          <ion-label>Date de début</ion-label>
-          <ion-datetime-button datetime="datetime-start"></ion-datetime-button>
-          <ion-modal [keepContentsMounted]="true">
-            <ng-template>
-              <ion-datetime 
-                id="datetime-start" 
-                presentation="date" 
-                [(ngModel)]="chantier.date_debut" 
-                name="date_debut">
-              </ion-datetime>
-            </ng-template>
-          </ion-modal>
+          <ion-input 
+            label="Date de début" 
+            labelPlacement="stacked" 
+            type="date"
+            [(ngModel)]="chantier.date_debut" 
+            name="date_debut">
+          </ion-input>
         </ion-item>
     
         <ion-item>
-          <ion-label>Date de fin</ion-label>
-          <ion-datetime-button datetime="datetime-end"></ion-datetime-button>
-          <ion-modal [keepContentsMounted]="true">
-            <ng-template>
-              <ion-datetime 
-                id="datetime-end" 
-                presentation="date" 
-                [(ngModel)]="chantier.date_fin" 
-                name="date_fin">
-              </ion-datetime>
-            </ng-template>
-          </ion-modal>
+          <ion-input 
+            label="Date de fin" 
+            labelPlacement="stacked" 
+            type="date"
+            [(ngModel)]="chantier.date_fin" 
+            name="date_fin">
+          </ion-input>
         </ion-item>
 
         <ion-item>
