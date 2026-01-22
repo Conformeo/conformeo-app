@@ -943,6 +943,37 @@ def delete_doc(did: int, db: Session = Depends(get_db)):
     db.commit()
     return {"status": "deleted"}
 
+# ==========================================
+# 📸 FIX : UPLOAD COVER CHANTIER
+# ==========================================
+@app.post("/chantiers/{cid}/cover")
+def upload_chantier_cover(
+    cid: int, 
+    file: UploadFile = File(...), 
+    db: Session = Depends(get_db)
+):
+    # 1. Vérif Chantier
+    chantier = db.query(models.Chantier).filter(models.Chantier.id == cid).first()
+    if not chantier:
+        raise HTTPException(404, "Chantier introuvable")
+    
+    try:
+        # 2. Upload vers Cloudinary
+        # On utilise un dossier spécifique 'conformeo_covers'
+        res = cloudinary.uploader.upload(file.file, folder="conformeo_covers", resource_type="image")
+        secure_url = res.get("secure_url")
+        
+        # 3. Sauvegarde en BDD
+        chantier.cover_url = secure_url
+        db.commit()
+        db.refresh(chantier)
+        
+        return {"url": secure_url}
+
+    except Exception as e:
+        print(f"Erreur Upload Cover: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur Cloudinary: {str(e)}")
+
 # --- UPDATE COMPANY (ROBUSTE) ---
 @app.put("/companies/me", response_model=schemas.CompanyOut)
 def update_company(

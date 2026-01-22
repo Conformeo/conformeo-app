@@ -415,6 +415,18 @@ export class ApiService {
     return this.http.delete(`${this.apiUrl}/docs/${docId}`, this.getOptions());
   }
 
+  // Upload photo de couverture Chantier
+  uploadChantierCover(chantierId: number, file: File) {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    // Auth Token nécessaire
+    const token = localStorage.getItem('access_token');
+    const headers = new HttpHeaders({ 'Authorization': `Bearer ${token}` });
+
+    return this.http.post<any>(`${this.apiUrl}/chantiers/${chantierId}/cover`, formData, { headers });
+  }
+
   // ==========================================
   // 📝 RAPPORTS
   // ==========================================
@@ -560,6 +572,18 @@ export class ApiService {
     window.open(url, '_system');
   }
 
+  // 👇 AJOUTEZ CETTE FONCTION MAGIQUE
+  getFullUrl(path: string | undefined | null): string {
+    if (!path) return ''; 
+    
+    // 1. Si c'est déjà une URL complète (Cloudinary), on la renvoie telle quelle
+    if (path.startsWith('http')) {
+      return path;
+    }
+
+    // 2. Si c'est une image locale (ancien système), on ajoute le domaine API
+    return `${this.apiUrl}/${path}`;
+  }
   
 
   // --- GESTION DUERP ---

@@ -3,26 +3,25 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 
-// 👇 IMPORT DES COMPOSANTS IONIC (Ajout de IonToggle et IonNote)
+// 👇 IMPORT DES COMPOSANTS IONIC
 import { 
   IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, 
   IonContent, IonList, IonItem, IonInput, ModalController,
   IonIcon, IonSpinner, IonLabel, IonListHeader, 
-  IonToggle, IonNote 
+  IonToggle, IonNote, LoadingController, ToastController 
 } from '@ionic/angular/standalone';
 
-import { ApiService, Chantier } from '../../services/api' // Chemin standardisé
+import { ApiService, Chantier } from '../../services/api';
 import { addIcons } from 'ionicons';
 
-// 👇 AJOUT DE L'ICONE BOUCLIER (shield-checkmark-outline)
-import { camera, cloudUpload, save, close, shieldCheckmarkOutline } from 'ionicons/icons';
+// 👇 AJOUT DES ICONES
+import { camera, cloudUpload, save, close, shieldCheckmarkOutline, image } from 'ionicons/icons';
 
 @Component({
   selector: 'app-add-chantier-modal',
   templateUrl: './add-chantier-modal.component.html',
   styleUrls: ['./add-chantier-modal.component.scss'],
   standalone: true,
-  // 👇 AJOUT DE IonToggle et IonNote DANS LES IMPORTS DU COMPOSANT
   imports: [
     CommonModule, FormsModule, 
     IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, 
@@ -46,25 +45,32 @@ export class AddChantierModalComponent implements OnInit {
 
   coverPhotoWebPath: string | undefined;
   coverPhotoBlob: Blob | undefined;
-  isSaving = false;
+  
+  // Utilisation pour l'affichage conditionnel du chargement
+  isLoading = false;
 
   constructor(
     private modalCtrl: ModalController,
-    private api: ApiService
+    private api: ApiService,
+    private loadingCtrl: LoadingController,
+    private toastCtrl: ToastController
   ) {
-    // 👇 ENREGISTREMENT DE L'ICONE SPS
-    addIcons({ camera, cloudUpload, save, close, shieldCheckmarkOutline });
+    addIcons({ camera, cloudUpload, save, close, shieldCheckmarkOutline, image });
   }
 
   ngOnInit() {
     if (this.existingChantier) {
-      // On copie l'objet pour ne pas modifier l'original tant qu'on n'a pas sauvegardé
+      // Clone pour ne pas modifier l'affichage dessous avant confirmation
       this.chantier = { ...this.existingChantier };
-      this.coverPhotoWebPath = this.chantier.cover_url;
+      
+      // Gestion de l'affichage de l'image existante
+      // On utilise getFullUrl pour que l'image s'affiche correctement (Cloudinary ou local)
+      if (this.chantier.cover_url) {
+        this.coverPhotoWebPath = this.api.getFullUrl(this.chantier.cover_url);
+      }
       
       // Formatage des dates pour les inputs HTML (YYYY-MM-DD)
       if (this.chantier.date_debut) {
-        // Gère le cas où c'est une string ou un objet Date
         const d = new Date(this.chantier.date_debut);
         this.chantier.date_debut = d.toISOString().split('T')[0];
       }
@@ -73,7 +79,7 @@ export class AddChantierModalComponent implements OnInit {
         this.chantier.date_fin = d.toISOString().split('T')[0];
       }
     } else {
-      // Initialisation des dates par défaut (Aujourd'hui et +30 jours)
+      // Initialisation des dates par défaut
       const today = new Date();
       const nextMonth = new Date();
       nextMonth.setDate(today.getDate() + 30);
@@ -97,59 +103,91 @@ export class AddChantierModalComponent implements OnInit {
       });
       
       if (image.webPath) {
-        this.coverPhotoWebPath = image.webPath;
+        this.coverPhotoWebPath = image.webPath; // Preview immédiate
         const response = await fetch(image.webPath);
-        this.coverPhotoBlob = await response.blob();
+        this.coverPhotoBlob = await response.blob(); // Stockage pour envoi
       }
     } catch (e) {
       console.log('Prise de photo annulée');
     }
   }
 
-  save() {
-    if (this.isSaving) return;
-    this.isSaving = true;
+  // 👇 FONCTION DE SAUVEGARDE CORRIGÉE
+  async save() {
+    if (!this.chantier.nom) {
+      this.presentToast('Le nom du chantier est obligatoire', 'warning');
+      return;
+    }
 
-    // CAS 1 : Nouvelle photo à uploader
-    if (this.coverPhotoBlob) {
-      this.api.uploadPhoto(this.coverPhotoBlob).subscribe({
-        next: (res) => {
-           this.chantier.cover_url = res.url;
-           this.finalizeSave();
+    const loading = await this.loadingCtrl.create({ message: 'Sauvegarde...' });
+    await loading.present();
+
+    if (this.existingChantier) {
+      // 1. UPDATE TEXTE
+      this.api.updateChantier(this.existingChantier.id, this.chantier).subscribe({
+        next: async (res) => {
+          // 2. SI NOUVELLE PHOTO -> UPLOAD
+          if (this.coverPhotoBlob) {
+            await this.processImageUpload(this.existingChantier.id);
+            // On met à jour l'URL locale pour le retour
+            res.cover_url = this.coverPhotoWebPath; 
+          }
+          
+          loading.dismiss();
+          this.modalCtrl.dismiss(res, 'confirm');
         },
-        error: () => { 
-          this.isSaving = false; 
-          alert("Erreur lors de l'envoi de la photo."); 
+        error: (err) => {
+          loading.dismiss();
+          console.error(err);
+          this.presentToast('Erreur modification', 'danger');
         }
       });
-    } 
-    // CAS 2 : Pas de nouvelle photo
-    else {
-      this.finalizeSave();
+
+    } else {
+      // 1. CREATION
+      this.api.createChantier(this.chantier).subscribe({
+        next: async (newChantier) => {
+          // 2. SI PHOTO -> UPLOAD (Maintenant qu'on a l'ID)
+          if (this.coverPhotoBlob && newChantier.id) {
+            await this.processImageUpload(newChantier.id);
+          }
+          
+          loading.dismiss();
+          this.modalCtrl.dismiss(newChantier, 'confirm');
+        },
+        error: (err) => {
+          loading.dismiss();
+          console.error(err);
+          this.presentToast('Erreur création', 'danger');
+        }
+      });
     }
   }
 
-  finalizeSave() {
-    // Petit nettoyage des dates si nécessaire (optionnel, l'API gère souvent)
-    
-    if (this.existingChantier) {
-      // MODE UPDATE
-      this.api.updateChantier(this.existingChantier.id, this.chantier).subscribe({
-        next: (updated) => this.modalCtrl.dismiss(updated, 'confirm'),
-        error: () => { 
-          this.isSaving = false; 
-          alert("Erreur lors de la modification."); 
+  // Helper pour gérer l'upload d'image proprement
+  async processImageUpload(chantierId: number): Promise<void> {
+    return new Promise((resolve) => {
+      // On transforme le Blob en File pour l'envoyer
+      const file = new File([this.coverPhotoBlob!], "cover.jpg", { type: "image/jpeg" });
+
+      this.api.uploadChantierCover(chantierId, file).subscribe({
+        next: (res) => {
+          console.log("Cover uploadée:", res.url);
+          resolve();
+        },
+        error: (err) => {
+          console.warn("Echec upload cover", err);
+          this.presentToast('Chantier sauvé mais échec image', 'warning');
+          resolve(); // On continue quand même
         }
       });
-    } else {
-      // MODE CREATE
-      this.api.createChantier(this.chantier).subscribe({
-        next: (created) => this.modalCtrl.dismiss(created, 'confirm'),
-        error: () => { 
-          this.isSaving = false; 
-          alert("Erreur lors de la création."); 
-        }
-      });
-    }
+    });
+  }
+
+  async presentToast(message: string, color: string) {
+    const toast = await this.toastCtrl.create({
+      message, duration: 2000, color, position: 'bottom'
+    });
+    toast.present();
   }
 }

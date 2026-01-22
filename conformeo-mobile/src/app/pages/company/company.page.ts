@@ -6,7 +6,7 @@ import {
   IonicModule, AlertController, ToastController, LoadingController, ModalController 
 } from '@ionic/angular';
 import { addIcons } from 'ionicons';
-// 👇 Importation de toutes les icônes utilisées
+// 👇 ON IMPORTE TOUTES LES ICÔNES NÉCESSAIRES
 import { 
   business, documentText, cloudUpload, trash, shieldCheckmark, 
   briefcase, warning, calendar, eye, pencil, add, folderOpen, close, camera, 
@@ -26,18 +26,18 @@ import { SignatureModalComponent } from '../chantier-details/signature-modal/sig
 export class CompanyPage implements OnInit {
 
   segment = 'infos';
+  // On initialise les champs pour éviter les erreurs "undefined"
   company: any = {
     name: '',
     address: '',
     phone: '',
-    contact_email: '', // On force l'initialisation
+    contact_email: '',
     logo_url: ''
   };
   docs: any[] = [];
   
   isLoading = false;
   hasExpiredDocs = false;
-
   isUploadModalOpen = false;
   newDoc = { titre: '', type_doc: 'AUTRE', date_expiration: '' };
   selectedFile: File | null = null;
@@ -53,7 +53,7 @@ export class CompanyPage implements OnInit {
     private loadingCtrl: LoadingController,
     private modalCtrl: ModalController
   ) {
-    // 👇 Enregistrement des icônes pour qu'elles s'affichent
+    // 👇 ON DÉCLARE TOUTES LES ICÔNES
     addIcons({ 
       business, documentText, cloudUpload, trash, shieldCheckmark, 
       briefcase, warning, calendar, eye, pencil, add, folderOpen, close, camera, 
@@ -77,7 +77,7 @@ export class CompanyPage implements OnInit {
       if (comp) {
         this.company = comp;
         
-        // 👇 FIX EMAIL : Si l'API renvoie 'email' (table users/companies), on le met dans 'contact_email'
+        // 👇 FIX EMAIL : Si l'API renvoie 'email' mais pas 'contact_email', on copie la valeur
         if (!this.company.contact_email && this.company.email) {
             this.company.contact_email = this.company.email;
         }
@@ -107,7 +107,7 @@ export class CompanyPage implements OnInit {
     this.api.uploadLogo(file).subscribe({
       next: (res) => {
         if (this.company) {
-            // On met à jour l'URL avec un timestamp pour forcer le rafraîchissement visuel
+            // On ajoute un timestamp pour forcer le rafraîchissement de l'image
             this.company.logo_url = res.url;
         }
         load.dismiss();
@@ -120,32 +120,17 @@ export class CompanyPage implements OnInit {
     });
   }
 
-  // 👇 FIX URL LOGO : Gère Cloudinary (http) et Local (uploads/)
-  getFullUrl(path: string | undefined): string {
-    if (!path) return '';
-    
-    // Si c'est déjà une URL complète (Cloudinary), on la retourne
-    if (path.startsWith('http')) {
-        // Petit hack cache : si on vient d'uploader, on ajoute un timestamp
-        if (!path.includes('?')) return path + '?t=' + new Date().getTime();
-        return path;
-    }
-    
-    // Sinon c'est une image locale, on ajoute le domaine de l'API
-    return `${this.api.apiUrl}/${path}`;
-  }
-
   // --- SAUVEGARDE INFOS ---
   async saveInfos() {
     if (!this.company) return;
     const load = await this.loadingCtrl.create({ message: 'Sauvegarde...' });
     await load.present();
     
-    // 👇 On envoie explicitement les champs corrects
+    // 👇 On prépare l'objet propre pour l'API
     const payload = {
       name: this.company.name,
       address: this.company.address,
-      contact_email: this.company.contact_email, // Le champ que le backend attend
+      contact_email: this.company.contact_email, // C'est ce champ que l'input modifie
       phone: this.company.phone
     };
 
@@ -156,18 +141,19 @@ export class CompanyPage implements OnInit {
           // Mise à jour locale
           if (res) {
              this.company = { ...this.company, ...res };
-             // Re-map de l'email si besoin
-             if(!this.company.contact_email && res.email) this.company.contact_email = res.email;
+             // On s'assure que contact_email reste synchronisé
+             if(res.email) this.company.contact_email = res.email;
           }
       },
       error: (err) => { 
         load.dismiss(); 
+        console.error(err);
         this.presentToast('Erreur serveur', 'danger'); 
       }
     });
   }
 
-  // --- RESTE DU CODE (DOCS, ETC.) ---
+  // --- RESTE DU CODE (SANS CHANGEMENT MAJEUR) ---
   checkGlobalStatus() {
     this.hasExpiredDocs = this.docs.some(d => {
         if(!d.date_expiration) return false;
@@ -253,7 +239,8 @@ export class CompanyPage implements OnInit {
   }
 
   openDoc(url: string) { 
-    const fullUrl = this.getFullUrl(url);
+    // Utilisation de la méthode du service
+    const fullUrl = this.api.getFullUrl(url);
     window.open(fullUrl, '_system'); 
   }
 

@@ -18,8 +18,10 @@
 <ion-content [fullscreen]="true" class="bg-light">
 
   <div class="header-image-container">
-    <img [src]="chantier?.cover_url || 'assets/chantier-placeholder.jpg'" class="cover-img" 
+    <img [src]="api.getFullUrl(chantier?.cover_url) || 'assets/chantier-placeholder.jpg'" 
+         class="cover-img" 
          onerror="this.src='assets/chantier-placeholder.jpg'">
+         
     <div class="header-overlay">
       <div class="header-text">
         <h1 class="chantier-title">{{ chantier?.nom }}</h1>
@@ -94,12 +96,10 @@
       </div>
 
       <div class="content-wrapper">
-  
         <app-task-list 
           *ngIf="chantier" 
           [chantierId]="chantier.id || 0">
         </app-task-list>
-
       </div>
       
       <div class="section-header" *ngIf="materielsSurSite.length > 0">
@@ -107,7 +107,7 @@
       </div>
       <div class="materiel-scroll" *ngIf="materielsSurSite.length > 0">
         <ion-card *ngFor="let mat of materielsSurSite" class="mat-card">
-          <div class="mat-img" [style.backgroundImage]="'url(' + (mat.image_url || 'assets/no-img.png') + ')'"></div>
+          <div class="mat-img" [style.backgroundImage]="'url(' + (api.getFullUrl(mat.image_url) || 'assets/no-img.png') + ')'"></div>
           <ion-card-header>
             <ion-card-title>{{ mat.nom }}</ion-card-title>
             <div class="etat-badge" [ngClass]="mat.etat.toLowerCase()">{{ mat.etat }}</div>

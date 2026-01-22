@@ -30,10 +30,10 @@
         <div class="logo-container" (click)="triggerLogoUpload()">
           <div class="logo-circle">
             <img *ngIf="company.logo_url" 
-                 [src]="getFullUrl(company.logo_url)" 
-                 class="logo-img" 
-                 alt="Logo"
-                 onError="this.style.display='none'"/>
+              [src]="api.getFullUrl(company.logo_url)" 
+              class="logo-preview" 
+              alt="Logo Entreprise"
+              onError="this.style.display='none'"/>
                  
             <div *ngIf="!company.logo_url" class="placeholder-logo">
                <ion-icon name="image" style="font-size: 40px; color: #ccc;"></ion-icon>
