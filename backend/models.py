@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Float, JSON, Text
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Float, JSON, Text, Date
 from sqlalchemy.orm import relationship
 from database import Base
 from datetime import datetime
@@ -55,8 +55,8 @@ class Chantier(Base):
     latitude = Column(Float, nullable=True)
     longitude = Column(Float, nullable=True)
 
-    date_debut = Column(DateTime, nullable=True)
-    date_fin = Column(DateTime, nullable=True)
+    date_debut = Column(Date, nullable=True)
+    date_fin = Column(Date, nullable=True)
     statut_planning = Column(String, default="prevu")
     
     # 👇 NOUVELLE COLONNE POUR LE TOGGLE SPS

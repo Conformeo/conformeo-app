@@ -189,8 +189,6 @@ class ChantierCreate(BaseModel):
     soumis_sps: Optional[bool] = False
     cover_url: Optional[str] = None # Au cas où on l'envoie manuellement
 
-# Dans backend/schemas.py
-
 class ChantierUpdate(BaseModel):
     nom: Optional[str] = None
     client: Optional[str] = None
