@@ -189,12 +189,15 @@ class ChantierCreate(BaseModel):
     soumis_sps: Optional[bool] = False
     cover_url: Optional[str] = None # Au cas où on l'envoie manuellement
 
+# Dans backend/schemas.py
+
 class ChantierUpdate(BaseModel):
     nom: Optional[str] = None
     client: Optional[str] = None
     adresse: Optional[str] = None
     
-    # Assurez-vous que ces champs sont bien présents et Optionnels
+    # 👇 C'EST ICI QUE TOUT SE JOUE :
+    # Si ces lignes ne sont pas là, la mise à jour est IMPOSSIBLE.
     date_debut: Optional[str] = None 
     date_fin: Optional[str] = None
     est_actif: Optional[bool] = None
