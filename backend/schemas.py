@@ -177,17 +177,34 @@ class ChantierBase(BaseModel):
     datetime_fin: Optional[date] = None   
     soumis_sps: bool = False # ✅ Ajouté pour la coordination SPS
 
-class ChantierCreate(ChantierBase):
-    pass
+class ChantierCreate(BaseModel):
+    nom: str
+    client: Optional[str] = None
+    adresse: Optional[str] = None
+    date_debut: Optional[str] = None
+    
+    # 👇 IL FAUT ABSOLUMENT AJOUTER CES LIGNES ICI
+    date_fin: Optional[str] = None
+    est_actif: Optional[bool] = True
+    soumis_sps: Optional[bool] = False
+    cover_url: Optional[str] = None # Au cas où on l'envoie manuellement
 
 class ChantierUpdate(BaseModel):
     nom: Optional[str] = None
-    adresse: Optional[str] = None
-    est_actif: Optional[bool] = None 
     client: Optional[str] = None
-    date_debut: Optional[Any] = None
-    date_fin: Optional[Any] = None
-    soumis_sps: Optional[bool] = None # ✅ Ajouté
+    adresse: Optional[str] = None
+    
+    # Assurez-vous que ces champs sont bien présents et Optionnels
+    date_debut: Optional[str] = None 
+    date_fin: Optional[str] = None
+    
+    est_actif: Optional[bool] = None
+    soumis_sps: Optional[bool] = None
+    
+    cover_url: Optional[str] = None
+
+    class Config:
+        orm_mode = True
 
 class ChantierOut(ChantierBase):
     id: int

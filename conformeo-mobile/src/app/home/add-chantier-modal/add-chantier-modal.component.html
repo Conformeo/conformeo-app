@@ -63,27 +63,42 @@
 
     <ion-list lines="full">
         <ion-list-header>
-          <ion-label>Planning Prévisionnel</ion-label>
+          <ion-label>Planning & Statut</ion-label>
         </ion-list-header>
     
         <ion-item>
-          <ion-input 
-            label="Date de début" 
-            labelPlacement="stacked" 
-            type="date" 
-            [(ngModel)]="chantier.date_debut" 
-            name="date_debut">
-          </ion-input>
+          <ion-label>Date de début</ion-label>
+          <ion-datetime-button datetime="datetime-start"></ion-datetime-button>
+          <ion-modal [keepContentsMounted]="true">
+            <ng-template>
+              <ion-datetime 
+                id="datetime-start" 
+                presentation="date" 
+                [(ngModel)]="chantier.date_debut" 
+                name="date_debut">
+              </ion-datetime>
+            </ng-template>
+          </ion-modal>
         </ion-item>
     
         <ion-item>
-          <ion-input 
-            label="Date de fin" 
-            labelPlacement="stacked" 
-            type="date" 
-            [(ngModel)]="chantier.date_fin" 
-            name="date_fin">
-          </ion-input>
+          <ion-label>Date de fin</ion-label>
+          <ion-datetime-button datetime="datetime-end"></ion-datetime-button>
+          <ion-modal [keepContentsMounted]="true">
+            <ng-template>
+              <ion-datetime 
+                id="datetime-end" 
+                presentation="date" 
+                [(ngModel)]="chantier.date_fin" 
+                name="date_fin">
+              </ion-datetime>
+            </ng-template>
+          </ion-modal>
+        </ion-item>
+
+        <ion-item>
+          <ion-label>Chantier en cours</ion-label>
+          <ion-toggle slot="end" [(ngModel)]="chantier.est_actif" name="est_actif"></ion-toggle>
         </ion-item>
     </ion-list>
 

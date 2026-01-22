@@ -409,39 +409,54 @@ def read_chantier(chantier_id: int, db: Session = Depends(get_db)):
 # --- UPDATE CHANTIER (ROBUSTE) ---
 @app.put("/chantiers/{cid}", response_model=schemas.ChantierOut)
 def update_chantier(cid: int, chantier: schemas.ChantierUpdate, db: Session = Depends(get_db)):
+    # 1. Récupération du chantier existant
     db_chantier = db.query(models.Chantier).filter(models.Chantier.id == cid).first()
     if not db_chantier:
         raise HTTPException(status_code=404, detail="Chantier introuvable")
 
+    # 2. Conversion des données reçues (on ignore ce qui n'a pas été envoyé)
     update_data = chantier.dict(exclude_unset=True)
 
     for key, value in update_data.items():
+        # --- GESTION DES DATES ---
         if key in ["date_debut", "date_fin"]:
             if value == "" or value is None:
                 setattr(db_chantier, key, None)
             elif isinstance(value, str):
                 try:
-                    setattr(db_chantier, key, datetime.fromisoformat(value[:10]).date())
-                except:
-                    pass
+                    # On coupe à 10 char pour garder YYYY-MM-DD et ignorer l'heure
+                    clean_date = datetime.fromisoformat(value[:10]).date()
+                    setattr(db_chantier, key, clean_date)
+                except ValueError:
+                    pass # On garde l'ancienne date si format invalide
             else:
                 setattr(db_chantier, key, value)
         
-        elif key == "est_actif":
+        # --- GESTION DES BOOLÉENS (Actif & SPS) ---
+        elif key in ["est_actif", "soumis_sps"]:
             if isinstance(value, str):
+                # Convertit "true"/"True" en True, le reste en False
                 setattr(db_chantier, key, value.lower() == 'true')
             else:
                 setattr(db_chantier, key, bool(value))
                 
-        elif key == "adresse" and value != db_chantier.adresse:
-            db_chantier.adresse = value
-            lat, lng = get_gps_from_address(value)
-            db_chantier.latitude = lat
-            db_chantier.longitude = lng
+        # --- GESTION ADRESSE & GPS ---
+        elif key == "adresse":
+            # On ne recalcule le GPS que si l'adresse a changé
+            if value != db_chantier.adresse:
+                db_chantier.adresse = value
+                try:
+                    lat, lng = get_gps_from_address(value)
+                    db_chantier.latitude = lat
+                    db_chantier.longitude = lng
+                except:
+                    print("Erreur géocodage, on garde les anciennes coordonnées ou None")
             
+        # --- AUTRES CHAMPS (Nom, Client, Cover_URL...) ---
         else:
             setattr(db_chantier, key, value)
 
+    # 3. Sauvegarde
     db.commit()
     db.refresh(db_chantier)
     return db_chantier
