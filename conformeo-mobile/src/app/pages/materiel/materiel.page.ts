@@ -6,12 +6,8 @@ import { Platform } from '@ionic/angular/standalone';
 import { 
   IonHeader, IonToolbar, IonContent,
   IonButtons, IonButton, IonIcon, IonFab, IonFabButton, 
-  AlertController, IonBackButton, IonSearchbar,
-  IonTitle, ModalController, LoadingController, IonBadge, 
-  IonRefresher, IonRefresherContent,
-  IonList, IonItem, IonLabel, IonAvatar, IonThumbnail,
-  IonCard, IonCardHeader, IonCardSubtitle, IonCardTitle, IonCardContent,
-  IonSkeletonText, IonNote, IonItemSliding, IonItemOptions, IonItemOption
+  AlertController, IonBackButton,
+  IonTitle, ModalController, LoadingController, IonBadge
 } from '@ionic/angular/standalone';
 import { Capacitor } from '@capacitor/core';
 import { addIcons } from 'ionicons';
@@ -35,14 +31,10 @@ import { BarcodeScanner, BarcodeFormat } from '@capacitor-mlkit/barcode-scanning
   standalone: true,
   // 👇 ICI : On ajoute tous les composants utilisés dans le HTML
   imports: [
-    CommonModule, FormsModule, IonHeader, IonSearchbar,
+    CommonModule, FormsModule, IonHeader,
     IonToolbar, IonContent, IonTitle,
     IonButtons, IonButton, IonIcon, IonFab,
     IonFabButton, IonBackButton, IonBadge,
-    IonRefresher, IonRefresherContent,
-    IonList, IonItem, IonLabel, IonAvatar, IonThumbnail,
-    IonCard, IonCardHeader, IonCardSubtitle, IonCardTitle, IonCardContent,
-    IonSkeletonText, IonNote, IonItemSliding, IonItemOptions, IonItemOption
   ]
 })
 export class MaterielPage implements OnInit {

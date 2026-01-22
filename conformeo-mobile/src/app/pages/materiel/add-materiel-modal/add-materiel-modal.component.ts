@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { 
   IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, 
-  IonContent, IonList, IonItem, IonInput, IonLabel, 
+  IonContent, IonList, IonItem, IonInput, 
   IonIcon, IonSpinner, ModalController, IonSelect, IonSelectOption 
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
@@ -22,7 +22,7 @@ import { removeBackground } from '@imgly/background-removal';
   imports: [
     CommonModule, FormsModule, 
     IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, 
-    IonContent, IonList, IonItem, IonInput, IonLabel, 
+    IonContent, IonList, IonItem, IonInput,
     IonIcon, IonSpinner, IonSelect, IonSelectOption 
   ]
 })

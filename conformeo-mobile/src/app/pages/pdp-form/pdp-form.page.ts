@@ -25,7 +25,7 @@ import { add, trash, save, download, mail, arrowBack, documentText } from 'ionic
     IonHeader, IonToolbar, IonTitle, IonButtons, IonBackButton, IonContent,
     IonList, IonListHeader, IonItem, IonInput, IonLabel, IonTextarea,
     IonButton, IonIcon, IonDatetime, IonDatetimeButton, IonModal,
-    IonSelect, IonSelectOption, SignatureModalComponent
+    IonSelect, IonSelectOption
   ]
 })
 export class PdpFormPage implements OnInit {

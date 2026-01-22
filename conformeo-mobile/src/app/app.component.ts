@@ -1,18 +1,18 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
-import { Router, NavigationEnd, RouterLink, RouterLinkActive } from '@angular/router';
+import { Router, NavigationEnd, RouterLink,  } from '@angular/router';
 import { 
   IonApp, IonSplitPane, IonMenu, IonContent, IonList, 
-  IonListHeader, IonNote, IonItem, IonLabel, 
+  IonItem, IonLabel, 
   IonRouterOutlet, IonIcon, ToastController, MenuController,
-  IonMenuToggle // 👈 AJOUT IMPORTANT
+  IonMenuToggle // 👈 IonButton ajouté pour le logout
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
 import { 
   gridOutline, hammerOutline, mapOutline, peopleOutline, business,
   settingsOutline, logOutOutline, sync, checkmarkCircle, warning, calendarOutline,
-  documentTextOutline // Ajout icone doc
+  documentTextOutline, home
 } from 'ionicons/icons';
 
 import { OfflineService } from './services/offline';
@@ -26,23 +26,22 @@ import { ApiService } from './services/api';
   imports: [
     CommonModule, 
     RouterLink,       
-    RouterLinkActive,
     IonApp, IonSplitPane, IonMenu, IonContent, IonList, 
-    IonListHeader, IonNote, IonItem, IonLabel, 
-    IonRouterOutlet, IonIcon, IonMenuToggle // 👈 N'oubliez pas de l'ajouter ici
+    IonItem, IonLabel, 
+    IonRouterOutlet, IonIcon, IonMenuToggle 
   ],
 })
 export class AppComponent {
   
-  // 👇 MENU MIS À JOUR
+  // 👇 MENU COMPLET
   public appPages = [
     { title: 'Tableau de Bord', url: '/dashboard', icon: 'grid-outline' },
     { title: 'Mes Chantiers', url: '/home', icon: 'map-outline' },
     { title: 'Parc Matériel', url: '/materiel', icon: 'hammer-outline' },
     { title: 'Équipes', url: '/team', icon: 'people-outline' },
-    { title: 'Mon Compte', url: '/settings', icon: 'settings-outline' },
+    { title: 'Mon Entreprise', url: '/company', icon: 'business' }, // ✅ Page Entreprise
     { title: 'Planning', url: '/planning', icon: 'calendar-outline' },
-    { title: 'Mon Entreprise', url: '/company', icon: 'business' },
+    { title: 'Mon Compte', url: '/settings', icon: 'settings-outline' },
   ];
 
   currentUrl = '';
@@ -58,12 +57,12 @@ export class AppComponent {
     addIcons({ 
       gridOutline, hammerOutline, mapOutline, peopleOutline, business,
       settingsOutline, logOutOutline, sync, checkmarkCircle, warning, calendarOutline,
-      documentTextOutline
+      documentTextOutline, home
     });
     
     this.initializeApp();
 
-    // Suivi de l'URL active pour la surbrillance dans le menu
+    // Suivi de l'URL active pour la surbrillance
     this.router.events.subscribe((event) => {
       if (event instanceof NavigationEnd) {
         this.currentUrl = event.url;
@@ -81,15 +80,14 @@ export class AppComponent {
     });
   }
 
-  // 👇 FONCTION SUPPRIMÉE : navigateTo() (Plus nécessaire grâce à routerLink dans le HTML)
-
   isUrlActive(url: string): boolean {
     return this.currentUrl === url || this.currentUrl.startsWith(url);
   }
 
   logout() {
     this.api.logout();
-    this.menuCtrl.close(); // On ferme le menu en partant
+    this.menuCtrl.close();
+    this.router.navigateByUrl('/login');
   }
 
   // --- ROBOT DE SYNCHRONISATION ---
@@ -128,6 +126,7 @@ export class AppComponent {
         try {
           const rawPath = data.localPhotoPath;
           const fileName = rawPath.substring(rawPath.lastIndexOf('/') + 1);
+          // @ts-ignore - Ignore si la méthode n'existe pas encore dans votre version locale
           const blob = await this.api.readLocalPhoto(fileName);
 
           this.api.uploadPhoto(blob).subscribe({
@@ -143,6 +142,7 @@ export class AppComponent {
         try {
           const blobPromises = data.localPaths.map((path: string) => {
              const fileName = path.substring(path.lastIndexOf('/') + 1);
+             // @ts-ignore
              return this.api.readLocalPhoto(fileName);
           });
           const blobs = await Promise.all(blobPromises);

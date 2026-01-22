@@ -3,11 +3,10 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { 
-  IonHeader, IonToolbar, IonTitle, IonContent, IonList, 
-  IonCard, IonCardHeader, IonCardTitle, IonCardSubtitle, IonCardContent, 
-  IonChip, IonIcon, IonLabel, IonFab, IonFabButton, 
+  IonHeader, IonToolbar, IonTitle, IonContent, 
+  IonIcon, IonFab, IonFabButton, 
   IonRefresher, IonRefresherContent, ModalController,
-  IonButtons, IonButton, IonBadge, NavController, IonSearchbar, 
+  IonButtons, IonButton, NavController, IonSearchbar, 
   LoadingController, AlertController // <--- AJOUT AlertController
 } from '@ionic/angular/standalone';
 
@@ -31,11 +30,10 @@ import * as L from 'leaflet';
   standalone: true,
   imports: [
     CommonModule, FormsModule, RouterLink,
-    IonHeader, IonToolbar, IonTitle, IonContent, IonList, 
-    IonCard, IonCardHeader, IonCardTitle, IonCardSubtitle, IonCardContent, 
-    IonChip, IonIcon, IonLabel, IonFab, IonFabButton, 
+    IonHeader, IonToolbar, IonTitle, IonContent, 
+    IonIcon, IonFab, IonFabButton, 
     IonRefresher, IonRefresherContent, IonButtons, IonButton,
-    IonBadge, IonSearchbar
+    IonSearchbar
   ],
 })
 export class HomePage implements OnInit {
