@@ -417,6 +417,9 @@ def update_chantier(cid: int, chantier: schemas.ChantierUpdate, db: Session = De
     # 2. Conversion des données (exclude_unset est important pour le PATCH partiel)
     update_data = chantier.dict(exclude_unset=True)
 
+    # Debug optionnel pour voir ce qui arrive
+    print(f"🔄 Update Chantier {cid} : {update_data}")
+
     for key, value in update_data.items():
         
         # --- GESTION DES DATES ---
@@ -435,18 +438,17 @@ def update_chantier(cid: int, chantier: schemas.ChantierUpdate, db: Session = De
                     setattr(db_chantier, key, None) # Chaîne vide = suppression
                 else:
                     try:
-                        # On coupe à 10 char pour "YYYY-MM-DD"
+                        # On coupe à 10 char pour "YYYY-MM-DD" si jamais il y a l'heure
                         clean_date = datetime.fromisoformat(value[:10]).date()
                         setattr(db_chantier, key, clean_date)
                     except ValueError:
-                        # IMPORTANT : Ne pas ignorer l'erreur silencieusement en dev
                         print(f"ERREUR FORMAT DATE pour {key}: {value}")
-                        # On lève une erreur pour avertir le client que le format est mauvais
                         raise HTTPException(status_code=400, detail=f"Format de date invalide pour {key}. Attendu: YYYY-MM-DD")
 
         # --- GESTION DES BOOLÉENS ---
         elif key in ["est_actif", "soumis_sps"]:
             if isinstance(value, str):
+                # Gère "true", "True", "TRUE" -> True
                 setattr(db_chantier, key, value.lower() == 'true')
             else:
                 setattr(db_chantier, key, bool(value))
@@ -456,24 +458,25 @@ def update_chantier(cid: int, chantier: schemas.ChantierUpdate, db: Session = De
             if value != db_chantier.adresse:
                 db_chantier.adresse = value
                 try:
-                    # Assure-toi que cette fonction est importée et existe
+                    # Assurez-vous que cette fonction est bien importée
                     lat, lng = get_gps_from_address(value)
                     db_chantier.latitude = lat
                     db_chantier.longitude = lng
                 except Exception as e:
                     print(f"Erreur géocodage: {e}")
-                    # On ne bloque pas la mise à jour, mais on log l'erreur
+                    # On continue même si le GPS échoue
 
         # --- AUTRES CHAMPS ---
         else:
             setattr(db_chantier, key, value)
 
-    # 3. Sauvegarde
+    # 3. Sauvegarde sécurisée
     try:
         db.commit()
         db.refresh(db_chantier)
     except Exception as e:
-        db.rollback()
+        db.rollback() # Annule les changements si erreur SQL
+        print(f"Erreur SQL: {e}")
         raise HTTPException(status_code=500, detail=f"Erreur lors de la sauvegarde: {str(e)}")
 
     return db_chantier

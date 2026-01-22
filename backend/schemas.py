@@ -197,10 +197,8 @@ class ChantierUpdate(BaseModel):
     # Assurez-vous que ces champs sont bien présents et Optionnels
     date_debut: Optional[str] = None 
     date_fin: Optional[str] = None
-    
     est_actif: Optional[bool] = None
     soumis_sps: Optional[bool] = None
-    
     cover_url: Optional[str] = None
 
     class Config:
