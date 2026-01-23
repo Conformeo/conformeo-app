@@ -1,10 +1,10 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { IonicModule, ToastController, NavController } from '@ionic/angular';
-import { ApiService } from 'src/app/services/api';
+import { IonicModule, ToastController, LoadingController } from '@ionic/angular';
+import { ApiService } from '../../../services/api';
 import { addIcons } from 'ionicons';
-import { add, trash, save, cloudDownload, arrowBack, documentText } from 'ionicons/icons';
+import { saveOutline, addCircle, trashOutline, downloadOutline, informationCircle } from 'ionicons/icons';
 
 @Component({
   selector: 'app-duerp-form',
@@ -18,111 +18,120 @@ export class DuerpFormPage implements OnInit {
   annee = new Date().getFullYear().toString();
   lignes: any[] = [];
   
-  isLoading = false; 
+  // Modèle pour une nouvelle ligne
+  newLine = {
+    unite_travail: 'Chantier Général',
+    tache: '',
+    risque: '',
+    gravite: 2,
+    mesures_realisees: '',
+    mesures_a_realiser: '',
+    statut: 'EN COURS' // 👈 Valeur par défaut importante
+  };
 
   constructor(
     private api: ApiService,
     private toastCtrl: ToastController,
-    private navCtrl: NavController
+    private loadingCtrl: LoadingController
   ) {
-    addIcons({ add, trash, save, cloudDownload, arrowBack, documentText });
+    addIcons({ saveOutline, addCircle, trashOutline, downloadOutline, informationCircle });
   }
 
   ngOnInit() {
     this.loadDuerp();
   }
 
-  loadDuerp() {
-    this.isLoading = true;
+  async loadDuerp() {
+    const loading = await this.loadingCtrl.create({ message: 'Chargement...' });
+    await loading.present();
     
     this.api.getDuerp(this.annee).subscribe({
       next: (data) => {
-        if (data && data.lignes && data.lignes.length > 0) {
-          this.lignes = data.lignes;
-        } else {
-          this.lignes = [];
-          this.addLine();
-        }
-        this.isLoading = false;
+        // On s'assure que chaque ligne a un statut (pour les anciennes données)
+        this.lignes = (data.lignes || []).map((l: any) => ({
+          ...l,
+          statut: l.statut || 'EN COURS'
+        }));
+        loading.dismiss();
       },
-      error: (err) => {
-        console.error("Erreur chargement DUERP", err);
-        // On ne vide pas forcément la liste en cas d'erreur réseau, 
-        // mais ici on initialise pour éviter un écran vide.
+      error: () => {
+        loading.dismiss();
         this.lignes = [];
-        this.addLine(); 
-        this.isLoading = false;
       }
     });
   }
 
   addLine() {
-    this.lignes.push({ 
-      tache: '', 
-      risque: '', 
-      gravite: 1, 
-      mesures_realisees: '', 
-      mesures_a_realiser: '' 
-    });
+    // Ajout à la liste locale
+    this.lignes.push({ ...this.newLine });
+    
+    // Reset du formulaire (on garde l'unité de travail pour gagner du temps)
+    this.newLine.tache = '';
+    this.newLine.risque = '';
+    this.newLine.mesures_realisees = '';
+    this.newLine.mesures_a_realiser = '';
+    this.newLine.statut = 'EN COURS';
+    this.presentToast('Ligne ajoutée (Pensez à enregistrer)', 'medium');
   }
 
   removeLine(index: number) {
     this.lignes.splice(index, 1);
   }
 
-  save() {
-    this.isLoading = true;
-    
-    // Conversion de gravite en int pour être sûr (l'input peut renvoyer une string)
-    const lignesPropres = this.lignes.map(l => ({
-        ...l,
-        gravite: parseInt(l.gravite) || 1
-    }));
+  async save() {
+    const loading = await this.loadingCtrl.create({ message: 'Sauvegarde du DUERP...' });
+    await loading.present();
 
-    const payload = { 
-      annee: parseInt(this.annee), 
-      lignes: lignesPropres 
+    const payload = {
+      annee: parseInt(this.annee),
+      lignes: this.lignes
     };
 
     this.api.saveDuerp(payload).subscribe({
       next: () => {
-        this.isLoading = false;
-        this.presentToast('DUERP enregistré avec succès ! ✅', 'success');
+        loading.dismiss();
+        this.presentToast('DUERP Enregistré avec succès ! ✅', 'success');
       },
       error: (err) => {
-        this.isLoading = false;
+        loading.dismiss();
         console.error(err);
-        this.presentToast('Erreur lors de la sauvegarde', 'danger');
+        this.presentToast('Erreur sauvegarde', 'danger');
       }
     });
   }
 
-  // 👇 MODIFICATION MAJEURE ICI
-  downloadPdf() {
-    this.presentToast('Ouverture du PDF...', 'primary');
-    
-    // 1. On récupère le token stocké (le sésame)
-    const token = localStorage.getItem('access_token') || localStorage.getItem('token');
-    
-    if (!token) {
-        this.presentToast('Erreur : Non connecté', 'danger');
-        return;
+  async downloadPdf() {
+    const loading = await this.loadingCtrl.create({ message: 'Génération PDF...' });
+    await loading.present();
+
+    this.api.downloadDuerpPdf(this.annee).subscribe({
+      next: (blob) => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `DUERP_${this.annee}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        loading.dismiss();
+      },
+      error: () => {
+        loading.dismiss();
+        this.presentToast('Erreur téléchargement PDF', 'danger');
+      }
+    });
+  }
+
+  getStatusColor(statut: string): string {
+    switch(statut) {
+      case 'FAIT': return 'var(--ion-color-success)';
+      case 'À FAIRE': return 'var(--ion-color-danger)';
+      default: return 'var(--ion-color-warning)';
     }
-
-    // 2. On construit l'URL avec le token en paramètre (?token=...)
-    const url = `${this.api.apiUrl}/companies/me/duerp/${this.annee}/pdf?token=${token}`;
-    
-    // 3. On ouvre ! 
-    // '_system' force le navigateur du téléphone (Safari/Chrome) qui gère parfaitement les PDF
-    window.open(url, '_system');
   }
 
-  goBack() {
-    this.navCtrl.back();
-  }
-
-  async presentToast(message: string, color: string) {
-    const t = await this.toastCtrl.create({ message, duration: 3000, color });
+  async presentToast(msg: string, color: string) {
+    const t = await this.toastCtrl.create({ message: msg, duration: 2000, color: color, position: 'bottom' });
     t.present();
   }
 }

@@ -1,15 +1,12 @@
 <ion-header>
-  <ion-toolbar color="primary">
+  <ion-toolbar color="tertiary">
     <ion-buttons slot="start">
-      <ion-button (click)="goBack()">
-        <ion-icon name="arrow-back"></ion-icon>
-      </ion-button>
+      <ion-back-button defaultHref="/company"></ion-back-button>
     </ion-buttons>
-    <ion-title>DUERP {{ annee }}</ion-title>
+    <ion-title>Édition DUERP {{ annee }}</ion-title>
     <ion-buttons slot="end">
       <ion-button (click)="downloadPdf()">
-        <ion-icon name="document-text"></ion-icon>
-        <span class="ion-hide-sm-down">&nbsp;PDF</span>
+        <ion-icon name="download-outline" slot="icon-only"></ion-icon>
       </ion-button>
     </ion-buttons>
   </ion-toolbar>
@@ -17,73 +14,136 @@
 
 <ion-content class="ion-padding bg-light">
 
-  <ion-text color="medium" class="ion-text-center header-info">
-    <p>Ce document est obligatoire et doit être mis à jour au moins une fois par an.</p>
-  </ion-text>
-
-  <div *ngIf="isLoading" class="ion-text-center ion-padding">
-    <ion-spinner name="crescent"></ion-spinner>
-    <p>Chargement du document...</p>
+  <div class="info-banner">
+    <ion-icon name="information-circle"></ion-icon>
+    <p>Ajoutez ici les risques identifiés par unité de travail.</p>
   </div>
 
-  <div *ngFor="let ligne of lignes; let i = index">
-    <ion-card class="duerp-card ion-margin-bottom">
-      
-      <ion-card-header class="header-risk">
-        <ion-card-title class="flex-between" style="display: flex; justify-content: space-between; align-items: center; font-size: 1.1rem;">
-          <span>🔴 Risque #{{ i + 1 }}</span>
-          <ion-button fill="clear" color="danger" (click)="removeLine(i)">
-            <ion-icon name="trash" slot="icon-only"></ion-icon>
-          </ion-button>
-        </ion-card-title>
-      </ion-card-header>
-      
-      <ion-card-content>
-        <ion-item lines="none" class="input-field">
-          <ion-label position="stacked">1. Tâches effectuées</ion-label>
-          <ion-textarea [(ngModel)]="ligne.tache" placeholder="Ex: Utilisation marteau-piqueur" rows="2"></ion-textarea>
-        </ion-item>
+  <div *ngFor="let l of lignes; let i = index" class="risk-card">
+    <div class="risk-header">
+      <span class="badge-unit">{{ l.unite_travail }}</span>
+      <ion-button fill="clear" color="danger" size="small" (click)="removeLine(i)">
+        <ion-icon name="trash-outline"></ion-icon>
+      </ion-button>
+    </div>
 
-        <ion-item lines="none" class="input-field">
-          <ion-label position="stacked">2. Identification des Risques</ion-label>
-          <ion-textarea [(ngModel)]="ligne.risque" placeholder="Ex: Bruit, Vibrations" rows="2"></ion-textarea>
-        </ion-item>
+    <ion-grid>
+      <ion-row>
+        <ion-col size="12">
+          <ion-item class="input-item">
+            <ion-label position="stacked">Tâche / Situation</ion-label>
+            <ion-input [(ngModel)]="l.tache"></ion-input>
+          </ion-item>
+        </ion-col>
+        
+        <ion-col size="8">
+          <ion-item class="input-item">
+            <ion-label position="stacked">Risque</ion-label>
+            <ion-input [(ngModel)]="l.risque"></ion-input>
+          </ion-item>
+        </ion-col>
+        
+        <ion-col size="4">
+          <ion-item class="input-item">
+            <ion-label position="stacked">Gravité</ion-label>
+            <ion-select [(ngModel)]="l.gravite" interface="popover">
+              <ion-select-option [value]="1">1 - Faible</ion-select-option>
+              <ion-select-option [value]="2">2 - Moyen</ion-select-option>
+              <ion-select-option [value]="3">3 - Grave</ion-select-option>
+              <ion-select-option [value]="4">4 - Mortel</ion-select-option>
+            </ion-select>
+          </ion-item>
+        </ion-col>
 
-        <ion-item lines="none" class="input-field">
-          <ion-label position="stacked">3. Gravité * (de 1 à 3)</ion-label>
-          <ion-select [(ngModel)]="ligne.gravite" interface="popover" placeholder="Sélectionner">
-            <ion-select-option [value]="1">🟢 1 - Faible</ion-select-option>
-            <ion-select-option [value]="2">🟠 2 - Moyen</ion-select-option>
-            <ion-select-option [value]="3">🔴 3 - Grave/Mortel</ion-select-option>
-          </ion-select>
-        </ion-item>
+        <ion-col size="12">
+          <ion-item class="input-item">
+            <ion-label position="stacked">⚠️ Mesures À PRENDRE</ion-label>
+            <ion-textarea [(ngModel)]="l.mesures_a_realiser" rows="2"></ion-textarea>
+          </ion-item>
+        </ion-col>
 
-        <ion-item lines="none" class="input-field">
-          <ion-label position="stacked">4. Prévention Réalisée</ion-label>
-          <ion-textarea [(ngModel)]="ligne.mesures_realisees" placeholder="Ex: Casque anti-bruit fourni" rows="2"></ion-textarea>
-        </ion-item>
+        <ion-col size="12">
+          <ion-item class="input-item">
+            <ion-label position="stacked">✅ Mesures FAITES</ion-label>
+            <ion-textarea [(ngModel)]="l.mesures_realisees" rows="2"></ion-textarea>
+          </ion-item>
+        </ion-col>
 
-        <ion-item lines="none" class="input-field">
-          <ion-label position="stacked">5. Prévention à Réaliser</ion-label>
-          <ion-textarea [(ngModel)]="ligne.mesures_a_realiser" placeholder="Ex: Formation bruit prévue" rows="2"></ion-textarea>
-        </ion-item>
-      </ion-card-content>
-    </ion-card>
+        <ion-col size="12">
+          <ion-item class="input-item" lines="none">
+            <ion-label position="stacked">État du plan d'action</ion-label>
+            <ion-select [(ngModel)]="l.statut" [style.color]="getStatusColor(l.statut)">
+              <ion-select-option value="À FAIRE">🔴 À FAIRE</ion-select-option>
+              <ion-select-option value="EN COURS">🟠 EN COURS</ion-select-option>
+              <ion-select-option value="FAIT">🟢 FAIT (Maîtrisé)</ion-select-option>
+            </ion-select>
+          </ion-item>
+        </ion-col>
+
+      </ion-row>
+    </ion-grid>
   </div>
 
-  <ion-button expand="block" fill="outline" class="dashed-btn ion-margin-top" (click)="addLine()">
-    <ion-icon name="add" slot="start"></ion-icon> Ajouter un risque
-  </ion-button>
+  <ion-card class="add-card">
+    <ion-card-header>
+      <ion-card-subtitle>Nouvelle Ligne</ion-card-subtitle>
+    </ion-card-header>
+    <ion-card-content>
+      <ion-item fill="outline" class="mb-2">
+        <ion-label position="floating">Unité de Travail (ex: Toiture, Bureau...)</ion-label>
+        <ion-input [(ngModel)]="newLine.unite_travail"></ion-input>
+      </ion-item>
 
-  <div class="ion-padding-bottom" style="height: 20px;"></div>
+      <ion-item fill="outline" class="mb-2">
+        <ion-label position="floating">Tâche</ion-label>
+        <ion-input [(ngModel)]="newLine.tache"></ion-input>
+      </ion-item>
+
+      <ion-row>
+        <ion-col>
+          <ion-item fill="outline">
+            <ion-label position="floating">Risque</ion-label>
+            <ion-input [(ngModel)]="newLine.risque"></ion-input>
+          </ion-item>
+        </ion-col>
+        <ion-col size="4">
+          <ion-item fill="outline">
+            <ion-label>Gravité</ion-label>
+            <ion-select [(ngModel)]="newLine.gravite">
+              <ion-select-option [value]="1">1</ion-select-option>
+              <ion-select-option [value]="2">2</ion-select-option>
+              <ion-select-option [value]="3">3</ion-select-option>
+              <ion-select-option [value]="4">4</ion-select-option>
+            </ion-select>
+          </ion-item>
+        </ion-col>
+      </ion-row>
+
+      <ion-item fill="outline" class="mt-2">
+        <ion-label>État initial</ion-label>
+        <ion-select [(ngModel)]="newLine.statut">
+          <ion-select-option value="À FAIRE">À FAIRE</ion-select-option>
+          <ion-select-option value="EN COURS">EN COURS</ion-select-option>
+          <ion-select-option value="FAIT">FAIT</ion-select-option>
+        </ion-select>
+      </ion-item>
+
+      <ion-button expand="block" (click)="addLine()" class="ion-margin-top" [disabled]="!newLine.tache || !newLine.risque">
+        <ion-icon name="add-circle" slot="start"></ion-icon>
+        Ajouter au DUERP
+      </ion-button>
+    </ion-card-content>
+  </ion-card>
+
+  <div class="spacer"></div>
 
 </ion-content>
 
 <ion-footer>
-  <ion-toolbar class="ion-padding">
-    <ion-button expand="block" (click)="save()" size="large">
-      <ion-icon name="save" slot="start"></ion-icon>
-      Enregistrer le DUERP
+  <ion-toolbar>
+    <ion-button expand="block" (click)="save()" color="success" size="large">
+      <ion-icon name="save-outline" slot="start"></ion-icon>
+      ENREGISTRER LE DUERP
     </ion-button>
   </ion-toolbar>
 </ion-footer>

@@ -567,7 +567,7 @@ def generate_duerp_pdf(duerp, company, lignes):
 
     # --- STYLE DU TABLEAU (Sobre) ---
     # Largeurs optimisées pour paysage A4 (Total ~780pt dispo)
-    col_widths = [160, 140, 80, 320, 80]
+    col_widths = [160, 140, 70, 330, 80]
     
     t = Table(data, colWidths=col_widths, repeatRows=1)
     
