@@ -400,11 +400,22 @@ def read_chantiers(
         raise HTTPException(status_code=500, detail=f"Erreur serveur: {str(e)}")
     
 
-@app.get("/chantiers/{chantier_id}", response_model=schemas.ChantierOut)
-def read_chantier(chantier_id: int, db: Session = Depends(get_db)):
-    chantier = db.query(models.Chantier).filter(models.Chantier.id == chantier_id).first()
-    if not chantier: raise HTTPException(status_code=404, detail="Chantier introuvable")
-    return chantier
+# @app.get("/chantiers/{chantier_id}", response_model=schemas.ChantierOut)
+# def read_chantier(chantier_id: int, db: Session = Depends(get_db)):
+#     chantier = db.query(models.Chantier).filter(models.Chantier.id == chantier_id).first()
+#     if not chantier: raise HTTPException(status_code=404, detail="Chantier introuvable")
+#     return chantier
+
+@app.get("/chantiers/{cid}", response_model=schemas.ChantierOut)
+def get_chantier(cid: int, db: Session = Depends(get_db)):
+    # Query safely
+    db_chantier = db.query(models.Chantier).filter(models.Chantier.id == cid).first()
+    
+    if not db_chantier:
+        # This raises a 404 exception which FastAPI handles correctly (with CORS)
+        raise HTTPException(status_code=404, detail="Chantier introuvable")
+        
+    return db_chantier
 
 # --- UPDATE CHANTIER (ROBUSTE) ---
 @app.put("/chantiers/{cid}", response_model=schemas.ChantierOut)
