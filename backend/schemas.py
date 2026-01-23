@@ -312,6 +312,8 @@ class DUERPRow(BaseModel):
     mesures_realisees: Optional[str] = None
     mesures_a_realiser: Optional[str] = None
 
+    statut: str = "EN COURS"
+
 class DUERPCreate(BaseModel):
     annee: int
     lignes: List[DUERPRow]

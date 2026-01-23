@@ -3,7 +3,8 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.units import cm
 from reportlab.lib.utils import ImageReader
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
-from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.enums import TA_CENTER, TA_LEFT
 from reportlab.lib import colors
 from PIL import Image, ImageOps
 import os
@@ -491,60 +492,107 @@ def generate_pdp_pdf(chantier, pdp, output_path, company=None):
 # ==========================================
 def generate_duerp_pdf(duerp, company, lignes):
     """
-    Génère le Document Unique (DUERP) complet en PDF (Format Paysage)
+    Génère le Document Unique (DUERP) - Style Sobre & Professionnel
     """
     buffer = BytesIO()
-    # On utilise SimpleDocTemplate qui est plus puissant pour les tableaux multipages
-    doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), rightMargin=20, leftMargin=20, topMargin=20, bottomMargin=20)
+    doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30)
     
     elements = []
     styles = getSampleStyleSheet()
-    style_normal = styles['Normal']
-    style_title = styles['Title']
     
-    # Titre
-    elements.append(Paragraph(f"DOCUMENT UNIQUE (DUERP) - {duerp.annee}", style_title))
-    elements.append(Spacer(1, 10))
-    elements.append(Paragraph(f"Entreprise : {company.name} | Mis à jour le : {duerp.date_mise_a_jour.strftime('%d/%m/%Y')}", style_normal))
-    elements.append(Spacer(1, 20))
+    # --- STYLES PERSONNALISÉS ---
+    style_titre = ParagraphStyle(
+        'TitreDoc', parent=styles['Title'], 
+        fontSize=18, spaceAfter=20, textColor=colors.HexColor('#333333'), alignment=TA_CENTER
+    )
+    style_sous_titre = ParagraphStyle(
+        'SousTitre', parent=styles['Normal'],
+        fontSize=10, textColor=colors.HexColor('#666666'), alignment=TA_CENTER
+    )
+    style_cell_header = ParagraphStyle(
+        'CellHeader', parent=styles['Normal'],
+        fontSize=10, fontName='Helvetica-Bold', textColor=colors.black, alignment=TA_CENTER
+    )
+    style_cell_normal = ParagraphStyle(
+        'CellNormal', parent=styles['Normal'],
+        fontSize=10, fontName='Helvetica', leading=12
+    )
     
-    # Données du tableau
-    data = [['Unité de Travail / Tâche', 'Risque Identifié', 'Gravité', 'Mesures de Prévention', 'État']]
+    # --- EN-TÊTE DU DOCUMENT ---
+    elements.append(Paragraph(f"DOCUMENT UNIQUE D'ÉVALUATION DES RISQUES (DUERP) - {duerp.annee}", style_titre))
+    
+    info_line = f"<b>Entreprise :</b> {company.name} &nbsp;&nbsp;|&nbsp;&nbsp; <b>Mise à jour :</b> {duerp.date_mise_a_jour.strftime('%d/%m/%Y')}"
+    elements.append(Paragraph(info_line, style_sous_titre))
+    elements.append(Spacer(1, 25))
+    
+    # --- PRÉPARATION DES DONNÉES ---
+    # En-têtes du tableau
+    headers = [
+        Paragraph('Unité / Tâche', style_cell_header),
+        Paragraph('Risque Identifié', style_cell_header),
+        Paragraph('G.', style_cell_header), # G pour Gravité
+        Paragraph('Mesures de Prévention', style_cell_header),
+        Paragraph('État', style_cell_header)
+    ]
+    
+    data = [headers]
     
     for l in lignes:
-        # Paragraph permet le retour à la ligne automatique dans les cellules
-        tache = Paragraph(l.tache, style_normal)
-        risque = Paragraph(l.risque, style_normal)
+        # Contenu des cellules
+        tache = Paragraph(f"<b>{l.unite_travail}</b><br/>{l.tache}", style_cell_normal)
+        risque = Paragraph(l.risque, style_cell_normal)
+        gravite = Paragraph(str(l.gravite), ParagraphStyle('Center', parent=style_cell_normal, alignment=TA_CENTER))
         
-        # Mise en forme des mesures
-        mesures_text = f"<b>À FAIRE :</b> {l.mesures_a_realiser or '-'}<br/><br/><i>FAIT : {l.mesures_realisees or '-'}</i>"
-        mesures = Paragraph(mesures_text, style_normal)
+        # Formatage des mesures (A faire / Fait)
+        mesures_html = ""
+        if l.mesures_a_realiser:
+            mesures_html += f"• À FAIRE : {l.mesures_a_realiser}<br/>"
+        if l.mesures_realisees:
+            mesures_html += f"<font color='#666666'>• FAIT : {l.mesures_realisees}</font>"
+        if not mesures_html: mesures_html = "-"
+            
+        mesures = Paragraph(mesures_html, style_cell_normal)
         
-        data.append([tache, risque, str(l.gravite), mesures, "EN COURS"])
+        # Gestion de la couleur du statut (Sobre : texte coloré, pas de fond fluo)
+        statut_val = l.statut if l.statut else "EN COURS"
+        color_statut = "#E67E22" # Orange par défaut (En cours)
+        
+        if statut_val == "FAIT": color_statut = "#27AE60" # Vert pro
+        elif statut_val == "À FAIRE": color_statut = "#C0392B" # Rouge pro
+        
+        statut_html = f"<font color='{color_statut}'><b>{statut_val}</b></font>"
+        statut = Paragraph(statut_html, ParagraphStyle('Statut', parent=style_cell_normal, alignment=TA_CENTER))
+        
+        data.append([tache, risque, gravite, mesures, statut])
 
-    # Style du tableau
-    # Largeurs colonnes : Total ~800 points en paysage
-    col_widths = [180, 150, 60, 330, 80]
+    # --- STYLE DU TABLEAU (Sobre) ---
+    # Largeurs optimisées pour paysage A4 (Total ~780pt dispo)
+    col_widths = [160, 140, 40, 360, 80]
     
-    t = Table(data, colWidths=col_widths)
+    t = Table(data, colWidths=col_widths, repeatRows=1)
+    
     t.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.navy),       # En-tête bleu marine
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),  # Texte blanc
-        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-        ('VALIGN', (0, 0), (-1, -1), 'TOP'),                # Texte aligné en haut
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 12),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),     # Fond des lignes beige clair
-        ('GRID', (0, 0), (-1, -1), 1, colors.black),        # Grille noire
-        ('BOX', (0, 0), (-1, -1), 2, colors.black),         # Cadre extérieur épais
+        # En-tête : Fond Gris Clair, Bordures fines
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#F0F0F0')),
+        ('LINEBELOW', (0, 0), (-1, 0), 1, colors.HexColor('#999999')),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('TOPPADDING', (0, 0), (-1, -1), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+        ('LEFTPADDING', (0, 0), (-1, -1), 8),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+        
+        # Corps du tableau : Lignes fines grises
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CCCCCC')),
+        ('ALIGN', (2, 1), (2, -1), 'CENTER'), # Centrer la gravité
     ]))
     
     elements.append(t)
     
-    # --- GÉNÉRATION ---
-    doc.build(elements)
+    # --- PIED DE PAGE ---
+    elements.append(Spacer(1, 30))
+    elements.append(Paragraph("<i>Document généré par Conforméo - Application de gestion BTP</i>", style_sous_titre))
     
+    doc.build(elements)
     buffer.seek(0)
     return buffer
 

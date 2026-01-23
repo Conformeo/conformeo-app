@@ -232,6 +232,7 @@ class DUERPLigne(Base):
     gravite = Column(Integer)
     mesures_realisees = Column(String)
     mesures_a_realiser = Column(String)
+    statut = Column(String, default="EN COURS")
     
     duerp = relationship("DUERP", back_populates="lignes")
 

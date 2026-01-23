@@ -12,7 +12,7 @@ import {
 import { 
   gridOutline, hammerOutline, mapOutline, peopleOutline, business,
   settingsOutline, logOutOutline, sync, checkmarkCircle, warning, calendarOutline,
-  documentTextOutline, home, cubeOutline
+  documentTextOutline, home, cubeOutline, shieldCheckmarkOutline
 } from 'ionicons/icons';
 
 import { OfflineService } from './services/offline';
@@ -58,7 +58,7 @@ export class AppComponent {
     addIcons({ 
       gridOutline, hammerOutline, mapOutline, peopleOutline, business,
       settingsOutline, logOutOutline, sync, checkmarkCircle, warning, calendarOutline,
-      documentTextOutline, home, cubeOutline
+      documentTextOutline, home, cubeOutline, shieldCheckmarkOutline
     });
     
     this.initializeApp();

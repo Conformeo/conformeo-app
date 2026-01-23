@@ -1823,3 +1823,12 @@ def fix_duerp_unite(db: Session = Depends(get_db)):
         return {"message": "✅ Colonne 'unite_travail' ajoutée avec succès !"}
     except Exception as e:
         return {"error": str(e)}
+    
+@app.get("/fix_duerp_statut")
+def fix_duerp_statut(db: Session = Depends(get_db)):
+    try:
+        db.execute(text("ALTER TABLE duerp_lignes ADD COLUMN IF NOT EXISTS statut VARCHAR DEFAULT 'EN COURS'"))
+        db.commit()
+        return {"message": "✅ Colonne 'statut' ajoutée au DUERP !"}
+    except Exception as e:
+        return {"error": str(e)}

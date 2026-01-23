@@ -6,7 +6,6 @@ import {
   IonicModule, AlertController, ToastController, LoadingController, ModalController 
 } from '@ionic/angular';
 import { addIcons } from 'ionicons';
-// 👇 ON IMPORTE TOUTES LES ICÔNES NÉCESSAIRES
 import { 
   business, documentText, cloudUpload, trash, shieldCheckmark, 
   briefcase, warning, calendar, eye, pencil, add, folderOpen, close, camera, 
@@ -26,7 +25,6 @@ import { SignatureModalComponent } from '../chantier-details/signature-modal/sig
 export class CompanyPage implements OnInit {
 
   segment = 'infos';
-  // On initialise les champs pour éviter les erreurs "undefined"
   company: any = {
     name: '',
     address: '',
@@ -39,12 +37,14 @@ export class CompanyPage implements OnInit {
   isLoading = false;
   hasExpiredDocs = false;
   isUploadModalOpen = false;
+  
+  // Modèle pour le nouveau document
   newDoc = { titre: '', type_doc: 'AUTRE', date_expiration: '' };
+  
   selectedFile: File | null = null;
   
   @ViewChild('fileInput') fileInput!: ElementRef;
   @ViewChild('logoInput') logoInput!: ElementRef;
-  isLogoDragging = false; 
 
   constructor(
     public api: ApiService,
@@ -53,7 +53,6 @@ export class CompanyPage implements OnInit {
     private loadingCtrl: LoadingController,
     private modalCtrl: ModalController
   ) {
-    // 👇 ON DÉCLARE TOUTES LES ICÔNES
     addIcons({ 
       business, documentText, cloudUpload, trash, shieldCheckmark, 
       briefcase, warning, calendar, eye, pencil, add, folderOpen, close, camera, 
@@ -76,8 +75,7 @@ export class CompanyPage implements OnInit {
       
       if (comp) {
         this.company = comp;
-        
-        // 👇 FIX EMAIL : Si l'API renvoie 'email' mais pas 'contact_email', on copie la valeur
+        // Synchro de l'email si contact_email est vide
         if (!this.company.contact_email && this.company.email) {
             this.company.contact_email = this.company.email;
         }
@@ -92,7 +90,7 @@ export class CompanyPage implements OnInit {
     });
   }
 
-  // --- LOGO GESTION ---
+  // --- LOGO ---
   triggerLogoUpload() { this.logoInput.nativeElement.click(); }
   
   onLogoSelected(event: any) {
@@ -107,7 +105,6 @@ export class CompanyPage implements OnInit {
     this.api.uploadLogo(file).subscribe({
       next: (res) => {
         if (this.company) {
-            // On ajoute un timestamp pour forcer le rafraîchissement de l'image
             this.company.logo_url = res.url;
         }
         load.dismiss();
@@ -126,11 +123,10 @@ export class CompanyPage implements OnInit {
     const load = await this.loadingCtrl.create({ message: 'Sauvegarde...' });
     await load.present();
     
-    // 👇 On prépare l'objet propre pour l'API
     const payload = {
       name: this.company.name,
       address: this.company.address,
-      contact_email: this.company.contact_email, // C'est ce champ que l'input modifie
+      contact_email: this.company.contact_email,
       phone: this.company.phone
     };
 
@@ -138,22 +134,19 @@ export class CompanyPage implements OnInit {
       next: (res) => { 
           load.dismiss(); 
           this.presentToast('Infos mises à jour ✅', 'success'); 
-          // Mise à jour locale
           if (res) {
              this.company = { ...this.company, ...res };
-             // On s'assure que contact_email reste synchronisé
              if(res.email) this.company.contact_email = res.email;
           }
       },
       error: (err) => { 
         load.dismiss(); 
-        console.error(err);
         this.presentToast('Erreur serveur', 'danger'); 
       }
     });
   }
 
-  // --- RESTE DU CODE (SANS CHANGEMENT MAJEUR) ---
+  // --- DOCUMENTS ---
   checkGlobalStatus() {
     this.hasExpiredDocs = this.docs.some(d => {
         if(!d.date_expiration) return false;
@@ -167,6 +160,7 @@ export class CompanyPage implements OnInit {
     const today = new Date();
     const diffTime = expDate.getTime() - today.getTime();
     const daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
     if (daysLeft < 0) return { text: `Expiré (${Math.abs(daysLeft)}j)`, color: 'danger' };
     if (daysLeft < 30) return { text: `Expire ds ${daysLeft}j`, color: 'warning' };
     return { text: `Valide`, color: 'success' };
@@ -187,8 +181,11 @@ export class CompanyPage implements OnInit {
     if (!this.selectedFile || !this.newDoc.titre) return;
     const load = await this.loadingCtrl.create({ message: 'Envoi...' });
     await load.present();
+    
     let dateExp = undefined;
-    if (this.newDoc.date_expiration) dateExp = String(this.newDoc.date_expiration).split('T')[0]; 
+    if (this.newDoc.date_expiration) {
+        dateExp = String(this.newDoc.date_expiration).split('T')[0]; 
+    }
 
     this.api.uploadCompanyDoc(this.selectedFile, this.newDoc.titre, this.newDoc.type_doc, dateExp).subscribe({
       next: (newDoc) => {
@@ -239,7 +236,7 @@ export class CompanyPage implements OnInit {
   }
 
   openDoc(url: string) { 
-    // Utilisation de la méthode du service
+    if(!url) return;
     const fullUrl = this.api.getFullUrl(url);
     window.open(fullUrl, '_system'); 
   }
