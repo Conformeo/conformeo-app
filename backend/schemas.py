@@ -231,8 +231,8 @@ class ChantierOut(BaseModel):
     date_debut: Optional[date] = None
     date_fin: Optional[date] = None
     
-    est_actif: bool
-    soumis_sps: bool
+    est_actif: bool = True       # Provide default
+    soumis_sps: bool = False     # Provide default
     cover_url: Optional[str] = None
     
     date_creation: Optional[datetime] = None
