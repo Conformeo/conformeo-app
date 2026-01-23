@@ -40,28 +40,31 @@ class User(Base):
 # 2. CHANTIERS
 # ==========================
 class Chantier(Base):
-    # 👇 RENOMMAGE V2 POUR FORCER LA CRÉATION DE LA COLONNE 'soumis_sps'
+    # 👇 On force la création d'une nouvelle table propre
     __tablename__ = "chantiers_v2"
 
     id = Column(Integer, primary_key=True, index=True)
     nom = Column(String, index=True)
-    adresse = Column(String)
-    client = Column(String)
+    adresse = Column(String, nullable=True)
+    client = Column(String, nullable=True)
+    
+    # 👇 Utiliser 'Date' est plus simple que 'DateTime' pour un planning
+    date_debut = Column(Date, nullable=True)
+    date_fin = Column(Date, nullable=True)
+    
+    statut_planning = Column(String, default="prevu")
     est_actif = Column(Boolean, default=True)
-    date_creation = Column(DateTime, default=datetime.utcnow)
+    soumis_sps = Column(Boolean, default=False)
+    
     signature_url = Column(String, nullable=True)
     cover_url = Column(String, nullable=True)
 
     latitude = Column(Float, nullable=True)
     longitude = Column(Float, nullable=True)
+    
+    date_creation = Column(DateTime, default=datetime.utcnow)
 
-    date_debut = Column(Date, nullable=True)
-    date_fin = Column(Date, nullable=True)
-    statut_planning = Column(String, default="prevu")
-    
-    # 👇 NOUVELLE COLONNE POUR LE TOGGLE SPS
-    soumis_sps = Column(Boolean, default=False)
-    
+    # Clé étrangère
     company_id = Column(Integer, ForeignKey("companies.id"), nullable=True)
     company = relationship("Company", back_populates="chantiers")
 
@@ -72,9 +75,9 @@ class Chantier(Base):
     ppsps_docs = relationship("PPSPS", back_populates="chantier")
     plans_prevention = relationship("PlanPrevention", back_populates="chantier")
     pic = relationship("PIC", uselist=False, back_populates="chantier")
-    
     tasks = relationship("Task", back_populates="chantier")
     permis_feu = relationship("PermisFeu", back_populates="chantier")
+
 
 # ==========================
 # 3. MATERIEL

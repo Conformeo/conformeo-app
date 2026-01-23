@@ -189,13 +189,30 @@ class ChantierCreate(BaseModel):
     soumis_sps: Optional[bool] = False
     cover_url: Optional[str] = None # Au cas où on l'envoie manuellement
 
+class ChantierBase(BaseModel):
+    nom: str
+    adresse: Optional[str] = None
+    client: Optional[str] = None
+    
+    # On autorise str (pour l'update) ou date (pour la lecture)
+    date_debut: Optional[date] = None 
+    date_fin: Optional[date] = None   
+    
+    est_actif: bool = True
+    soumis_sps: bool = False
+
+class ChantierCreate(ChantierBase):
+    # En entrée (création), on accepte des strings "YYYY-MM-DD"
+    date_debut: Optional[str] = None
+    date_fin: Optional[str] = None
+    cover_url: Optional[str] = None
+
 class ChantierUpdate(BaseModel):
     nom: Optional[str] = None
     client: Optional[str] = None
     adresse: Optional[str] = None
     
-    # 👇 C'EST ICI QUE TOUT SE JOUE :
-    # Si ces lignes ne sont pas là, la mise à jour est IMPOSSIBLE.
+    # 👇 TOUS VOS CHAMPS SONT BIEN LÀ
     date_debut: Optional[str] = None 
     date_fin: Optional[str] = None
     est_actif: Optional[bool] = None
@@ -205,16 +222,26 @@ class ChantierUpdate(BaseModel):
     class Config:
         orm_mode = True
 
-class ChantierOut(ChantierBase):
+class ChantierOut(BaseModel):
     id: int
-    est_actif: bool = True 
+    nom: str
+    client: Optional[str] = None
+    adresse: Optional[str] = None
+    
+    date_debut: Optional[date] = None
+    date_fin: Optional[date] = None
+    
+    est_actif: bool
+    soumis_sps: bool
     cover_url: Optional[str] = None
-    signature_url: Optional[str] = None
+    
     date_creation: Optional[datetime] = None
     company_id: Optional[int] = None
     
     class Config:
-        from_attributes = True
+        orm_mode = True
+        # Si vous utilisez Pydantic V2, remplacez orm_mode par :
+        # from_attributes = True
 
 # --- RAPPORT ---
 class RapportCreate(BaseModel):
