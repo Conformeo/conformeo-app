@@ -1286,6 +1286,38 @@ def create_or_update_duerp(duerp_data: schemas.DUERPCreate, db: Session = Depend
     db.commit()
     return db_duerp
 
+# Dans backend/main.py
+
+@app.get("/duerp/consultation/pdf")
+def consulter_duerp_pdf(
+    db: Session = Depends(get_db),
+    # 👇 On accepte n'importe quel utilisateur connecté (Ouvrier, Conducteur, Admin)
+    current_user: models.User = Depends(security.get_current_user) 
+):
+    if not current_user.company_id:
+        raise HTTPException(404, "Vous n'êtes rattaché à aucune entreprise.")
+
+    # On récupère le DUERP le plus récent de l'entreprise
+    duerp = db.query(models.DUERP).filter(
+        models.DUERP.company_id == current_user.company_id
+    ).order_by(models.DUERP.annee.desc()).first()
+    
+    if not duerp:
+        raise HTTPException(404, "Aucun Document Unique n'a été établi pour le moment.")
+
+    # Génération du PDF (code existant)
+    company = db.query(models.Company).filter(models.Company.id == current_user.company_id).first()
+    lignes = db.query(models.DUERPLigne).filter(models.DUERPLigne.duerp_id == duerp.id).all()
+    
+    # On imagine que votre fonction de génération PDF gère le tri par unité
+    pdf_buffer = pdf_generator.generate_duerp_pdf(duerp, company, lignes)
+    
+    return StreamingResponse(
+        pdf_buffer,
+        media_type='application/pdf',
+        headers={"Content-Disposition": f"inline; filename=DUERP_Consultation.pdf"}
+    )
+
 @app.get("/companies/me/duerp/{annee}", response_model=schemas.DUERPOut)
 def get_duerp(annee: str, db: Session = Depends(get_db), current_user: models.User = Depends(security.get_current_user)):
     d = db.query(models.DUERP).filter(models.DUERP.company_id == current_user.company_id, models.DUERP.annee == annee).first()
@@ -1781,3 +1813,13 @@ def force_activate_all(
     
     db.commit()
     return {"status": "Succès", "chantiers_reactives": result}
+
+@app.get("/fix_duerp_unite")
+def fix_duerp_unite(db: Session = Depends(get_db)):
+    try:
+        # Ajoute la colonne si elle manque
+        db.execute(text("ALTER TABLE duerp_lignes ADD COLUMN IF NOT EXISTS unite_travail VARCHAR DEFAULT 'Général'"))
+        db.commit()
+        return {"message": "✅ Colonne 'unite_travail' ajoutée avec succès !"}
+    except Exception as e:
+        return {"error": str(e)}

@@ -224,6 +224,8 @@ class DUERPLigne(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     duerp_id = Column(Integer, ForeignKey("duerps.id"))
+
+    unite_travail = Column(String, default="Général")
     
     tache = Column(String)
     risque = Column(String)

@@ -304,6 +304,8 @@ PdpOut = PlanPreventionOut
 
 # --- DUERP ---
 class DUERPRow(BaseModel):
+    unite_travail: str = "Chantier Général"
+    
     tache: str
     risque: str
     gravite: int

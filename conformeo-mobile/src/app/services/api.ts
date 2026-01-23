@@ -36,7 +36,7 @@ export interface DocExterne {
   titre: string;
   categorie: string;
   url: string;
-  date_ajout: string; // Mis à jour pour correspondre au backend (date_upload -> date_ajout)
+  date_ajout: string; 
 }
 
 export interface Chantier {
@@ -75,10 +75,10 @@ export interface Materiel {
   id?: number;
   nom: string;
   reference: string;
-  ref_interne?: string; // Ajouté
+  ref_interne?: string; 
   etat: string;
   statut_vgp: string;
-  date_derniere_vgp?: string; // Ajouté
+  date_derniere_vgp?: string; 
   image_url?: string | null;
   chantier_id?: number | null;
 }
@@ -87,7 +87,7 @@ export interface Inspection {
   id?: number;
   titre: string;
   type: string;
-  data: any; // Peut être un objet ou une liste selon le backend
+  data: any; 
   chantier_id: number;
   createur: string;
   date_creation?: string;
@@ -338,15 +338,6 @@ export class ApiService {
     return this.http.delete(`${this.apiUrl}/companies/me/documents/${docId}`, this.getOptions());
   }
 
-  // 👇 AJOUT POUR LA SIGNATURE
-  // signCompanyDoc(docId: number, nomSignataire: string, signatureUrl: string): Observable<any> {
-  //   return this.http.post(
-  //     `${this.apiUrl}/companies/documents/${docId}/sign`,
-  //     { nom_signataire: nomSignataire, signature_url: signatureUrl },
-  //     this.getOptions()
-  //   );
-  // }
-
   // ==========================================
   // 🏗️ CHANTIERS
   // ==========================================
@@ -400,12 +391,9 @@ export class ApiService {
     formData.append('categorie', categorie);
     formData.append('titre', titre);
 
-    // Note : Pour l'upload de fichiers, on ne met PAS 'Content-Type': 'application/json'
-    // Angular gère le Content-Type automatiquement quand on passe un FormData
     const token = localStorage.getItem('token') || localStorage.getItem('access_token') || '';
     const headers = new HttpHeaders({
       'Authorization': `Bearer ${token}`
-      // Pas de Content-Type ici !
     });
 
     return this.http.post<any>(`${this.apiUrl}/chantiers/${chantierId}/docs`, formData, { headers });
@@ -420,7 +408,6 @@ export class ApiService {
     const formData = new FormData();
     formData.append('file', file);
     
-    // Auth Token nécessaire
     const token = localStorage.getItem('access_token');
     const headers = new HttpHeaders({ 'Authorization': `Bearer ${token}` });
 
@@ -572,16 +559,11 @@ export class ApiService {
     window.open(url, '_system');
   }
 
-  // 👇 AJOUTEZ CETTE FONCTION MAGIQUE
   getFullUrl(path: string | undefined | null): string {
     if (!path) return ''; 
-    
-    // 1. Si c'est déjà une URL complète (Cloudinary), on la renvoie telle quelle
     if (path.startsWith('http')) {
       return path;
     }
-
-    // 2. Si c'est une image locale (ancien système), on ajoute le domaine API
     return `${this.apiUrl}/${path}`;
   }
   
@@ -598,17 +580,23 @@ export class ApiService {
     return this.http.post(`${this.apiUrl}/companies/me/duerp`, data, this.getOptions());
   }
 
-  // DUERP PDF Download (Correction pour récupérer le Blob)
+  // 3. Télécharger le PDF (Admin)
   downloadDuerpPdf(annee: string): Observable<Blob> {
     const url = `${this.apiUrl}/companies/me/duerp/${annee}/pdf`;
-    
-    // On utilise getOptions() pour inclure le Token, 
-    // et on force responseType: 'blob' pour dire à Angular que c'est un fichier
     return this.http.get(url, { 
       headers: this.getOptions().headers, 
       responseType: 'blob' 
     });
   }
+
+  // 4. 👇 NOUVELLE MÉTHODE : Télécharger le DUERP "Public" (Consultation Salariés)
+  downloadPublicDuerp(): Observable<Blob> {
+    return this.http.get(`${this.apiUrl}/duerp/consultation/pdf`, {
+      responseType: 'blob',
+      headers: this.getOptions().headers
+    });
+  }
+  
 
   // PLAN PREVENTION
   createPdp(data: any) {
@@ -700,6 +688,6 @@ export class ApiService {
   }
 
   getPermisFeuList(chantierId: number) {
-    return this.http.get<any[]>(`${this.apiUrl}/chantiers/${chantierId}/permis-feu`, this.getOptions()); // Header ajouté pour la sécu
+    return this.http.get<any[]>(`${this.apiUrl}/chantiers/${chantierId}/permis-feu`, this.getOptions()); 
   }
 }

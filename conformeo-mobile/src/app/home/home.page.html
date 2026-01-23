@@ -1,31 +1,44 @@
 <ion-header [translucent]="true">
-  <ion-toolbar color="primary">
-    <ion-title>Conforméo</ion-title>
-
+  
+  <ion-toolbar [color]="isSelectionMode ? 'medium' : 'primary'">
+    
     <ion-buttons slot="start">
-      <ion-button (click)="navigateTo('/dashboard')">
-        <ion-icon name="stats-chart-outline"></ion-icon>
-      </ion-button>
       
-      <ion-button (click)="navigateTo('/materiel')">
-        <ion-icon name="hammer-outline"></ion-icon>
+      <ng-container *ngIf="!isSelectionMode">
+        <ion-button (click)="navigateTo('/dashboard')">
+          <ion-icon name="stats-chart-outline"></ion-icon>
+        </ion-button>
+        <ion-button (click)="navigateTo('/materiel')">
+          <ion-icon name="hammer-outline"></ion-icon>
+        </ion-button>
+      </ng-container>
+
+      <ion-button *ngIf="isSelectionMode" (click)="toggleSelectionMode()">
+        <ion-icon name="close-outline" slot="start"></ion-icon>
+        Annuler
       </ion-button>
+
     </ion-buttons>
+
+    <ion-title>
+      {{ isSelectionMode ? selectedIds.size + ' sélectionné(s)' : 'Conforméo' }}
+    </ion-title>
 
     <ion-buttons slot="end">
       
-      <ion-button (click)="toggleSelectionMode()">
-        <ion-icon [name]="isSelectionMode ? 'close-circle-outline' : 'checkbox-outline'" 
-                  [color]="isSelectionMode ? 'danger' : 'light'"></ion-icon>
-      </ion-button>
+      <ng-container *ngIf="!isSelectionMode">
+        <ion-button (click)="toggleSelectionMode()">
+          <ion-icon name="checkbox-outline"></ion-icon>
+        </ion-button>
 
-      <input type="file" #csvInput (change)="onCSVSelected($event)" accept=".csv" style="display: none;" />
-      <ion-button (click)="csvInput.click()">
-        <ion-icon name="cloud-upload-outline"></ion-icon>
-      </ion-button>
+        <input type="file" #csvInput (change)="onCSVSelected($event)" accept=".csv" style="display: none;" />
+        <ion-button (click)="csvInput.click()">
+          <ion-icon name="cloud-upload-outline"></ion-icon>
+        </ion-button>
+      </ng-container>
 
-      <ion-button (click)="downloadCSV()">
-        <ion-icon name="download-outline" [color]="selectedIds.size > 0 ? 'success' : 'light'"></ion-icon>
+      <ion-button (click)="downloadCSV()" [disabled]="isSelectionMode && selectedIds.size === 0">
+        <ion-icon name="download-outline" [color]="isSelectionMode ? 'light' : 'light'"></ion-icon>
       </ion-button>
 
       <ion-icon 
@@ -34,9 +47,10 @@
         style="font-size: 24px; margin-right: 10px; margin-left: 5px;">
       </ion-icon>
     </ion-buttons>
+
   </ion-toolbar>
 
-  <ion-toolbar color="primary">
+  <ion-toolbar color="primary" *ngIf="!isSelectionMode">
     <ion-searchbar 
         placeholder="Rechercher un chantier..." 
         [(ngModel)]="searchTerm" 
@@ -55,9 +69,6 @@
 
   <h2 style="margin-left: 16px; margin-top: 10px; font-weight: 700;">
     Mes Chantiers ({{ filteredChantiers.length }})
-    <span *ngIf="isSelectionMode && selectedIds.size > 0" style="font-size: 0.8em; color: var(--ion-color-primary);">
-      - {{ selectedIds.size }} sélectionné(s)
-    </span>
   </h2>
   
   <div *ngIf="filteredChantiers.length === 0" style="text-align: center; margin-top: 50px; opacity: 0.6;">
@@ -65,7 +76,6 @@
   </div>
 
   <div class="pro-list">
-    
     <div *ngFor="let c of filteredChantiers" class="pro-card" 
          (click)="isSelectionMode ? toggleItemSelection(c.id!) : null"
          [routerLink]="isSelectionMode ? null : ['/chantier', c.id]"

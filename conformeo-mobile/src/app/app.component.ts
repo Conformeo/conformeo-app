@@ -41,6 +41,7 @@ export class AppComponent {
     { title: 'Équipes', url: '/team', icon: 'people-outline' },
     { title: 'Mon Entreprise', url: '/company', icon: 'business' }, // ✅ Page Entreprise
     { title: 'Planning', url: '/planning', icon: 'calendar-outline' },
+    { title: 'Sécurité & DUERP', url: '/securite-doc', icon: 'shield-checkmark-outline' },
     { title: 'Mon Compte', url: '/settings', icon: 'settings-outline' },
   ];
 
