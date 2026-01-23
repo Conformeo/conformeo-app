@@ -408,12 +408,20 @@ def read_chantiers(
 
 @app.get("/chantiers/{cid}", response_model=schemas.ChantierOut)
 def get_chantier(cid: int, db: Session = Depends(get_db)):
-    # On cherche le chantier
+    # 1. On cherche le chantier
     db_chantier = db.query(models.Chantier).filter(models.Chantier.id == cid).first()
     
-    # 👇 LA SÉCURITÉ : Si non trouvé, on arrête tout de suite
+    # 2. Sécurité : Si pas trouvé, 404
     if not db_chantier:
         raise HTTPException(status_code=404, detail="Chantier introuvable")
+        
+    # 3. 👇 FIX CRITIQUE : Conversion DateTime -> Date
+    # On force la suppression de l'heure pour satisfaire Pydantic
+    if hasattr(db_chantier, "date_debut") and isinstance(db_chantier.date_debut, datetime):
+        db_chantier.date_debut = db_chantier.date_debut.date()
+        
+    if hasattr(db_chantier, "date_fin") and isinstance(db_chantier.date_fin, datetime):
+        db_chantier.date_fin = db_chantier.date_fin.date()
         
     return db_chantier
 
