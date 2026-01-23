@@ -162,6 +162,17 @@ export class AddChantierModalComponent implements OnInit {
     }
   }
 
+  async deleteChantier() {
+    if (!confirm('Êtes-vous sûr de vouloir supprimer ce chantier définitivement ?')) return;
+    
+    this.api.deleteChantier(this.existingChantier.id).subscribe({
+      next: () => {
+        this.modalCtrl.dismiss(null, 'delete'); // On ferme et on signale la suppression
+      },
+      error: (err) => alert("Erreur lors de la suppression")
+    });
+  }
+
   async processImageUpload(chantierId: number): Promise<void> {
     return new Promise((resolve) => {
       const file = new File([this.coverPhotoBlob!], "cover.jpg", { type: "image/jpeg" });

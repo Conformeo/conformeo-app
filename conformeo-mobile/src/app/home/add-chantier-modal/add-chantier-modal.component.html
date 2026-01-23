@@ -109,6 +109,12 @@
         <span *ngIf="!isSaving">Enregistrer</span>
       </ion-button>
     </div>
+    <div class="ion-padding-top" *ngIf="existingChantier">
+      <ion-button expand="block" color="danger" fill="outline" (click)="deleteChantier()">
+        <ion-icon name="trash-outline" slot="start"></ion-icon>
+        Supprimer ce chantier
+      </ion-button>
+    </div>
 
   </form>
 
