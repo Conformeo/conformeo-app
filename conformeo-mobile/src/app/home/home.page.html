@@ -13,18 +13,25 @@
     </ion-buttons>
 
     <ion-buttons slot="end">
+      
+      <ion-button (click)="toggleSelectionMode()">
+        <ion-icon [name]="isSelectionMode ? 'close-circle-outline' : 'checkbox-outline'" 
+                  [color]="isSelectionMode ? 'danger' : 'light'"></ion-icon>
+      </ion-button>
+
       <input type="file" #csvInput (change)="onCSVSelected($event)" accept=".csv" style="display: none;" />
       <ion-button (click)="csvInput.click()">
         <ion-icon name="cloud-upload-outline"></ion-icon>
       </ion-button>
+
       <ion-button (click)="downloadCSV()">
-        <ion-icon name="download-outline"></ion-icon>
+        <ion-icon name="download-outline" [color]="selectedIds.size > 0 ? 'success' : 'light'"></ion-icon>
       </ion-button>
 
       <ion-icon 
         [name]="isOnline ? 'cloud-done' : 'cloud-offline'" 
         [color]="isOnline ? 'success' : 'danger'"
-        style="font-size: 24px; margin-right: 10px;">
+        style="font-size: 24px; margin-right: 10px; margin-left: 5px;">
       </ion-icon>
     </ion-buttons>
   </ion-toolbar>
@@ -48,6 +55,9 @@
 
   <h2 style="margin-left: 16px; margin-top: 10px; font-weight: 700;">
     Mes Chantiers ({{ filteredChantiers.length }})
+    <span *ngIf="isSelectionMode && selectedIds.size > 0" style="font-size: 0.8em; color: var(--ion-color-primary);">
+      - {{ selectedIds.size }} sélectionné(s)
+    </span>
   </h2>
   
   <div *ngIf="filteredChantiers.length === 0" style="text-align: center; margin-top: 50px; opacity: 0.6;">
@@ -55,10 +65,23 @@
   </div>
 
   <div class="pro-list">
-    <div *ngFor="let c of filteredChantiers" class="pro-card" [routerLink]="['/chantier', c.id]">
+    
+    <div *ngFor="let c of filteredChantiers" class="pro-card" 
+         (click)="isSelectionMode ? toggleItemSelection(c.id!) : null"
+         [routerLink]="isSelectionMode ? null : ['/chantier', c.id]"
+         [style.opacity]="isSelectionMode && c.id && !selectedIds.has(c.id) ? '0.6' : '1'"
+         [style.border]="c.id && selectedIds.has(c.id) ? '2px solid var(--ion-color-primary)' : ''">
       
       <div class="card-thumb">
         
+        <div *ngIf="isSelectionMode && c.id" 
+             style="position: absolute; top: 8px; left: 8px; z-index: 10; background: white; border-radius: 50%; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center;">
+          <ion-icon [name]="selectedIds.has(c.id!) ? 'checkbox' : 'square-outline'" 
+                    [color]="selectedIds.has(c.id!) ? 'primary' : 'medium'"
+                    style="font-size: 24px;">
+          </ion-icon>
+        </div>
+
         <img *ngIf="c.cover_url" 
              [src]="getCoverUrl(c.cover_url)" 
              crossorigin="anonymous"
@@ -71,7 +94,7 @@
           <ion-icon name="image-outline" style="font-size: 24px; color: #999;"></ion-icon>
         </div>
 
-        <div 
+        <div *ngIf="!isSelectionMode"
           class="status-dot" 
           [style.background-color]="c.est_actif ? '#2dd36f' : '#92949c'"
           [style.border]="c.est_actif ? '2px solid #fff' : '2px solid #e0e0e0'">
@@ -89,19 +112,19 @@
 
         <div class="meta-row">
           <span class="tag date">J-{{ getDaysOpen(c.date_creation) }}</span>
-          <span class="tag reports">
+          <span class="tag reports" *ngIf="!isSelectionMode">
             <ion-icon name="document-text-outline"></ion-icon> Voir
           </span>
         </div>
       </div>
 
-      <div class="card-arrow">
+      <div class="card-arrow" *ngIf="!isSelectionMode">
         <ion-icon name="chevron-forward-outline"></ion-icon>
       </div>
     </div>
   </div>
   
-  <ion-fab vertical="bottom" horizontal="end" slot="fixed">
+  <ion-fab vertical="bottom" horizontal="end" slot="fixed" *ngIf="!isSelectionMode">
     <ion-fab-button (click)="openAddModal()">
       <ion-icon name="add"></ion-icon>
     </ion-fab-button>

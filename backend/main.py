@@ -567,36 +567,46 @@ async def import_chantiers_csv(file: UploadFile = File(...), db: Session = Depen
 
 @app.get("/chantiers/export/csv")
 def export_chantiers_csv(
+    ids: Optional[str] = Query(None), # 👈 Accepte "1,2,3"
     db: Session = Depends(get_db), 
     current_user: models.User = Depends(security.get_current_user)
 ):
-    # 1. Récupérer les chantiers de l'entreprise
-    chantiers = db.query(models.Chantier).filter(
+    # 1. Base de la requête
+    query = db.query(models.Chantier).filter(
         models.Chantier.company_id == current_user.company_id
-    ).all()
+    )
 
-    # 2. Créer le fichier CSV en mémoire
+    # 2. Filtrage si des IDs sont fournis
+    if ids:
+        try:
+            # Convertit "1,5,12" en liste d'entiers [1, 5, 12]
+            id_list = [int(i) for i in ids.split(',') if i.strip().isdigit()]
+            if id_list:
+                query = query.filter(models.Chantier.id.in_(id_list))
+        except:
+            pass # Si format invalide, on exporte tout par sécurité
+
+    chantiers = query.all()
+
+    # 3. Création du CSV (Code inchangé)
     output = StringIO()
-    writer = csv.writer(output, delimiter=';') # Point-virgule pour Excel fr
-    
-    # En-têtes
+    writer = csv.writer(output, delimiter=';')
     writer.writerow(['ID', 'Nom', 'Client', 'Adresse', 'Date Début', 'Date Fin', 'Statut'])
 
-    # Données
     for c in chantiers:
         statut = "En cours" if c.est_actif else "Terminé"
         d_debut = c.date_debut.strftime("%d/%m/%Y") if c.date_debut else ""
         d_fin = c.date_fin.strftime("%d/%m/%Y") if c.date_fin else ""
-        
         writer.writerow([c.id, c.nom, c.client, c.adresse, d_debut, d_fin, statut])
 
     output.seek(0)
     
-    # 3. Envoyer le fichier
+    filename = "selection_chantiers.csv" if ids else "tous_les_chantiers.csv"
+
     return StreamingResponse(
         iter([output.getvalue()]),
         media_type="text/csv",
-        headers={"Content-Disposition": "attachment; filename=mes_chantiers.csv"}
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
 
 # ==========================================

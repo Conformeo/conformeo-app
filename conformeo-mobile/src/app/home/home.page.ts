@@ -17,7 +17,7 @@ import {
   statsChartOutline, hammerOutline, cloudDone, cloudOffline, 
   syncOutline, construct, documentTextOutline, locationOutline,
   chevronForwardOutline, cloudUploadOutline, searchOutline,
-  downloadOutline // 👈 AJOUT 2 : Icône de téléchargement
+  downloadOutline, checkbox
 } from 'ionicons/icons'; 
 
 import { ApiService, Chantier } from '../services/api';
@@ -43,6 +43,8 @@ export class HomePage implements OnInit {
   filteredChantiers: Chantier[] = [];
   searchTerm: string = '';
   isOnline = true;
+  isSelectionMode = false;
+  selectedIds: Set<number> = new Set(); // Utiliser un Set pour éviter les doublons
 
   stats: any = {
     kpis: { total_chantiers: 0, actifs: 0, rapports: 0, alertes: 0, materiel_sorti: 0 },
@@ -68,7 +70,7 @@ export class HomePage implements OnInit {
       statsChartOutline, hammerOutline, cloudDone, cloudOffline, 
       syncOutline, construct, documentTextOutline, locationOutline,
       chevronForwardOutline, cloudUploadOutline, searchOutline,
-      downloadOutline // 👈 AJOUT 4 : Enregistrement de l'icône
+      downloadOutline, checkbox
     });
 
     (window as any).openChantier = (id: number) => {
@@ -174,14 +176,33 @@ export class HomePage implements OnInit {
     }
   }
 
-  // 👇 AJOUT 5 : Fonction d'export CSV
+  // 👇 GESTION DU MODE SÉLECTION
+  toggleSelectionMode() {
+    this.isSelectionMode = !this.isSelectionMode;
+    this.selectedIds.clear(); // On vide la sélection quand on change de mode
+  }
+
+  toggleItemSelection(id: number) {
+    if (this.selectedIds.has(id)) {
+      this.selectedIds.delete(id);
+    } else {
+      this.selectedIds.add(id);
+    }
+  }
+
+  // 👇 FONCTION D'EXPORT MISE À JOUR
   downloadCSV() {
     const token = localStorage.getItem('access_token');
     if (!token) return;
 
-    // URL de l'API (à adapter si l'URL change)
-    const url = 'https://conformeo-api.onrender.com/chantiers/export/csv';
+    let url = 'https://conformeo-api.onrender.com/chantiers/export/csv';
     
+    // Si on est en mode sélection et qu'on a coché des trucs
+    if (this.isSelectionMode && this.selectedIds.size > 0) {
+      const idsParam = Array.from(this.selectedIds).join(','); // "1,5,12"
+      url += `?ids=${idsParam}`;
+    }
+
     this.http.get(url, {
       responseType: 'blob',
       headers: { Authorization: `Bearer ${token}` }
@@ -190,17 +211,18 @@ export class HomePage implements OnInit {
         const a = document.createElement('a');
         const objectUrl = URL.createObjectURL(blob);
         a.href = objectUrl;
-        a.download = `chantiers_export_${new Date().toISOString().slice(0,10)}.csv`;
+        a.download = `export_chantiers_${new Date().toISOString().slice(0,10)}.csv`;
         a.click();
         URL.revokeObjectURL(objectUrl);
+        
+        // Optionnel : Quitter le mode sélection après téléchargement
+        this.toggleSelectionMode();
       },
       error: (err) => {
         console.error("Erreur téléchargement CSV", err);
         this.alertCtrl.create({
-          header: 'Erreur',
-          message: 'Impossible de télécharger le fichier CSV.',
-          buttons: ['OK']
-        }).then(alert => alert.present());
+          header: 'Erreur', message: 'Échec du téléchargement.', buttons: ['OK']
+        }).then(a => a.present());
       }
     });
   }
