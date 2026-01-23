@@ -39,3 +39,61 @@
     --border-width: 2px;
     margin-top: 20px;
 }
+
+.info-banner {
+  background: #e3f2fd;
+  color: #0d47a1;
+  padding: 15px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid #bbdefb;
+  
+  ion-icon { font-size: 24px; }
+  p { margin: 0; font-size: 14px; }
+}
+
+.risk-card {
+  background: white;
+  border-radius: 12px;
+  padding: 10px;
+  margin-bottom: 15px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  border-left: 5px solid var(--ion-color-tertiary);
+}
+
+.risk-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 5px;
+  border-bottom: 1px solid #f0f0f0;
+  margin-bottom: 10px;
+}
+
+.badge-unit {
+  background: #eee;
+  color: #333;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+.input-item {
+  --background: #f9f9f9;
+  --border-radius: 8px;
+  margin-bottom: 5px;
+  font-size: 14px;
+}
+
+.add-card {
+  margin-top: 30px;
+  border: 2px dashed #ccc;
+  box-shadow: none;
+}
+
+.spacer { height: 80px; }
