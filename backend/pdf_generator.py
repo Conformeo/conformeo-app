@@ -297,7 +297,7 @@ def generate_ppsps_pdf(chantier, ppsps, output_path, company=None):
     # 2. SECOURS
     draw_section("2. SECOURS & URGENCES")
     sec = ppsps.secours_data or {}
-    c.setFont(FONT_TITLE, 10); c.setFillColorRGB(0.8, 0, 0)
+    c.setFont(FONT_TITLE, 10);  c.setFillColorRGB(0.8, 0, 0)
     c.drawString(margin, y, f"URGENCES : {sec.get('num_urgence','15')}")
     c.setFillColorRGB(0,0,0); c.setFont(FONT_TEXT, 10); y -= 0.6*cm
     c.drawString(margin, y, f"Hôpital : {sec.get('hopital','-')}")
@@ -530,7 +530,7 @@ def generate_duerp_pdf(duerp, company, lignes):
     headers = [
         Paragraph('Unité / Tâche', style_cell_header),
         Paragraph('Risque Identifié', style_cell_header),
-        Paragraph('G.', style_cell_header), # G pour Gravité
+        Paragraph('Gravité', style_cell_header), # G pour Gravité
         Paragraph('Mesures de Prévention', style_cell_header),
         Paragraph('État', style_cell_header)
     ]
@@ -567,7 +567,7 @@ def generate_duerp_pdf(duerp, company, lignes):
 
     # --- STYLE DU TABLEAU (Sobre) ---
     # Largeurs optimisées pour paysage A4 (Total ~780pt dispo)
-    col_widths = [160, 140, 40, 360, 80]
+    col_widths = [160, 140, 80, 320, 80]
     
     t = Table(data, colWidths=col_widths, repeatRows=1)
     
