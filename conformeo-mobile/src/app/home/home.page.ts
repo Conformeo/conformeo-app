@@ -2,12 +2,13 @@ import { Component, OnInit, NgZone } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
+import { HttpClient } from '@angular/common/http'; // 👈 AJOUT 1 : HttpClient
 import { 
   IonHeader, IonToolbar, IonTitle, IonContent, 
   IonIcon, IonFab, IonFabButton, 
   IonRefresher, IonRefresherContent, ModalController,
   IonButtons, IonButton, NavController, IonSearchbar, 
-  LoadingController, AlertController // <--- AJOUT AlertController
+  LoadingController, AlertController
 } from '@ionic/angular/standalone';
 
 import { addIcons } from 'ionicons';
@@ -15,7 +16,8 @@ import {
   business, location, checkmarkCircle, alertCircle, add, 
   statsChartOutline, hammerOutline, cloudDone, cloudOffline, 
   syncOutline, construct, documentTextOutline, locationOutline,
-  chevronForwardOutline, cloudUploadOutline, searchOutline 
+  chevronForwardOutline, cloudUploadOutline, searchOutline,
+  downloadOutline // 👈 AJOUT 2 : Icône de téléchargement
 } from 'ionicons/icons'; 
 
 import { ApiService, Chantier } from '../services/api';
@@ -56,15 +58,17 @@ export class HomePage implements OnInit {
     public offline: OfflineService,
     private navCtrl: NavController,
     private loadingCtrl: LoadingController,
-    private alertCtrl: AlertController, // <--- Injection
+    private alertCtrl: AlertController,
     private router: Router,
-    private ngZone: NgZone
+    private ngZone: NgZone,
+    private http: HttpClient // 👈 AJOUT 3 : Injection HttpClient
   ) {
     addIcons({ 
       business, location, checkmarkCircle, alertCircle, add, 
       statsChartOutline, hammerOutline, cloudDone, cloudOffline, 
       syncOutline, construct, documentTextOutline, locationOutline,
-      chevronForwardOutline, cloudUploadOutline, searchOutline
+      chevronForwardOutline, cloudUploadOutline, searchOutline,
+      downloadOutline // 👈 AJOUT 4 : Enregistrement de l'icône
     });
 
     (window as any).openChantier = (id: number) => {
@@ -118,7 +122,6 @@ export class HomePage implements OnInit {
         attribution: '© OpenStreetMap'
       }).addTo(this.map!);
 
-      // Configurer les icônes Leaflet correctement
       const iconDefault = L.icon({
         iconUrl: 'assets/icon/marker-icon.png', 
         shadowUrl: 'assets/icon/marker-shadow.png',
@@ -129,7 +132,6 @@ export class HomePage implements OnInit {
 
       sites.forEach(site => {
         if (site.lat && site.lng) {
-          // Utilisation de l'icône configurée
           const marker = L.marker([site.lat, site.lng], { icon: iconDefault });
 
           const popupHtml = `
@@ -152,7 +154,6 @@ export class HomePage implements OnInit {
 
   loadChantiers(event?: any) {
     this.api.getChantiers().subscribe(data => {
-      // On remet la liste au propre sans logs
       this.chantiers = data.reverse();
       this.filterChantiers();
       
@@ -171,6 +172,37 @@ export class HomePage implements OnInit {
         (c.adresse?.toLowerCase() || '').includes(term)
       );
     }
+  }
+
+  // 👇 AJOUT 5 : Fonction d'export CSV
+  downloadCSV() {
+    const token = localStorage.getItem('access_token');
+    if (!token) return;
+
+    // URL de l'API (à adapter si l'URL change)
+    const url = 'https://conformeo-api.onrender.com/chantiers/export/csv';
+    
+    this.http.get(url, {
+      responseType: 'blob',
+      headers: { Authorization: `Bearer ${token}` }
+    }).subscribe({
+      next: (blob) => {
+        const a = document.createElement('a');
+        const objectUrl = URL.createObjectURL(blob);
+        a.href = objectUrl;
+        a.download = `chantiers_export_${new Date().toISOString().slice(0,10)}.csv`;
+        a.click();
+        URL.revokeObjectURL(objectUrl);
+      },
+      error: (err) => {
+        console.error("Erreur téléchargement CSV", err);
+        this.alertCtrl.create({
+          header: 'Erreur',
+          message: 'Impossible de télécharger le fichier CSV.',
+          buttons: ['OK']
+        }).then(alert => alert.present());
+      }
+    });
   }
 
   async onCSVSelected(event: any) {

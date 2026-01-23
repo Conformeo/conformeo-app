@@ -24,7 +24,7 @@ from fastapi_mail import FastMail, MessageSchema, ConnectionConfig, MessageType
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
-from io import BytesIO
+from io import BytesIO, StringIO
 
 # 👇 IMPORTATION DES MODULES LOCAUX
 import models
@@ -564,6 +564,40 @@ async def import_chantiers_csv(file: UploadFile = File(...), db: Session = Depen
         return {"status": "success", "message": f"{count} chantiers importés !"}
     except Exception as e:
         db.rollback(); raise HTTPException(500, f"Erreur: {str(e)}")
+
+@app.get("/chantiers/export/csv")
+def export_chantiers_csv(
+    db: Session = Depends(get_db), 
+    current_user: models.User = Depends(security.get_current_user)
+):
+    # 1. Récupérer les chantiers de l'entreprise
+    chantiers = db.query(models.Chantier).filter(
+        models.Chantier.company_id == current_user.company_id
+    ).all()
+
+    # 2. Créer le fichier CSV en mémoire
+    output = StringIO()
+    writer = csv.writer(output, delimiter=';') # Point-virgule pour Excel fr
+    
+    # En-têtes
+    writer.writerow(['ID', 'Nom', 'Client', 'Adresse', 'Date Début', 'Date Fin', 'Statut'])
+
+    # Données
+    for c in chantiers:
+        statut = "En cours" if c.est_actif else "Terminé"
+        d_debut = c.date_debut.strftime("%d/%m/%Y") if c.date_debut else ""
+        d_fin = c.date_fin.strftime("%d/%m/%Y") if c.date_fin else ""
+        
+        writer.writerow([c.id, c.nom, c.client, c.adresse, d_debut, d_fin, statut])
+
+    output.seek(0)
+    
+    # 3. Envoyer le fichier
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=mes_chantiers.csv"}
+    )
 
 # ==========================================
 # 5. MATERIEL

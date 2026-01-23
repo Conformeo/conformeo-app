@@ -17,6 +17,9 @@
       <ion-button (click)="csvInput.click()">
         <ion-icon name="cloud-upload-outline"></ion-icon>
       </ion-button>
+      <ion-button (click)="downloadCSV()">
+        <ion-icon name="download-outline"></ion-icon>
+      </ion-button>
 
       <ion-icon 
         [name]="isOnline ? 'cloud-done' : 'cloud-offline'" 
@@ -68,7 +71,11 @@
           <ion-icon name="image-outline" style="font-size: 24px; color: #999;"></ion-icon>
         </div>
 
-        <div class="status-dot" [class.active]="c.est_actif"></div>
+        <div 
+          class="status-dot" 
+          [style.background-color]="c.est_actif ? '#2dd36f' : '#92949c'"
+          [style.border]="c.est_actif ? '2px solid #fff' : '2px solid #e0e0e0'">
+        </div>
       </div>
 
       <div class="card-content">
