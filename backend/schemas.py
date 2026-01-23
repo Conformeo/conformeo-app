@@ -169,25 +169,7 @@ class CompanyDocOut(BaseModel):
         from_attributes = True
 
 # --- CHANTIER ---
-class ChantierBase(BaseModel):
-    nom: str
-    adresse: Optional[str] = None
-    client: Optional[str] = None
-    date_debut: Optional[date] = None 
-    datetime_fin: Optional[date] = None   
-    soumis_sps: bool = False # ✅ Ajouté pour la coordination SPS
-
-class ChantierCreate(BaseModel):
-    nom: str
-    client: Optional[str] = None
-    adresse: Optional[str] = None
-    date_debut: Optional[str] = None
-    
-    # 👇 IL FAUT ABSOLUMENT AJOUTER CES LIGNES ICI
-    date_fin: Optional[str] = None
-    est_actif: Optional[bool] = True
-    soumis_sps: Optional[bool] = False
-    cover_url: Optional[str] = None # Au cas où on l'envoie manuellement
+# (J'ai supprimé les doublons ici pour ne garder que la version correcte)
 
 class ChantierBase(BaseModel):
     nom: str
@@ -240,8 +222,7 @@ class ChantierOut(BaseModel):
     
     class Config:
         orm_mode = True
-        # Si vous utilisez Pydantic V2, remplacez orm_mode par :
-        # from_attributes = True
+        # from_attributes = True # Si version récente de Pydantic
 
 # --- RAPPORT ---
 class RapportCreate(BaseModel):
@@ -251,6 +232,7 @@ class RapportCreate(BaseModel):
     niveau_urgence: str = "Normal"
     latitude: Optional[float] = None
     longitude: Optional[float] = None
+    photo_url: Optional[str] = None # Ajouté pour correspondre au main.py
 
 class ImageOut(BaseModel):
     id: int
