@@ -408,11 +408,11 @@ def read_chantiers(
 
 @app.get("/chantiers/{cid}", response_model=schemas.ChantierOut)
 def get_chantier(cid: int, db: Session = Depends(get_db)):
-    # Query safely
+    # Try to find the chantier
     db_chantier = db.query(models.Chantier).filter(models.Chantier.id == cid).first()
     
+    # If it doesn't exist, stop here and return 404
     if not db_chantier:
-        # This raises a 404 exception which FastAPI handles correctly (with CORS)
         raise HTTPException(status_code=404, detail="Chantier introuvable")
         
     return db_chantier

@@ -1,6 +1,7 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
+import { addIcons } from 'ionicons';
 import { Router, NavigationEnd, RouterLink,  } from '@angular/router';
 import { 
   IonApp, IonSplitPane, IonMenu, IonContent, IonList, 
@@ -8,7 +9,6 @@ import {
   IonRouterOutlet, IonIcon, ToastController, MenuController,
   IonMenuToggle // 👈 IonButton ajouté pour le logout
 } from '@ionic/angular/standalone';
-import { addIcons } from 'ionicons';
 import { 
   gridOutline, hammerOutline, mapOutline, peopleOutline, business,
   settingsOutline, logOutOutline, sync, checkmarkCircle, warning, calendarOutline,
