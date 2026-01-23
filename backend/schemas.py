@@ -169,14 +169,13 @@ class CompanyDocOut(BaseModel):
         from_attributes = True
 
 # --- CHANTIER ---
-# (J'ai supprimé les doublons ici pour ne garder que la version correcte)
 
 class ChantierBase(BaseModel):
     nom: str
     adresse: Optional[str] = None
     client: Optional[str] = None
     
-    # On autorise str (pour l'update) ou date (pour la lecture)
+    # On utilise date (et pas datetime) pour être propre
     date_debut: Optional[date] = None 
     date_fin: Optional[date] = None   
     
@@ -184,7 +183,7 @@ class ChantierBase(BaseModel):
     soumis_sps: bool = False
 
 class ChantierCreate(ChantierBase):
-    # En entrée (création), on accepte des strings "YYYY-MM-DD"
+    # En entrée (création), on accepte des strings "YYYY-MM-DD" pour faciliter la vie du frontend
     date_debut: Optional[str] = None
     date_fin: Optional[str] = None
     cover_url: Optional[str] = None
@@ -194,7 +193,6 @@ class ChantierUpdate(BaseModel):
     client: Optional[str] = None
     adresse: Optional[str] = None
     
-    # 👇 TOUS VOS CHAMPS SONT BIEN LÀ
     date_debut: Optional[str] = None 
     date_fin: Optional[str] = None
     est_actif: Optional[bool] = None
@@ -213,16 +211,15 @@ class ChantierOut(BaseModel):
     date_debut: Optional[date] = None
     date_fin: Optional[date] = None
     
-    est_actif: bool = True       # Provide default
-    soumis_sps: bool = False     # Provide default
+    est_actif: bool = True
+    soumis_sps: bool = False
     cover_url: Optional[str] = None
     
     date_creation: Optional[datetime] = None
     company_id: Optional[int] = None
     
     class Config:
-        orm_mode = True
-        # from_attributes = True # Si version récente de Pydantic
+        from_attributes = True
 
 # --- RAPPORT ---
 class RapportCreate(BaseModel):

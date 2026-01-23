@@ -408,10 +408,10 @@ def read_chantiers(
 
 @app.get("/chantiers/{cid}", response_model=schemas.ChantierOut)
 def get_chantier(cid: int, db: Session = Depends(get_db)):
-    # Try to find the chantier
+    # On cherche le chantier
     db_chantier = db.query(models.Chantier).filter(models.Chantier.id == cid).first()
     
-    # If it doesn't exist, stop here and return 404
+    # 👇 LA SÉCURITÉ : Si non trouvé, on arrête tout de suite
     if not db_chantier:
         raise HTTPException(status_code=404, detail="Chantier introuvable")
         
