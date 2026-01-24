@@ -304,13 +304,18 @@ PdpOut = PlanPreventionOut
 
 # --- DUERP ---
 class DUERPRow(BaseModel):
+    # 👇 Vérifiez la présence de ces lignes
     unite_travail: str = "Chantier Général"
+    statut: str = "EN COURS"
     
     tache: str
     risque: str
     gravite: int
     mesures_realisees: Optional[str] = None
     mesures_a_realiser: Optional[str] = None
+    
+    class Config:
+        from_attributes = True
 
     statut: str = "EN COURS"
 

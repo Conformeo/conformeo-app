@@ -221,18 +221,19 @@ class DUERP(Base):
 
 class DUERPLigne(Base):
     __tablename__ = "duerp_lignes"
-
+    
     id = Column(Integer, primary_key=True, index=True)
     duerp_id = Column(Integer, ForeignKey("duerps.id"))
-
-    unite_travail = Column(String, default="Général")
+    
+    # 👇 CES DEUX LIGNES SONT OBLIGATOIRES POUR QUE ÇA MARCHE
+    unite_travail = Column(String, default="Général") 
+    statut = Column(String, default="EN COURS")
     
     tache = Column(String)
     risque = Column(String)
     gravite = Column(Integer)
     mesures_realisees = Column(String)
     mesures_a_realiser = Column(String)
-    statut = Column(String, default="EN COURS")
     
     duerp = relationship("DUERP", back_populates="lignes")
 

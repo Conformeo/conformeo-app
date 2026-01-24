@@ -1281,13 +1281,13 @@ def create_or_update_duerp(duerp_data: schemas.DUERPCreate, db: Session = Depend
     for l in duerp_data.lignes:
         new_line = models.DUERPLigne(
             duerp_id=db_duerp.id,
-            unite_travail=l.unite_travail, # 👈 AJOUTÉ
+            unite_travail=l.unite_travail, # 👈 INDISPENSABLE
             tache=l.tache, 
             risque=l.risque, 
             gravite=l.gravite,
             mesures_realisees=l.mesures_realisees, 
             mesures_a_realiser=l.mesures_a_realiser,
-            statut=l.statut # 👈 AJOUTÉ
+            statut=l.statut                # 👈 INDISPENSABLE
         )
         db.add(new_line)
     
