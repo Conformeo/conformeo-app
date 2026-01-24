@@ -399,13 +399,6 @@ def read_chantiers(
         print(f"❌ ERREUR CRITIQUE /chantiers : {e}")
         raise HTTPException(status_code=500, detail=f"Erreur serveur: {str(e)}")
     
-
-# @app.get("/chantiers/{chantier_id}", response_model=schemas.ChantierOut)
-# def read_chantier(chantier_id: int, db: Session = Depends(get_db)):
-#     chantier = db.query(models.Chantier).filter(models.Chantier.id == chantier_id).first()
-#     if not chantier: raise HTTPException(status_code=404, detail="Chantier introuvable")
-#     return chantier
-
 @app.get("/chantiers/{cid}", response_model=schemas.ChantierOut)
 def get_chantier(cid: int, db: Session = Depends(get_db)):
     # 1. On cherche le chantier

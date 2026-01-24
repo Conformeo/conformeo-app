@@ -3,7 +3,16 @@
     <ion-buttons slot="start">
       <ion-back-button defaultHref="/home" text="" color="light"></ion-back-button>
     </ion-buttons>
-    <ion-title *ngIf="!searchTerm">Matériel</ion-title>
+    
+    <ion-title>
+      {{ isSelectionMode ? selectedCount + ' sélectionné(s)' : (searchTerm ? '' : 'Matériel') }}
+    </ion-title>
+
+    <ion-buttons slot="end">
+      <ion-button (click)="toggleSelectionMode()" color="light">
+        <ion-icon [name]="isSelectionMode ? 'close-circle-outline' : 'checkbox-outline'" slot="icon-only"></ion-icon>
+      </ion-button>
+    </ion-buttons>
   </ion-toolbar>
 </ion-header>
 
@@ -34,18 +43,29 @@
     </div>
 
     <div class="search-container">
-      <div class="search-wrapper">
-        <ion-icon name="search-outline" class="search-icon"></ion-icon>
-        <input 
-          type="text" 
-          placeholder="Rechercher..." 
-          [(ngModel)]="searchTerm" 
-          (input)="filterMateriels()">
+      
+      <div *ngIf="isSelectionMode" style="width: 100%; display: flex; gap: 10px;">
+        <ion-button expand="block" color="success" (click)="exportCsv()" [disabled]="selectedCount === 0" style="flex: 1;">
+          <ion-icon name="download-outline" slot="start"></ion-icon>
+          Exporter ({{ selectedCount }})
+        </ion-button>
       </div>
 
-      <button class="scan-btn" (click)="startScan()">
-        <ion-icon name="qr-code-outline"></ion-icon>
-      </button>
+      <ng-container *ngIf="!isSelectionMode">
+        <div class="search-wrapper">
+          <ion-icon name="search-outline" class="search-icon"></ion-icon>
+          <input 
+            type="text" 
+            placeholder="Rechercher..." 
+            [(ngModel)]="searchTerm" 
+            (input)="filterMateriels()">
+        </div>
+
+        <button class="scan-btn" (click)="startScan()">
+          <ion-icon name="qr-code-outline"></ion-icon>
+        </button>
+      </ng-container>
+
     </div>
 
     <div class="list-container" style="padding-bottom: 100px;">
@@ -58,9 +78,14 @@
 
       <div *ngFor="let mat of filteredMateriels" 
            class="tool-card" 
-           [class]="mat.etat || 'Bon'">
+           [class]="mat.etat || 'Bon'"
+           style="display: flex; align-items: center;">
 
-        <div class="card-main" (click)="openTransfer(mat)">
+        <div *ngIf="isSelectionMode" style="padding-left: 10px; padding-right: 5px;">
+           <ion-checkbox [(ngModel)]="mat.selected"></ion-checkbox>
+        </div>
+
+        <div class="card-main" (click)="!isSelectionMode ? openTransfer(mat) : (mat.selected = !mat.selected)">
           
           <div class="img-wrapper"
                [class.border-green]="mat.statut_vgp === 'CONFORME'"
@@ -103,7 +128,7 @@
 
         </div>
 
-        <div class="card-side-actions">
+        <div class="card-side-actions" *ngIf="!isSelectionMode">
           <ion-button fill="clear" color="dark" (click)="openEdit(mat)">
             <ion-icon name="create-outline" slot="icon-only"></ion-icon>
           </ion-button>
@@ -119,14 +144,28 @@
   <div class="desktop-only">
 
     <div class="desktop-header">
-      <h1>Parc Matériel <ion-badge color="medium" style="vertical-align: middle; margin-left: 10px;">{{ materiels.length }}</ion-badge></h1>
+      <h1>
+        Parc Matériel 
+        <ion-badge color="medium" style="vertical-align: middle; margin-left: 10px;">{{ materiels.length }}</ion-badge>
+      </h1>
 
       <div class="actions">
+        <ion-button *ngIf="isSelectionMode" (click)="exportCsv()" color="success" [disabled]="selectedCount === 0">
+           <ion-icon name="download-outline" slot="start"></ion-icon> Exporter CSV ({{selectedCount}})
+        </ion-button>
+
+        <ion-button (click)="toggleSelectionMode()" [color]="isSelectionMode ? 'warning' : 'medium'" fill="outline">
+          <ion-icon [name]="isSelectionMode ? 'close' : 'checkbox-outline'" slot="start"></ion-icon> 
+          {{ isSelectionMode ? 'Annuler' : 'Sélectionner' }}
+        </ion-button>
+
         <input type="file" #csvInput (change)="onCSVSelected($event)" accept=".csv" style="display: none;" />
-        <ion-button (click)="csvInput.click()" fill="outline" color="secondary">
+        
+        <ion-button *ngIf="!isSelectionMode" (click)="csvInput.click()" fill="outline" color="secondary">
           <ion-icon name="cloud-upload-outline" slot="start"></ion-icon> Import CSV
         </ion-button>
-        <ion-button (click)="addMateriel()">
+        
+        <ion-button *ngIf="!isSelectionMode" (click)="addMateriel()">
           <ion-icon name="add" slot="start"></ion-icon> Nouveau
         </ion-button>
         
@@ -148,9 +187,14 @@
 
     <div class="equipment-grid">
 
-      <div *ngFor="let mat of filteredMateriels" class="equip-card" (click)="openTransfer(mat)">
+      <div *ngFor="let mat of filteredMateriels" 
+           class="equip-card" 
+           (click)="!isSelectionMode ? openTransfer(mat) : (mat.selected = !mat.selected)"
+           [class.selected-card]="mat.selected"> <div *ngIf="isSelectionMode" style="position: absolute; top: 10px; left: 10px; z-index: 20;">
+          <ion-checkbox [(ngModel)]="mat.selected"></ion-checkbox>
+       </div>
 
-       <div class="action-buttons" style="position: absolute; top: 10px; right: 10px; z-index: 10; display: flex; gap: 5px;">
+       <div *ngIf="!isSelectionMode" class="action-buttons" style="position: absolute; top: 10px; right: 10px; z-index: 10; display: flex; gap: 5px;">
            <div (click)="$event.stopPropagation(); openEdit(mat)" class="icon-btn edit-btn">
               <ion-icon name="create-outline"></ion-icon>
            </div>
@@ -200,7 +244,7 @@
               {{ mat.chantier_id ? getChantierName(mat.chantier_id) : '' }}
             </p>
             
-            <ion-button expand="block" fill="outline" size="small" (click)="$event.stopPropagation(); showQrCode(mat)">
+            <ion-button *ngIf="!isSelectionMode" expand="block" fill="outline" size="small" (click)="$event.stopPropagation(); showQrCode(mat)">
               <ion-icon name="qr-code-outline" slot="start"></ion-icon>
               Passeport
             </ion-button>

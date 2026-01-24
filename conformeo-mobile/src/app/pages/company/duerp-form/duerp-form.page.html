@@ -20,9 +20,15 @@
   </div>
 
   <div *ngFor="let l of lignes; let i = index" class="risk-card">
-    <div class="risk-header">
-      <span class="badge-unit">{{ l.unite_travail }}</span>
-      <ion-chip [color]="l.statut === 'FAIT' ? 'success' : 'danger'" style="margin-left: auto; margin-right: 10px;">
+    
+    <div class="risk-header" style="display: flex; align-items: center; gap: 10px;">
+      
+      <ion-item class="unit-input" lines="none" style="flex: 1; --background: transparent; --min-height: 30px;">
+        <ion-icon name="business-outline" slot="start" size="small" style="margin-right: 8px; color: #666;"></ion-icon>
+        <ion-input [(ngModel)]="l.unite_travail" placeholder="Unité (ex: Atelier)" style="font-weight: bold; color: var(--ion-color-primary);"></ion-input>
+      </ion-item>
+
+      <ion-chip [color]="l.statut === 'FAIT' ? 'success' : 'danger'" style="height: 24px; font-size: 12px;">
         <ion-icon [name]="l.statut === 'FAIT' ? 'checkmark-circle' : 'alert-circle'"></ion-icon>
         <ion-label>{{ l.statut }}</ion-label>
       </ion-chip>

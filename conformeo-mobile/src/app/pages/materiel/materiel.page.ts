@@ -2,12 +2,12 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Platform } from '@ionic/angular/standalone'; 
-// 👇 AJOUT DES COMPOSANTS UI MANQUANTS (Listes, Cards, Items...)
 import { 
   IonHeader, IonToolbar, IonContent,
   IonButtons, IonButton, IonIcon, IonFab, IonFabButton, 
   AlertController, IonBackButton,
-  IonTitle, ModalController, LoadingController, IonBadge
+  IonTitle, ModalController, LoadingController, IonBadge,
+  IonCheckbox, IonList, IonItem, IonLabel, ToastController
 } from '@ionic/angular/standalone';
 import { Capacitor } from '@capacitor/core';
 import { addIcons } from 'ionicons';
@@ -16,7 +16,7 @@ import {
   add, hammer, construct, home, swapHorizontal, qrCodeOutline,
   searchOutline, cube, homeOutline, locationOutline, shieldCheckmark,
   trashOutline, hammerOutline, cloudUploadOutline, createOutline,
-  printOutline 
+  printOutline, close, checkboxOutline, chevronForward, downloadOutline
 } from 'ionicons/icons';
 
 import { ApiService, Materiel, Chantier } from '../../services/api'; 
@@ -24,33 +24,43 @@ import { AddMaterielModalComponent } from './add-materiel-modal/add-materiel-mod
 import { QrCodeModalComponent } from './qr-code-modal/qr-code-modal.page';
 import { BarcodeScanner, BarcodeFormat } from '@capacitor-mlkit/barcode-scanning';
 
+// 👇 CORRECTION ICI : On déclare les champs manquants comme optionnels (?)
+interface MaterielUI extends Materiel {
+  selected?: boolean;
+  marque?: string;  // Ajout pour corriger l'erreur TS
+  modele?: string;  // Ajout pour corriger l'erreur TS
+}
+
 @Component({
   selector: 'app-materiel',
   templateUrl: './materiel.page.html',
   styleUrls: ['./materiel.page.scss'],
   standalone: true,
-  // 👇 ICI : On ajoute tous les composants utilisés dans le HTML
   imports: [
     CommonModule, FormsModule, IonHeader,
     IonToolbar, IonContent, IonTitle,
     IonButtons, IonButton, IonIcon, IonFab,
     IonFabButton, IonBackButton, IonBadge,
+    IonCheckbox, IonList, IonItem, IonLabel
   ]
 })
 export class MaterielPage implements OnInit {
 
-  materiels: Materiel[] = [];
-  filteredMateriels: Materiel[] = [];
+  materiels: MaterielUI[] = []; 
+  filteredMateriels: MaterielUI[] = [];
   chantiers: Chantier[] = [];
   searchTerm: string = '';
   isDesktop = false;
+
+  isSelectionMode = false;
 
   constructor(
     private api: ApiService,
     private alertCtrl: AlertController,
     private platform: Platform,
     private modalCtrl: ModalController,
-    private loadingCtrl: LoadingController 
+    private loadingCtrl: LoadingController,
+    private toastCtrl: ToastController 
   ) {
     addIcons({
       add, hammer, construct, home, swapHorizontal, qrCodeOutline,
@@ -58,7 +68,8 @@ export class MaterielPage implements OnInit {
       'trash-outline': trashOutline,
       'hammer-outline': hammerOutline,
       'cloud-upload-outline': cloudUploadOutline,
-      'print-outline': printOutline
+      'print-outline': printOutline,
+      close, checkboxOutline, chevronForward, downloadOutline 
     });
 
     this.checkScreen();
@@ -74,15 +85,14 @@ export class MaterielPage implements OnInit {
   }
 
   loadData(event?: any) {
-    // 1. Chargement Chantiers
     this.api.getChantiers().subscribe(chantiers => {
       this.chantiers = chantiers;
     });
 
-    // 2. Chargement Matériel
     this.api.getMateriels().subscribe({
       next: (mats) => {
-        this.materiels = mats;
+        // Le cast "as MaterielUI[]" fonctionne maintenant car l'interface inclut marque/modele
+        this.materiels = mats as MaterielUI[];
         this.filterMateriels(); 
         if (event) event.target.complete();
       },
@@ -106,6 +116,63 @@ export class MaterielPage implements OnInit {
     }
   }
 
+  // --- GESTION SELECTION ---
+  
+  toggleSelectionMode() {
+    this.isSelectionMode = !this.isSelectionMode;
+    if (!this.isSelectionMode) {
+      this.materiels.forEach(e => e.selected = false);
+      this.filteredMateriels.forEach(e => e.selected = false);
+    }
+  }
+
+  get selectedCount(): number {
+    return this.materiels.filter(e => e.selected).length;
+  }
+
+  // --- EXPORT CSV ---
+
+  exportCsv() {
+    const selection = this.materiels.filter(e => e.selected);
+    
+    if (selection.length === 0) {
+      this.presentToast('Aucun équipement sélectionné', 'warning');
+      return;
+    }
+
+    let csvContent = '\uFEFFNom;Marque;Modèle;Référence;État;Lieu\n';
+
+    selection.forEach(e => {
+      // Maintenant TypeScript accepte e.marque et e.modele grâce à l'interface MaterielUI
+      const nom = (e.nom || '').replace(/;/g, ',');
+      const marque = (e.marque || '').replace(/;/g, ',');
+      const modele = (e.modele || '').replace(/;/g, ',');
+      const reference = (e.reference || '').replace(/;/g, ',');
+      const etat = (e.etat || 'Bon');
+      const lieu = this.getChantierName(e.chantier_id).replace(/;/g, ',');
+
+      csvContent += `${nom};${marque};${modele};${reference};${etat};${lieu}\n`;
+    });
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `Export_Materiel_${new Date().toISOString().slice(0,10)}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    this.presentToast(`Export de ${selection.length} éléments réussi ! 📂`, 'success');
+    this.toggleSelectionMode(); 
+  }
+
+  async presentToast(message: string, color: string) {
+    const toast = await this.toastCtrl.create({ message, duration: 2000, color, position: 'bottom' });
+    toast.present();
+  }
+
   // --- IMPORT CSV ---
   async onCSVSelected(event: any) {
     const file = event.target.files[0];
@@ -122,7 +189,7 @@ export class MaterielPage implements OnInit {
         error: (err) => {
           loading.dismiss();
           console.error(err);
-          this.presentAlert('Erreur', "Erreur lors de l'import. Vérifiez le format du fichier.");
+          this.presentAlert('Erreur', "Erreur lors de l'import.");
         }
       });
     }
@@ -131,41 +198,34 @@ export class MaterielPage implements OnInit {
   // --- SCANNER INTELLIGENT ---
   async startScan() {
     try {
-      // 1. Permissions
       const { camera } = await BarcodeScanner.requestPermissions();
       if (camera !== 'granted' && camera !== 'limited') {
         this.presentAlert('Erreur', "Permission caméra refusée.");
         return;
       }
 
-      // 2. Module Google (Android)
       if (Capacitor.getPlatform() === 'android') {
         const { available } = await BarcodeScanner.isGoogleBarcodeScannerModuleAvailable();
         if (!available) await BarcodeScanner.installGoogleBarcodeScannerModule();
       }
 
-      // 3. UI Hacks
       document.body.classList.add('barcode-scanner-active');
       const elements = document.querySelectorAll('body > *');
       elements.forEach((el: any) => {
         if (el.tagName !== 'APP-ROOT') el.style.display = 'none';
       });
 
-      // 4. Scan
       const { barcodes } = await BarcodeScanner.scan({ formats: [BarcodeFormat.QrCode] });
 
-      // 5. Restauration UI
       document.body.classList.remove('barcode-scanner-active');
       elements.forEach((el: any) => el.style.display = '');
 
-      // 6. Traitement Résultat
       if (barcodes.length > 0) {
         const scannedData = barcodes[0].rawValue;
         console.log('Scanned:', scannedData);
 
         let foundMat = null;
 
-        // Cas A : Format "CONFORME-ID"
         if (scannedData.startsWith('CONFORME-')) {
           const parts = scannedData.split('-');
           if(parts.length > 1) {
@@ -173,7 +233,6 @@ export class MaterielPage implements OnInit {
             foundMat = this.materiels.find(m => m.id === id);
           }
         } 
-        // Cas B : Référence classique
         else {
           const searchRef = scannedData.trim().toLowerCase();
           foundMat = this.materiels.find(m => 
@@ -200,7 +259,6 @@ export class MaterielPage implements OnInit {
     }
   }
 
-  // --- SHOW QR CODE ---
   async showQrCode(mat: any) {
     const modal = await this.modalCtrl.create({
       component: QrCodeModalComponent,
@@ -210,8 +268,6 @@ export class MaterielPage implements OnInit {
     });
     await modal.present();
   }
-
-  // --- ACTIONS CRUD ---
   
   async addMateriel() {
     const modal = await this.modalCtrl.create({
@@ -286,8 +342,6 @@ export class MaterielPage implements OnInit {
     await alert.present();
   }
 
-  // --- HELPERS VISUELS ---
-
   async presentAlert(header: string, message: string) {
     const alert = await this.alertCtrl.create({
       header,
@@ -307,7 +361,6 @@ export class MaterielPage implements OnInit {
     return mat.image_url;
   }
 
-  // ✅ FONCTION RESTAURÉE
   getThumbUrl(url: string): string {
     if (!url) return '';
     if (url.startsWith('http:')) url = url.replace('http:', 'https:');
