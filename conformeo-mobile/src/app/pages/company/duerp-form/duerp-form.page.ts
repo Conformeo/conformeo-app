@@ -130,6 +130,22 @@ export class DuerpFormPage implements OnInit {
     }
   }
 
+  // 👇 NOUVELLE FONCTION D'AUTOMATISATION
+  autoUpdateStatus(ligne: any) {
+    const aFaire = ligne.mesures_a_realiser ? ligne.mesures_a_realiser.trim() : '';
+    const fait = ligne.mesures_realisees ? ligne.mesures_realisees.trim() : '';
+
+    // Règle 1 : S'il reste des choses à faire, c'est "À FAIRE" (Rouge)
+    if (aFaire.length > 0) {
+      ligne.statut = 'À FAIRE';
+    } 
+    // Règle 2 : Si "À faire" est vide MAIS qu'il y a du "Fait", c'est "FAIT" (Vert)
+    else if (fait.length > 0) {
+      ligne.statut = 'FAIT';
+    }
+    // Sinon, on laisse par défaut (souvent À FAIRE)
+  }
+
   async presentToast(msg: string, color: string) {
     const t = await this.toastCtrl.create({ message: msg, duration: 2000, color: color, position: 'bottom' });
     t.present();

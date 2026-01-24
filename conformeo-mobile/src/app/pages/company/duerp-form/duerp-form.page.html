@@ -58,14 +58,14 @@
         <ion-col size="12">
           <ion-item class="input-item">
             <ion-label position="stacked">⚠️ Mesures À PRENDRE</ion-label>
-            <ion-textarea [(ngModel)]="l.mesures_a_realiser" rows="2"></ion-textarea>
+            <ion-textarea [(ngModel)]="l.mesures_a_realiser" (ionInput)="autoUpdateStatus(l)" rows="2"></ion-textarea>
           </ion-item>
         </ion-col>
 
         <ion-col size="12">
           <ion-item class="input-item">
             <ion-label position="stacked">✅ Mesures FAITES</ion-label>
-            <ion-textarea [(ngModel)]="l.mesures_realisees" rows="2"></ion-textarea>
+            <ion-textarea [(ngModel)]="l.mesures_realisees" (ionInput)="autoUpdateStatus(l)" rows="2"></ion-textarea>
           </ion-item>
         </ion-col>
 
@@ -88,38 +88,16 @@
       <ion-card-subtitle>Nouvelle Ligne</ion-card-subtitle>
     </ion-card-header>
     <ion-card-content>
+      
       <ion-item fill="outline" class="mb-2">
-        <ion-label position="floating">Unité de Travail (ex: Toiture, Bureau...)</ion-label>
-        <ion-input [(ngModel)]="newLine.unite_travail"></ion-input>
+         <ion-label position="floating">Mesures À PRENDRE</ion-label>
+         <ion-textarea [(ngModel)]="newLine.mesures_a_realiser" (ionInput)="autoUpdateStatus(newLine)"></ion-textarea>
       </ion-item>
 
       <ion-item fill="outline" class="mb-2">
-        <ion-label position="floating">Tâche</ion-label>
-        <ion-input [(ngModel)]="newLine.tache"></ion-input>
+         <ion-label position="floating">Mesures FAITES</ion-label>
+         <ion-textarea [(ngModel)]="newLine.mesures_realisees" (ionInput)="autoUpdateStatus(newLine)"></ion-textarea>
       </ion-item>
-
-      <ion-grid class="ion-no-padding">
-        <ion-row>
-          <ion-col size="8">
-            <ion-item fill="outline" style="margin-right: 5px;">
-              <ion-label position="floating">Risque</ion-label>
-              <ion-input [(ngModel)]="newLine.risque"></ion-input>
-            </ion-item>
-          </ion-col>
-          
-          <ion-col size="4">
-            <ion-item fill="outline">
-              <ion-label position="floating">Gravité</ion-label>
-              <ion-select [(ngModel)]="newLine.gravite">
-                <ion-select-option [value]="1">1</ion-select-option>
-                <ion-select-option [value]="2">2</ion-select-option>
-                <ion-select-option [value]="3">3</ion-select-option>
-                <ion-select-option [value]="4">4</ion-select-option>
-              </ion-select>
-            </ion-item>
-          </ion-col>
-        </ion-row>
-      </ion-grid>
 
       <ion-item fill="outline" class="mt-2">
         <ion-label>État initial</ion-label>
