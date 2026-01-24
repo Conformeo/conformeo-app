@@ -1265,13 +1265,13 @@ def create_or_update_duerp(
     if not current_user.company_id:
         raise HTTPException(400, "Pas d'entreprise rattachée")
     
-    # 👇 CORRECTION 1 : On convertit l'année en String pour la recherche
+    # Correction Type : Conversion de l'année en String
     annee_str = str(duerp_data.annee)
 
     # 1. Gestion du DUERP principal (En-tête)
     existing = db.query(models.DUERP).filter(
         models.DUERP.company_id == current_user.company_id, 
-        models.DUERP.annee == annee_str # 👈 Utilisation de la version string
+        models.DUERP.annee == annee_str 
     ).first()
 
     if existing:
@@ -1280,25 +1280,40 @@ def create_or_update_duerp(
         existing.date_mise_a_jour = datetime.now()
         db_duerp = existing
     else:
-        # 👇 CORRECTION 2 : On convertit aussi lors de la création
         db_duerp = models.DUERP(
             company_id=current_user.company_id, 
-            annee=annee_str # 👈 Ici aussi
+            annee=annee_str
         )
         db.add(db_duerp)
         db.commit()
         db.refresh(db_duerp)
 
-    # 2. Création des lignes avec TOUS les champs
+    # 2. Création des lignes avec NETTOYAGE LOGIQUE
     for l in duerp_data.lignes:
+        
+        # 👇 LOGIQUE MÉTIER : On nettoie les champs contradictoires
+        clean_a_realiser = l.mesures_a_realiser
+        clean_realisees = l.mesures_realisees
+        
+        if l.statut == "FAIT":
+            # Si c'est FAIT, il ne reste plus rien "À FAIRE"
+            clean_a_realiser = "" 
+            
+        elif l.statut == "À FAIRE":
+            # Si c'est À FAIRE, c'est que rien n'a été "FAIT"
+            clean_realisees = ""
+
         new_line = models.DUERPLigne(
             duerp_id=db_duerp.id,
             unite_travail=l.unite_travail,
             tache=l.tache, 
             risque=l.risque, 
             gravite=l.gravite,
-            mesures_realisees=l.mesures_realisees, 
-            mesures_a_realiser=l.mesures_a_realiser,
+            
+            # On enregistre les versions nettoyées
+            mesures_realisees=clean_realisees, 
+            mesures_a_realiser=clean_a_realiser,
+            
             statut=l.statut
         )
         db.add(new_line)
@@ -1306,7 +1321,6 @@ def create_or_update_duerp(
     db.commit()
     return db_duerp
 
-# Dans backend/main.py
 
 @app.get("/duerp/consultation/pdf")
 def consulter_duerp_pdf(
