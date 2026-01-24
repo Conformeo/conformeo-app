@@ -1257,13 +1257,21 @@ def read_own_company(
     return company
 
 @app.post("/companies/me/duerp", response_model=schemas.DUERPOut)
-def create_or_update_duerp(duerp_data: schemas.DUERPCreate, db: Session = Depends(get_db), current_user: models.User = Depends(security.get_current_user)):
-    if not current_user.company_id: raise HTTPException(400, "Pas d'entreprise")
+def create_or_update_duerp(
+    duerp_data: schemas.DUERPCreate, 
+    db: Session = Depends(get_db), 
+    current_user: models.User = Depends(security.get_current_user)
+):
+    if not current_user.company_id:
+        raise HTTPException(400, "Pas d'entreprise rattachée")
     
+    # 👇 CORRECTION 1 : On convertit l'année en String pour la recherche
+    annee_str = str(duerp_data.annee)
+
     # 1. Gestion du DUERP principal (En-tête)
     existing = db.query(models.DUERP).filter(
         models.DUERP.company_id == current_user.company_id, 
-        models.DUERP.annee == duerp_data.annee
+        models.DUERP.annee == annee_str # 👈 Utilisation de la version string
     ).first()
 
     if existing:
@@ -1272,7 +1280,11 @@ def create_or_update_duerp(duerp_data: schemas.DUERPCreate, db: Session = Depend
         existing.date_mise_a_jour = datetime.now()
         db_duerp = existing
     else:
-        db_duerp = models.DUERP(company_id=current_user.company_id, annee=duerp_data.annee)
+        # 👇 CORRECTION 2 : On convertit aussi lors de la création
+        db_duerp = models.DUERP(
+            company_id=current_user.company_id, 
+            annee=annee_str # 👈 Ici aussi
+        )
         db.add(db_duerp)
         db.commit()
         db.refresh(db_duerp)
@@ -1281,13 +1293,13 @@ def create_or_update_duerp(duerp_data: schemas.DUERPCreate, db: Session = Depend
     for l in duerp_data.lignes:
         new_line = models.DUERPLigne(
             duerp_id=db_duerp.id,
-            unite_travail=l.unite_travail, # 👈 INDISPENSABLE
+            unite_travail=l.unite_travail,
             tache=l.tache, 
             risque=l.risque, 
             gravite=l.gravite,
             mesures_realisees=l.mesures_realisees, 
             mesures_a_realiser=l.mesures_a_realiser,
-            statut=l.statut                # 👈 INDISPENSABLE
+            statut=l.statut
         )
         db.add(new_line)
     
