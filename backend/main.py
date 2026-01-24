@@ -1841,25 +1841,26 @@ def fix_duerp_statut(db: Session = Depends(get_db)):
     except Exception as e:
         return {"error": str(e)}
     
-@app.get("/fix_duerp_columns")
-def fix_duerp_columns(db: Session = Depends(get_db)):
+@app.get("/fix_duerp_columns_v2")
+def fix_duerp_columns_v2(db: Session = Depends(get_db)):
     logs = []
+    
+    # 1. Tentative pour la colonne 'statut'
     try:
-        # Ajout colonne 'statut'
-        try:
-            db.execute(text("ALTER TABLE duerp_lignes ADD COLUMN statut VARCHAR DEFAULT 'EN COURS'"))
-            logs.append("✅ Colonne 'statut' ajoutée.")
-        except Exception as e:
-            logs.append(f"ℹ️ Colonne 'statut' existe déjà ou erreur: {e}")
-
-        # Ajout colonne 'unite_travail'
-        try:
-            db.execute(text("ALTER TABLE duerp_lignes ADD COLUMN unite_travail VARCHAR DEFAULT 'Général'"))
-            logs.append("✅ Colonne 'unite_travail' ajoutée.")
-        except Exception as e:
-            logs.append(f"ℹ️ Colonne 'unite_travail' existe déjà ou erreur: {e}")
-            
+        db.execute(text("ALTER TABLE duerp_lignes ADD COLUMN statut VARCHAR DEFAULT 'EN COURS'"))
         db.commit()
-        return {"status": "Terminé", "logs": logs}
+        logs.append("✅ Colonne 'statut' créée avec succès.")
     except Exception as e:
-        return {"error": str(e)}
+        db.rollback() # 👈 TRES IMPORTANT : On débloque la base si ça rate
+        logs.append("ℹ️ La colonne 'statut' existe déjà (Normal).")
+
+    # 2. Tentative pour la colonne 'unite_travail'
+    try:
+        db.execute(text("ALTER TABLE duerp_lignes ADD COLUMN unite_travail VARCHAR DEFAULT 'Général'"))
+        db.commit()
+        logs.append("✅ Colonne 'unite_travail' créée avec succès.")
+    except Exception as e:
+        db.rollback() # 👈 On débloque encore
+        logs.append(f"⚠️ Erreur sur 'unite_travail' (ou elle existe déjà) : {str(e)}")
+        
+    return {"status": "Opération terminée", "détails": logs}
