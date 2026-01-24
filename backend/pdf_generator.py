@@ -492,8 +492,7 @@ def generate_pdp_pdf(chantier, pdp, output_path, company=None):
 # ==========================================
 def generate_duerp_pdf(duerp, company, lignes):
     """
-    Génère le Document Unique (DUERP) - Style Sobre & Professionnel
-    Avec affichage intelligent selon le statut (FAIT / EN COURS / À FAIRE)
+    Génère le DUERP - Mode Binaire (FAIT / À FAIRE)
     """
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30)
@@ -501,32 +500,18 @@ def generate_duerp_pdf(duerp, company, lignes):
     elements = []
     styles = getSampleStyleSheet()
     
-    # --- STYLES PERSONNALISÉS ---
-    style_titre = ParagraphStyle(
-        'TitreDoc', parent=styles['Title'], 
-        fontSize=18, spaceAfter=20, textColor=colors.HexColor('#333333'), alignment=TA_CENTER
-    )
-    style_sous_titre = ParagraphStyle(
-        'SousTitre', parent=styles['Normal'],
-        fontSize=10, textColor=colors.HexColor('#666666'), alignment=TA_CENTER
-    )
-    style_cell_header = ParagraphStyle(
-        'CellHeader', parent=styles['Normal'],
-        fontSize=10, fontName='Helvetica-Bold', textColor=colors.black, alignment=TA_CENTER
-    )
-    style_cell_normal = ParagraphStyle(
-        'CellNormal', parent=styles['Normal'],
-        fontSize=10, fontName='Helvetica', leading=12
-    )
+    # --- STYLES ---
+    style_titre = ParagraphStyle('TitreDoc', parent=styles['Title'], fontSize=18, spaceAfter=20, textColor=colors.HexColor('#333333'), alignment=TA_CENTER)
+    style_sous_titre = ParagraphStyle('SousTitre', parent=styles['Normal'], fontSize=10, textColor=colors.HexColor('#666666'), alignment=TA_CENTER)
+    style_cell_header = ParagraphStyle('CellHeader', parent=styles['Normal'], fontSize=10, fontName='Helvetica-Bold', textColor=colors.black, alignment=TA_CENTER)
+    style_cell_normal = ParagraphStyle('CellNormal', parent=styles['Normal'], fontSize=10, fontName='Helvetica', leading=12)
     
-    # --- EN-TÊTE DU DOCUMENT ---
+    # --- EN-TÊTE ---
     elements.append(Paragraph(f"DOCUMENT UNIQUE D'ÉVALUATION DES RISQUES (DUERP) - {duerp.annee}", style_titre))
-    
-    info_line = f"<b>Entreprise :</b> {company.name} &nbsp;&nbsp;|&nbsp;&nbsp; <b>Mise à jour :</b> {duerp.date_mise_a_jour.strftime('%d/%m/%Y')}"
-    elements.append(Paragraph(info_line, style_sous_titre))
+    elements.append(Paragraph(f"<b>Entreprise :</b> {company.name} &nbsp;&nbsp;|&nbsp;&nbsp; <b>Mise à jour :</b> {duerp.date_mise_a_jour.strftime('%d/%m/%Y')}", style_sous_titre))
     elements.append(Spacer(1, 25))
     
-    # --- PRÉPARATION DES DONNÉES ---
+    # --- TABLEAU ---
     headers = [
         Paragraph('Unité / Tâche', style_cell_header),
         Paragraph('Risque Identifié', style_cell_header),
@@ -538,71 +523,59 @@ def generate_duerp_pdf(duerp, company, lignes):
     data = [headers]
     
     for l in lignes:
-        # Contenu des cellules de base
+        # Données de base
         tache = Paragraph(f"<b>{l.unite_travail}</b><br/>{l.tache}", style_cell_normal)
         risque = Paragraph(l.risque, style_cell_normal)
         gravite = Paragraph(str(l.gravite), ParagraphStyle('Center', parent=style_cell_normal, alignment=TA_CENTER))
         
-        # --- LOGIQUE D'AFFICHAGE INTELLIGENTE ---
-        statut_val = l.statut if l.statut else "EN COURS"
+        # --- NOUVELLE LOGIQUE BINAIRE ---
+        statut_val = l.statut if l.statut else "À FAIRE"
+        # On traite l'ancien "EN COURS" comme du "À FAIRE" pour la transition
+        if statut_val == "EN COURS": statut_val = "À FAIRE"
+            
         mesures_html = ""
 
-        # CAS 1 : C'est FAIT -> On cache "À faire"
+        # CAS 1 : C'est FAIT (Vert) -> On n'affiche QUE le réalisé.
         if statut_val == "FAIT":
             if l.mesures_realisees:
-                mesures_html += f"<font color='#27AE60'>✔ RÉALISÉ : {l.mesures_realisees}</font>"
+                mesures_html += f"<font color='#27AE60'>✔ ACTION TERMINÉE : {l.mesures_realisees}</font>"
             else:
                 mesures_html += "<i>(Risque maîtrisé)</i>"
-
-        # CAS 2 : C'est À FAIRE -> On cache "Fait"
-        elif statut_val == "À FAIRE":
-            if l.mesures_a_realiser:
-                mesures_html += f"• À PLANIFIER : {l.mesures_a_realiser}"
-            else:
-                mesures_html += "<i>(Aucune mesure définie)</i>"
-
-        # CAS 3 : EN COURS -> On affiche tout
-        else: 
+        
+        # CAS 2 : C'est À FAIRE (Rouge) -> On affiche "À faire" ET l'historique "Déjà fait"
+        else:
             if l.mesures_a_realiser:
                 mesures_html += f"<b>➔ Reste à faire :</b> {l.mesures_a_realiser}<br/><br/>"
+            
+            # On affiche quand même ce qui est fait pour montrer l'avancement
             if l.mesures_realisees:
-                mesures_html += f"<font color='#666666'><i>✔ Déjà fait : {l.mesures_realisees}</i></font>"
+                mesures_html += f"<font color='#666666'><i>✔ Déjà réalisé : {l.mesures_realisees}</i></font>"
             
-        if not mesures_html: mesures_html = "-"
-            
+            if not mesures_html: mesures_html = "<i>(Aucune mesure définie)</i>"
+
         mesures = Paragraph(mesures_html, style_cell_normal)
         
-        # Couleurs du statut
-        color_statut = "#E67E22" # Orange
+        # Couleurs
+        color_statut = "#C0392B" # Rouge (À FAIRE)
         if statut_val == "FAIT": color_statut = "#27AE60" # Vert
-        elif statut_val == "À FAIRE": color_statut = "#C0392B" # Rouge
         
         statut_html = f"<font color='{color_statut}'><b>{statut_val}</b></font>"
         statut = Paragraph(statut_html, ParagraphStyle('Statut', parent=style_cell_normal, alignment=TA_CENTER))
         
         data.append([tache, risque, gravite, mesures, statut])
 
-    # --- STYLE DU TABLEAU ---
-    col_widths = [160, 140, 40, 360, 80]
-    
-    t = Table(data, colWidths=col_widths, repeatRows=1)
-    
+    # --- STYLE ---
+    t = Table(data, colWidths=[160, 140, 40, 360, 80], repeatRows=1)
     t.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#F0F0F0')),
         ('LINEBELOW', (0, 0), (-1, 0), 1, colors.HexColor('#999999')),
         ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-        ('TOPPADDING', (0, 0), (-1, -1), 10),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
-        ('LEFTPADDING', (0, 0), (-1, -1), 8),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+        ('PADDING', (0, 0), (-1, -1), 10),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CCCCCC')),
         ('ALIGN', (2, 1), (2, -1), 'CENTER'),
     ]))
     
     elements.append(t)
-    elements.append(Spacer(1, 30))
-    elements.append(Paragraph("<i>Document généré par Conforméo - Application de gestion BTP</i>", style_sous_titre))
-    
     doc.build(elements)
     buffer.seek(0)
     return buffer

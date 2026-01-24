@@ -26,7 +26,7 @@ export class DuerpFormPage implements OnInit {
     gravite: 2,
     mesures_realisees: '',
     mesures_a_realiser: '',
-    statut: 'EN COURS' // 👈 Valeur par défaut importante
+    statut: 'À FAIRE'
   };
 
   constructor(
@@ -124,9 +124,9 @@ export class DuerpFormPage implements OnInit {
 
   getStatusColor(statut: string): string {
     switch(statut) {
-      case 'FAIT': return 'var(--ion-color-success)';
-      case 'À FAIRE': return 'var(--ion-color-danger)';
-      default: return 'var(--ion-color-warning)';
+      case 'FAIT': return 'var(--ion-color-success)'; // Vert
+      case 'À FAIRE': return 'var(--ion-color-danger)'; // Rouge
+      default: return 'var(--ion-color-danger)'; // Par défaut Rouge (gère les anciens 'EN COURS')
     }
   }
 

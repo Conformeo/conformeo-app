@@ -74,7 +74,6 @@
             <ion-label position="stacked">État du plan d'action</ion-label>
             <ion-select [(ngModel)]="l.statut" [style.color]="getStatusColor(l.statut)">
               <ion-select-option value="À FAIRE">🔴 À FAIRE</ion-select-option>
-              <ion-select-option value="EN COURS">🟠 EN COURS</ion-select-option>
               <ion-select-option value="FAIT">🟢 FAIT (Maîtrisé)</ion-select-option>
             </ion-select>
           </ion-item>
@@ -126,7 +125,6 @@
         <ion-label>État initial</ion-label>
         <ion-select [(ngModel)]="newLine.statut">
           <ion-select-option value="À FAIRE">À FAIRE</ion-select-option>
-          <ion-select-option value="EN COURS">EN COURS</ion-select-option>
           <ion-select-option value="FAIT">FAIT</ion-select-option>
         </ion-select>
       </ion-item>
