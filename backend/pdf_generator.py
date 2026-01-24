@@ -493,6 +493,7 @@ def generate_pdp_pdf(chantier, pdp, output_path, company=None):
 def generate_duerp_pdf(duerp, company, lignes):
     """
     Génère le Document Unique (DUERP) - Style Sobre & Professionnel
+    Avec affichage intelligent selon le statut (FAIT / EN COURS / À FAIRE)
     """
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30)
@@ -526,11 +527,10 @@ def generate_duerp_pdf(duerp, company, lignes):
     elements.append(Spacer(1, 25))
     
     # --- PRÉPARATION DES DONNÉES ---
-    # En-têtes du tableau
     headers = [
         Paragraph('Unité / Tâche', style_cell_header),
         Paragraph('Risque Identifié', style_cell_header),
-        Paragraph('Gravité', style_cell_header), # G pour Gravité
+        Paragraph('G.', style_cell_header),
         Paragraph('Mesures de Prévention', style_cell_header),
         Paragraph('État', style_cell_header)
     ]
@@ -538,41 +538,56 @@ def generate_duerp_pdf(duerp, company, lignes):
     data = [headers]
     
     for l in lignes:
-        # Contenu des cellules
+        # Contenu des cellules de base
         tache = Paragraph(f"<b>{l.unite_travail}</b><br/>{l.tache}", style_cell_normal)
         risque = Paragraph(l.risque, style_cell_normal)
         gravite = Paragraph(str(l.gravite), ParagraphStyle('Center', parent=style_cell_normal, alignment=TA_CENTER))
         
-        # Formatage des mesures (A faire / Fait)
+        # --- LOGIQUE D'AFFICHAGE INTELLIGENTE ---
+        statut_val = l.statut if l.statut else "EN COURS"
         mesures_html = ""
-        if l.mesures_a_realiser:
-            mesures_html += f"• À FAIRE : {l.mesures_a_realiser}<br/>"
-        if l.mesures_realisees:
-            mesures_html += f"<font color='#666666'>• FAIT : {l.mesures_realisees}</font>"
+
+        # CAS 1 : C'est FAIT -> On cache "À faire"
+        if statut_val == "FAIT":
+            if l.mesures_realisees:
+                mesures_html += f"<font color='#27AE60'>✔ RÉALISÉ : {l.mesures_realisees}</font>"
+            else:
+                mesures_html += "<i>(Risque maîtrisé)</i>"
+
+        # CAS 2 : C'est À FAIRE -> On cache "Fait"
+        elif statut_val == "À FAIRE":
+            if l.mesures_a_realiser:
+                mesures_html += f"• À PLANIFIER : {l.mesures_a_realiser}"
+            else:
+                mesures_html += "<i>(Aucune mesure définie)</i>"
+
+        # CAS 3 : EN COURS -> On affiche tout
+        else: 
+            if l.mesures_a_realiser:
+                mesures_html += f"<b>➔ Reste à faire :</b> {l.mesures_a_realiser}<br/><br/>"
+            if l.mesures_realisees:
+                mesures_html += f"<font color='#666666'><i>✔ Déjà fait : {l.mesures_realisees}</i></font>"
+            
         if not mesures_html: mesures_html = "-"
             
         mesures = Paragraph(mesures_html, style_cell_normal)
         
-        # Gestion de la couleur du statut (Sobre : texte coloré, pas de fond fluo)
-        statut_val = l.statut if l.statut else "EN COURS"
-        color_statut = "#E67E22" # Orange par défaut (En cours)
-        
-        if statut_val == "FAIT": color_statut = "#27AE60" # Vert pro
-        elif statut_val == "À FAIRE": color_statut = "#C0392B" # Rouge pro
+        # Couleurs du statut
+        color_statut = "#E67E22" # Orange
+        if statut_val == "FAIT": color_statut = "#27AE60" # Vert
+        elif statut_val == "À FAIRE": color_statut = "#C0392B" # Rouge
         
         statut_html = f"<font color='{color_statut}'><b>{statut_val}</b></font>"
         statut = Paragraph(statut_html, ParagraphStyle('Statut', parent=style_cell_normal, alignment=TA_CENTER))
         
         data.append([tache, risque, gravite, mesures, statut])
 
-    # --- STYLE DU TABLEAU (Sobre) ---
-    # Largeurs optimisées pour paysage A4 (Total ~780pt dispo)
-    col_widths = [160, 140, 70, 330, 80]
+    # --- STYLE DU TABLEAU ---
+    col_widths = [160, 140, 40, 360, 80]
     
     t = Table(data, colWidths=col_widths, repeatRows=1)
     
     t.setStyle(TableStyle([
-        # En-tête : Fond Gris Clair, Bordures fines
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#F0F0F0')),
         ('LINEBELOW', (0, 0), (-1, 0), 1, colors.HexColor('#999999')),
         ('VALIGN', (0, 0), (-1, -1), 'TOP'),
@@ -580,15 +595,11 @@ def generate_duerp_pdf(duerp, company, lignes):
         ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
         ('LEFTPADDING', (0, 0), (-1, -1), 8),
         ('RIGHTPADDING', (0, 0), (-1, -1), 8),
-        
-        # Corps du tableau : Lignes fines grises
         ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CCCCCC')),
-        ('ALIGN', (2, 1), (2, -1), 'CENTER'), # Centrer la gravité
+        ('ALIGN', (2, 1), (2, -1), 'CENTER'),
     ]))
     
     elements.append(t)
-    
-    # --- PIED DE PAGE ---
     elements.append(Spacer(1, 30))
     elements.append(Paragraph("<i>Document généré par Conforméo - Application de gestion BTP</i>", style_sous_titre))
     
