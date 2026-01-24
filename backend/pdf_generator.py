@@ -490,9 +490,18 @@ def generate_pdp_pdf(chantier, pdp, output_path, company=None):
 # ==========================================
 # 6. GENERATEUR DUERP (Tableau Dynamique)
 # ==========================================
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4, landscape
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.enums import TA_CENTER
+from io import BytesIO
+
 def generate_duerp_pdf(duerp, company, lignes):
     """
-    Génère le DUERP - Mode Binaire (FAIT / À FAIRE)
+    Génère le DUERP - Mode Transparent
+    - Historique conservé même si l'action est terminée.
+    - État calculé automatiquement (FAIT / À FAIRE).
     """
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30)
@@ -528,34 +537,40 @@ def generate_duerp_pdf(duerp, company, lignes):
         risque = Paragraph(l.risque, style_cell_normal)
         gravite = Paragraph(str(l.gravite), ParagraphStyle('Center', parent=style_cell_normal, alignment=TA_CENTER))
         
-        # --- NOUVELLE LOGIQUE BINAIRE ---
+        # --- LOGIQUE D'AFFICHAGE INTELLIGENTE ---
         statut_val = l.statut if l.statut else "À FAIRE"
-        # On traite l'ancien "EN COURS" comme du "À FAIRE" pour la transition
+        # On force l'ancien "EN COURS" vers "À FAIRE" pour la cohérence binaire
         if statut_val == "EN COURS": statut_val = "À FAIRE"
             
         mesures_html = ""
 
-        # CAS 1 : C'est FAIT (Vert) -> On n'affiche QUE le réalisé.
+        # CAS 1 : C'est FAIT (Vert)
         if statut_val == "FAIT":
+            # A. On affiche ce qui a été fait (En Vert et Gras)
             if l.mesures_realisees:
-                mesures_html += f"<font color='#27AE60'>✔ ACTION TERMINÉE : {l.mesures_realisees}</font>"
+                mesures_html += f"<font color='#27AE60'><b>✔ ACTION TERMINÉE : {l.mesures_realisees}</b></font>"
             else:
-                mesures_html += "<i>(Risque maîtrisé)</i>"
-        
-        # CAS 2 : C'est À FAIRE (Rouge) -> On affiche "À faire" ET l'historique "Déjà fait"
-        else:
-            if l.mesures_a_realiser:
-                mesures_html += f"<b>➔ Reste à faire :</b> {l.mesures_a_realiser}<br/><br/>"
+                mesures_html += f"<font color='#27AE60'><b>✔ ACTION TERMINÉE</b></font>"
             
-            # On affiche quand même ce qui est fait pour montrer l'avancement
+            # B. On affiche QUAND MÊME ce qui était prévu (En Gris, plus petit) pour l'historique
+            if l.mesures_a_realiser:
+                mesures_html += f"<br/><br/><font color='#888888' size='9'><i>(Mesure initiale prévue : {l.mesures_a_realiser})</i></font>"
+        
+        # CAS 2 : C'est À FAIRE (Rouge)
+        else:
+            # A. On affiche ce qu'il reste à faire en priorité
+            if l.mesures_a_realiser:
+                mesures_html += f"<b>➔ Reste à faire :</b> {l.mesures_a_realiser}"
+            
+            # B. On affiche ce qui est déjà fait en dessous (En Gris)
             if l.mesures_realisees:
-                mesures_html += f"<font color='#666666'><i>✔ Déjà réalisé : {l.mesures_realisees}</i></font>"
+                mesures_html += f"<br/><br/><font color='#666666'><i>✔ Déjà réalisé : {l.mesures_realisees}</i></font>"
             
             if not mesures_html: mesures_html = "<i>(Aucune mesure définie)</i>"
 
         mesures = Paragraph(mesures_html, style_cell_normal)
         
-        # Couleurs
+        # Couleurs de la colonne État
         color_statut = "#C0392B" # Rouge (À FAIRE)
         if statut_val == "FAIT": color_statut = "#27AE60" # Vert
         
@@ -564,15 +579,15 @@ def generate_duerp_pdf(duerp, company, lignes):
         
         data.append([tache, risque, gravite, mesures, statut])
 
-    # --- STYLE ---
+    # --- STYLE DU TABLEAU ---
     t = Table(data, colWidths=[160, 140, 40, 360, 80], repeatRows=1)
     t.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#F0F0F0')),
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#F0F0F0')), # Gris clair entête
         ('LINEBELOW', (0, 0), (-1, 0), 1, colors.HexColor('#999999')),
         ('VALIGN', (0, 0), (-1, -1), 'TOP'),
         ('PADDING', (0, 0), (-1, -1), 10),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CCCCCC')),
-        ('ALIGN', (2, 1), (2, -1), 'CENTER'),
+        ('ALIGN', (2, 1), (2, -1), 'CENTER'), # Centrer la gravité
     ]))
     
     elements.append(t)
