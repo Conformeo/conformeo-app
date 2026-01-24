@@ -24,11 +24,12 @@ import { AddMaterielModalComponent } from './add-materiel-modal/add-materiel-mod
 import { QrCodeModalComponent } from './qr-code-modal/qr-code-modal.page';
 import { BarcodeScanner, BarcodeFormat } from '@capacitor-mlkit/barcode-scanning';
 
-// 👇 CORRECTION ICI : On déclare les champs manquants comme optionnels (?)
+// 👇 MISE À JOUR DE L'INTERFACE
 interface MaterielUI extends Materiel {
   selected?: boolean;
-  marque?: string;  // Ajout pour corriger l'erreur TS
-  modele?: string;  // Ajout pour corriger l'erreur TS
+  marque?: string;
+  modele?: string;
+  date_derniere_vgp?: string; // Ajout pour le CSV
 }
 
 @Component({
@@ -91,7 +92,6 @@ export class MaterielPage implements OnInit {
 
     this.api.getMateriels().subscribe({
       next: (mats) => {
-        // Le cast "as MaterielUI[]" fonctionne maintenant car l'interface inclut marque/modele
         this.materiels = mats as MaterielUI[];
         this.filterMateriels(); 
         if (event) event.target.complete();
@@ -130,7 +130,7 @@ export class MaterielPage implements OnInit {
     return this.materiels.filter(e => e.selected).length;
   }
 
-  // --- EXPORT CSV ---
+  // --- EXPORT CSV (MODIFIÉ) ---
 
   exportCsv() {
     const selection = this.materiels.filter(e => e.selected);
@@ -140,18 +140,26 @@ export class MaterielPage implements OnInit {
       return;
     }
 
-    let csvContent = '\uFEFFNom;Marque;Modèle;Référence;État;Lieu\n';
+    // 1. Définition des colonnes (En-têtes)
+    // On retire Marque/Modèle et on ajoute Dernière VGP
+    let csvContent = '\uFEFFNom;Référence;État;Lieu;Dernière VGP\n';
 
     selection.forEach(e => {
-      // Maintenant TypeScript accepte e.marque et e.modele grâce à l'interface MaterielUI
       const nom = (e.nom || '').replace(/;/g, ',');
-      const marque = (e.marque || '').replace(/;/g, ',');
-      const modele = (e.modele || '').replace(/;/g, ',');
+      // Suppression Marque/Modèle ici
       const reference = (e.reference || '').replace(/;/g, ',');
       const etat = (e.etat || 'Bon');
       const lieu = this.getChantierName(e.chantier_id).replace(/;/g, ',');
+      
+      // Ajout VGP
+      // On formatte la date si elle existe, sinon vide
+      let dateVgp = '';
+      if (e.date_derniere_vgp) {
+        // Optionnel : formater la date si elle est brute (ex: YYYY-MM-DD)
+        dateVgp = e.date_derniere_vgp.split('T')[0]; 
+      }
 
-      csvContent += `${nom};${marque};${modele};${reference};${etat};${lieu}\n`;
+      csvContent += `${nom};${reference};${etat};${lieu};${dateVgp}\n`;
     });
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
