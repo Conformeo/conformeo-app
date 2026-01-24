@@ -9,9 +9,20 @@
     </ion-title>
 
     <ion-buttons slot="end">
-      <ion-button (click)="toggleSelectionMode()" color="light">
-        <ion-icon [name]="isSelectionMode ? 'close-circle-outline' : 'checkbox-outline'" slot="icon-only"></ion-icon>
+      
+      <ng-container *ngIf="isSelectionMode">
+        <ion-button (click)="selectAll()" color="light" title="Tout sélectionner">
+          <ion-icon name="checkmark-done-outline" slot="icon-only"></ion-icon>
+        </ion-button>
+        <ion-button (click)="toggleSelectionMode()" color="warning" title="Annuler">
+          <ion-icon name="close-circle-outline" slot="icon-only"></ion-icon>
+        </ion-button>
+      </ng-container>
+
+      <ion-button *ngIf="!isSelectionMode" (click)="toggleSelectionMode()" color="light" title="Sélectionner">
+        <ion-icon name="checkbox-outline" slot="icon-only"></ion-icon>
       </ion-button>
+
     </ion-buttons>
   </ion-toolbar>
 </ion-header>
@@ -45,7 +56,11 @@
     <div class="search-container">
       
       <div *ngIf="isSelectionMode" style="width: 100%; display: flex; gap: 10px;">
-        <ion-button expand="block" color="success" (click)="exportCsv()" [disabled]="selectedCount === 0" style="flex: 1;">
+        <ion-button fill="outline" (click)="selectAll()" style="flex: 1;" color="medium">
+          Tout
+        </ion-button>
+
+        <ion-button expand="block" color="success" (click)="exportCsv()" [disabled]="selectedCount === 0" style="flex: 2;">
           <ion-icon name="download-outline" slot="start"></ion-icon>
           Exporter ({{ selectedCount }})
         </ion-button>
@@ -150,13 +165,23 @@
       </h1>
 
       <div class="actions">
-        <ion-button *ngIf="isSelectionMode" (click)="exportCsv()" color="success" [disabled]="selectedCount === 0">
-           <ion-icon name="download-outline" slot="start"></ion-icon> Exporter CSV ({{selectedCount}})
-        </ion-button>
+        
+        <ng-container *ngIf="isSelectionMode">
+          <ion-button (click)="selectAll()" fill="outline" color="dark">
+            <ion-icon name="checkmark-done-outline" slot="start"></ion-icon> Tout sélectionner
+          </ion-button>
 
-        <ion-button (click)="toggleSelectionMode()" [color]="isSelectionMode ? 'warning' : 'medium'" fill="outline">
-          <ion-icon [name]="isSelectionMode ? 'close' : 'checkbox-outline'" slot="start"></ion-icon> 
-          {{ isSelectionMode ? 'Annuler' : 'Sélectionner' }}
+          <ion-button (click)="exportCsv()" color="success" [disabled]="selectedCount === 0">
+             <ion-icon name="download-outline" slot="start"></ion-icon> Exporter ({{selectedCount}})
+          </ion-button>
+
+          <ion-button (click)="toggleSelectionMode()" color="warning" fill="solid">
+            <ion-icon name="close" slot="start"></ion-icon> Annuler
+          </ion-button>
+        </ng-container>
+
+        <ion-button *ngIf="!isSelectionMode" (click)="toggleSelectionMode()" color="medium" fill="outline">
+          <ion-icon name="checkbox-outline" slot="start"></ion-icon> Sélectionner
         </ion-button>
 
         <input type="file" #csvInput (change)="onCSVSelected($event)" accept=".csv" style="display: none;" />
@@ -190,7 +215,9 @@
       <div *ngFor="let mat of filteredMateriels" 
            class="equip-card" 
            (click)="!isSelectionMode ? openTransfer(mat) : (mat.selected = !mat.selected)"
-           [class.selected-card]="mat.selected"> <div *ngIf="isSelectionMode" style="position: absolute; top: 10px; left: 10px; z-index: 20;">
+           [class.selected-card]="mat.selected">
+
+       <div *ngIf="isSelectionMode" style="position: absolute; top: 10px; left: 10px; z-index: 20;">
           <ion-checkbox [(ngModel)]="mat.selected"></ion-checkbox>
        </div>
 

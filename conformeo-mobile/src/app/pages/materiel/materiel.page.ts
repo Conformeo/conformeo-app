@@ -16,7 +16,8 @@ import {
   add, hammer, construct, home, swapHorizontal, qrCodeOutline,
   searchOutline, cube, homeOutline, locationOutline, shieldCheckmark,
   trashOutline, hammerOutline, cloudUploadOutline, createOutline,
-  printOutline, close, checkboxOutline, chevronForward, downloadOutline
+  printOutline, close, checkboxOutline, chevronForward, downloadOutline,
+  checkmarkDoneOutline
 } from 'ionicons/icons';
 
 import { ApiService, Materiel, Chantier } from '../../services/api'; 
@@ -70,7 +71,7 @@ export class MaterielPage implements OnInit {
       'hammer-outline': hammerOutline,
       'cloud-upload-outline': cloudUploadOutline,
       'print-outline': printOutline,
-      close, checkboxOutline, chevronForward, downloadOutline 
+      close, checkboxOutline, chevronForward, downloadOutline, checkmarkDoneOutline
     });
 
     this.checkScreen();
@@ -120,10 +121,22 @@ export class MaterielPage implements OnInit {
   
   toggleSelectionMode() {
     this.isSelectionMode = !this.isSelectionMode;
+    // Si on désactive (Annuler), on décoche tout
     if (!this.isSelectionMode) {
-      this.materiels.forEach(e => e.selected = false);
-      this.filteredMateriels.forEach(e => e.selected = false);
+      this.unselectAll();
     }
+  }
+
+  // 👇 NOUVELLE FONCTION : Tout sélectionner
+  selectAll() {
+    // On sélectionne uniquement ceux qui sont affichés (filtrés)
+    this.filteredMateriels.forEach(e => e.selected = true);
+  }
+
+  // 👇 NOUVELLE FONCTION : Tout décocher (interne)
+  unselectAll() {
+    this.materiels.forEach(e => e.selected = false);
+    this.filteredMateriels.forEach(e => e.selected = false);
   }
 
   get selectedCount(): number {
