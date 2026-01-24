@@ -1260,12 +1260,14 @@ def read_own_company(
 def create_or_update_duerp(duerp_data: schemas.DUERPCreate, db: Session = Depends(get_db), current_user: models.User = Depends(security.get_current_user)):
     if not current_user.company_id: raise HTTPException(400, "Pas d'entreprise")
     
+    # 1. Gestion du DUERP principal (En-tête)
     existing = db.query(models.DUERP).filter(
         models.DUERP.company_id == current_user.company_id, 
         models.DUERP.annee == duerp_data.annee
     ).first()
 
     if existing:
+        # On supprime les anciennes lignes pour les recréer proprement
         db.query(models.DUERPLigne).filter(models.DUERPLigne.duerp_id == existing.id).delete()
         existing.date_mise_a_jour = datetime.now()
         db_duerp = existing
@@ -1275,11 +1277,17 @@ def create_or_update_duerp(duerp_data: schemas.DUERPCreate, db: Session = Depend
         db.commit()
         db.refresh(db_duerp)
 
+    # 2. Création des lignes avec TOUS les champs
     for l in duerp_data.lignes:
         new_line = models.DUERPLigne(
             duerp_id=db_duerp.id,
-            tache=l.tache, risque=l.risque, gravite=l.gravite,
-            mesures_realisees=l.mesures_realisees, mesures_a_realiser=l.mesures_a_realiser
+            unite_travail=l.unite_travail, # 👈 AJOUTÉ
+            tache=l.tache, 
+            risque=l.risque, 
+            gravite=l.gravite,
+            mesures_realisees=l.mesures_realisees, 
+            mesures_a_realiser=l.mesures_a_realiser,
+            statut=l.statut # 👈 AJOUTÉ
         )
         db.add(new_line)
     
@@ -1830,5 +1838,28 @@ def fix_duerp_statut(db: Session = Depends(get_db)):
         db.execute(text("ALTER TABLE duerp_lignes ADD COLUMN IF NOT EXISTS statut VARCHAR DEFAULT 'EN COURS'"))
         db.commit()
         return {"message": "✅ Colonne 'statut' ajoutée au DUERP !"}
+    except Exception as e:
+        return {"error": str(e)}
+    
+@app.get("/fix_duerp_columns")
+def fix_duerp_columns(db: Session = Depends(get_db)):
+    logs = []
+    try:
+        # Ajout colonne 'statut'
+        try:
+            db.execute(text("ALTER TABLE duerp_lignes ADD COLUMN statut VARCHAR DEFAULT 'EN COURS'"))
+            logs.append("✅ Colonne 'statut' ajoutée.")
+        except Exception as e:
+            logs.append(f"ℹ️ Colonne 'statut' existe déjà ou erreur: {e}")
+
+        # Ajout colonne 'unite_travail'
+        try:
+            db.execute(text("ALTER TABLE duerp_lignes ADD COLUMN unite_travail VARCHAR DEFAULT 'Général'"))
+            logs.append("✅ Colonne 'unite_travail' ajoutée.")
+        except Exception as e:
+            logs.append(f"ℹ️ Colonne 'unite_travail' existe déjà ou erreur: {e}")
+            
+        db.commit()
+        return {"status": "Terminé", "logs": logs}
     except Exception as e:
         return {"error": str(e)}
