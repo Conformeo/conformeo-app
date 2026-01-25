@@ -20,6 +20,10 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/dashboard/dashboard.page').then( m => m.DashboardPage), canActivate: [authGuard]
   },
   {
+    path: 'chantier-details/:id', // 👈 Le ":id" est crucial
+    loadComponent: () => import('./pages/chantier-details/chantier-details.page').then( m => m.ChantierDetailsPage), canActivate: [authGuard]
+  },
+  {
     path: 'chantier/:id',
     loadComponent: () => import('./pages/chantier-details/chantier-details.page').then( m => m.ChantierDetailsPage), canActivate: [authGuard]
   },
@@ -41,8 +45,7 @@ export const routes: Routes = [
   },
   {
     path: 'settings',
-    loadComponent: () => import('./pages/settings/settings.page').then( m => m.SettingsPage),
-    canActivate: [authGuard]
+    loadComponent: () => import('./pages/settings/settings.page').then( m => m.SettingsPage),  canActivate: [authGuard]
   },
   {
     path: 'planning',
