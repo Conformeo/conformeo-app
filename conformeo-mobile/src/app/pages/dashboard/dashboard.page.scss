@@ -62,9 +62,30 @@
 
 /* Liste Récente */
 .recent-item {
-  display: flex; align-items: center; padding: 12px 0; border-bottom: 1px solid #f0f0f0;
+  display: flex; 
+  align-items: center; 
+  padding: 12px 10px; /* Un peu de padding horizontal */
+  border-bottom: 1px solid #f0f0f0;
+  border-radius: 8px; /* Arrondi pour l'effet hover */
+  transition: background-color 0.2s ease, transform 0.1s ease; /* Animation fluide */
+  
+  /* 👇 REND L'ÉLÉMENT CLIQUABLE VISUELLEMENT */
+  cursor: pointer; 
+
   &:last-child { border-bottom: none; }
+
+  /* Effet au survol de la souris */
+  &:hover {
+    background-color: #f5f7fa;
+  }
+  
+  /* Effet au clic */
+  &:active {
+    background-color: #ebeef5;
+    transform: scale(0.99);
+  }
 }
+
 .item-icon { color: #888; font-size: 20px; margin-right: 15px; }
 .item-info { flex: 1; }
 .item-info h4 { margin: 0 0 4px; font-size: 14px; font-weight: 600; color: #333; }
@@ -74,6 +95,7 @@
 .badge.Faible { background: #e8f5e9; color: #2e7d32; }
 .badge.Moyen { background: #fff3e0; color: #ef6c00; }
 .badge.Critique { background: #ffebee; color: #c62828; }
+.badge.Info { background: #e3f2fd; color: #1976d2; }
 
 /* User Badge Header */
 .user-badge {

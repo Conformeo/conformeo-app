@@ -1,7 +1,6 @@
 <ion-header class="ion-no-border">
   <ion-toolbar style="--background: #f8f9fa;">
     <ion-buttons slot="start">
-      <!-- <ion-back-button defaultHref="/home" text="" color="dark"></ion-back-button> -->
       <ion-menu-button auto-hide="false"></ion-menu-button>
     </ion-buttons>
     
@@ -83,15 +82,22 @@
         </div>
         
         <div class="recent-list">
-          <div class="recent-item" *ngFor="let rap of recentRapports">
+          <div class="recent-item clickable" 
+               *ngFor="let rap of recentRapports" 
+               (click)="goToReport(rap)">
+               
             <div class="item-icon"><ion-icon name="camera-outline"></ion-icon></div>
             <div class="item-info">
-              <h4>{{ rap.titre }}</h4>
+              <h4>{{ rap.titre || 'Rapport sans titre' }}</h4>
               <p>{{ rap.date_creation | date:'dd/MM HH:mm' }} - {{ rap.chantier_nom }}</p>
             </div>
             <div class="item-status">
-              <span class="badge" [class]="rap.niveau_urgence">{{ rap.niveau_urgence }}</span>
+              <span class="badge" [class]="rap.niveau_urgence">{{ rap.niveau_urgence || 'Info' }}</span>
             </div>
+          </div>
+          
+          <div *ngIf="recentRapports.length === 0" style="padding: 20px; text-align: center; color: #999;">
+            Aucun rapport récent
           </div>
         </div>
       </div>
