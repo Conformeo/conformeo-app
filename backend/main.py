@@ -258,6 +258,7 @@ def get_stats(db: Session = Depends(get_db)):
         total = db.query(models.Chantier).count()
         actifs = db.query(models.Chantier).filter(models.Chantier.est_actif == True).count()
         rap = db.query(models.Rapport).count()
+        # Correction pour PostgreSQL : utiliser in_([])
         alert = db.query(models.Rapport).filter(models.Rapport.niveau_urgence.in_(['Critique', 'Moyen'])).count()
         mat_sorti = db.query(models.Materiel).filter(models.Materiel.chantier_id != None).count()
 
@@ -283,15 +284,17 @@ def get_stats(db: Session = Depends(get_db)):
             cnt = db.query(models.Rapport).filter(models.Rapport.date_creation >= start, models.Rapport.date_creation <= end).count()
             values.append(cnt)
 
-        # --- 4. ACTIVITÉ RÉCENTE ---
+        # --- 4. ACTIVITÉ RÉCENTE (CORRIGÉ) ---
         recents = db.query(models.Rapport).order_by(models.Rapport.date_creation.desc()).limit(5).all()
         rec_fmt = []
         for r in recents:
             c_nom = r.chantier.nom if r.chantier else "Chantier Inconnu"
             rec_fmt.append({
+                "id": r.id,  # 👈 AJOUTÉ : Pour identifier le rapport précis
                 "titre": r.titre, 
                 "date_creation": r.date_creation, 
                 "chantier_nom": c_nom, 
+                "chantier_id": r.chantier_id, # 👈 AJOUTÉ : Indispensable pour la redirection
                 "niveau_urgence": r.niveau_urgence
             })
 
@@ -300,6 +303,7 @@ def get_stats(db: Session = Depends(get_db)):
         chantiers = db.query(models.Chantier).filter(models.Chantier.est_actif == True).all()
         for c in chantiers:
             lat, lng = c.latitude, c.longitude
+            # Si pas de GPS chantier, on cherche le dernier rapport géolocalisé
             if not lat:
                 last_gps = db.query(models.Rapport).filter(models.Rapport.chantier_id == c.id, models.Rapport.latitude != None).first()
                 if last_gps:
@@ -325,6 +329,7 @@ def get_stats(db: Session = Depends(get_db)):
 
     except Exception as e:
         print(f"❌ Erreur Dashboard Stats: {str(e)}")
+        # On retourne une structure vide mais valide pour éviter de faire planter le front
         return {
             "kpis": {"total_chantiers": 0, "actifs": 0, "rapports": 0, "alertes": 0, "materiel_sorti": 0},
             "chart": {"labels": [], "values": []},
