@@ -172,6 +172,39 @@ def update_user_me(user_up: schemas.UserUpdate, db: Session = Depends(get_db), c
     db.refresh(current_user)
     return current_user
 
+@app.put("/users/{user_id}", response_model=schemas.User)
+def update_user(
+    user_id: int, 
+    user_update: schemas.UserUpdate, 
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(security.get_current_user)
+):
+    # Sécurité : Seul un Admin ou l'utilisateur lui-même peut modifier
+    if current_user.role != "admin" and current_user.id != user_id:
+        raise HTTPException(status_code=403, detail="Non autorisé")
+
+    db_user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not db_user:
+        raise HTTPException(status_code=404, detail="Utilisateur introuvable")
+
+    # Mise à jour des champs
+    if user_update.email:
+        db_user.email = user_update.email
+    
+    if user_update.role and current_user.role == "admin":
+        db_user.role = user_update.role
+        
+    if user_update.password:
+        db_user.hashed_password = security.get_password_hash(user_update.password)
+
+    # 👇 AJOUTEZ CE BLOC POUR LE NOM 👇
+    if user_update.full_name is not None:
+        db_user.full_name = user_update.full_name
+
+    db.commit()
+    db.refresh(db_user)
+    return db_user
+
 # ==========================================
 # 2. GESTION EQUIPE
 # ==========================================

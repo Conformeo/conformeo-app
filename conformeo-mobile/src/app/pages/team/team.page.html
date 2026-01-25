@@ -28,7 +28,7 @@
 
         <ion-label>
           <h2>
-            {{ u.nom || 'Sans nom' }}
+            {{ u.full_name || 'Sans nom' }}
             <span *ngIf="u.email === currentUserEmail" class="me-tag">(Moi)</span>
           </h2>
           <p>{{ u.email }}</p>

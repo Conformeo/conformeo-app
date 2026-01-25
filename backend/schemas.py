@@ -21,9 +21,10 @@ class UserLogin(BaseModel):
     password: str
 
 class UserUpdate(BaseModel):
-    full_name: Optional[str] = None
     email: Optional[EmailStr] = None
     password: Optional[str] = None
+    role: Optional[str] = None
+    full_name: Optional[str] = None  
 
 class UserUpdateAdmin(BaseModel):
     full_name: Optional[str] = None
