@@ -206,7 +206,7 @@ class ChantierUpdate(BaseModel):
     cover_url: Optional[str] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class ChantierOut(BaseModel):
     id: int
