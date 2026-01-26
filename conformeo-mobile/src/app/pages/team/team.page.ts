@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { IonicModule, AlertController, ToastController, LoadingController } from '@ionic/angular'; 
 import { addIcons } from 'ionicons';
 import { add, person, trash, mail, key, business, create, personAdd } from 'ionicons/icons';
-import { ApiService } from '../../services/api';
+import { ApiService, User } from '../../services/api';
 
 @Component({
   selector: 'app-team',
@@ -15,126 +15,131 @@ import { ApiService } from '../../services/api';
 })
 export class TeamPage implements OnInit {
 
-  users: any[] = []; 
+  users: User[] = [];
   currentUserEmail: string = '';
-  
   isModalOpen = false;
-  isEditing = false; // Pour savoir si on modifie ou crée
-  selectedUserId: number | null = null;
-
-  // Modèle du formulaire
-  userData = { nom: '', email: '', password: '', role: 'Conducteur' };
+  isEditing = false;
+  
+  // Objet tampon pour le formulaire
+  userData = {
+    id: 0,
+    nom: '',        // ✅ C'est ce champ qui est relié au HTML
+    email: '',
+    role: 'Conducteur',
+    password: ''
+  };
 
   constructor(
-    public api: ApiService, 
-    private alertCtrl: AlertController,
+    private api: ApiService,
     private toastCtrl: ToastController,
-    private loadingCtrl: LoadingController
+    private alertCtrl: AlertController
   ) {
-    addIcons({ add, person, trash, mail, key, business, create, personAdd });
+    addIcons({ personAdd, create, trash, add, person, mail, key, business });
   }
 
   ngOnInit() {
+    this.loadUsers();
     this.api.getMe().subscribe(u => this.currentUserEmail = u.email);
   }
 
-  ionViewWillEnter() {
-    this.loadTeam();
-  }
-
-  loadTeam() {
+  loadUsers() {
     this.api.getTeam().subscribe({
-      next: (data) => this.users = data,
+      next: (data) => {
+        this.users = data;
+      },
       error: (err) => console.error("Erreur chargement équipe", err)
     });
   }
 
-  // --- OUVERTURE MODALE ---
-  
+  // --- MODALE ---
+
   openAddModal() {
     this.isEditing = false;
-    this.userData = { nom: '', email: '', password: '', role: 'Conducteur' };
+    // On remet à zéro le formulaire
+    this.userData = { id: 0, nom: '', email: '', role: 'Conducteur', password: '' };
     this.isModalOpen = true;
   }
 
-  openEditModal(user: any) {
+  openEditModal(user: User) {
     this.isEditing = true;
-    this.selectedUserId = user.id;
-    // On copie les données existantes (sans le mot de passe bien sûr)
-    this.userData = { 
-      nom: user.nom || '', 
-      email: user.email, 
-      role: user.role, 
-      password: '' // On laisse vide, si rempli = changement de MDP
+    // 👇 ON COPIE LES DONNÉES DU MEMBRE DANS LE FORMULAIRE
+    this.userData = {
+      id: user.id,
+      nom: user.nom || '',  // ✅ On récupère bien le nom existant
+      email: user.email,
+      role: user.role,
+      password: '' // On laisse vide par sécurité
     };
     this.isModalOpen = true;
   }
 
-  // --- SAUVEGARDE ---
+  // --- ACTIONS ---
 
-  async saveUser() {
-    if (!this.userData.email || !this.userData.nom) {
-      this.presentToast('Nom et Email obligatoires', 'warning');
-      return;
-    }
-    // Si création, mot de passe obligatoire
-    if (!this.isEditing && !this.userData.password) {
-      this.presentToast('Mot de passe obligatoire pour la création', 'warning');
+  saveUser() {
+    if (!this.userData.email) {
+      this.presentToast('L\'email est obligatoire', 'warning');
       return;
     }
 
-    const load = await this.loadingCtrl.create({ message: 'Sauvegarde...' });
-    await load.present();
-
-    if (this.isEditing && this.selectedUserId) {
+    if (this.isEditing) {
       // MODE MODIFICATION
-      this.api.updateTeamMember(this.selectedUserId, this.userData).subscribe({
+      const payload: any = {
+        nom: this.userData.nom, // ✅ On envoie bien 'nom'
+        email: this.userData.email,
+        role: this.userData.role
+      };
+      
+      // On n'envoie le mot de passe que s'il a été changé
+      if (this.userData.password && this.userData.password.trim() !== '') {
+        payload.password = this.userData.password;
+      }
+
+      this.api.updateTeamMember(this.userData.id, payload).subscribe({
         next: () => {
-          load.dismiss();
-          this.presentToast('Utilisateur modifié ! ✅', 'success');
+          this.presentToast('Membre modifié avec succès', 'success');
           this.isModalOpen = false;
-          this.loadTeam();
+          this.loadUsers(); // 🔄 On rafraîchit la liste immédiatement
         },
         error: (err) => {
-          load.dismiss();
-          this.presentToast('Erreur modification', 'danger');
+          console.error(err);
+          this.presentToast('Erreur lors de la modification', 'danger');
         }
       });
+
     } else {
-      // MODE CRÉATION
+      // MODE CRÉATION (INVITATION)
+      if (!this.userData.password) {
+        this.presentToast('Mot de passe obligatoire pour créer', 'warning');
+        return;
+      }
+
       this.api.inviteMember(this.userData).subscribe({
         next: () => {
-          load.dismiss();
-          this.presentToast('Invitation envoyée ! 📩', 'success');
+          this.presentToast('Invitation envoyée !', 'success');
           this.isModalOpen = false;
-          this.loadTeam();
+          this.loadUsers();
         },
         error: (err) => {
-          load.dismiss();
-          this.presentToast(err.error?.detail || 'Erreur création', 'danger');
+          console.error(err);
+          this.presentToast('Erreur lors de l\'invitation', 'danger');
         }
       });
     }
   }
 
-  // --- SUPPRESSION ---
-  
-  async deleteUser(user: any) {
+  async deleteUser(user: User) {
     const alert = await this.alertCtrl.create({
-      header: 'Supprimer ?',
-      message: `Retirer ${user.nom || user.email} de l'équipe ?`,
+      header: 'Confirmer',
+      message: `Voulez-vous vraiment supprimer ${user.nom || user.email} ?`,
       buttons: [
         { text: 'Annuler', role: 'cancel' },
-        { 
-          text: 'Supprimer', 
+        {
+          text: 'Supprimer',
           role: 'destructive',
           handler: () => {
-            this.api.deleteMember(user.id).subscribe({
-              next: () => {
-                this.users = this.users.filter(u => u.id !== user.id);
-                this.presentToast('Membre supprimé', 'dark');
-              },
-              error: () => this.presentToast('Impossible de supprimer', 'danger')
+            this.api.deleteMember(user.id).subscribe(() => {
+              this.presentToast('Utilisateur supprimé', 'success');
+              this.loadUsers();
             });
           }
         }
@@ -143,13 +148,22 @@ export class TeamPage implements OnInit {
     await alert.present();
   }
 
-  getInitials(user: any) {
-    const name = user.nom || user.email;
-    return name ? name.charAt(0).toUpperCase() : '?';
+  // --- UI UTILS ---
+
+  getInitials(user: User): string {
+    if (user.nom) {
+      return user.nom.substring(0, 2).toUpperCase();
+    }
+    return user.email.substring(0, 2).toUpperCase();
   }
 
-  async presentToast(message: string, color: string = 'primary') {
-    const t = await this.toastCtrl.create({ message, duration: 2000, color });
-    t.present();
+  async presentToast(message: string, color: string) {
+    const toast = await this.toastCtrl.create({
+      message,
+      duration: 2000,
+      color,
+      position: 'bottom'
+    });
+    toast.present();
   }
 }
