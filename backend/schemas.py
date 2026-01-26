@@ -72,6 +72,7 @@ class CompanyOut(BaseModel):
     address: Optional[str] = None
     phone: Optional[str] = None
     contact_email: Optional[str] = None 
+    email: Optional[str] = None
     class Config:
         from_attributes = True
 

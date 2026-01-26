@@ -1296,7 +1296,20 @@ def read_own_company(
     if not company:
         raise HTTPException(status_code=404, detail="Entreprise introuvable")
         
-    return company
+    # 👇 CORRECTION D'AFFICHAGE
+    # On mappe manuellement l'email de la BDD vers le champ attendu par le frontend
+    return {
+        "id": company.id,
+        "name": company.name,
+        "address": company.address,
+        "phone": company.phone,
+        "logo_url": company.logo_url,
+        "subscription_plan": company.subscription_plan,
+        
+        # C'est ici que la magie opère :
+        "contact_email": company.email,  # On remplit contact_email avec la valeur de email
+        "email": company.email           # On envoie aussi email au cas où
+    }
 
 @app.post("/companies/me/duerp", response_model=schemas.DUERPOut)
 def create_or_update_duerp(
