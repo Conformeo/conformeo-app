@@ -5,7 +5,7 @@ from .. import models, schemas
 from ..database import get_db
 from ..dependencies import get_current_user
 
-router = APIRouter(prefix="/materiel", tags=["Matériel"])
+router = APIRouter(prefix="/materiels", tags=["Matériel"]) 
 
 @router.get("/", response_model=List[schemas.MaterielOut])
 def get_materiels(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
