@@ -20,7 +20,6 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
-from fastapi_mail import FastMail, MessageSchema, ConnectionConfig, MessageType
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -1324,27 +1323,43 @@ def download_doe(cid: int, db: Session = Depends(get_db)):
 async def send_journal_email(cid: int, email_dest: str, db: Session = Depends(get_db)):
     c = db.query(models.Chantier).filter(models.Chantier.id == cid).first()
     if not c: raise HTTPException(404, "Chantier introuvable")
+    
     raps = db.query(models.Rapport).filter(models.Rapport.chantier_id == cid).all()
     inss = db.query(models.Inspection).filter(models.Inspection.chantier_id == cid).all()
     comp = get_company_for_chantier(db, c.id)
 
-    filename = f"Journal_{c.nom}_{datetime.now().strftime('%Y%m%d')}.pdf"
-    filename = "".join([x for x in filename if x.isalpha() or x.isdigit() or x in (' ', '.', '_')]).strip()
-    path = f"uploads/{filename}"
-    pdf_generator.generate_pdf(c, raps, inss, path, company=comp)
-
-    html = f"""
-    <p>Bonjour,</p>
-    <p>Veuillez trouver ci-joint le <b>Journal de Bord</b> et le suivi d'avancement pour le chantier <b>{c.nom}</b>.</p>
-    <p>Cordialement,<br>{comp.name if comp else "L'équipe"}</p>
+    # Génération du PDF en mémoire (plus propre que de créer un fichier temporaire)
+    pdf_buffer = BytesIO()
+    pdf_generator.generate_pdf(c, raps, inss, pdf_buffer, company=comp)
+    
+    # Corps de l'email HTML
+    html_content = f"""
+    <html>
+    <body>
+        <p>Bonjour,</p>
+        <p>Veuillez trouver ci-joint le <b>Journal de Bord</b> et le suivi d'avancement pour le chantier <b>{c.nom}</b>.</p>
+        <br>
+        <p>Cordialement,</p>
+        <p><strong>{comp.name if comp else "L'équipe"}</strong></p>
+    </body>
+    </html>
     """
-    message = MessageSchema(subject=f"Suivi Chantier - {c.nom}", recipients=[email_dest], body=html, subtype=MessageType.html, attachments=[path])
-    fm = FastMail(mail_conf)
-    try:
-        await fm.send_message(message)
+
+    filename = f"Journal_{c.nom}.pdf"
+
+    # 👇 APPEL DE LA NOUVELLE FONCTION
+    success = send_email_via_brevo(
+        to_email=email_dest,
+        subject=f"Suivi Chantier - {c.nom}",
+        html_content=html_content,
+        pdf_attachment=pdf_buffer,
+        pdf_filename=filename
+    )
+
+    if success:
         return {"message": "Journal envoyé au client ! 🚀"}
-    except Exception as e:
-        print(e); raise HTTPException(500, "Erreur envoi email")
+    else:
+        raise HTTPException(status_code=500, detail="Erreur envoi email")
 
 @app.get("/companies/me", response_model=schemas.CompanyOut)
 def read_own_company(
