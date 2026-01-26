@@ -1121,26 +1121,37 @@ def update_company(
     if not current_user.company_id: 
         raise HTTPException(400, "Utilisateur sans entreprise")
     
-    # On récupère l'entreprise
     company = db.query(models.Company).filter(models.Company.id == current_user.company_id).first()
     if not company: raise HTTPException(404, "Entreprise introuvable")
 
-    # Mise à jour des champs texte
+    # 1. Mise à jour des champs classiques
     if comp_update.name: company.name = comp_update.name
     if comp_update.address: company.address = comp_update.address
     if comp_update.phone: company.phone = comp_update.phone
     
-    # 👇 CORRECTION ICI : On écrit dans 'contact_email' (le nom de la colonne Supabase)
-    if comp_update.contact_email: 
-        company.contact_email = comp_update.contact_email
-    elif comp_update.email:
-        company.contact_email = comp_update.email
+    # 2. LOGIQUE BLINDÉE POUR L'EMAIL
+    # On récupère la valeur envoyée (que ce soit dans 'email' ou 'contact_email')
+    new_email = comp_update.contact_email or comp_update.email
     
+    if new_email:
+        print(f"📧 Email reçu pour mise à jour : {new_email}")
+        
+        # On essaie d'écrire sur l'attribut 'contact_email' (Nom colonne Supabase)
+        if hasattr(company, "contact_email"):
+            company.contact_email = new_email
+            
+        # On essaie AUSSI d'écrire sur 'email' (au cas où le modèle Python utilise ce nom)
+        if hasattr(company, "email"):
+            company.email = new_email
+
     try:
         db.commit()
         db.refresh(company)
         
-        # 👇 Mapping de retour pour que l'affichage suive
+        # 3. On construit la réponse manuellement pour être sûr de ce qu'on renvoie
+        # On cherche la valeur enregistrée pour l'afficher
+        saved_email = getattr(company, "contact_email", getattr(company, "email", None))
+        
         return {
             "id": company.id,
             "name": company.name,
@@ -1148,9 +1159,8 @@ def update_company(
             "phone": company.phone,
             "logo_url": company.logo_url,
             "subscription_plan": company.subscription_plan,
-            # On renvoie bien la valeur enregistrée
-            "contact_email": company.contact_email, 
-            "email": company.contact_email 
+            "contact_email": saved_email, # On renvoie bien ce qu'on a trouvé
+            "email": saved_email
         }
     except Exception as e:
         db.rollback()
