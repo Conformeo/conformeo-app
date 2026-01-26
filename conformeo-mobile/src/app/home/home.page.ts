@@ -190,6 +190,16 @@ export class HomePage implements OnInit {
     }
   }
 
+  // Dans votre classe HomePage ou ChantiersPage
+
+  handleImageError(event: any) {
+    // Masque l'image cassée pour laisser apparaître le placeholder (div) qui est derrière ou à la place
+    event.target.style.display = 'none';
+    
+    // Optionnel : Si vous voulez forcer une image par défaut :
+    // event.target.src = 'assets/chantier-placeholder.jpg';
+  }
+
   // 👇 FONCTION D'EXPORT MISE À JOUR
   downloadCSV() {
     const token = localStorage.getItem('access_token');

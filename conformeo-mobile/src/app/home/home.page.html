@@ -94,9 +94,9 @@
 
         <img *ngIf="c.cover_url" 
              [src]="getCoverUrl(c.cover_url)" 
-             crossorigin="anonymous"
+             alt="Photo chantier"
              style="width: 100%; height: 100%; object-fit: cover; border-radius: 12px;"
-             onerror="this.style.display='none'" 
+             (error)="handleImageError($event)" 
         />
 
         <div *ngIf="!c.cover_url" 
