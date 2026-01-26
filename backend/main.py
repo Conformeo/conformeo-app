@@ -100,27 +100,30 @@ def get_gps_from_address(address: str):
         print(f"Erreur GPS pour {address}: {e}")
     return None, None
 
-# --- SERVICE EMAIL (BREVO API) ---
+# --- FONCTION D'ENVOI D'EMAIL (CORRIGÉE) ---
 def send_email_via_brevo(to_email: str, subject: str, html_content: str, pdf_attachment=None, pdf_filename="document.pdf"):
     """
-    Envoie un email transactionnel via l'API Brevo (plus fiable que SMTP).
+    Envoie un email transactionnel via l'API Brevo V3.
     """
+    # 1. Récupération sécurisée de la clé
     api_key = os.getenv("BREVO_API_KEY")
-    sender_email = os.getenv("SENDER_EMAIL", "contact@conformeo.com")
+    sender_email = os.getenv("SENDER_EMAIL", "contact@conformeo-app.fr")
     sender_name = os.getenv("SENDER_NAME", "Conforméo")
 
     if not api_key:
-        print("❌ ERREUR : Clé API Brevo manquante dans le .env")
+        print("❌ ERREUR CRITIQUE : La variable 'BREVO_API_KEY' est vide sur le serveur.")
         return False
 
     url = "https://api.brevo.com/v3/smtp/email"
     
+    # 2. En-têtes corrects pour Brevo
     headers = {
         "accept": "application/json",
-        "api-key": api_key,
+        "api-key": api_key,  # C'est ici que la clé est transmise
         "content-type": "application/json"
     }
 
+    # 3. Construction du message
     payload = {
         "sender": {"name": sender_name, "email": sender_email},
         "to": [{"email": to_email}],
@@ -128,36 +131,43 @@ def send_email_via_brevo(to_email: str, subject: str, html_content: str, pdf_att
         "htmlContent": html_content
     }
 
-    # Gestion de la pièce jointe (PDF)
+    # 4. Gestion de la pièce jointe (PDF)
     if pdf_attachment:
-        # L'API Brevo attend du base64 pour les fichiers
-        import base64
-        # Si c'est des bytes (buffer), on encode
-        if isinstance(pdf_attachment, bytes):
-            encoded_content = base64.b64encode(pdf_attachment).decode("utf-8")
-        # Si c'est un BytesIO (buffer mémoire), on lit puis encode
-        else:
-            encoded_content = base64.b64encode(pdf_attachment.getvalue()).decode("utf-8")
-            
-        payload["attachment"] = [
-            {
-                "content": encoded_content,
-                "name": pdf_filename
-            }
-        ]
+        try:
+            # Si c'est un buffer (BytesIO), on récupère les bytes
+            if hasattr(pdf_attachment, "getvalue"):
+                file_content = pdf_attachment.getvalue()
+            else:
+                file_content = pdf_attachment
 
+            # Encodage en Base64 requis par l'API
+            encoded_content = base64.b64encode(file_content).decode("utf-8")
+            
+            payload["attachment"] = [
+                {
+                    "content": encoded_content,
+                    "name": pdf_filename
+                }
+            ]
+        except Exception as e:
+            print(f"⚠️ Erreur lors de l'encodage du PDF : {e}")
+
+    # 5. Envoi
     try:
         response = requests.post(url, json=payload, headers=headers)
+        
         if response.status_code in [200, 201, 202]:
-            print(f"✅ Email envoyé à {to_email} !")
+            print(f"✅ Email envoyé avec succès à {to_email} !")
             return True
         else:
-            print(f"❌ Erreur Brevo : {response.text}")
+            # On affiche l'erreur exacte renvoyée par Brevo
+            print(f"❌ Refus de Brevo ({response.status_code}) : {response.text}")
             return False
+            
     except Exception as e:
-        print(f"❌ Exception Email : {str(e)}")
+        print(f"❌ Exception Python lors de l'envoi : {str(e)}")
         return False
-
+    
 # ==========================================
 # 1. UTILISATEURS / AUTH
 # ==========================================

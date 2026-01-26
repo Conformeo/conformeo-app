@@ -81,6 +81,6 @@ export const routes: Routes = [
   },
   {
     path: 'securite-doc',
-    loadComponent: () => import('./securite-doc/securite-doc.page').then( m => m.SecuriteDocPage)
+    loadComponent: () => import('./securite-doc/securite-doc.page').then( m => m.SecuriteDocPage), canActivate: [authGuard]
   }
 ];
