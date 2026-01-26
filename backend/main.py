@@ -55,19 +55,6 @@ cloudinary_config = {
 if cloudinary_config["cloud_name"]:
     cloudinary.config(**cloudinary_config)
 
-# --- CONFIGURATION EMAIL ---
-mail_conf = ConnectionConfig(
-    MAIL_USERNAME = "michelgmv7@gmail.com",
-    MAIL_PASSWORD = os.environ.get("MAIL_PASSWORD"),
-    MAIL_FROM = "contact@conformeo-app.fr",
-    MAIL_PORT = 2525,
-    MAIL_SERVER = "smtp-relay.brevo.com",
-    MAIL_STARTTLS = True,
-    MAIL_SSL_TLS = False,
-    USE_CREDENTIALS = True,
-    VALIDATE_CERTS = False 
-)
-
 os.makedirs("uploads", exist_ok=True)
 app.mount("/static", StaticFiles(directory="uploads"), name="static")
 
@@ -113,6 +100,64 @@ def get_gps_from_address(address: str):
     except Exception as e:
         print(f"Erreur GPS pour {address}: {e}")
     return None, None
+
+# --- SERVICE EMAIL (BREVO API) ---
+def send_email_via_brevo(to_email: str, subject: str, html_content: str, pdf_attachment=None, pdf_filename="document.pdf"):
+    """
+    Envoie un email transactionnel via l'API Brevo (plus fiable que SMTP).
+    """
+    api_key = os.getenv("BREVO_API_KEY")
+    sender_email = os.getenv("SENDER_EMAIL", "contact@conformeo.com")
+    sender_name = os.getenv("SENDER_NAME", "Conforméo")
+
+    if not api_key:
+        print("❌ ERREUR : Clé API Brevo manquante dans le .env")
+        return False
+
+    url = "https://api.brevo.com/v3/smtp/email"
+    
+    headers = {
+        "accept": "application/json",
+        "api-key": api_key,
+        "content-type": "application/json"
+    }
+
+    payload = {
+        "sender": {"name": sender_name, "email": sender_email},
+        "to": [{"email": to_email}],
+        "subject": subject,
+        "htmlContent": html_content
+    }
+
+    # Gestion de la pièce jointe (PDF)
+    if pdf_attachment:
+        # L'API Brevo attend du base64 pour les fichiers
+        import base64
+        # Si c'est des bytes (buffer), on encode
+        if isinstance(pdf_attachment, bytes):
+            encoded_content = base64.b64encode(pdf_attachment).decode("utf-8")
+        # Si c'est un BytesIO (buffer mémoire), on lit puis encode
+        else:
+            encoded_content = base64.b64encode(pdf_attachment.getvalue()).decode("utf-8")
+            
+        payload["attachment"] = [
+            {
+                "content": encoded_content,
+                "name": pdf_filename
+            }
+        ]
+
+    try:
+        response = requests.post(url, json=payload, headers=headers)
+        if response.status_code in [200, 201, 202]:
+            print(f"✅ Email envoyé à {to_email} !")
+            return True
+        else:
+            print(f"❌ Erreur Brevo : {response.text}")
+            return False
+    except Exception as e:
+        print(f"❌ Exception Email : {str(e)}")
+        return False
 
 # ==========================================
 # 1. UTILISATEURS / AUTH
@@ -967,45 +1012,38 @@ def send_pdp_email(
 
     pdf_buffer = BytesIO()
     pdf_generator.generate_pdp_pdf(chantier, pdp, pdf_buffer, company=company)
-    pdf_buffer.seek(0)
-    pdf_bytes = pdf_buffer.read()
+    # Important : ne pas faire seek(0) ici si on passe le buffer directement à la fonction, 
+    # mais ma fonction gère le .getvalue(), donc c'est bon.
 
-    SMTP_SERVER = "smtp.gmail.com"
-    SMTP_PORT = 587
-    SMTP_USER = "michelgmv7@gmail.com"
-    SMTP_PASSWORD = "xzqs zuxm lcma jhfm" 
+    # Préparation du contenu HTML (Plus joli !)
+    html_body = f"""
+    <html>
+    <body>
+        <h2>Bonjour,</h2>
+        <p>Veuillez trouver ci-joint le <strong>Plan de Prévention</strong> concernant le chantier <em>{chantier.nom}</em>.</p>
+        <br>
+        <p>Cordialement,</p>
+        <p><strong>{company.name}</strong></p>
+        <p style="font-size: 10px; color: gray;">Envoyé via Conforméo</p>
+    </body>
+    </html>
+    """
 
-    try:
-        msg = MIMEMultipart()
-        msg['Subject'] = f"Plan de Prévention - Chantier {chantier.nom}"
-        msg['From'] = SMTP_USER
-        msg['To'] = req.email
+    filename = f"PDP_{chantier.nom}.pdf"
 
-        body = f"""
-        Bonjour,
-        
-        Veuillez trouver ci-joint le Plan de Prévention concernant le chantier "{chantier.nom}".
-        
-        Cordialement,
-        {company.name}
-        """
-        msg.attach(MIMEText(body, 'plain'))
+    # 👇 APPEL DE LA NOUVELLE FONCTION
+    success = send_email_via_brevo(
+        to_email=req.email,
+        subject=f"Plan de Prévention - {chantier.nom}",
+        html_content=html_body,
+        pdf_attachment=pdf_buffer,
+        pdf_filename=filename
+    )
 
-        filename = f"PDP_{chantier.nom}.pdf"
-        part = MIMEApplication(pdf_bytes, Name=filename)
-        part['Content-Disposition'] = f'attachment; filename="{filename}"'
-        msg.attach(part)
-
-        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
-            server.starttls()
-            server.login(SMTP_USER, SMTP_PASSWORD)
-            server.send_message(msg)
-
-        return {"message": "Email envoyé avec succès"}
-
-    except Exception as e:
-        print(f"Erreur SMTP: {e}")
-        raise HTTPException(status_code=500, detail="Erreur lors de l'envoi de l'email")
+    if success:
+        return {"message": "Email envoyé avec succès 🚀"}
+    else:
+        raise HTTPException(status_code=500, detail="Erreur lors de l'envoi de l'email via Brevo")
 
 # PIC
 @app.get("/chantiers/{cid}/pic")
@@ -1661,6 +1699,8 @@ def get_permis_pdf_route(permis_id: int, db: Session = Depends(get_db)):
         media_type="application/pdf", 
         headers={"Content-Disposition": f"inline; filename={filename}"}
     )
+
+
 
 # ==========================================
 # 9. FIX & MIGRATIONS
