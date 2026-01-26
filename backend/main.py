@@ -79,12 +79,13 @@ origins = [
     "http://localhost:8000",
     "capacitor://localhost",
     "https://conformeo-app.vercel.app",
+    "https://conformeo-app.vercel.app/",
     "*"
 ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], 
+    allow_origins=origins, 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

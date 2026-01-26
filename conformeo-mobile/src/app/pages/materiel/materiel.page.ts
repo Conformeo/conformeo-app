@@ -71,6 +71,7 @@ export class MaterielPage implements OnInit {
       'hammer-outline': hammerOutline,
       'cloud-upload-outline': cloudUploadOutline,
       'print-outline': printOutline,
+      'checkbox-outline': checkboxOutline,
       close, checkboxOutline, chevronForward, downloadOutline, checkmarkDoneOutline
     });
 
