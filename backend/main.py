@@ -1290,26 +1290,29 @@ def read_own_company(
     db: Session = Depends(get_db), 
     current_user: models.User = Depends(security.get_current_user)
 ):
+    # 1. Vérification si l'utilisateur est rattaché à une entreprise
     if not current_user.company_id:
-        raise HTTPException(status_code=404, detail="Aucune entreprise liée")
+        raise HTTPException(status_code=404, detail="Aucune entreprise liée à votre compte")
         
+    # 2. Récupération de l'entreprise
     company = db.query(models.Company).filter(models.Company.id == current_user.company_id).first()
+    
     if not company:
-        raise HTTPException(status_code=404, detail="Entreprise introuvable")
+        raise HTTPException(status_code=404, detail="Entreprise introuvable en base de données")
         
-    # 👇 CORRECTION D'AFFICHAGE
-    # On mappe manuellement l'email de la BDD vers le champ attendu par le frontend
+    # 3. Construction sécurisée de la réponse
+    # On utilise "or None" ou des chaînes vides pour éviter les erreurs de type
     return {
         "id": company.id,
         "name": company.name,
         "address": company.address,
         "phone": company.phone,
         "logo_url": company.logo_url,
-        "subscription_plan": company.subscription_plan,
+        "subscription_plan": company.subscription_plan or "free",
         
-        # C'est ici que la magie opère :
-        "contact_email": company.email,  # On remplit contact_email avec la valeur de email
-        "email": company.email           # On envoie aussi email au cas où
+        # Mapping sécurisé pour l'email
+        "contact_email": company.email if hasattr(company, "email") else None,
+        "email": company.email if hasattr(company, "email") else None
     }
 
 @app.post("/companies/me/duerp", response_model=schemas.DUERPOut)
