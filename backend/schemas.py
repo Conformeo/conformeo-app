@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr
 from typing import List, Optional, Any, Dict, Union
 from datetime import datetime, date
 
@@ -13,7 +13,7 @@ class TokenData(BaseModel):
 class UserCreate(BaseModel):
     email: EmailStr
     password: str
-    full_name: str
+    nom: str  # On utilise nom ici
     company_name: Optional[str] = None
 
 class UserLogin(BaseModel):
@@ -24,21 +24,22 @@ class UserUpdate(BaseModel):
     email: Optional[EmailStr] = None
     password: Optional[str] = None
     role: Optional[str] = None
-    full_name: Optional[str] = None  
+    nom: Optional[str] = None        # Priorité à nom
+    full_name: Optional[str] = None  # On garde pour compatibilité
 
 class UserUpdateAdmin(BaseModel):
-    full_name: Optional[str] = None
+    nom: Optional[str] = None       # Priorité à nom
+    full_name: Optional[str] = None 
     email: Optional[EmailStr] = None
     password: Optional[str] = None
     role: Optional[str] = None      
     is_active: Optional[Any] = None 
     company_id: Optional[Any] = None 
 
-# 👇 C'EST ICI QUE J'AI MIS A JOUR LA DEFINITION
-class User(BaseModel):
+class UserOut(BaseModel):
     id: int
     email: EmailStr
-    full_name: Optional[str] = None
+    nom: Optional[str] = None # C'est ce champ que le front va lire
     role: str
     is_active: bool
     company_id: Optional[int] = None
@@ -46,12 +47,10 @@ class User(BaseModel):
     class Config:
         from_attributes = True
 
-# Alias pour garder la compatibilité si votre code utilise UserOut ailleurs
-UserOut = User 
-
 class UserInvite(BaseModel):
     email: EmailStr
-    role: str = "conducteur" 
+    role: str = "conducteur"
+    nom: Optional[str] = "Nouveau Membre"
 
 # --- COMPANY ---
 class CompanyCreate(BaseModel):
@@ -132,7 +131,7 @@ class TaskOut(BaseModel):
     class Config:
         from_attributes = True
 
-# --- DOCS INTERNES ---
+# --- DOCS ---
 class DocumentCreate(BaseModel):
     titre: str
     type_doc: str 
@@ -153,7 +152,6 @@ class DocSign(BaseModel):
     signature_base64: str
     nom_signataire: str
 
-# --- DOCS EXTERNES (DOE/GED) ---
 class DocExterneOut(BaseModel):
     id: int
     titre: str
@@ -164,7 +162,6 @@ class DocExterneOut(BaseModel):
     class Config:
         from_attributes = True
 
-# --- COMPANY DOCS (KBIS...) ---
 class CompanyDocOut(BaseModel):
     id: int
     titre: str
@@ -175,21 +172,16 @@ class CompanyDocOut(BaseModel):
         from_attributes = True
 
 # --- CHANTIER ---
-
 class ChantierBase(BaseModel):
     nom: str
     adresse: Optional[str] = None
     client: Optional[str] = None
-    
-    # On utilise date (et pas datetime) pour être propre
     date_debut: Optional[date] = None 
     date_fin: Optional[date] = None   
-    
     est_actif: bool = True
     soumis_sps: bool = False
 
 class ChantierCreate(ChantierBase):
-    # En entrée (création), on accepte des strings "YYYY-MM-DD" pour faciliter la vie du frontend
     date_debut: Optional[str] = None
     date_fin: Optional[str] = None
     cover_url: Optional[str] = None
@@ -198,7 +190,6 @@ class ChantierUpdate(BaseModel):
     nom: Optional[str] = None
     client: Optional[str] = None
     adresse: Optional[str] = None
-    
     date_debut: Optional[str] = None 
     date_fin: Optional[str] = None
     est_actif: Optional[bool] = None
@@ -206,21 +197,18 @@ class ChantierUpdate(BaseModel):
     cover_url: Optional[str] = None
 
     class Config:
-        from_attributes = True
+        from_attributes = True # ✅ CORRECTION WARNING
 
 class ChantierOut(BaseModel):
     id: int
     nom: str
     client: Optional[str] = None
     adresse: Optional[str] = None
-    
     date_debut: Optional[date] = None
     date_fin: Optional[date] = None
-    
     est_actif: bool = True
     soumis_sps: bool = False
     cover_url: Optional[str] = None
-    
     date_creation: Optional[datetime] = None
     company_id: Optional[int] = None
     
@@ -235,7 +223,7 @@ class RapportCreate(BaseModel):
     niveau_urgence: str = "Normal"
     latitude: Optional[float] = None
     longitude: Optional[float] = None
-    photo_url: Optional[str] = None # Ajouté pour correspondre au main.py
+    photo_url: Optional[str] = None
 
 class ImageOut(BaseModel):
     id: int
@@ -251,7 +239,7 @@ class RapportOut(RapportCreate):
     class Config:
         from_attributes = True
 
-# --- INSPECTION ---
+# --- AUTRES ---
 class InspectionCreate(BaseModel):
     titre: str
     type: str
@@ -267,11 +255,9 @@ class InspectionOut(BaseModel):
     createur: Optional[str] = "Non renseigné"
     date_creation: Optional[datetime] = None
     chantier_id: int
-
     class Config:
         from_attributes = True
 
-# --- PPSPS ---
 class PPSPSCreate(BaseModel):
     chantier_id: int
     responsable_chantier: Optional[str] = None
@@ -288,7 +274,6 @@ class PPSPSOut(PPSPSCreate):
     class Config:
         from_attributes = True
 
-# --- PLAN DE PREVENTION (PDP) ---
 class PlanPreventionCreate(BaseModel):
     chantier_id: int
     entreprise_utilisatrice: Optional[str] = None
@@ -308,21 +293,16 @@ class PlanPreventionOut(PlanPreventionCreate):
 PdpCreate = PlanPreventionCreate
 PdpOut = PlanPreventionOut
 
-# --- DUERP ---
 class DUERPRow(BaseModel):
     unite_travail: str = "Chantier Général"
     statut: str = "EN COURS"
-    
     tache: str
     risque: str
     gravite: int
     mesures_realisees: Optional[str] = None
     mesures_a_realiser: Optional[str] = None
-    
     class Config:
         from_attributes = True
-
-    statut: str = "EN COURS"
 
 class DUERPCreate(BaseModel):
     annee: int
@@ -340,7 +320,6 @@ DuerpRow = DUERPRow
 DuerpCreate = DUERPCreate
 DuerpOut = DUERPOut
 
-# --- PIC (Plan Installation Chantier) ---
 class PicSchema(BaseModel):
     chantier_id: int
     final_url: Optional[str] = None
@@ -352,7 +331,6 @@ class PicOut(PicSchema):
     class Config:
         from_attributes = True
 
-# --- PERMIS FEU ---
 class PermisFeuCreate(BaseModel):
     chantier_id: int
     lieu: str

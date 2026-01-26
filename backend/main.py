@@ -172,61 +172,49 @@ def update_user_me(user_up: schemas.UserUpdate, db: Session = Depends(get_db), c
     db.refresh(current_user)
     return current_user
 
+
+# 👇 REMPLACEZ UNIQUEMENT LA FONCTION update_user
 @app.put("/users/{user_id}", response_model=schemas.UserOut)
 def update_user(
     user_id: int, 
-    user_update: schemas.UserUpdateAdmin, # On utilise le schéma large pour accepter tous les champs
+    user_update: schemas.UserUpdateAdmin, 
     db: Session = Depends(get_db),
     current_user: models.User = Depends(security.get_current_user)
 ):
     # 1. Vérification des droits
-    # Un admin peut modifier n'importe qui de son entreprise.
-    # Un utilisateur lambda ne peut modifier que lui-même.
-    
     is_admin = (current_user.role == "Admin" or current_user.role == "admin")
     is_self = (current_user.id == user_id)
 
     if not is_admin and not is_self:
-        raise HTTPException(status_code=403, detail="Vous n'avez pas les droits pour modifier cet utilisateur.")
+        raise HTTPException(status_code=403, detail="Non autorisé")
 
-    # 2. Récupération de l'utilisateur cible
+    # 2. Récupération
     db_user = db.query(models.User).filter(models.User.id == user_id).first()
-    
     if not db_user:
-        raise HTTPException(status_code=404, detail="Utilisateur introuvable")
+        raise HTTPException(status_code=404, detail="Introuvable")
 
-    # Vérification d'appartenance à la même entreprise (si admin modifie un autre)
     if not is_self and db_user.company_id != current_user.company_id:
-        raise HTTPException(status_code=403, detail="Cet utilisateur n'est pas dans votre entreprise.")
+        raise HTTPException(status_code=403, detail="Utilisateur hors entreprise")
 
-    # 3. Application des modifications (excluant les champs non envoyés)
+    # 3. Application des modifications
     update_data = user_update.dict(exclude_unset=True)
 
-    # --- MISE À JOUR DU NOM (ROBUSTE) ---
-    # On gère le cas où le front envoie 'full_name' mais la BDD attend 'nom' ou inversement
-    if "full_name" in update_data:
-        new_name = update_data["full_name"]
-        
-        # On essaie de mettre à jour 'full_name'
-        if hasattr(db_user, "full_name"):
-            db_user.full_name = new_name
-            
-        # On essaie AUSSI de mettre à jour 'nom' (pour la compatibilité historique)
-        if hasattr(db_user, "nom"):
-            db_user.nom = new_name
+    # ✅ CORRECTION CRUCIALE : On force l'écriture dans 'nom'
+    if "nom" in update_data:
+        db_user.nom = update_data["nom"]
+    elif "full_name" in update_data:
+        # Si le front envoie 'full_name', on le met dans 'nom'
+        db_user.nom = update_data["full_name"]
 
-    # --- AUTRES CHAMPS ---
     if "email" in update_data and update_data["email"]:
         db_user.email = update_data["email"]
     
-    # Seul un admin peut changer le rôle
     if "role" in update_data and is_admin:
         db_user.role = update_data["role"]
         
     if "password" in update_data and update_data["password"]:
         db_user.hashed_password = security.get_password_hash(update_data["password"])
 
-    # Champ actif/inactif
     if "is_active" in update_data and is_admin:
         db_user.is_active = update_data["is_active"]
 
@@ -236,8 +224,8 @@ def update_user(
         return db_user
     except Exception as e:
         db.rollback()
-        print(f"❌ Erreur Update User: {e}")
-        raise HTTPException(status_code=500, detail="Erreur lors de la sauvegarde")
+        print(f"❌ Erreur Update: {e}")
+        raise HTTPException(status_code=500, detail="Erreur serveur")
 
 # 👇 NOUVELLE ROUTE : Liste de tous les utilisateurs de l'entreprise (Remplace GET /team)
 @app.get("/users", response_model=List[schemas.UserOut])
