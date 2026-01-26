@@ -61,6 +61,7 @@ class CompanyUpdate(BaseModel):
     name: Optional[str] = None
     address: Optional[str] = None
     contact_email: Optional[str] = None
+    email: Optional[str] = None
     phone: Optional[str] = None
 
 class CompanyOut(BaseModel):

@@ -1131,6 +1131,8 @@ def update_company(
     
     if comp_update.contact_email: 
         company.email = comp_update.contact_email
+    elif comp_update.email:
+        company.email = comp_update.email
     
     try:
         db.commit()
