@@ -79,7 +79,6 @@ origins = [
     "http://localhost:8000",
     "capacitor://localhost",
     "https://conformeo-app.vercel.app",
-    "https://conformeo-app.vercel.app/",
     "*"
 ]
 
