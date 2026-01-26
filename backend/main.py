@@ -76,15 +76,14 @@ app.mount("/static", StaticFiles(directory="uploads"), name="static")
 origins = [
     "http://localhost:8100",
     "http://localhost:4200",
-    "http://localhost:8000",
+    "http://localhost",
     "capacitor://localhost",
     "https://conformeo-app.vercel.app",
-    "*"
 ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins, 
+    allow_origins=origins,          # IMPORTANT: pas "*" si credentials=True
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
