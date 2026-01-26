@@ -1121,22 +1121,37 @@ def update_company(
     if not current_user.company_id: 
         raise HTTPException(400, "Utilisateur sans entreprise")
     
+    # On récupère l'entreprise
     company = db.query(models.Company).filter(models.Company.id == current_user.company_id).first()
     if not company: raise HTTPException(404, "Entreprise introuvable")
 
+    # Mise à jour des champs texte
     if comp_update.name: company.name = comp_update.name
     if comp_update.address: company.address = comp_update.address
     if comp_update.phone: company.phone = comp_update.phone
     
+    # 👇 CORRECTION ICI : On écrit dans 'contact_email' (le nom de la colonne Supabase)
     if comp_update.contact_email: 
-        company.email = comp_update.contact_email
+        company.contact_email = comp_update.contact_email
     elif comp_update.email:
-        company.email = comp_update.email
+        company.contact_email = comp_update.email
     
     try:
         db.commit()
         db.refresh(company)
-        return company
+        
+        # 👇 Mapping de retour pour que l'affichage suive
+        return {
+            "id": company.id,
+            "name": company.name,
+            "address": company.address,
+            "phone": company.phone,
+            "logo_url": company.logo_url,
+            "subscription_plan": company.subscription_plan,
+            # On renvoie bien la valeur enregistrée
+            "contact_email": company.contact_email, 
+            "email": company.contact_email 
+        }
     except Exception as e:
         db.rollback()
         print(f"❌ ERREUR SQL: {e}") 
