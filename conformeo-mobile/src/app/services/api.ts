@@ -632,34 +632,45 @@ export class ApiService {
     return this.http.get<any>(`${this.apiUrl}/dashboard/stats`, this.getOptions());
   }
   
+  // Récupérer son propre profil
   getMe(): Observable<User> {
     return this.http.get<User>(`${this.apiUrl}/users/me`, this.getOptions());
   }
 
+  // Mettre à jour son propre profil
   updateUser(data: any): Observable<User> {
     return this.http.put<User>(`${this.apiUrl}/users/me`, data, this.getOptions());
   }
 
-  // --- GESTION ÉQUIPE (Team) ---
+  // --- GESTION ÉQUIPE (MODIFIÉ : /team -> /users) ---
 
+  // Récupérer tous les membres de l'entreprise
   getTeam(): Observable<User[]> {
-    return this.http.get<User[]>(`${this.apiUrl}/team`, this.getOptions());
+    // ⚠️ CHANGEMENT DE ROUTE : /team -> /users
+    return this.http.get<User[]>(`${this.apiUrl}/users`, this.getOptions());
   }
 
+  // Inviter un nouveau membre
   inviteMember(data: any): Observable<any> {
-    return this.http.post(`${this.apiUrl}/team/invite`, data, this.getOptions());
+    // ⚠️ CHANGEMENT DE ROUTE : /team/invite -> /users/invite
+    return this.http.post(`${this.apiUrl}/users/invite`, data, this.getOptions());
   }
 
+  // Mettre à jour un membre spécifique (Admin)
   updateTeamMember(userId: number, data: any): Observable<any> {
-    return this.http.put(`${this.apiUrl}/team/${userId}`, data, this.getOptions());
+    // ⚠️ CHANGEMENT DE ROUTE : /team/{id} -> /users/{id}
+    return this.http.put(`${this.apiUrl}/users/${userId}`, data, this.getOptions());
   }
 
+  // Alias pour garder la compatibilité avec votre code existant
   addTeamMember(user: any): Observable<User> {
     return this.inviteMember(user);
   }
 
+  // Supprimer un membre
   deleteMember(userId: number): Observable<any> {
-    return this.http.delete(`${this.apiUrl}/team/${userId}`, this.getOptions());
+    // ⚠️ CHANGEMENT DE ROUTE : /team/{id} -> /users/{id}
+    return this.http.delete(`${this.apiUrl}/users/${userId}`, this.getOptions());
   }
 
 

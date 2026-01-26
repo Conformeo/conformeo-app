@@ -205,18 +205,23 @@ def update_user(
     db.refresh(db_user)
     return db_user
 
-# ==========================================
-# 2. GESTION EQUIPE
-# ==========================================
-
-@app.get("/team", response_model=List[schemas.UserOut])
-def get_my_team(db: Session = Depends(get_db), current_user: models.User = Depends(security.get_current_user)):
+# 👇 NOUVELLE ROUTE : Liste de tous les utilisateurs de l'entreprise (Remplace GET /team)
+@app.get("/users", response_model=List[schemas.UserOut])
+def get_company_users(
+    db: Session = Depends(get_db), 
+    current_user: models.User = Depends(security.get_current_user)
+):
     if not current_user.company_id:
-        return [current_user]
+        return [current_user] # Si pas d'entreprise, on renvoie juste soi-même
     return db.query(models.User).filter(models.User.company_id == current_user.company_id).all()
 
-@app.post("/team/invite")
-def invite_member(invite: schemas.UserInvite, db: Session = Depends(get_db), current_user: models.User = Depends(security.get_current_user)):
+# 👇 NOUVELLE ROUTE : Inviter un membre (Remplace POST /team/invite)
+@app.post("/users/invite")
+def invite_user(
+    invite: schemas.UserInvite, 
+    db: Session = Depends(get_db), 
+    current_user: models.User = Depends(security.get_current_user)
+):
     if not current_user.company_id:
         raise HTTPException(status_code=400, detail="Vous devez avoir une entreprise pour inviter.")
     
@@ -224,61 +229,43 @@ def invite_member(invite: schemas.UserInvite, db: Session = Depends(get_db), cur
         raise HTTPException(status_code=400, detail="Cet email est déjà utilisé.")
 
     hashed_pw = security.get_password_hash(invite.password)
+    
+    # On récupère 'full_name' s'il est présent dans le schéma d'invitation, sinon défaut
+    full_name = getattr(invite, 'full_name', 'Nouveau Membre')
+
     new_user = models.User(
         email=invite.email,
-        full_name= getattr(invite, 'full_name', 'Nouveau Membre'), 
+        full_name=full_name, 
         hashed_password=hashed_pw,
         company_id=current_user.company_id,
         role=invite.role
     )
     db.add(new_user)
     db.commit()
-    return {"message": "Membre ajouté"}
+    return {"message": "Membre ajouté avec succès"}
 
-@app.delete("/team/{user_id}")
-def remove_member(user_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(security.get_current_user)):
-    user = db.query(models.User).filter(models.User.id == user_id, models.User.company_id == current_user.company_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="Utilisateur introuvable")
-    if user.id == current_user.id:
-        raise HTTPException(status_code=400, detail="Impossible de se supprimer soi-même")
-    db.delete(user)
-    db.commit()
-    return {"message": "Supprimé"}
-
-# --- UPDATE TEAM MEMBER (ROBUSTE) ---
-@app.put("/team/{user_id}")
-def update_team_member(
+# 👇 NOUVELLE ROUTE : Supprimer un utilisateur (Remplace DELETE /team/{id})
+@app.delete("/users/{user_id}")
+def delete_user(
     user_id: int, 
-    user_up: schemas.UserUpdateAdmin, 
     db: Session = Depends(get_db), 
     current_user: models.User = Depends(security.get_current_user)
 ):
-    if not current_user.company_id:
-        raise HTTPException(400, "Pas d'entreprise")
-    
-    user_to_edit = db.query(models.User).filter(
+    # On vérifie que l'utilisateur à supprimer appartient bien à la même entreprise
+    user = db.query(models.User).filter(
         models.User.id == user_id, 
         models.User.company_id == current_user.company_id
     ).first()
     
-    if not user_to_edit:
-        raise HTTPException(404, "Utilisateur introuvable")
-
-    # On utilise exclude_unset pour ne modifier que ce qui est envoyé
-    update_data = user_up.dict(exclude_unset=True)
-
-    if "full_name" in update_data: user_to_edit.full_name = update_data["full_name"]
-    if hasattr(user_to_edit, 'nom') and "full_name" in update_data: user_to_edit.nom = update_data["full_name"]
-    
-    if "email" in update_data and update_data["email"]: user_to_edit.email = update_data["email"]
-    if "role" in update_data and update_data["role"]: user_to_edit.role = update_data["role"]
-    
-    if "password" in update_data and update_data["password"]:
-        user_to_edit.hashed_password = security.get_password_hash(update_data["password"])
-
+    if not user:
+        raise HTTPException(status_code=404, detail="Utilisateur introuvable dans votre équipe")
+        
+    if user.id == current_user.id:
+        raise HTTPException(status_code=400, detail="Impossible de se supprimer soi-même")
+        
+    db.delete(user)
     db.commit()
-    return {"message": "Profil mis à jour avec succès ✅"}
+    return {"message": "Utilisateur supprimé"}
 
 # ==========================================
 # 3. DASHBOARD

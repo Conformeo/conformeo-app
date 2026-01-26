@@ -34,15 +34,20 @@ class UserUpdateAdmin(BaseModel):
     is_active: Optional[Any] = None 
     company_id: Optional[Any] = None 
 
-class UserOut(BaseModel):
+# 👇 C'EST ICI QUE J'AI MIS A JOUR LA DEFINITION
+class User(BaseModel):
     id: int
     email: EmailStr
     full_name: Optional[str] = None
     role: str
     is_active: bool
     company_id: Optional[int] = None
+    
     class Config:
         from_attributes = True
+
+# Alias pour garder la compatibilité si votre code utilise UserOut ailleurs
+UserOut = User 
 
 class UserInvite(BaseModel):
     email: EmailStr
@@ -305,7 +310,6 @@ PdpOut = PlanPreventionOut
 
 # --- DUERP ---
 class DUERPRow(BaseModel):
-    # 👇 Vérifiez la présence de ces lignes
     unite_travail: str = "Chantier Général"
     statut: str = "EN COURS"
     
