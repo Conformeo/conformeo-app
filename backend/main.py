@@ -110,6 +110,16 @@ def send_email_via_brevo(to_email: str, subject: str, html_content: str, pdf_att
     sender_email = os.getenv("SENDER_EMAIL", "contact@conformeo-app.fr")
     sender_name = os.getenv("SENDER_NAME", "Conforméo")
 
+# ... à l'intérieur de send_email_via_brevo ...
+    api_key = os.getenv("BREVO_API_KEY")
+    
+    # 👇 AJOUTEZ CECI POUR LE DEBUG (à retirer ensuite !)
+    if api_key:
+        print(f"🔍 DEBUG CLE: Longueur={len(api_key)}, Début={api_key[:10]}..., Fin=...{api_key[-5:]}")
+    else:
+        print("🔍 DEBUG CLE: La variable est VIDE ou NON TROUVÉE")
+    # 👆 FIN DEBUG
+
     if not api_key:
         print("❌ ERREUR CRITIQUE : La variable 'BREVO_API_KEY' est vide sur le serveur.")
         return False
