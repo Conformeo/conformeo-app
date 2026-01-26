@@ -347,3 +347,21 @@ class PermisFeuOut(PermisFeuCreate):
     date: datetime
     class Config:
         from_attributes = True
+
+
+
+
+
+
+
+
+
+
+
+# Dans backend/schemas.py
+
+class UserCreate(BaseModel):
+    email: EmailStr
+    password: str
+    nom: str
+    company_name: Optional[str] = None # 👈 Ajoutez cette ligne si elle manque
