@@ -27,24 +27,26 @@
     <ion-card class="ios-card">
       <ion-card-content>
         
-        <div class="logo-container" (click)="triggerLogoUpload()">
+        <div class="logo-container" (click)="logoInput.click()">
           <div class="logo-circle">
+            
             <img *ngIf="company.logo_url" 
-              [src]="api.getFullUrl(company.logo_url)" 
-              class="logo-preview" 
-              alt="Logo Entreprise"
-              onError="this.style.display='none'"/>
+                 [src]="company.logo_url" 
+                 class="logo-img" 
+                 alt="Logo Entreprise"
+                 onError="this.style.display='none'"/>
                  
-            <div *ngIf="!company.logo_url" class="placeholder-logo">
-               <ion-icon name="image" style="font-size: 40px; color: #ccc;"></ion-icon>
+            <div *ngIf="!company.logo_url" class="logo-placeholder">
+               <ion-icon name="image-outline"></ion-icon>
             </div>
             
-            <div class="edit-badge">
+            <div class="edit-overlay">
               <ion-icon name="camera"></ion-icon>
             </div>
           </div>
           <p class="logo-hint">Appuyez pour changer le logo</p>
         </div>
+
         <input #logoInput type="file" (change)="onLogoSelected($event)" hidden accept="image/*">
         
         <ion-list lines="full">

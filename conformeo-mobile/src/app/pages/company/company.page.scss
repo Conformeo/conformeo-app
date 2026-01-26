@@ -1,220 +1,228 @@
-.bg-light { --background: #f4f5f8; }
-.mt-20 { margin-top: 20px; }
-.mb-15 { margin-bottom: 15px; }
-
-// --- STYLE CARTE INFOS ---
-.ios-card {
-  border-radius: 16px;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.06);
-  margin-top: 10px;
+// --- UTILITAIRES & LAYOUT ---
+.bg-light {
+  --background: #f4f5f8;
 }
-.logo-zone {
-  text-align: center; margin-bottom: 20px;
-  .company-logo {
-    width: 80px; height: 80px;
-    object-fit: contain;
-    border-radius: 12px;
-    border: 1px solid #eee;
-  }
-}
-.footer-note { font-size: 12px; margin-top: 20px; }
 
-// --- STYLE DOCS ---
-.alert-banner {
-  background: var(--ion-color-danger-tint);
-  color: var(--ion-color-danger-shade);
-  padding: 10px 15px;
-  border-radius: 8px;
-  display: flex; align-items: center; gap: 10px;
-  font-weight: bold; font-size: 13px;
+.mb-15 {
   margin-bottom: 15px;
 }
 
-.doc-list { background: transparent; }
-.doc-item {
-  --background: white;
-  --border-radius: 12px;
-  margin-bottom: 10px;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.04);
-}
+// --- SEGMENT INFOS : CARTE & LOGO ---
 
-.doc-icon {
-  width: 40px; height: 40px;
-  border-radius: 8px;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 20px; margin-right: 15px;
-  &.DUERP { background: rgba(var(--ion-color-warning-rgb), 0.2); color: var(--ion-color-warning); }
-  &.KBIS { background: rgba(var(--ion-color-primary-rgb), 0.2); color: var(--ion-color-primary); }
-  &.ASSURANCE { background: rgba(var(--ion-color-success-rgb), 0.2); color: var(--ion-color-success); }
-  &.AUTRE { background: #eee; color: #666; }
-}
-
-.expiration-badge { margin-top: 5px; }
-
-.empty-state {
-  text-align: center; margin-top: 50px;
-  ion-icon { font-size: 60px; margin-bottom: 10px; }
-  p { margin: 0; color: var(--ion-color-medium); }
-  .sub { font-size: 12px; }
-}
-
-// --- FILE UPLOAD BOX ---
-.file-box {
-  border: 2px dashed #ccc;
-  border-radius: 12px;
-  padding: 30px;
-  text-align: center;
-  color: #666;
-  margin-top: 20px;
-  &.has-file { border-color: var(--ion-color-primary); color: var(--ion-color-primary); background: rgba(var(--ion-color-primary-rgb), 0.05); }
-}
-
-// ... (votre css existant)
-
-.logo-zone {
-  position: relative;
-  width: 100px;
-  height: 100px;
-  margin: 0 auto 20px auto;
-  
-  img {
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-    border-radius: 12px;
-    border: 1px solid #eee;
-  }
-
-  .edit-overlay {
-    position: absolute;
-    bottom: -5px;
-    right: -5px;
-    background: var(--ion-color-primary);
-    border-radius: 50%;
-    width: 30px;
-    height: 30px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-  }
-}
-
-// ... (gardez votre css existant)
-
-.logo-container {
-  display: flex;
-  justify-content: center;
-  margin-bottom: 25px;
-}
-
-.logo-drop-zone {
-  position: relative;
-  width: 100%;
-  max-width: 300px; /* Largeur max pour pas que ce soit énorme */
-  height: 180px;
-  border: 3px dashed #ccc;
+.ios-card {
   border-radius: 16px;
-  background: #f9f9f9;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  overflow: hidden;
-
-  // État quand on survole ou qu'on glisse un fichier
-  &:hover, &.dragging {
-    border-color: var(--ion-color-primary);
-    background: rgba(var(--ion-color-primary-rgb), 0.05);
-    .instruction-text { color: var(--ion-color-primary); }
-    .logo-preview { opacity: 0.3; } // On floute un peu l'image pour voir le texte
-  }
-
-  // L'image actuelle en fond
-  .logo-preview {
-    position: absolute;
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-    padding: 10px;
-    z-index: 1;
-    transition: opacity 0.3s;
-  }
-
-  // Le texte et l'icône par dessus
-  .drop-content {
-    z-index: 2;
-    text-align: center;
-    pointer-events: none; // Pour ne pas gêner le clic
-    // background: rgba(255,255,255, 0.7); // Petit fond blanc semi-transparent pour lisibilité
-    padding: 10px 20px;
-    border-radius: 12px;
-    backdrop-filter: blur(2px);
-
-    ion-icon {
-      font-size: 40px;
-      color: #888;
-      margin-bottom: 5px;
-    }
-    
-    h3 {
-      margin: 0;
-      font-size: 16px;
-      font-weight: bold;
-      color: #555;
-    }
-    
-    p {
-      margin: 5px 0 0;
-      font-size: 12px;
-      color: #999;
-    }
-  }
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+  background: white;
+  margin-top: 10px;
+  overflow: visible; // Pour que l'ombre ne soit pas coupée
 }
 
+// Conteneur principal du logo
 .logo-container {
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin-bottom: 20px;
+  justify-content: center;
+  margin: 20px 0 30px 0;
+  cursor: pointer;
 }
 
+// Le cercle du logo
 .logo-circle {
-  width: 100px;
-  height: 100px;
+  width: 120px;
+  height: 120px;
   border-radius: 50%;
-  border: 3px solid white;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+  border: 4px solid white;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   position: relative;
-  background: #f4f5f8;
+  background: #f0f0f0;
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow: hidden;
+  overflow: hidden; // Important : coupe l'image pour qu'elle reste ronde
 
+  // L'image réelle
   .logo-img {
     width: 100%;
     height: 100%;
-    object-fit: cover;
+    object-fit: cover; // Remplit tout le cercle sans déformation
+    display: block;
   }
 
-  .edit-badge {
-    position: absolute;
-    bottom: 0;
-    width: 100%;
-    background: rgba(0,0,0,0.5);
-    height: 30px;
+  // Placeholder si pas d'image
+  .logo-placeholder {
     display: flex;
     align-items: center;
     justify-content: center;
-    color: white;
+    width: 100%;
+    height: 100%;
+    
+    ion-icon {
+      font-size: 40px;
+      color: #ccc;
+    }
+  }
+
+  // Bandeau "Modifier" en bas du cercle
+  .edit-overlay {
+    position: absolute;
+    bottom: 0;
+    width: 100%;
+    height: 35px;
+    background: rgba(0, 0, 0, 0.6); // Fond noir semi-transparent
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(2px); // Effet flou iOS
+    
+    ion-icon {
+      color: white;
+      font-size: 18px;
+    }
   }
 }
 
+// Texte sous le logo
 .logo-hint {
-  font-size: 12px;
+  font-size: 13px;
+  color: var(--ion-color-medium);
+  margin-top: 12px;
+  font-weight: 500;
+}
+
+// --- SEGMENT GED : LISTE DOCUMENTS ---
+
+// Bannière d'alerte (expiration)
+.alert-banner {
+  background: rgba(var(--ion-color-danger-rgb), 0.1);
+  color: var(--ion-color-danger-shade);
+  padding: 12px 15px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 20px;
+  border: 1px solid rgba(var(--ion-color-danger-rgb), 0.2);
+
+  ion-icon {
+    font-size: 20px;
+  }
+}
+
+.doc-list {
+  background: transparent;
+  padding-top: 0;
+}
+
+// Style de chaque item de document
+.doc-item {
+  --background: white;
+  --border-radius: 12px;
+  margin-bottom: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  --padding-start: 10px;
+  --inner-padding-end: 10px;
+}
+
+// Carré coloré avec l'icône du document
+.doc-icon {
+  width: 45px;
+  height: 45px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  margin-right: 15px;
+
+  // Couleurs dynamiques selon le type
+  &.DUERP {
+    background: rgba(var(--ion-color-warning-rgb), 0.15);
+    color: var(--ion-color-warning);
+  }
+  &.KBIS {
+    background: rgba(var(--ion-color-primary-rgb), 0.15);
+    color: var(--ion-color-primary);
+  }
+  &.ASSURANCE {
+    background: rgba(var(--ion-color-success-rgb), 0.15);
+    color: var(--ion-color-success);
+  }
+  &.AUTRE {
+    background: #f0f2f5;
+    color: #666;
+  }
+}
+
+.expiration-badge {
+  margin-top: 6px;
+  
+  ion-badge {
+    font-weight: normal;
+    padding: 4px 8px;
+    border-radius: 6px;
+  }
+}
+
+// État vide (pas de documents)
+.empty-state {
+  text-align: center;
+  margin-top: 60px;
+  padding: 20px;
+
+  ion-icon {
+    font-size: 64px;
+    color: #e0e0e0;
+    margin-bottom: 15px;
+  }
+
+  p {
+    margin: 0;
+    color: var(--ion-color-medium);
+    font-size: 16px;
+    font-weight: 500;
+  }
+}
+
+// --- MODAL UPLOAD : ZONE DRAG & DROP ---
+
+.file-box {
+  border: 2px dashed #dcdcdc;
+  border-radius: 16px;
+  padding: 40px 20px;
+  text-align: center;
   color: #888;
-  margin-top: 8px;
+  margin-top: 20px;
+  transition: all 0.3s ease;
+  background-color: #fafafa;
+  cursor: pointer;
+
+  ion-icon {
+    margin-bottom: 10px;
+    color: #bbb;
+    transition: color 0.3s;
+  }
+
+  p {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 500;
+  }
+
+  // État quand un fichier est sélectionné
+  &.has-file {
+    border-color: var(--ion-color-primary);
+    background: rgba(var(--ion-color-primary-rgb), 0.08);
+    color: var(--ion-color-primary-shade);
+
+    ion-icon {
+      color: var(--ion-color-primary);
+    }
+  }
+
+  &:active {
+    transform: scale(0.98);
+  }
 }

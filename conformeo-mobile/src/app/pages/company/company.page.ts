@@ -93,9 +93,27 @@ export class CompanyPage implements OnInit {
   // --- LOGO ---
   triggerLogoUpload() { this.logoInput.nativeElement.click(); }
   
-  onLogoSelected(event: any) {
+  // ...
+onLogoSelected(event: any) {
     const file = event.target.files[0];
-    if (file) this.processLogoUpload(file);
+    if (file) {
+      // 1. Créer un aperçu local immédiat
+      const reader = new FileReader();
+      reader.onload = () => {
+        this.company.logo_url = reader.result as string; // Affiche l'image tout de suite
+      };
+      reader.readAsDataURL(file);
+
+      // 2. Envoyer au serveur
+      this.api.uploadLogo(file).subscribe({
+        next: (res) => {
+          // La réponse du serveur contient l'URL définitive (Cloudinary/S3)
+          if(res.url) this.company.logo_url = res.url; 
+          this.presentToast('Logo mis à jour !', 'success');
+        },
+        error: (err) => this.presentToast('Erreur upload logo', 'danger')
+      });
+    }
   }
 
   async processLogoUpload(file: File) {
