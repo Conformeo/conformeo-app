@@ -1313,18 +1313,18 @@ def read_own_company(
     db: Session = Depends(get_db), 
     current_user: models.User = Depends(security.get_current_user)
 ):
-    # 1. Vérification si l'utilisateur est rattaché à une entreprise
     if not current_user.company_id:
-        raise HTTPException(status_code=404, detail="Aucune entreprise liée à votre compte")
+        raise HTTPException(status_code=404, detail="Aucune entreprise liée")
         
-    # 2. Récupération de l'entreprise
     company = db.query(models.Company).filter(models.Company.id == current_user.company_id).first()
-    
     if not company:
-        raise HTTPException(status_code=404, detail="Entreprise introuvable en base de données")
-        
-    # 3. Construction sécurisée de la réponse
-    # On utilise "or None" ou des chaînes vides pour éviter les erreurs de type
+        raise HTTPException(status_code=404, detail="Entreprise introuvable")
+    
+    # 👇 CORRECTION D'AFFICHAGE (Lecture)
+    # On récupère la valeur présente en base de données (contact_email)
+    # On utilise getattr pour être sûr de ne pas planter si le nom diffère légèrement
+    real_email = getattr(company, "contact_email", getattr(company, "email", None))
+
     return {
         "id": company.id,
         "name": company.name,
@@ -1333,9 +1333,9 @@ def read_own_company(
         "logo_url": company.logo_url,
         "subscription_plan": company.subscription_plan or "free",
         
-        # Mapping sécurisé pour l'email
-        "contact_email": company.email if hasattr(company, "email") else None,
-        "email": company.email if hasattr(company, "email") else None
+        # On remplit les deux champs du schéma avec la vraie valeur trouvée
+        "contact_email": real_email, 
+        "email": real_email           
     }
 
 @app.post("/companies/me/duerp", response_model=schemas.DUERPOut)
