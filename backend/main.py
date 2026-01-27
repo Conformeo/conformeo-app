@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, Request  # 👈 AJOUT IMPORTANT : Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
@@ -18,14 +18,23 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Conforméo API")
 
-# --- 1. CONFIGURATION CORS (CRITIQUE POUR VERCEL) ---
+# --- 0. MIDDLEWARE DE SÉCURITÉ (CSP) ---
+# 👇 C'EST CE BLOC QUI VA DÉBLOQUER L'AFFICHAGE DU DASHBOARD
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    # On autorise tout (*) y compris 'unsafe-eval' pour que les scripts Angular/Ionic fonctionnent
+    response.headers["Content-Security-Policy"] = "default-src * 'unsafe-inline' 'unsafe-eval' data: blob:;"
+    return response
+
+# --- 1. CONFIGURATION CORS ---
 origins = [
     "http://localhost:8100",
     "http://localhost:4200",
     "capacitor://localhost",
-    "https://conformeo-app.vercel.app",   # Sans slash
-    "https://conformeo-app.vercel.app/",  # Avec slash (important !)
-    "*" # A retirer en prod stricte, mais utile pour le debug
+    "https://conformeo-app.vercel.app",
+    "https://conformeo-app.vercel.app/",
+    "*"  # Utile pour le debug, à restreindre plus tard si besoin
 ]
 
 app.add_middleware(
@@ -37,9 +46,7 @@ app.add_middleware(
 )
 
 # --- 2. GESTION DES FICHIERS (UPLOADS) ---
-# On s'assure que le dossier existe pour éviter les erreurs 500
 os.makedirs("uploads", exist_ok=True)
-# On rend ce dossier accessible via URL (ex: http://api.../uploads/logo.png)
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 # --- 3. INCLUSION DES ROUTEURS ---
@@ -48,10 +55,8 @@ app.include_router(companies.router)
 app.include_router(users.router)
 app.include_router(materiel.router)
 app.include_router(duerp.router)
-
-# Chantiers contient 2 routeurs (le principal et celui des docs orphelines)
 app.include_router(chantiers.router)
-# app.include_router(chantiers.router_docs)
+# app.include_router(chantiers.router_docs) # Désactivé car fusionné
 app.include_router(dashboard.router)
 
 @app.get("/")
