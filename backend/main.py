@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from .database import engine, Base
 
 # Imports des routeurs
-from .routers import auth, companies, chantiers, users, materiel, duerp
+from .routers import auth, companies, chantiers, users, materiel, duerp, dashboard
 
 # Chargement des variables d'environnement
 load_dotenv()
@@ -52,6 +52,7 @@ app.include_router(duerp.router)
 # Chantiers contient 2 routeurs (le principal et celui des docs orphelines)
 app.include_router(chantiers.router)
 app.include_router(chantiers.router_docs)
+app.include_router(dashboard.router)
 
 @app.get("/")
 def read_root():
