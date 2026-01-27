@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 import io
 from datetime import datetime
 
@@ -11,7 +11,6 @@ from ..services.email import send_email_via_brevo
 from ..services import pdf as pdf_generator 
 
 router = APIRouter(prefix="/chantiers", tags=["Chantiers"])
-router_docs = APIRouter(tags=["Documents Sécurité"]) # Pour les routes orphelines
 
 # --- CRUD CHANTIER ---
 
@@ -29,10 +28,8 @@ def read_one_chantier(chantier_id: int, db: Session = Depends(get_db), current_u
 def create_chantier(chantier: schemas.ChantierCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     if not current_user.company_id: raise HTTPException(400, "Utilisateur sans entreprise")
     
-    # Conversion Pydantic -> Dict pour SQLAlchemy
     chantier_data = chantier.dict()
-    
-    # Gestion des dates si envoyées en string vide
+    # Nettoyage des dates vides
     if chantier_data.get('date_debut') == "": chantier_data['date_debut'] = None
     if chantier_data.get('date_fin') == "": chantier_data['date_fin'] = None
 
@@ -43,7 +40,7 @@ def create_chantier(chantier: schemas.ChantierCreate, db: Session = Depends(get_
     return db_chantier
 
 @router.put("/{chantier_id}", response_model=schemas.ChantierOut)
-def update_chantier(chantier_id: int, chantier_update: schemas.ChantierUpdate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+def update_chantier(chantier_id: int, chantier_update: schemas.ChantierUpdate, db: Session = Depends(get_db)):
     db_chantier = db.query(models.Chantier).filter(models.Chantier.id == chantier_id).first()
     if not db_chantier: raise HTTPException(404, "Chantier introuvable")
 
@@ -55,7 +52,30 @@ def update_chantier(chantier_id: int, chantier_update: schemas.ChantierUpdate, d
     db.refresh(db_chantier)
     return db_chantier
 
-# --- TASKS (Tâches) ---
+# --- DETAILS (Rapports, Inspections, etc.) : C'est ce qui manquait ! ---
+
+@router.get("/{chantier_id}/rapports", response_model=List[schemas.RapportOut])
+def get_chantier_rapports(chantier_id: int, db: Session = Depends(get_db)):
+    return db.query(models.Rapport).filter(models.Rapport.chantier_id == chantier_id).all()
+
+@router.get("/{chantier_id}/inspections", response_model=List[schemas.InspectionOut])
+def get_chantier_inspections(chantier_id: int, db: Session = Depends(get_db)):
+    return db.query(models.Inspection).filter(models.Inspection.chantier_id == chantier_id).all()
+
+@router.get("/{chantier_id}/docs", response_model=List[schemas.DocExterneOut])
+def get_chantier_docs(chantier_id: int, db: Session = Depends(get_db)):
+    # Récupère les documents externes (GED)
+    return db.query(models.DocExterne).filter(models.DocExterne.chantier_id == chantier_id).all()
+
+@router.get("/{chantier_id}/pic", response_model=Optional[schemas.PicOut])
+def get_chantier_pic(chantier_id: int, db: Session = Depends(get_db)):
+    return db.query(models.PIC).filter(models.PIC.chantier_id == chantier_id).first()
+
+@router.get("/{chantier_id}/permis-feu", response_model=List[schemas.PermisFeuOut])
+def get_chantier_permis_feu(chantier_id: int, db: Session = Depends(get_db)):
+    return db.query(models.PermisFeu).filter(models.PermisFeu.chantier_id == chantier_id).all()
+
+# --- TASKS ---
 
 @router.get("/{chantier_id}/tasks", response_model=List[schemas.TaskOut])
 def read_tasks(chantier_id: int, db: Session = Depends(get_db)):
@@ -63,7 +83,7 @@ def read_tasks(chantier_id: int, db: Session = Depends(get_db)):
 
 @router.post("/{chantier_id}/tasks", response_model=schemas.TaskOut)
 def create_task(chantier_id: int, task: schemas.TaskCreate, db: Session = Depends(get_db)):
-    db_task = models.Task(**task.dict()) # chantier_id est déjà dans le schema task
+    db_task = models.Task(**task.dict()) 
     db.add(db_task)
     db.commit()
     db.refresh(db_task)
@@ -81,7 +101,17 @@ def update_task(task_id: int, task_update: schemas.TaskUpdate, db: Session = Dep
     db.refresh(t)
     return t
 
-# --- PDF & EMAIL (Journal de bord) ---
+# --- SECURITE (Plans Prevention, PPSPS) ---
+
+@router.get("/{chantier_id}/plans-prevention", response_model=List[schemas.PlanPreventionOut])
+def get_pdps(chantier_id: int, db: Session = Depends(get_db)):
+    return db.query(models.PlanPrevention).filter(models.PlanPrevention.chantier_id == chantier_id).all()
+
+@router.get("/{chantier_id}/ppsps", response_model=List[schemas.PPSPSOut])
+def get_ppsps(chantier_id: int, db: Session = Depends(get_db)):
+    return db.query(models.PPSPS).filter(models.PPSPS.chantier_id == chantier_id).all()
+
+# --- PDF & EMAIL ---
 
 @router.post("/{chantier_id}/send-email")
 def send_journal_email(chantier_id: int, email_dest: str, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
@@ -100,29 +130,3 @@ def send_journal_email(chantier_id: int, email_dest: str, db: Session = Depends(
     success = send_email_via_brevo(email_dest, f"Journal - {chantier.nom}", html_content, pdf_buffer, f"Journal_{chantier.nom}.pdf")
     if success: return {"message": "Email envoyé ! 🚀"}
     raise HTTPException(500, "Erreur envoi Brevo")
-
-# --- DOCUMENTS SECURITE (Lecture seule pour l'exemple, création possible) ---
-
-@router.get("/{chantier_id}/plans-prevention", response_model=List[schemas.PlanPreventionOut])
-def get_pdps(chantier_id: int, db: Session = Depends(get_db)):
-    return db.query(models.PlanPrevention).filter(models.PlanPrevention.chantier_id == chantier_id).all()
-
-@router.get("/{chantier_id}/ppsps", response_model=List[schemas.PPSPSOut])
-def get_ppsps(chantier_id: int, db: Session = Depends(get_db)):
-    return db.query(models.PPSPS).filter(models.PPSPS.chantier_id == chantier_id).all()
-
-# --- ROUTEUR SECONDAIRE (Orphelin) ---
-@router_docs.post("/plans-prevention/{pid}/email")
-def send_pdp_email_route(pid: int, email_dest: str, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    pdp = db.query(models.PlanPrevention).filter(models.PlanPrevention.id == pid).first()
-    if not pdp: raise HTTPException(404, "Plan introuvable")
-    
-    chantier = db.query(models.Chantier).filter(models.Chantier.id == pdp.chantier_id).first()
-    company = db.query(models.Company).filter(models.Company.id == current_user.company_id).first()
-
-    pdf_buffer = io.BytesIO()
-    pdf_generator.generate_pdp_pdf(chantier, pdp, pdf_buffer, company=company)
-
-    success = send_email_via_brevo(email_dest, f"PDP - {chantier.nom}", "<p>Ci-joint le Plan de Prévention.</p>", pdf_buffer, "PDP.pdf")
-    if success: return {"message": "Envoyé !"}
-    raise HTTPException(500, "Echec envoi")
