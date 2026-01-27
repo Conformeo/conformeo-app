@@ -18,23 +18,26 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Conforméo API")
 
-# --- 0. MIDDLEWARE DE SÉCURITÉ (VERSION BLINDÉE) ---
-# 👇 C'est ici que nous avons renforcé la permission pour 'eval'
+# --- 0. MIDDLEWARE DE SÉCURITÉ (VERSION ULTRA-PERMISSIVE) ---
 @app.middleware("http")
 async def add_security_headers(request: Request, call_next):
     response = await call_next(request)
     
-    # On définit une politique ultra-permissive pour éviter tout blocage Frontend
-    # On autorise spécifiquement 'script-src' avec 'unsafe-eval'
+    # On autorise explicitement TOUT pour éviter les blocages Frontend
+    # L'important est 'unsafe-eval' dans script-src
     csp_policy = (
-        "default-src * data: blob: 'unsafe-inline' 'unsafe-eval'; "
+        "default-src * data: blob: filesystem: about: ws: wss: 'unsafe-inline' 'unsafe-eval'; "
         "script-src * data: blob: 'unsafe-inline' 'unsafe-eval'; "
         "connect-src * data: blob: 'unsafe-inline'; "
         "img-src * data: blob: 'unsafe-inline'; "
-        "style-src * data: blob: 'unsafe-inline';"
+        "style-src * data: blob: 'unsafe-inline'; "
+        "frame-src * data: blob: ; "
+        "font-src * data: blob: 'unsafe-inline';"
     )
     
     response.headers["Content-Security-Policy"] = csp_policy
+    # On ajoute aussi ces headers pour être sûr
+    response.headers["Access-Control-Allow-Origin"] = "*"
     return response
 
 # --- 1. CONFIGURATION CORS ---
