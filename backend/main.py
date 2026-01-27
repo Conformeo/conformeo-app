@@ -51,7 +51,7 @@ app.include_router(duerp.router)
 
 # Chantiers contient 2 routeurs (le principal et celui des docs orphelines)
 app.include_router(chantiers.router)
-app.include_router(chantiers.router_docs)
+# app.include_router(chantiers.router_docs)
 app.include_router(dashboard.router)
 
 @app.get("/")
