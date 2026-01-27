@@ -23,6 +23,7 @@ class Company(Base):
     chantiers = relationship("Chantier", back_populates="company")
     materiels = relationship("Materiel", back_populates="company")
     duerps = relationship("DUERP", back_populates="company") 
+    documents = relationship("CompanyDocument", back_populates="company")
 
 class User(Base):
     __tablename__ = "users"
@@ -306,3 +307,15 @@ class DocExterne(Base):
     
     # Lien vers le chantier
     chantier = relationship("Chantier", backref="docs_externes")
+
+class CompanyDocument(Base):
+    __tablename__ = "company_documents"
+
+    id = Column(Integer, primary_key=True, index=True)
+    titre = Column(String)
+    url = Column(String)
+    date_upload = Column(DateTime, default=datetime.utcnow)
+    date_expiration = Column(DateTime, nullable=True) # Utile pour les assurances
+
+    company_id = Column(Integer, ForeignKey("companies.id"))
+    company = relationship("Company", back_populates="documents")
