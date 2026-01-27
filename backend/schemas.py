@@ -206,8 +206,8 @@ class ChantierOut(BaseModel):
     nom: str
     client: Optional[str] = None
     adresse: Optional[str] = None
-    date_debut: Optional[date] = None
-    date_fin: Optional[date] = None
+    date_debut: Optional[datetime] = None 
+    date_fin: Optional[datetime] = None
     est_actif: bool = True
     soumis_sps: bool = False
     cover_url: Optional[str] = None
