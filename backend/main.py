@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-from fastapi import FastAPI, Request  # 👈 AJOUT IMPORTANT : Request
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
@@ -13,18 +13,28 @@ from .routers import auth, companies, chantiers, users, materiel, duerp, dashboa
 # Chargement des variables d'environnement
 load_dotenv()
 
-# Création des tables en BDD (si elles n'existent pas)
+# Création des tables en BDD
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Conforméo API")
 
-# --- 0. MIDDLEWARE DE SÉCURITÉ (CSP) ---
-# 👇 C'EST CE BLOC QUI VA DÉBLOQUER L'AFFICHAGE DU DASHBOARD
+# --- 0. MIDDLEWARE DE SÉCURITÉ (VERSION BLINDÉE) ---
+# 👇 C'est ici que nous avons renforcé la permission pour 'eval'
 @app.middleware("http")
 async def add_security_headers(request: Request, call_next):
     response = await call_next(request)
-    # On autorise tout (*) y compris 'unsafe-eval' pour que les scripts Angular/Ionic fonctionnent
-    response.headers["Content-Security-Policy"] = "default-src * 'unsafe-inline' 'unsafe-eval' data: blob:;"
+    
+    # On définit une politique ultra-permissive pour éviter tout blocage Frontend
+    # On autorise spécifiquement 'script-src' avec 'unsafe-eval'
+    csp_policy = (
+        "default-src * data: blob: 'unsafe-inline' 'unsafe-eval'; "
+        "script-src * data: blob: 'unsafe-inline' 'unsafe-eval'; "
+        "connect-src * data: blob: 'unsafe-inline'; "
+        "img-src * data: blob: 'unsafe-inline'; "
+        "style-src * data: blob: 'unsafe-inline';"
+    )
+    
+    response.headers["Content-Security-Policy"] = csp_policy
     return response
 
 # --- 1. CONFIGURATION CORS ---
@@ -34,7 +44,7 @@ origins = [
     "capacitor://localhost",
     "https://conformeo-app.vercel.app",
     "https://conformeo-app.vercel.app/",
-    "*"  # Utile pour le debug, à restreindre plus tard si besoin
+    "*"
 ]
 
 app.add_middleware(
@@ -56,7 +66,6 @@ app.include_router(users.router)
 app.include_router(materiel.router)
 app.include_router(duerp.router)
 app.include_router(chantiers.router)
-# app.include_router(chantiers.router_docs) # Désactivé car fusionné
 app.include_router(dashboard.router)
 
 @app.get("/")
