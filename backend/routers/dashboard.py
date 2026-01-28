@@ -81,15 +81,20 @@ def get_dashboard_stats(db: Session = Depends(database.get_db), current_user: mo
 @router.get("/fix-data")
 def fix_dashboard_data(db: Session = Depends(database.get_db), current_user: models.User = Depends(dependencies.get_current_user)):
     """
-    FORCE l'injection de données fictives pour la démo.
+    Script de réparation intelligent : 
+    - Assigne les vraies coordonnées pour Avignon.
+    - Distribue les autres chantiers aléatoirement en France.
     """
     if not current_user.company_id:
         return {"message": "Aucune entreprise liée"}
     
     cid = current_user.company_id
     
-    # 1. Injection GPS (Villes françaises)
-    coords = [
+    # Coordonnées exactes pour Avignon (25 rue de la république)
+    GPS_AVIGNON = (43.949317, 4.805528)
+
+    # Liste de villes par défaut pour les autres chantiers
+    coords_random = [
         (48.8566, 2.3522),  # Paris
         (45.7640, 4.8357),  # Lyon
         (43.2965, 5.3698),  # Marseille
@@ -98,37 +103,53 @@ def fix_dashboard_data(db: Session = Depends(database.get_db), current_user: mod
         (47.2184, -1.5536)  # Nantes
     ]
     
-    # On récupère TOUS les chantiers actifs
     chantiers = db.query(models.Chantier).filter(models.Chantier.company_id == cid).all()
     
-    count_gps = 0
+    updated_count = 0
     for i, c in enumerate(chantiers):
-        # 👇 CHANGEMENT ICI : On enlève la condition 'if' pour FORCER la mise à jour
-        lat_base, lng_base = coords[i % len(coords)]
+        c.est_actif = True # On s'assure qu'ils sont visibles
         
-        # On met à jour sans se poser de question
-        c.latitude = lat_base + (random.uniform(-0.05, 0.05))
-        c.longitude = lng_base + (random.uniform(-0.05, 0.05))
-        c.est_actif = True # On s'assure qu'ils sont actifs pour la carte
-        count_gps += 1
+        # 👇 DÉTECTION SPÉCIFIQUE POUR VOTRE CHANTIER AVIGNON
+        # On vérifie si "Avignon" est dans l'adresse (si le champ existe) ou si c'est le client Supabase
+        is_avignon = False
+        
+        # Vérification par le nom ou le client (basé sur votre capture d'écran)
+        if "Supabase" in (c.client or "") or "database" in (c.nom or ""):
+            is_avignon = True
+        
+        # Si vous avez un champ 'ville' ou 'adresse' dans votre modèle, on peut aussi tester :
+        # if hasattr(c, 'adresse') and "Avignon" in (c.adresse or ""): is_avignon = True
+        # if hasattr(c, 'ville') and "Avignon" in (c.ville or ""): is_avignon = True
 
-    # 2. Création Alerte Retard (Sur le premier chantier)
+        if is_avignon:
+            c.latitude = GPS_AVIGNON[0]
+            c.longitude = GPS_AVIGNON[1]
+            print(f"📍 Chantier '{c.nom}' localisé à Avignon !")
+        else:
+            # Pour les autres, on garde l'aléatoire pour peupler la carte
+            lat_base, lng_base = coords_random[i % len(coords_random)]
+            c.latitude = lat_base + (random.uniform(-0.05, 0.05))
+            c.longitude = lng_base + (random.uniform(-0.05, 0.05))
+            
+        updated_count += 1
+
+    # --- On garde la création d'alertes pour la démo ---
     if chantiers:
-        chantier_retard = chantiers[0]
-        # On force la date de fin à "Hier"
-        chantier_retard.date_fin = datetime.now() - timedelta(days=1)
-    
-    # 3. Création Alerte Rapport Critique
+        # On force un chantier en retard (le premier qui n'est PAS Avignon pour éviter de polluer votre test)
+        other_chantiers = [ch for ch in chantiers if ch.latitude != GPS_AVIGNON[0]]
+        if other_chantiers:
+            other_chantiers[0].date_fin = datetime.now() - timedelta(days=2)
+
+    # Réparation Rapport Critique
     rapports = db.query(models.Rapport).join(models.Chantier).filter(models.Chantier.company_id == cid).all()
     if rapports:
-        # On force le premier rapport en Critique
         rapport_critique = rapports[0]
         rapport_critique.niveau_urgence = "Critique"
-        rapport_critique.titre = "Alerte Structurelle" # Un titre bien visible
+        rapport_critique.titre = "Fissure structurelle majeure"
     
     db.commit()
     
     return {
         "status": "success", 
-        "message": f"Mise à jour FORCÉE ! {count_gps} chantiers géolocalisés sur la carte."
+        "message": f"Correction effectuée : {updated_count} chantiers mis à jour (dont Avignon)."
     }
