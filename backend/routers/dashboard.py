@@ -1,29 +1,62 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
-# 👇 Nouveaux imports nécessaires pour la génération de données
 from datetime import datetime, timedelta
 import random
-# 👆 Fin des nouveaux imports
+import time
+import requests  # 👈 Nécessaire pour interroger OpenStreetMap
 
 from .. import models, database, dependencies
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 
+# --- FONCTIONS UTILITAIRES ---
+
+def get_gps_from_address(address_query):
+    """
+    Interroge l'API OpenStreetMap (Nominatim) pour obtenir les coordonnées GPS
+    d'une adresse ou d'une ville.
+    """
+    if not address_query or len(address_query) < 3:
+        return None
+
+    url = "https://nominatim.openstreetmap.org/search"
+    params = {
+        'q': address_query,
+        'format': 'json',
+        'limit': 1,
+        'countrycodes': 'fr' # On limite à la France pour éviter les homonymes
+    }
+    # User-Agent obligatoire pour respecter la politique d'OpenStreetMap
+    headers = {'User-Agent': 'ConformeoApp/1.0'} 
+
+    try:
+        response = requests.get(url, params=params, headers=headers, timeout=5)
+        if response.status_code == 200:
+            data = response.json()
+            if data:
+                return float(data[0]['lat']), float(data[0]['lon'])
+    except Exception as e:
+        print(f"❌ Erreur Geocoding pour '{address_query}': {e}")
+    
+    return None
+
+# --- ROUTES ---
+
 @router.get("/stats")
 def get_dashboard_stats(db: Session = Depends(database.get_db), current_user: models.User = Depends(dependencies.get_current_user)):
     
-    # --- VOTRE CODE ACTUEL DE STATS (Inchangé) ---
     if not current_user.company_id:
         return {"nb_chantiers": 0, "map": [], "recents": []}
 
     cid = current_user.company_id
 
+    # 1. COMPTAGES
     count_chantiers = db.query(models.Chantier).filter(models.Chantier.company_id == cid).count()
     count_materiels = db.query(models.Materiel).filter(models.Materiel.company_id == cid).count()
     count_rapports = db.query(models.Rapport).join(models.Chantier).filter(models.Chantier.company_id == cid).count()
 
-    # Alertes
+    # 2. ALERTES
     chantiers_retard = db.query(models.Chantier).filter(
         models.Chantier.company_id == cid,
         models.Chantier.est_actif == True,
@@ -37,16 +70,23 @@ def get_dashboard_stats(db: Session = Depends(database.get_db), current_user: mo
 
     total_alertes = chantiers_retard + rapports_critiques
 
-    # Carte
-    sites_db = db.query(models.Chantier).filter(models.Chantier.company_id == cid, models.Chantier.est_actif == True).all()
+    # 3. CARTE (On ne renvoie que ceux qui ont un GPS valide)
+    sites_db = db.query(models.Chantier).filter(
+        models.Chantier.company_id == cid,
+        models.Chantier.est_actif == True
+    ).all()
+
     map_data = []
     for s in sites_db:
-        if s.latitude and s.longitude:
-            try:
-                map_data.append({"nom": s.nom, "client": s.client, "lat": float(s.latitude), "lng": float(s.longitude)})
-            except: pass
+        if s.latitude and s.longitude and s.latitude != 0:
+            map_data.append({
+                "nom": s.nom, 
+                "client": s.client, 
+                "lat": float(s.latitude), 
+                "lng": float(s.longitude)
+            })
 
-    # Récents
+    # 4. RÉCENTS
     recents_db = db.query(models.Rapport).join(models.Chantier).filter(models.Chantier.company_id == cid).order_by(desc(models.Rapport.date_creation)).limit(5).all()
     recents_formatted = []
     for r in recents_db:
@@ -77,79 +117,66 @@ def get_dashboard_stats(db: Session = Depends(database.get_db), current_user: mo
     return {**stats_data, "data": stats_data}
 
 
-# 👇👇👇 LA ROUTE MAGIQUE POUR RÉPARER LES DONNÉES 👇👇👇
+# 👇 ROUTE DE RÉPARATION INTELLIGENTE (GÉOCODAGE RÉEL) 👇
 @router.get("/fix-data")
 def fix_dashboard_data(db: Session = Depends(database.get_db), current_user: models.User = Depends(dependencies.get_current_user)):
     """
-    Script de réparation intelligent : 
-    - Assigne les vraies coordonnées pour Avignon.
-    - Distribue les autres chantiers aléatoirement en France.
+    Parcourt tous les chantiers et calcule leurs coordonnées GPS réelles
+    via l'API OpenStreetMap en fonction de leur adresse/ville.
     """
     if not current_user.company_id:
         return {"message": "Aucune entreprise liée"}
     
     cid = current_user.company_id
-    
-    # Coordonnées exactes pour Avignon (25 rue de la république)
-    GPS_AVIGNON = (43.949317, 4.805528)
-
-    # Liste de villes par défaut pour les autres chantiers
-    coords_random = [
-        (48.8566, 2.3522),  # Paris
-        (45.7640, 4.8357),  # Lyon
-        (43.2965, 5.3698),  # Marseille
-        (44.8378, -0.5792), # Bordeaux
-        (50.6292, 3.0573),  # Lille
-        (47.2184, -1.5536)  # Nantes
-    ]
-    
     chantiers = db.query(models.Chantier).filter(models.Chantier.company_id == cid).all()
     
-    updated_count = 0
-    for i, c in enumerate(chantiers):
-        c.est_actif = True # On s'assure qu'ils sont visibles
-        
-        # 👇 DÉTECTION SPÉCIFIQUE POUR VOTRE CHANTIER AVIGNON
-        # On vérifie si "Avignon" est dans l'adresse (si le champ existe) ou si c'est le client Supabase
-        is_avignon = False
-        
-        # Vérification par le nom ou le client (basé sur votre capture d'écran)
-        if "Supabase" in (c.client or "") or "database" in (c.nom or ""):
-            is_avignon = True
-        
-        # Si vous avez un champ 'ville' ou 'adresse' dans votre modèle, on peut aussi tester :
-        # if hasattr(c, 'adresse') and "Avignon" in (c.adresse or ""): is_avignon = True
-        # if hasattr(c, 'ville') and "Avignon" in (c.ville or ""): is_avignon = True
-
-        if is_avignon:
-            c.latitude = GPS_AVIGNON[0]
-            c.longitude = GPS_AVIGNON[1]
-            print(f"📍 Chantier '{c.nom}' localisé à Avignon !")
-        else:
-            # Pour les autres, on garde l'aléatoire pour peupler la carte
-            lat_base, lng_base = coords_random[i % len(coords_random)]
-            c.latitude = lat_base + (random.uniform(-0.05, 0.05))
-            c.longitude = lng_base + (random.uniform(-0.05, 0.05))
-            
-        updated_count += 1
-
-    # --- On garde la création d'alertes pour la démo ---
-    if chantiers:
-        # On force un chantier en retard (le premier qui n'est PAS Avignon pour éviter de polluer votre test)
-        other_chantiers = [ch for ch in chantiers if ch.latitude != GPS_AVIGNON[0]]
-        if other_chantiers:
-            other_chantiers[0].date_fin = datetime.now() - timedelta(days=2)
-
-    # Réparation Rapport Critique
-    rapports = db.query(models.Rapport).join(models.Chantier).filter(models.Chantier.company_id == cid).all()
-    if rapports:
-        rapport_critique = rapports[0]
-        rapport_critique.niveau_urgence = "Critique"
-        rapport_critique.titre = "Fissure structurelle majeure"
+    updated_logs = []
     
+    for c in chantiers:
+        c.est_actif = True
+        
+        # 1. Construction de la requête d'adresse
+        # On essaie d'être le plus précis possible
+        search_query = ""
+        
+        if hasattr(c, 'adresse') and c.adresse:
+            search_query += f"{c.adresse} "
+        if hasattr(c, 'code_postal') and c.code_postal:
+            search_query += f"{c.code_postal} "
+        if hasattr(c, 'ville') and c.ville:
+            search_query += f"{c.ville}"
+            
+        # Si on n'a pas de champ adresse structuré, on cherche dans le nom/client
+        # (Ex: "Collège test Mairie Carpentras")
+        if len(search_query.strip()) < 5:
+             # Fallback : on concatène tout ce qu'on a pour espérer trouver une ville
+             search_query = f"{c.nom or ''} {c.client or ''}"
+
+        # 2. Appel API OpenStreetMap
+        print(f"🌍 Géocodage pour : {search_query}...")
+        coords = get_gps_from_address(search_query)
+        
+        if coords:
+            c.latitude = coords[0]
+            c.longitude = coords[1]
+            updated_logs.append(f"✅ {c.nom} -> {coords}")
+        else:
+            updated_logs.append(f"⚠️ {c.nom} : Adresse introuvable ({search_query})")
+            # En cas d'échec total, on met Paris par défaut pour ne pas casser la carte
+            if not c.latitude: 
+                c.latitude, c.longitude = 48.8566, 2.3522
+
+        # 3. Pause obligatoire (Rate Limiting OpenStreetMap 1 req/sec)
+        time.sleep(1.1)
+
+    # --- Reste du script pour les alertes (inchangé) ---
+    if chantiers:
+        chantiers[-1].date_fin = datetime.now() - timedelta(days=2) # 1 retard
+
     db.commit()
     
     return {
         "status": "success", 
-        "message": f"Correction effectuée : {updated_count} chantiers mis à jour (dont Avignon)."
+        "message": "Géocodage terminé via OpenStreetMap",
+        "details": updated_logs
     }
