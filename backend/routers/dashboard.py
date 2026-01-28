@@ -81,8 +81,7 @@ def get_dashboard_stats(db: Session = Depends(database.get_db), current_user: mo
 @router.get("/fix-data")
 def fix_dashboard_data(db: Session = Depends(database.get_db), current_user: models.User = Depends(dependencies.get_current_user)):
     """
-    Route utilitaire pour injecter des coordonnées GPS et des alertes fictives
-    pour tester le tableau de bord.
+    FORCE l'injection de données fictives pour la démo.
     """
     if not current_user.company_id:
         return {"message": "Aucune entreprise liée"}
@@ -91,38 +90,45 @@ def fix_dashboard_data(db: Session = Depends(database.get_db), current_user: mod
     
     # 1. Injection GPS (Villes françaises)
     coords = [
-        (48.8566, 2.3522), (45.7640, 4.8357), (43.2965, 5.3698), 
-        (44.8378, -0.5792), (50.6292, 3.0573), (47.2184, -1.5536)
+        (48.8566, 2.3522),  # Paris
+        (45.7640, 4.8357),  # Lyon
+        (43.2965, 5.3698),  # Marseille
+        (44.8378, -0.5792), # Bordeaux
+        (50.6292, 3.0573),  # Lille
+        (47.2184, -1.5536)  # Nantes
     ]
     
+    # On récupère TOUS les chantiers actifs
     chantiers = db.query(models.Chantier).filter(models.Chantier.company_id == cid).all()
+    
     count_gps = 0
     for i, c in enumerate(chantiers):
-        # On ne touche que ceux qui n'ont pas de GPS
-        if not c.latitude or c.latitude == 0:
-            lat_base, lng_base = coords[i % len(coords)]
-            # Petit décalage aléatoire pour éviter la superposition
-            c.latitude = lat_base + (random.uniform(-0.05, 0.05))
-            c.longitude = lng_base + (random.uniform(-0.05, 0.05))
-            count_gps += 1
+        # 👇 CHANGEMENT ICI : On enlève la condition 'if' pour FORCER la mise à jour
+        lat_base, lng_base = coords[i % len(coords)]
+        
+        # On met à jour sans se poser de question
+        c.latitude = lat_base + (random.uniform(-0.05, 0.05))
+        c.longitude = lng_base + (random.uniform(-0.05, 0.05))
+        c.est_actif = True # On s'assure qu'ils sont actifs pour la carte
+        count_gps += 1
 
-    # 2. Création Alerte Retard
+    # 2. Création Alerte Retard (Sur le premier chantier)
     if chantiers:
         chantier_retard = chantiers[0]
-        chantier_retard.est_actif = True
-        chantier_retard.date_fin = datetime.now() - timedelta(days=2) # Fini il y a 2 jours
+        # On force la date de fin à "Hier"
+        chantier_retard.date_fin = datetime.now() - timedelta(days=1)
     
     # 3. Création Alerte Rapport Critique
     rapports = db.query(models.Rapport).join(models.Chantier).filter(models.Chantier.company_id == cid).all()
     if rapports:
-        # On prend le dernier rapport et on le met en Critique
+        # On force le premier rapport en Critique
         rapport_critique = rapports[0]
         rapport_critique.niveau_urgence = "Critique"
-        rapport_critique.titre = "Fuite de gaz majeure" # Un titre qui fait peur !
+        rapport_critique.titre = "Alerte Structurelle" # Un titre bien visible
     
     db.commit()
     
     return {
         "status": "success", 
-        "message": f"Données réparées ! {count_gps} chantiers géolocalisés, 1 retard créé, 1 rapport critique créé."
+        "message": f"Mise à jour FORCÉE ! {count_gps} chantiers géolocalisés sur la carte."
     }
