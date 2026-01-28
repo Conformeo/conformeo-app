@@ -1,7 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { IonicModule, NavController } from '@ionic/angular';
-// 👇 1. AJOUT DE Router ICI
 import { RouterLink, Router } from '@angular/router';
 import { BaseChartDirective } from 'ng2-charts';
 import { Chart, ChartConfiguration, ChartOptions, registerables } from 'chart.js';
@@ -21,10 +20,11 @@ Chart.register(...registerables);
 })
 export class DashboardPage implements OnInit {
 
+  // 👇 Initialisation avec des valeurs par défaut
   stats: any = {
-    actifs: 0,
+    actifs: 0,          // Sera rempli par nb_chantiers
+    materiel_sorti: 0,  // Sera rempli par nb_materiels
     rapports: 0,
-    materiel_sorti: 0,
     alertes: 0,
     last_reports: []
   };
@@ -32,7 +32,7 @@ export class DashboardPage implements OnInit {
   recentRapports: any[] = [];
   map: any;
 
-  // Config Graphique
+  // Config Graphique (Vide par défaut)
   public barChartData: ChartConfiguration<'bar'>['data'] = {
     labels: [],
     datasets: [
@@ -49,7 +49,6 @@ export class DashboardPage implements OnInit {
   constructor(
     private api: ApiService,
     private navCtrl: NavController,
-    // 👇 2. INJECTION DU ROUTER ICI
     private router: Router
   ) {
     addIcons({ business, documentText, hammer, warning, cameraOutline });  
@@ -69,21 +68,41 @@ export class DashboardPage implements OnInit {
 
   loadDashboardData() {
     console.log("🔄 Chargement des stats...");
+    
     this.api.getStats().subscribe({
-      next: (data) => {
-        if (data.kpis) this.stats = data.kpis;
-        // On s'assure que la liste est bien remplie pour l'affichage
-        if (data.recents) {
-            this.recentRapports = data.recents;
-            // Si votre HTML utilise stats.last_reports, on fait le lien :
-            this.stats.last_reports = data.recents; 
+      next: (response: any) => {
+        console.log("🔥 Données reçues du Backend :", response);
+
+        // 1. On récupère les données (peu importe si elles sont dans 'data' ou à la racine)
+        // Grâce à notre modification backend, 'response' contient directement les chiffres
+        const d = response.data || response;
+
+        // 2. MAPPING MANUEL : On connecte les fils ! 🔌
+        // On force les variables de l'écran (gauche) à prendre les valeurs du JSON (droite)
+        this.stats = {
+          // L'écran attend 'actifs', le JSON envoie 'nb_chantiers' (ou 'chantiers')
+          actifs: d.nb_chantiers || d.nbChantiers || d.chantiers || 0,
+          
+          // L'écran attend 'materiel_sorti', le JSON envoie 'nb_materiels'
+          materiel_sorti: d.nb_materiels || d.nbMateriels || d.materiels || 0,
+          
+          rapports: d.nb_rapports || 0, 
+          alertes: 0,
+          last_reports: d.recents || []
+        };
+
+        // 3. Mise à jour des listes si présentes
+        if (d.recents) {
+            this.recentRapports = d.recents;
+            this.stats.last_reports = d.recents; 
         }
         
-        if (data.chart) {
+        // 4. Gestion du Graphique
+        if (d.chart) {
           this.barChartData = {
-            labels: data.chart.labels,
+            labels: d.chart.labels,
             datasets: [{ 
-              data: data.chart.values, 
+              data: d.chart.values, 
               label: 'Rapports', 
               backgroundColor: '#1e3c72', 
               borderRadius: 5 
@@ -91,23 +110,20 @@ export class DashboardPage implements OnInit {
           };
         }
 
-        if (data.map) {
-          setTimeout(() => { this.initMap(data.map); }, 500);
+        // 5. Gestion de la Carte
+        if (d.map) {
+          setTimeout(() => { this.initMap(d.map); }, 500);
         }
       },
       error: (err) => console.error("Erreur chargement stats:", err)
     });
   }
 
-  // 👇 3. NOUVELLE FONCTION POUR OUVRIR LE RAPPORT
   goToReport(report: any) {
-    // Vérification de sécurité
     if (!report.chantier_id) {
       console.warn("Impossible d'ouvrir : Rapport sans chantier ID");
       return;
     }
-
-    // Navigation vers la page chantier avec un paramètre pour ouvrir le rapport
     this.router.navigate(['/chantier-details', report.chantier_id], {
       queryParams: { openReportId: report.id }
     });
@@ -121,20 +137,19 @@ export class DashboardPage implements OnInit {
 
     if (!document.getElementById('mapId')) return;
 
-    const iconRetinaUrl = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png';
-    const iconUrl = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png';
-    const shadowUrl = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png';
+    // Fix pour les icônes Leaflet manquantes
+    const iconRetinaUrl = 'assets/marker-icon-2x.png'; 
+    const iconUrl = 'assets/marker-icon.png';
+    const shadowUrl = 'assets/marker-shadow.png';
     
-    const defaultIcon = L.icon({
-      iconUrl: iconUrl,
-      iconRetinaUrl: iconRetinaUrl,
-      shadowUrl: shadowUrl,
-      iconSize: [25, 41],
-      iconAnchor: [12, 41],
-      popupAnchor: [1, -34],
-      shadowSize: [41, 41]
+    // On utilise des CDN si les assets locaux manquent, sinon ça plante
+    const L_im = L.Icon.Default.prototype as any;
+    L_im._getIconUrl = null;
+    L.Icon.Default.mergeOptions({
+      iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+      iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+      shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
     });
-    L.Marker.prototype.options.icon = defaultIcon;
 
     const center = sites.length > 0 ? [sites[0].lat, sites[0].lng] : [46.603354, 1.888334];
     const zoom = sites.length > 0 ? 12 : 5; 
