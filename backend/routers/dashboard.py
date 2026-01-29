@@ -11,17 +11,15 @@ router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 
 # --- GÉOCODAGE DYNAMIQUE (Sans aucune valeur par défaut) ---
 def get_gps_dynamic(query):
-    """
-    Interroge OpenStreetMap. 
-    Retourne les coordonnées réelles ou None si introuvable.
-    """
     if not query or len(query) < 3:
         return None
-
     try:
+        # On nettoie un peu la requête pour aider OSM
+        clean_query = query.replace(",", " ").strip()
+        
         url = "https://nominatim.openstreetmap.org/search"
-        params = {'q': query, 'format': 'json', 'limit': 1, 'countrycodes': 'fr'}
-        headers = {'User-Agent': 'ConformeoApp/1.0'} # Obligatoire pour OSM
+        params = {'q': clean_query, 'format': 'json', 'limit': 1, 'countrycodes': 'fr'}
+        headers = {'User-Agent': 'ConformeoApp/1.0'}
         
         res = requests.get(url, params=params, headers=headers, timeout=5)
         if res.status_code == 200:
@@ -30,7 +28,6 @@ def get_gps_dynamic(query):
                 return float(data[0]['lat']), float(data[0]['lon'])
     except Exception as e:
         print(f"❌ Erreur API OSM pour '{query}': {e}")
-
     return None
 
 # --- ROUTES DASHBOARD ---
@@ -43,12 +40,10 @@ def get_dashboard_stats(db: Session = Depends(database.get_db), current_user: mo
 
     cid = current_user.company_id
 
-    # 1. Chiffres Clés
     count_chantiers = db.query(models.Chantier).filter(models.Chantier.company_id == cid).count()
     count_materiels = db.query(models.Materiel).filter(models.Materiel.company_id == cid).count()
     count_rapports = db.query(models.Rapport).join(models.Chantier).filter(models.Chantier.company_id == cid).count()
 
-    # 2. Alertes (Calcul dynamique)
     chantiers_retard = db.query(models.Chantier).filter(
         models.Chantier.company_id == cid,
         models.Chantier.est_actif == True,
@@ -60,9 +55,7 @@ def get_dashboard_stats(db: Session = Depends(database.get_db), current_user: mo
         models.Rapport.niveau_urgence == "Critique"
     ).count()
 
-    total_alertes = chantiers_retard + rapports_critiques
-
-    # 3. Carte (On filtre les coordonnées invalides ou nulles)
+    # Carte : On filtre les coordonnées invalides (0.0 ou None)
     sites_db = db.query(models.Chantier).filter(
         models.Chantier.company_id == cid,
         models.Chantier.est_actif == True
@@ -70,7 +63,6 @@ def get_dashboard_stats(db: Session = Depends(database.get_db), current_user: mo
 
     map_data = []
     for s in sites_db:
-        # On n'ajoute le point QUE si les coordonnées sont valides (différentes de 0 et de None)
         if s.latitude and s.longitude and abs(s.latitude) > 0.1:
             map_data.append({
                 "nom": s.nom, 
@@ -79,7 +71,7 @@ def get_dashboard_stats(db: Session = Depends(database.get_db), current_user: mo
                 "lng": float(s.longitude)
             })
 
-    # 4. Récents
+    # Récents
     recents_db = db.query(models.Rapport).join(models.Chantier).filter(models.Chantier.company_id == cid).order_by(desc(models.Rapport.date_creation)).limit(5).all()
     recents_formatted = []
     for r in recents_db:
@@ -96,20 +88,20 @@ def get_dashboard_stats(db: Session = Depends(database.get_db), current_user: mo
     
     stats_data = {
         "nb_chantiers": count_chantiers, "nb_materiels": count_materiels, "nb_rapports": count_rapports,
-        "alertes": total_alertes, "map": map_data, "recents": recents_formatted, "company_name": name,
-        # Alias Frontend
-        "nbChantiers": count_chantiers, "nbMateriels": count_materiels, "nbRapports": count_rapports, "nbAlertes": total_alertes
+        "alertes": chantiers_retard + rapports_critiques,
+        "map": map_data, "recents": recents_formatted, "company_name": name,
+        "nbChantiers": count_chantiers, "nbMateriels": count_materiels, "nbRapports": count_rapports, 
+        "nbAlertes": chantiers_retard + rapports_critiques
     }
 
     return {**stats_data, "data": stats_data}
 
 
-# 👇 ROUTE DE RÉPARATION OBLIGATOIRE POUR METTRE À JOUR LA BDD 👇
+# 👇 ROUTE DE RÉPARATION (Correction de la logique Adresse) 👇
 @router.get("/fix-data")
 def fix_dashboard_data(db: Session = Depends(database.get_db), current_user: models.User = Depends(dependencies.get_current_user)):
     """
-    Force le recalcul des coordonnées GPS pour TOUS les chantiers via OpenStreetMap.
-    Écrase les anciennes valeurs incorrectes (comme celles de Paris).
+    Recalcule les GPS en utilisant le champ 'adresse' complet.
     """
     if not current_user.company_id:
         return {"message": "Aucune entreprise liée"}
@@ -123,58 +115,55 @@ def fix_dashboard_data(db: Session = Depends(database.get_db), current_user: mod
     for c in chantiers:
         c.est_actif = True
         
-        # Données du chantier
-        addr = getattr(c, 'adresse', getattr(c, 'address', '')) or ""
-        cp = getattr(c, 'code_postal', getattr(c, 'zip_code', '')) or ""
-        ville = getattr(c, 'ville', getattr(c, 'city', '')) or ""
-        client = c.client or ""
+        # 1. On récupère l'adresse brute (ex: "60 avenue Saint Roch, 84200 Carpentras")
+        addr_full = getattr(c, 'adresse', getattr(c, 'address', '')) or ""
         
-        # --- Stratégie en Cascade (Try Hard) ---
-        # On essaie plusieurs recherches du plus précis au plus large
+        # 2. Stratégie en Cascade
         attempts = []
         
-        # 1. Adresse exacte
-        if addr and ville: attempts.append(f"{addr} {cp} {ville}")
-        
-        # 2. Ville + Code Postal (C'est souvent celle-ci qui sauve Carpentras)
-        if ville and cp: attempts.append(f"{cp} {ville}")
-        
-        # 3. Ville seule
-        if ville: attempts.append(f"{ville} France")
-        
-        # 4. Fallback Client (ex: "Mairie Carpentras")
-        if not ville and len(client) > 3: attempts.append(f"{client} France")
+        # Tentative A : L'adresse brute complète (Meilleure chance)
+        if addr_full and len(addr_full) > 5:
+            attempts.append(addr_full)
+            
+            # Tentative A-bis : Si l'adresse contient une virgule, on essaie sans (OSM préfère parfois sans)
+            if "," in addr_full:
+                attempts.append(addr_full.replace(",", " "))
 
-        # Exécution
+        # Tentative B : Si on a des champs séparés (au cas où le modèle évolue)
+        ville = getattr(c, 'ville', getattr(c, 'city', '')) or ""
+        cp = getattr(c, 'code_postal', getattr(c, 'zip_code', '')) or ""
+        if ville:
+            attempts.append(f"{ville} France")
+        
+        # Tentative C : Fallback sur le Client + France (Dernier recours)
+        if c.client and len(c.client) > 3:
+            attempts.append(f"{c.client} France")
+
+        # Exécution des tentatives
         found_gps = None
         for query in attempts:
-            print(f"🌍 Recherche GPS pour : '{query}'")
+            print(f"🌍 Geocoding: '{query}'")
             coords = get_gps_dynamic(query)
             if coords:
                 found_gps = coords
-                logs.append(f"✅ {c.nom} -> Trouvé à {coords} (via '{query}')")
-                break # On a trouvé, on arrête de chercher
-            time.sleep(1.1) # Pause API respectueuse
+                logs.append(f"✅ {c.nom} -> Trouvé via '{query}'")
+                break
+            time.sleep(1.1) # Pause API
             
-        # Mise à jour BDD
         if found_gps:
             c.latitude = found_gps[0]
             c.longitude = found_gps[1]
             success_count += 1
         else:
-            # SI PAS TROUVÉ : On met 0 pour faire disparaître le point
-            # (Au moins il ne sera pas faussement à Paris)
-            logs.append(f"❌ {c.nom} : Adresse introuvable. GPS mis à 0.")
+            logs.append(f"❌ {c.nom} : Adresse introuvable ({addr_full})")
             c.latitude = 0
             c.longitude = 0
 
-    # Optionnel : Mise à jour d'un retard pour la démo
     if chantiers: chantiers[-1].date_fin = datetime.now() - timedelta(days=2)
-
     db.commit()
     
     return {
         "status": "success", 
-        "message": f"Géocodage terminé : {success_count}/{len(chantiers)} chantiers mis à jour.",
+        "message": f"Mise à jour terminée : {success_count}/{len(chantiers)} chantiers localisés.",
         "details": logs
     }
