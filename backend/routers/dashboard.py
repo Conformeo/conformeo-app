@@ -2,61 +2,44 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
 from datetime import datetime, timedelta
-import random
 import time
-import requests  # 👈 Nécessaire pour interroger OpenStreetMap
+import requests 
 
 from .. import models, database, dependencies
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 
-# --- FONCTION DE GÉOCODAGE ROBUSTE (Avec stratégie de repli) ---
-def get_gps_robust(address, city, zip_code):
+# --- FONCTION DE GÉOCODAGE DYNAMIQUE (Aucune donnée en dur) ---
+def get_gps_dynamic(query):
     """
-    Tente de trouver les coordonnées GPS avec plusieurs niveaux de précision.
-    1. Adresse complète (Ex: 60 avenue Saint Roch 84200 Carpentras)
-    2. Ville + Code Postal (Ex: 84200 Carpentras) -> Si le n° de rue bloque
-    3. Ville seule (Ex: Carpentras France) -> Si le code postal bloque
+    Interroge l'API OpenStreetMap avec une requête textuelle.
+    Retourne (lat, lon) si trouvé, sinon None.
     """
-    queries = []
-    
-    # Stratégie 1 : Adresse complète (Le plus précis)
-    if address and city:
-        queries.append(f"{address} {zip_code or ''} {city}")
-    
-    # Stratégie 2 : Code Postal + Ville (Précision Ville)
-    if city and zip_code:
-        queries.append(f"{zip_code} {city}")
-        
-    # Stratégie 3 : Ville seule + France
-    if city:
-        queries.append(f"{city} France")
+    if not query or len(query) < 3:
+        return None
 
-    # On teste chaque stratégie l'une après l'autre
-    for q in queries:
-        try:
-            url = "https://nominatim.openstreetmap.org/search"
-            params = {
-                'q': q,
-                'format': 'json',
-                'limit': 1,
-                'countrycodes': 'fr'
-            }
-            # User-Agent obligatoire pour respecter la politique d'OpenStreetMap
-            headers = {'User-Agent': 'ConformeoApp/1.0'}
-            
-            res = requests.get(url, params=params, headers=headers, timeout=5)
-            if res.status_code == 200:
-                data = res.json()
-                if data:
-                    print(f"✅ GPS trouvé pour '{q}' : {data[0]['lat']}, {data[0]['lon']}")
-                    return float(data[0]['lat']), float(data[0]['lon'])
-            
-            # Petite pause pour ne pas se faire bannir par l'API
-            time.sleep(1)
-            
-        except Exception as e:
-            print(f"❌ Erreur API pour '{q}': {e}")
+    try:
+        # URL officielle de Nominatim (OpenStreetMap)
+        url = "https://nominatim.openstreetmap.org/search"
+        params = {
+            'q': query,
+            'format': 'json',
+            'limit': 1,
+            'countrycodes': 'fr' # On limite à la France pour la précision
+        }
+        # User-Agent obligatoire pour ne pas être bloqué par OSM
+        headers = {'User-Agent': 'ConformeoApp/1.0'}
+        
+        res = requests.get(url, params=params, headers=headers, timeout=5)
+        
+        if res.status_code == 200:
+            data = res.json()
+            if data and len(data) > 0:
+                lat = float(data[0]['lat'])
+                lon = float(data[0]['lon'])
+                return lat, lon
+    except Exception as e:
+        print(f"❌ Erreur API pour '{query}': {e}")
 
     return None
 
@@ -89,7 +72,7 @@ def get_dashboard_stats(db: Session = Depends(database.get_db), current_user: mo
 
     total_alertes = chantiers_retard + rapports_critiques
 
-    # 3. CARTE (On ne renvoie que ceux qui ont un GPS valide)
+    # 3. CARTE (On ne renvoie QUE les chantiers géolocalisés)
     sites_db = db.query(models.Chantier).filter(
         models.Chantier.company_id == cid,
         models.Chantier.est_actif == True
@@ -97,8 +80,8 @@ def get_dashboard_stats(db: Session = Depends(database.get_db), current_user: mo
 
     map_data = []
     for s in sites_db:
-        # On vérifie que lat/lng existent et ne sont pas 0
-        if s.latitude and s.longitude and s.latitude != 0:
+        # Sécurité : on n'affiche le point que s'il a de vraies coordonnées
+        if s.latitude and s.longitude and (s.latitude != 0.0):
             map_data.append({
                 "nom": s.nom, 
                 "client": s.client, 
@@ -137,12 +120,12 @@ def get_dashboard_stats(db: Session = Depends(database.get_db), current_user: mo
     return {**stats_data, "data": stats_data}
 
 
-# 👇 ROUTE DE RÉPARATION INTELLIGENTE (GÉOCODAGE AVEC FALLBACK) 👇
+# 👇 ROUTE DE RÉPARATION INTELLIGENTE 👇
 @router.get("/fix-data")
 def fix_dashboard_data(db: Session = Depends(database.get_db), current_user: models.User = Depends(dependencies.get_current_user)):
     """
-    Parcourt les chantiers et met à jour les GPS via OpenStreetMap.
-    Si l'adresse exacte est introuvable, se rabat sur la Ville pour garantir l'affichage.
+    Parcourt les chantiers et met à jour les GPS via OpenStreetMap de façon purement dynamique.
+    Aucune valeur par défaut n'est utilisée.
     """
     if not current_user.company_id:
         return {"message": "Aucune entreprise liée"}
@@ -156,32 +139,62 @@ def fix_dashboard_data(db: Session = Depends(database.get_db), current_user: mod
     for c in chantiers:
         c.est_actif = True
         
-        # 1. Récupération sécurisée des champs (gère les noms anglais/français ou null)
+        # Récupération sécurisée des données existantes
         addr = getattr(c, 'adresse', getattr(c, 'address', '')) or ""
         cp = getattr(c, 'code_postal', getattr(c, 'zip_code', '')) or ""
         ville = getattr(c, 'ville', getattr(c, 'city', '')) or ""
+        client = c.client or ""
         
-        # Si pas de ville mais une adresse longue, on tente de deviner (fallback basique)
-        if not ville and len(addr) > 10:
-            logs.append(f"⚠️ {c.nom} : Champs ville vide, tentative avec l'adresse brute")
+        found_gps = None
         
-        # 2. Appel du géocodage robuste
-        print(f"🌍 Traitement de : {c.nom} ({addr} {ville})")
-        coords = get_gps_robust(addr, ville, cp)
+        # --- STRATÉGIE EN CASCADE ---
+        # On essaie plusieurs requêtes, de la plus précise à la plus large.
+        # Dès qu'une marche, on s'arrête.
         
-        if coords:
-            c.latitude = coords[0]
-            c.longitude = coords[1]
-            success_count += 1
-            logs.append(f"📍 {c.nom} -> OK ({coords})")
-        else:
-            # Si tout échoue, on laisse à 0 (ou on pourrait mettre une valeur par défaut, mais 0 est plus sûr pour éviter les fausses infos)
-            logs.append(f"❌ {c.nom} : Géocodage échoué complet.")
+        attempts = []
+        
+        # 1. Adresse complète (Idéal)
+        if addr and ville:
+            attempts.append(f"{addr} {cp} {ville}")
             
-        # Pause obligatoire pour l'API
-        time.sleep(1.1)
+        # 2. Ville + Code Postal (Si l'adresse est mal écrite ou n° inconnu)
+        if ville and cp:
+            attempts.append(f"{cp} {ville}")
+            
+        # 3. Ville seule (Si pas de CP)
+        if ville:
+            attempts.append(f"{ville} France")
+            
+        # 4. Fallback : Nom du Client + Ville (Ex: "Mairie Carpentras")
+        # Utile si l'adresse est vide mais que le client contient le lieu
+        if not ville and len(client) > 3:
+             attempts.append(f"{client} France")
 
-    # --- Gestion des Alertes (Mise à jour d'un retard pour la démo) ---
+        # Exécution des tentatives
+        for query in attempts:
+            print(f"🌍 Tentative géocodage : '{query}'")
+            coords = get_gps_dynamic(query)
+            if coords:
+                found_gps = coords
+                logs.append(f"✅ {c.nom} -> Trouvé via '{query}'")
+                break # On a trouvé, on sort de la boucle attempts
+            
+            # Petite pause pour l'API
+            time.sleep(1.1)
+            
+        # Mise à jour BDD
+        if found_gps:
+            c.latitude = found_gps[0]
+            c.longitude = found_gps[1]
+            success_count += 1
+        else:
+            # IMPORTANT : Si non trouvé, on laisse vide ou on met 0.
+            # On ne met SURTOUT PAS Paris par défaut.
+            logs.append(f"❌ {c.nom} : Impossible de localiser (Données: {addr} {ville})")
+            c.latitude = 0
+            c.longitude = 0
+
+    # --- (Optionnel) Mise à jour des alertes pour la démo ---
     if chantiers:
         chantiers[-1].date_fin = datetime.now() - timedelta(days=2)
 
@@ -189,6 +202,6 @@ def fix_dashboard_data(db: Session = Depends(database.get_db), current_user: mod
     
     return {
         "status": "success", 
-        "message": f"Mise à jour terminée : {success_count}/{len(chantiers)} chantiers localisés.",
+        "message": f"Géocodage terminé : {success_count}/{len(chantiers)} chantiers localisés.",
         "details": logs
     }
