@@ -9,41 +9,31 @@ from .. import models, database, dependencies
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 
-# --- FONCTION DE GÉOCODAGE DYNAMIQUE (Aucune donnée en dur) ---
+# --- GÉOCODAGE DYNAMIQUE (Sans aucune valeur par défaut) ---
 def get_gps_dynamic(query):
     """
-    Interroge l'API OpenStreetMap avec une requête textuelle.
-    Retourne (lat, lon) si trouvé, sinon None.
+    Interroge OpenStreetMap. 
+    Retourne les coordonnées réelles ou None si introuvable.
     """
     if not query or len(query) < 3:
         return None
 
     try:
-        # URL officielle de Nominatim (OpenStreetMap)
         url = "https://nominatim.openstreetmap.org/search"
-        params = {
-            'q': query,
-            'format': 'json',
-            'limit': 1,
-            'countrycodes': 'fr' # On limite à la France pour la précision
-        }
-        # User-Agent obligatoire pour ne pas être bloqué par OSM
-        headers = {'User-Agent': 'ConformeoApp/1.0'}
+        params = {'q': query, 'format': 'json', 'limit': 1, 'countrycodes': 'fr'}
+        headers = {'User-Agent': 'ConformeoApp/1.0'} # Obligatoire pour OSM
         
         res = requests.get(url, params=params, headers=headers, timeout=5)
-        
         if res.status_code == 200:
             data = res.json()
             if data and len(data) > 0:
-                lat = float(data[0]['lat'])
-                lon = float(data[0]['lon'])
-                return lat, lon
+                return float(data[0]['lat']), float(data[0]['lon'])
     except Exception as e:
-        print(f"❌ Erreur API pour '{query}': {e}")
+        print(f"❌ Erreur API OSM pour '{query}': {e}")
 
     return None
 
-# --- ROUTES ---
+# --- ROUTES DASHBOARD ---
 
 @router.get("/stats")
 def get_dashboard_stats(db: Session = Depends(database.get_db), current_user: models.User = Depends(dependencies.get_current_user)):
@@ -53,12 +43,12 @@ def get_dashboard_stats(db: Session = Depends(database.get_db), current_user: mo
 
     cid = current_user.company_id
 
-    # 1. COMPTAGES
+    # 1. Chiffres Clés
     count_chantiers = db.query(models.Chantier).filter(models.Chantier.company_id == cid).count()
     count_materiels = db.query(models.Materiel).filter(models.Materiel.company_id == cid).count()
     count_rapports = db.query(models.Rapport).join(models.Chantier).filter(models.Chantier.company_id == cid).count()
 
-    # 2. ALERTES
+    # 2. Alertes (Calcul dynamique)
     chantiers_retard = db.query(models.Chantier).filter(
         models.Chantier.company_id == cid,
         models.Chantier.est_actif == True,
@@ -72,7 +62,7 @@ def get_dashboard_stats(db: Session = Depends(database.get_db), current_user: mo
 
     total_alertes = chantiers_retard + rapports_critiques
 
-    # 3. CARTE (On ne renvoie QUE les chantiers géolocalisés)
+    # 3. Carte (On filtre les coordonnées invalides ou nulles)
     sites_db = db.query(models.Chantier).filter(
         models.Chantier.company_id == cid,
         models.Chantier.est_actif == True
@@ -80,8 +70,8 @@ def get_dashboard_stats(db: Session = Depends(database.get_db), current_user: mo
 
     map_data = []
     for s in sites_db:
-        # Sécurité : on n'affiche le point que s'il a de vraies coordonnées
-        if s.latitude and s.longitude and (s.latitude != 0.0):
+        # On n'ajoute le point QUE si les coordonnées sont valides (différentes de 0 et de None)
+        if s.latitude and s.longitude and abs(s.latitude) > 0.1:
             map_data.append({
                 "nom": s.nom, 
                 "client": s.client, 
@@ -89,17 +79,15 @@ def get_dashboard_stats(db: Session = Depends(database.get_db), current_user: mo
                 "lng": float(s.longitude)
             })
 
-    # 4. RÉCENTS
+    # 4. Récents
     recents_db = db.query(models.Rapport).join(models.Chantier).filter(models.Chantier.company_id == cid).order_by(desc(models.Rapport.date_creation)).limit(5).all()
     recents_formatted = []
     for r in recents_db:
-        real_titre = getattr(r, "titre", None) or f"Rapport #{r.id}"
-        urgence = getattr(r, "niveau_urgence", "Normal")
         recents_formatted.append({
             "id": r.id,
             "date": r.date_creation.isoformat() if r.date_creation else None,
-            "titre": real_titre,
-            "niveau_urgence": urgence,
+            "titre": getattr(r, "titre", None) or f"Rapport #{r.id}",
+            "niveau_urgence": getattr(r, "niveau_urgence", "Normal"),
             "chantier_nom": r.chantier.nom if r.chantier else "Inconnu",
             "chantier_id": r.chantier_id
         })
@@ -107,25 +95,21 @@ def get_dashboard_stats(db: Session = Depends(database.get_db), current_user: mo
     name = current_user.company.name if current_user.company else "N/A"
     
     stats_data = {
-        "nb_chantiers": count_chantiers,
-        "nb_materiels": count_materiels,
-        "nb_rapports": count_rapports,
-        "alertes": total_alertes,
-        "map": map_data,
-        "recents": recents_formatted,
-        "company_name": name,
+        "nb_chantiers": count_chantiers, "nb_materiels": count_materiels, "nb_rapports": count_rapports,
+        "alertes": total_alertes, "map": map_data, "recents": recents_formatted, "company_name": name,
+        # Alias Frontend
         "nbChantiers": count_chantiers, "nbMateriels": count_materiels, "nbRapports": count_rapports, "nbAlertes": total_alertes
     }
 
     return {**stats_data, "data": stats_data}
 
 
-# 👇 ROUTE DE RÉPARATION INTELLIGENTE 👇
+# 👇 ROUTE DE RÉPARATION OBLIGATOIRE POUR METTRE À JOUR LA BDD 👇
 @router.get("/fix-data")
 def fix_dashboard_data(db: Session = Depends(database.get_db), current_user: models.User = Depends(dependencies.get_current_user)):
     """
-    Parcourt les chantiers et met à jour les GPS via OpenStreetMap de façon purement dynamique.
-    Aucune valeur par défaut n'est utilisée.
+    Force le recalcul des coordonnées GPS pour TOUS les chantiers via OpenStreetMap.
+    Écrase les anciennes valeurs incorrectes (comme celles de Paris).
     """
     if not current_user.company_id:
         return {"message": "Aucune entreprise liée"}
@@ -139,48 +123,38 @@ def fix_dashboard_data(db: Session = Depends(database.get_db), current_user: mod
     for c in chantiers:
         c.est_actif = True
         
-        # Récupération sécurisée des données existantes
+        # Données du chantier
         addr = getattr(c, 'adresse', getattr(c, 'address', '')) or ""
         cp = getattr(c, 'code_postal', getattr(c, 'zip_code', '')) or ""
         ville = getattr(c, 'ville', getattr(c, 'city', '')) or ""
         client = c.client or ""
         
-        found_gps = None
-        
-        # --- STRATÉGIE EN CASCADE ---
-        # On essaie plusieurs requêtes, de la plus précise à la plus large.
-        # Dès qu'une marche, on s'arrête.
-        
+        # --- Stratégie en Cascade (Try Hard) ---
+        # On essaie plusieurs recherches du plus précis au plus large
         attempts = []
         
-        # 1. Adresse complète (Idéal)
-        if addr and ville:
-            attempts.append(f"{addr} {cp} {ville}")
-            
-        # 2. Ville + Code Postal (Si l'adresse est mal écrite ou n° inconnu)
-        if ville and cp:
-            attempts.append(f"{cp} {ville}")
-            
-        # 3. Ville seule (Si pas de CP)
-        if ville:
-            attempts.append(f"{ville} France")
-            
-        # 4. Fallback : Nom du Client + Ville (Ex: "Mairie Carpentras")
-        # Utile si l'adresse est vide mais que le client contient le lieu
-        if not ville and len(client) > 3:
-             attempts.append(f"{client} France")
+        # 1. Adresse exacte
+        if addr and ville: attempts.append(f"{addr} {cp} {ville}")
+        
+        # 2. Ville + Code Postal (C'est souvent celle-ci qui sauve Carpentras)
+        if ville and cp: attempts.append(f"{cp} {ville}")
+        
+        # 3. Ville seule
+        if ville: attempts.append(f"{ville} France")
+        
+        # 4. Fallback Client (ex: "Mairie Carpentras")
+        if not ville and len(client) > 3: attempts.append(f"{client} France")
 
-        # Exécution des tentatives
+        # Exécution
+        found_gps = None
         for query in attempts:
-            print(f"🌍 Tentative géocodage : '{query}'")
+            print(f"🌍 Recherche GPS pour : '{query}'")
             coords = get_gps_dynamic(query)
             if coords:
                 found_gps = coords
-                logs.append(f"✅ {c.nom} -> Trouvé via '{query}'")
-                break # On a trouvé, on sort de la boucle attempts
-            
-            # Petite pause pour l'API
-            time.sleep(1.1)
+                logs.append(f"✅ {c.nom} -> Trouvé à {coords} (via '{query}')")
+                break # On a trouvé, on arrête de chercher
+            time.sleep(1.1) # Pause API respectueuse
             
         # Mise à jour BDD
         if found_gps:
@@ -188,20 +162,19 @@ def fix_dashboard_data(db: Session = Depends(database.get_db), current_user: mod
             c.longitude = found_gps[1]
             success_count += 1
         else:
-            # IMPORTANT : Si non trouvé, on laisse vide ou on met 0.
-            # On ne met SURTOUT PAS Paris par défaut.
-            logs.append(f"❌ {c.nom} : Impossible de localiser (Données: {addr} {ville})")
+            # SI PAS TROUVÉ : On met 0 pour faire disparaître le point
+            # (Au moins il ne sera pas faussement à Paris)
+            logs.append(f"❌ {c.nom} : Adresse introuvable. GPS mis à 0.")
             c.latitude = 0
             c.longitude = 0
 
-    # --- (Optionnel) Mise à jour des alertes pour la démo ---
-    if chantiers:
-        chantiers[-1].date_fin = datetime.now() - timedelta(days=2)
+    # Optionnel : Mise à jour d'un retard pour la démo
+    if chantiers: chantiers[-1].date_fin = datetime.now() - timedelta(days=2)
 
     db.commit()
     
     return {
         "status": "success", 
-        "message": f"Géocodage terminé : {success_count}/{len(chantiers)} chantiers localisés.",
+        "message": f"Géocodage terminé : {success_count}/{len(chantiers)} chantiers mis à jour.",
         "details": logs
     }
