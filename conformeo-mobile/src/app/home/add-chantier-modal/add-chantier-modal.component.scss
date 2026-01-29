@@ -21,3 +21,15 @@
     p { margin: 0; font-weight: 600; }
   }
 }
+
+.autocomplete-container {
+  border: 1px solid #ddd;
+  border-top: none;
+  background: white;
+  border-radius: 0 0 10px 10px;
+  overflow: hidden;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+  margin-top: -1px; /* Pour coller au champ du dessus */
+  z-index: 1000;
+  position: relative;
+}

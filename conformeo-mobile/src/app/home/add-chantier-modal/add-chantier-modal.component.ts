@@ -44,6 +44,8 @@ export class AddChantierModalComponent implements OnInit {
   coverPhotoWebPath: string | undefined;
   coverPhotoBlob: Blob | undefined;
   isSaving = false;
+  addressSuggestions: any[] = [];
+
 
   constructor(
     private modalCtrl: ModalController,
@@ -104,6 +106,34 @@ export class AddChantierModalComponent implements OnInit {
     } catch (e) {
       console.log('Prise de photo annulée');
     }
+  }
+
+
+  // Appelé quand l'utilisateur tape
+  searchAddress(ev: any) {
+    const query = ev.target.value;
+    if (query.length > 3) {
+      // Appel à votre nouvelle route Backend
+      this.api.http.get(`${this.api.apiUrl}/tools/search-address?q=${query}`)
+        .subscribe((data: any) => {
+          this.addressSuggestions = data;
+        });
+    } else {
+      this.addressSuggestions = [];
+    }
+  }
+
+  // Appelé quand il clique sur une suggestion
+  selectAddress(addr: any) {
+    // 1. On remplit le champ visuel
+    this.chantier.adresse = addr.label; 
+    
+    // 2. On sauvegarde DIRECTEMENT les GPS (plus besoin que le backend cherche !)
+    this.chantier.latitude = addr.latitude;
+    this.chantier.longitude = addr.longitude;
+    
+    // 3. On vide la liste
+    this.addressSuggestions = [];
   }
 
   async save() {

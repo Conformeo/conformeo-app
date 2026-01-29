@@ -51,14 +51,36 @@
 
       <ion-item>
         <ion-input 
-          label="Adresse" 
+          label="Adresse (Recherche Auto)" 
           labelPlacement="stacked" 
           [(ngModel)]="chantier.adresse" 
           name="adresse" 
           type="text"
-          placeholder="Ex: 12 rue de la République">
-        </ion-input>
+          placeholder="Commencez à taper une adresse..."
+          (ionInput)="searchAddress($event)" 
+          [debounce]="300"> 
+          </ion-input>
+        <ion-icon name="search-outline" slot="end" color="medium" style="margin-top: 20px;"></ion-icon>
       </ion-item>
+
+      <div *ngIf="addressSuggestions.length > 0" class="autocomplete-container">
+        <ion-list style="margin: 0; padding: 0;">
+          <ion-item 
+            *ngFor="let addr of addressSuggestions" 
+            (click)="selectAddress(addr)" 
+            button 
+            detail="false"
+            style="--min-height: 55px;">
+            
+            <ion-icon name="location-sharp" slot="start" color="primary"></ion-icon>
+            <ion-label>
+              <h3 style="font-weight: 600;">{{ addr.nom_rue }}</h3>
+              <p style="font-size: 13px; color: #666;">{{ addr.code_postal }} {{ addr.ville }}</p>
+            </ion-label>
+          </ion-item>
+        </ion-list>
+      </div>
+
     </ion-list>
 
     <ion-list lines="full">
@@ -109,6 +131,7 @@
         <span *ngIf="!isSaving">Enregistrer</span>
       </ion-button>
     </div>
+    
     <div class="ion-padding-top" *ngIf="existingChantier">
       <ion-button expand="block" color="danger" fill="outline" (click)="deleteChantier()">
         <ion-icon name="trash-outline" slot="start"></ion-icon>
