@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List, Optional
 import io
-import requests # 👈 Ajout nécessaire pour le géocodage de secours
+import requests 
 from datetime import datetime, timedelta
 
 from .. import models, schemas
@@ -49,18 +49,14 @@ def create_chantier(chantier: schemas.ChantierCreate, db: Session = Depends(get_
     lat = chantier.latitude
     lng = chantier.longitude
 
-    # Si le frontend n'a pas envoyé de GPS (ex: saisie manuelle sans clic), le serveur prend le relais
     if (lat is None or lng is None) and chantier.adresse:
         print(f"🌍 Création: Pas de GPS reçu, calcul serveur pour : {chantier.adresse}")
         lat, lng = get_gps_from_address(chantier.adresse)
 
     chantier_data = chantier.dict()
-    
-    # On injecte les bons GPS
     chantier_data['latitude'] = lat
     chantier_data['longitude'] = lng
 
-    # Nettoyage des dates vides
     if chantier_data.get('date_debut') == "": chantier_data['date_debut'] = None
     if chantier_data.get('date_fin') == "": chantier_data['date_fin'] = None
 
@@ -81,14 +77,9 @@ def update_chantier(chantier_id: int, chantier_update: schemas.ChantierUpdate, d
     if "adresse" in update_data:
         new_addr = update_data["adresse"]
         if new_addr != db_chantier.adresse:
-            # L'adresse a changé !
-            
-            # Est-ce que le front a fourni les nouveaux GPS ?
             if "latitude" in update_data and "longitude" in update_data:
-                # Oui, parfait, on les utilise (ils sont déjà dans update_data)
                 pass 
             else:
-                # Non, on recalcule côté serveur
                 print(f"🌍 Update: Adresse changée sans GPS, calcul serveur pour : {new_addr}")
                 lat, lng = get_gps_from_address(new_addr)
                 update_data['latitude'] = lat
@@ -100,6 +91,46 @@ def update_chantier(chantier_id: int, chantier_update: schemas.ChantierUpdate, d
     db.commit()
     db.refresh(db_chantier)
     return db_chantier
+
+# 👇 LA ROUTE MANQUANTE POUR SUPPRIMER 👇
+@router.delete("/{chantier_id}")
+def delete_chantier(chantier_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    # 1. Vérification
+    c = db.query(models.Chantier).filter(models.Chantier.id == chantier_id).first()
+    if not c: 
+        raise HTTPException(status_code=404, detail="Chantier introuvable")
+    
+    # Sécurité : on vérifie que le chantier appartient bien à l'entreprise de l'utilisateur
+    if c.company_id != current_user.company_id:
+        raise HTTPException(status_code=403, detail="Non autorisé")
+
+    # 2. Nettoyage des données liées (Cascades manuelles pour être sûr)
+    try:
+        # Libérer le matériel
+        db.query(models.Materiel).filter(models.Materiel.chantier_id == chantier_id).update({"chantier_id": None})
+        
+        # Supprimer les images des rapports
+        db.query(models.RapportImage).filter(models.RapportImage.rapport.has(chantier_id=chantier_id)).delete(synchronize_session=False)
+        
+        # Supprimer les éléments liés
+        db.query(models.Rapport).filter(models.Rapport.chantier_id == chantier_id).delete()
+        db.query(models.Inspection).filter(models.Inspection.chantier_id == chantier_id).delete()
+        db.query(models.Task).filter(models.Task.chantier_id == chantier_id).delete()
+        db.query(models.DocExterne).filter(models.DocExterne.chantier_id == chantier_id).delete()
+        db.query(models.PPSPS).filter(models.PPSPS.chantier_id == chantier_id).delete()
+        db.query(models.PIC).filter(models.PIC.chantier_id == chantier_id).delete()
+        db.query(models.PlanPrevention).filter(models.PlanPrevention.chantier_id == chantier_id).delete()
+        db.query(models.PermisFeu).filter(models.PermisFeu.chantier_id == chantier_id).delete()
+
+        # 3. Suppression finale du chantier
+        db.delete(c)
+        db.commit()
+        return {"status": "deleted", "message": f"Chantier {chantier_id} supprimé avec succès"}
+    
+    except Exception as e:
+        db.rollback()
+        print(f"❌ Erreur suppression chantier: {e}")
+        raise HTTPException(status_code=500, detail="Erreur lors de la suppression du chantier")
 
 # --- DETAILS (Rapports, Inspections, etc.) ---
 
