@@ -192,6 +192,8 @@ class ChantierUpdate(BaseModel):
     nom: Optional[str] = None
     client: Optional[str] = None
     adresse: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
     date_debut: Optional[str] = None 
     date_fin: Optional[str] = None
     est_actif: Optional[bool] = None
