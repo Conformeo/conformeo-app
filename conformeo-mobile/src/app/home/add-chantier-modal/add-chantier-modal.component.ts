@@ -12,7 +12,11 @@ import {
 
 import { ApiService, Chantier } from '../../services/api';
 import { addIcons } from 'ionicons';
-import { camera, cloudUpload, save, close, shieldCheckmarkOutline, image } from 'ionicons/icons';
+// 👇 AJOUT DE 'checkboxOutline' pour corriger l'erreur console
+import { 
+  camera, cloudUpload, save, close, shieldCheckmarkOutline, image,
+  searchOutline, locationSharp, trashOutline, checkboxOutline 
+} from 'ionicons/icons';
 
 @Component({
   selector: 'app-add-chantier-modal',
@@ -30,7 +34,6 @@ export class AddChantierModalComponent implements OnInit {
 
   @Input() existingChantier: any = null;
 
-  // Initialisation propre
   chantier: Chantier = {
     nom: '',
     client: '',
@@ -38,7 +41,9 @@ export class AddChantierModalComponent implements OnInit {
     est_actif: true,
     date_debut: '',
     date_fin: '',
-    soumis_sps: false
+    soumis_sps: false,
+    latitude: 0,
+    longitude: 0
   };
 
   coverPhotoWebPath: string | undefined;
@@ -46,13 +51,16 @@ export class AddChantierModalComponent implements OnInit {
   isSaving = false;
   addressSuggestions: any[] = [];
 
-
   constructor(
     private modalCtrl: ModalController,
-    private api: ApiService,
+    public api: ApiService, 
     private toastCtrl: ToastController
   ) {
-    addIcons({ camera, cloudUpload, save, close, shieldCheckmarkOutline, image });
+    // 👇 ENREGISTREMENT DE TOUTES LES ICÔNES NÉCESSAIRES
+    addIcons({ 
+      camera, cloudUpload, save, close, shieldCheckmarkOutline, image,
+      searchOutline, locationSharp, trashOutline, checkboxOutline 
+    });
   }
 
   ngOnInit() {
@@ -108,31 +116,30 @@ export class AddChantierModalComponent implements OnInit {
     }
   }
 
-
-  // Appelé quand l'utilisateur tape
+  // 👇 AUTOCOMPLÉTION ADRESSE
   searchAddress(ev: any) {
     const query = ev.target.value;
-    if (query.length > 3) {
-      // Appel à votre nouvelle route Backend
+    if (query && query.length > 3) {
       this.api.http.get(`${this.api.apiUrl}/tools/search-address?q=${query}`)
-        .subscribe((data: any) => {
-          this.addressSuggestions = data;
+        .subscribe({
+          next: (data: any) => {
+            this.addressSuggestions = data;
+          },
+          error: (err) => console.error("Erreur recherche adresse", err)
         });
     } else {
       this.addressSuggestions = [];
     }
   }
 
-  // Appelé quand il clique sur une suggestion
+  // 👇 SÉLECTION D'UNE SUGGESTION (Important pour le GPS)
   selectAddress(addr: any) {
-    // 1. On remplit le champ visuel
     this.chantier.adresse = addr.label; 
     
-    // 2. On sauvegarde DIRECTEMENT les GPS (plus besoin que le backend cherche !)
-    this.chantier.latitude = addr.latitude;
-    this.chantier.longitude = addr.longitude;
+    // On force la conversion en nombre pour éviter les erreurs backend
+    this.chantier.latitude = Number(addr.latitude);
+    this.chantier.longitude = Number(addr.longitude);
     
-    // 3. On vide la liste
     this.addressSuggestions = [];
   }
 
@@ -145,15 +152,11 @@ export class AddChantierModalComponent implements OnInit {
     if (this.isSaving) return;
     this.isSaving = true;
 
-    // Payload propre
-    // On force le typage as 'any' temporairement pour manipuler les champs optionnels
-    // ou on respecte l'interface en mettant undefined
     const payload: any = { ...this.chantier };
     
-    // 👇 CORRECTION ICI : Utiliser undefined au lieu de null
-    // Si la date est vide, on l'enlève ou on met undefined
-    payload.date_debut = payload.date_debut ? String(payload.date_debut).split('T')[0] : undefined;
-    payload.date_fin = payload.date_fin ? String(payload.date_fin).split('T')[0] : undefined;
+    // Nettoyage des dates pour éviter les strings vides ou invalides
+    payload.date_debut = payload.date_debut ? String(payload.date_debut).split('T')[0] : null;
+    payload.date_fin = payload.date_fin ? String(payload.date_fin).split('T')[0] : null;
 
     try {
       let finalChantier: any;
@@ -176,10 +179,10 @@ export class AddChantierModalComponent implements OnInit {
         });
       }
 
-      // UPLOAD IMAGE
+      // UPLOAD IMAGE (si nouvelle photo prise)
       if (this.coverPhotoBlob && finalChantier?.id) {
         await this.processImageUpload(finalChantier.id);
-        finalChantier.cover_url = this.coverPhotoWebPath;
+        // On ne met pas à jour l'URL locale, la modal va se fermer
       }
 
       this.isSaving = false;
@@ -187,8 +190,9 @@ export class AddChantierModalComponent implements OnInit {
 
     } catch (error) {
       this.isSaving = false;
-      console.error(error);
-      this.presentToast('Une erreur est survenue lors de la sauvegarde.', 'danger');
+      console.error("Erreur Sauvegarde:", error);
+      // Message plus clair pour l'utilisateur
+      this.presentToast('Erreur serveur. Vérifiez votre connexion.', 'danger');
     }
   }
 
@@ -197,9 +201,13 @@ export class AddChantierModalComponent implements OnInit {
     
     this.api.deleteChantier(this.existingChantier.id).subscribe({
       next: () => {
-        this.modalCtrl.dismiss(null, 'delete'); // On ferme et on signale la suppression
+        this.presentToast('Chantier supprimé', 'success');
+        this.modalCtrl.dismiss(null, 'delete');
       },
-      error: (err) => alert("Erreur lors de la suppression")
+      error: (err) => {
+        console.error(err);
+        this.presentToast('Erreur lors de la suppression', 'danger');
+      }
     });
   }
 
@@ -209,7 +217,7 @@ export class AddChantierModalComponent implements OnInit {
       
       this.api.uploadChantierCover(chantierId, file).subscribe({
         next: (res) => { resolve(); },
-        error: (err) => { resolve(); }
+        error: (err) => { resolve(); } // On continue même si l'image échoue
       });
     });
   }
