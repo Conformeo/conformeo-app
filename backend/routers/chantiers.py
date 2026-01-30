@@ -5,6 +5,7 @@ import io
 import requests 
 from datetime import datetime, timedelta
 
+# Attention aux imports relatifs selon votre structure de dossiers
 from .. import models, schemas
 from ..database import get_db
 from ..dependencies import get_current_user
@@ -13,27 +14,23 @@ from ..services import pdf as pdf_generator
 
 router = APIRouter(prefix="/chantiers", tags=["Chantiers"])
 
-# --- HELPER : GÉOCODAGE DE SECOURS ---
+# --- HELPER : GÉOCODAGE ---
 def get_gps_from_address(address: str):
-    """Calcule les GPS via OpenStreetMap de manière sécurisée."""
     if not address or len(address) < 3: return None, None
     try:
-        clean_addr = address.replace(",", " ").strip()
+        clean = address.replace(",", " ").strip()
         url = "https://nominatim.openstreetmap.org/search"
-        params = {'q': clean_addr, 'format': 'json', 'limit': 1, 'countrycodes': 'fr'}
+        params = {'q': clean, 'format': 'json', 'limit': 1, 'countrycodes': 'fr'}
         headers = {'User-Agent': 'ConformeoApp/1.0'}
-        
-        response = requests.get(url, params=params, headers=headers, timeout=4)
-        
-        if response.status_code == 200:
-            data = response.json()
-            if data and len(data) > 0:
-                return float(data[0]['lat']), float(data[0]['lon'])
+        res = requests.get(url, params=params, headers=headers, timeout=4)
+        if res.status_code == 200:
+            data = res.json()
+            if data: return float(data[0]['lat']), float(data[0]['lon'])
     except Exception as e:
-        print(f"⚠️ Erreur GPS serveur : {e}")
+        print(f"⚠️ Erreur GPS: {e}")
     return None, None
 
-# --- CRUD CHANTIER ---
+# --- ROUTES ---
 
 @router.get("/", response_model=List[schemas.ChantierOut])
 def read_chantiers(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
@@ -49,20 +46,20 @@ def read_one_chantier(chantier_id: int, db: Session = Depends(get_db), current_u
 def create_chantier(chantier: schemas.ChantierCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     if not current_user.company_id: raise HTTPException(400, "Utilisateur sans entreprise")
     
-    # 1. Gestion GPS 📍
+    # Récupération sécurisée depuis le schéma (qui a maintenant les champs !)
     lat = chantier.latitude
     lng = chantier.longitude
 
-    # Si le frontend n'a pas envoyé de GPS, le serveur tente de le trouver
+    # Calcul serveur si manquant
     if (lat is None or lat == 0) and chantier.adresse:
-        print(f"🌍 Création: Pas de GPS reçu, calcul serveur pour : {chantier.adresse}")
+        print(f"🌍 Calcul GPS serveur pour : {chantier.adresse}")
         lat, lng = get_gps_from_address(chantier.adresse)
 
     chantier_data = chantier.dict()
     chantier_data['latitude'] = lat
     chantier_data['longitude'] = lng
 
-    # Nettoyage des dates (évite les erreurs de format)
+    # Nettoyage dates
     if not chantier_data.get('date_debut'): chantier_data['date_debut'] = None
     if not chantier_data.get('date_fin'): chantier_data['date_fin'] = None
 
@@ -74,8 +71,8 @@ def create_chantier(chantier: schemas.ChantierCreate, db: Session = Depends(get_
         return db_chantier
     except Exception as e:
         db.rollback()
-        print(f"❌ Erreur Création Chantier: {e}")
-        raise HTTPException(status_code=500, detail="Erreur lors de la création du chantier")
+        print(f"❌ Erreur DB: {e}")
+        raise HTTPException(status_code=500, detail="Erreur création chantier")
 
 @router.put("/{chantier_id}", response_model=schemas.ChantierOut)
 def update_chantier(chantier_id: int, chantier_update: schemas.ChantierUpdate, db: Session = Depends(get_db)):
@@ -84,56 +81,40 @@ def update_chantier(chantier_id: int, chantier_update: schemas.ChantierUpdate, d
 
     update_data = chantier_update.dict(exclude_unset=True)
 
-    # 2. Gestion GPS Update 🔄
-    if "adresse" in update_data:
-        new_addr = update_data["adresse"]
-        if new_addr != db_chantier.adresse:
-            # Si pas de GPS fourni, on recalcule
-            if not update_data.get("latitude"):
-                print(f"🌍 Update: Recalcul GPS pour : {new_addr}")
-                lat, lng = get_gps_from_address(new_addr)
-                update_data['latitude'] = lat
-                update_data['longitude'] = lng
+    if "adresse" in update_data and update_data["adresse"] != db_chantier.adresse:
+        if not update_data.get("latitude"):
+             lat, lng = get_gps_from_address(update_data["adresse"])
+             update_data['latitude'] = lat
+             update_data['longitude'] = lng
 
     for key, value in update_data.items():
         setattr(db_chantier, key, value)
 
-    try:
-        db.commit()
-        db.refresh(db_chantier)
-        return db_chantier
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail="Erreur lors de la mise à jour")
+    db.commit()
+    db.refresh(db_chantier)
+    return db_chantier
 
 @router.delete("/{chantier_id}")
 def delete_chantier(chantier_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     c = db.query(models.Chantier).filter(models.Chantier.id == chantier_id).first()
-    if not c: raise HTTPException(404, "Chantier introuvable")
-    
-    if c.company_id != current_user.company_id:
-        raise HTTPException(403, "Non autorisé")
+    if not c: raise HTTPException(404, "Introuvable")
+    if c.company_id != current_user.company_id: raise HTTPException(403, "Interdit")
 
     try:
-        # Nettoyage manuel des dépendances pour éviter les erreurs de clés étrangères
+        # Nettoyage manuel des dépendances
         db.query(models.Rapport).filter(models.Rapport.chantier_id == chantier_id).delete()
         db.query(models.Task).filter(models.Task.chantier_id == chantier_id).delete()
         db.query(models.Inspection).filter(models.Inspection.chantier_id == chantier_id).delete()
-        db.query(models.PPSPS).filter(models.PPSPS.chantier_id == chantier_id).delete()
-        db.query(models.PlanPrevention).filter(models.PlanPrevention.chantier_id == chantier_id).delete()
-        db.query(models.PermisFeu).filter(models.PermisFeu.chantier_id == chantier_id).delete()
         db.query(models.Materiel).filter(models.Materiel.chantier_id == chantier_id).update({"chantier_id": None})
-
+        
         db.delete(c)
         db.commit()
-        return {"status": "deleted", "message": f"Chantier {chantier_id} supprimé"}
-    
+        return {"status": "deleted"}
     except Exception as e:
         db.rollback()
-        print(f"❌ Erreur Suppression: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(500, detail=str(e))
 
-# ... (Gardez les routes Details, Tasks, PDF, Email comme avant)
+# ... (Gardez les autres routes Details, Tasks, PDF, Email inchangées en bas du fichier)
 @router.get("/{chantier_id}/rapports", response_model=List[schemas.RapportOut])
 def get_chantier_rapports(chantier_id: int, db: Session = Depends(get_db)):
     return db.query(models.Rapport).filter(models.Rapport.chantier_id == chantier_id).all()

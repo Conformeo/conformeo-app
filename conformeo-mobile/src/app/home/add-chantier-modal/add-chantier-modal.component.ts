@@ -12,10 +12,10 @@ import {
 
 import { ApiService, Chantier } from '../../services/api';
 import { addIcons } from 'ionicons';
-// 👇 AJOUT DE 'checkboxOutline' pour corriger l'erreur console
+// 👇 AJOUTEZ TOUTES CES ICÔNES
 import { 
   camera, cloudUpload, save, close, shieldCheckmarkOutline, image,
-  searchOutline, locationSharp, trashOutline, checkboxOutline
+  searchOutline, locationSharp, trashOutline, checkboxOutline 
 } from 'ionicons/icons';
 
 @Component({
@@ -35,15 +35,9 @@ export class AddChantierModalComponent implements OnInit {
   @Input() existingChantier: any = null;
 
   chantier: Chantier = {
-    nom: '',
-    client: '',
-    adresse: '',
-    est_actif: true,
-    date_debut: '',
-    date_fin: '',
-    soumis_sps: false,
-    latitude: 0,
-    longitude: 0
+    nom: '', client: '', adresse: '', est_actif: true,
+    date_debut: '', date_fin: '', soumis_sps: false,
+    latitude: 0, longitude: 0
   };
 
   coverPhotoWebPath: string | undefined;
@@ -56,7 +50,7 @@ export class AddChantierModalComponent implements OnInit {
     public api: ApiService, 
     private toastCtrl: ToastController
   ) {
-    // 👇 ENREGISTREMENT DE TOUTES LES ICÔNES NÉCESSAIRES
+    // 👇 ENREGISTREMENT VITAL POUR EVITER LES ERREURS URL
     addIcons({ 
       camera, cloudUpload, save, close, shieldCheckmarkOutline, image,
       searchOutline, locationSharp, trashOutline, checkboxOutline 
@@ -64,168 +58,109 @@ export class AddChantierModalComponent implements OnInit {
   }
 
   ngOnInit() {
-    const today = new Date();
-    const nextMonth = new Date();
-    nextMonth.setDate(today.getDate() + 30);
-
-    // Helper pour formater YYYY-MM-DD
     const formatDate = (date: any) => {
         if (!date) return '';
         if (typeof date === 'string' && date.match(/^\d{4}-\d{2}-\d{2}$/)) return date;
         const d = new Date(date);
-        if (isNaN(d.getTime())) return '';
-        return d.toISOString().split('T')[0];
+        return isNaN(d.getTime()) ? '' : d.toISOString().split('T')[0];
     };
 
     if (this.existingChantier) {
       this.chantier = { ...this.existingChantier };
-      
-      if (this.chantier.cover_url) {
-        this.coverPhotoWebPath = this.api.getFullUrl(this.chantier.cover_url);
-      }
-      
+      if (this.chantier.cover_url) this.coverPhotoWebPath = this.api.getFullUrl(this.chantier.cover_url);
       this.chantier.date_debut = formatDate(this.chantier.date_debut);
       this.chantier.date_fin = formatDate(this.chantier.date_fin);
-
     } else {
+      const today = new Date();
+      const nextMonth = new Date(); nextMonth.setDate(today.getDate() + 30);
       this.chantier.date_debut = formatDate(today);
       this.chantier.date_fin = formatDate(nextMonth);
     }
   }
 
-  cancel() {
-    this.modalCtrl.dismiss(null, 'cancel');
-  }
+  cancel() { this.modalCtrl.dismiss(null, 'cancel'); }
 
   async takeCoverPhoto() {
     try {
       const image = await Camera.getPhoto({
-        quality: 80,
-        allowEditing: false,
-        resultType: CameraResultType.Uri,
-        source: CameraSource.Camera
+        quality: 80, allowEditing: false, resultType: CameraResultType.Uri, source: CameraSource.Camera
       });
-      
       if (image.webPath) {
         this.coverPhotoWebPath = image.webPath;
         const response = await fetch(image.webPath);
         this.coverPhotoBlob = await response.blob();
       }
-    } catch (e) {
-      console.log('Prise de photo annulée');
-    }
+    } catch (e) {}
   }
 
-  // 👇 AUTOCOMPLÉTION ADRESSE
   searchAddress(ev: any) {
     const query = ev.target.value;
     if (query && query.length > 3) {
-      this.api.http.get(`${this.api.apiUrl}/tools/search-address?q=${query}`)
-        .subscribe({
-          next: (data: any) => {
-            this.addressSuggestions = data;
-          },
-          error: (err) => console.error("Erreur recherche adresse", err)
-        });
-    } else {
-      this.addressSuggestions = [];
-    }
+      this.api.http.get(`${this.api.apiUrl}/tools/search-address?q=${query}`).subscribe({
+          next: (data: any) => this.addressSuggestions = data,
+          error: (err) => console.error(err)
+      });
+    } else { this.addressSuggestions = []; }
   }
 
-  // 👇 SÉLECTION D'UNE SUGGESTION (Important pour le GPS)
   selectAddress(addr: any) {
     this.chantier.adresse = addr.label; 
-    
-    // On force la conversion en nombre pour éviter les erreurs backend
     this.chantier.latitude = Number(addr.latitude);
     this.chantier.longitude = Number(addr.longitude);
-    
     this.addressSuggestions = [];
   }
 
   async save() {
-    if (!this.chantier.nom) {
-      this.presentToast('Le nom du chantier est obligatoire', 'warning');
-      return;
-    }
-
+    if (!this.chantier.nom) return this.presentToast('Nom obligatoire', 'warning');
     if (this.isSaving) return;
     this.isSaving = true;
 
     const payload: any = { ...this.chantier };
-    
-    // Nettoyage des dates pour éviter les strings vides ou invalides
+    // Dates vides -> null
     payload.date_debut = payload.date_debut ? String(payload.date_debut).split('T')[0] : null;
     payload.date_fin = payload.date_fin ? String(payload.date_fin).split('T')[0] : null;
 
     try {
-      let finalChantier: any;
-
+      let final: any;
       if (this.existingChantier) {
-        // UPDATE
-        finalChantier = await new Promise((resolve, reject) => {
-          this.api.updateChantier(this.existingChantier.id, payload).subscribe({
-            next: (res) => resolve(res),
-            error: (err) => reject(err)
-          });
+        final = await new Promise((resolve, reject) => {
+          this.api.updateChantier(this.existingChantier.id, payload).subscribe({ next: resolve, error: reject });
         });
       } else {
-        // CREATE
-        finalChantier = await new Promise((resolve, reject) => {
-          this.api.createChantier(payload).subscribe({
-            next: (res) => resolve(res),
-            error: (err) => reject(err)
-          });
+        final = await new Promise((resolve, reject) => {
+          this.api.createChantier(payload).subscribe({ next: resolve, error: reject });
         });
       }
 
-      // UPLOAD IMAGE (si nouvelle photo prise)
-      if (this.coverPhotoBlob && finalChantier?.id) {
-        await this.processImageUpload(finalChantier.id);
-        // On ne met pas à jour l'URL locale, la modal va se fermer
+      if (this.coverPhotoBlob && final?.id) {
+        await this.processImageUpload(final.id);
       }
-
       this.isSaving = false;
-      this.modalCtrl.dismiss(finalChantier, 'confirm');
-
+      this.modalCtrl.dismiss(final, 'confirm');
     } catch (error) {
       this.isSaving = false;
-      console.error("Erreur Sauvegarde:", error);
-      // Message plus clair pour l'utilisateur
-      this.presentToast('Erreur serveur. Vérifiez votre connexion.', 'danger');
+      console.error(error);
+      this.presentToast('Erreur sauvegarde', 'danger');
     }
   }
 
   async deleteChantier() {
-    if (!confirm('Êtes-vous sûr de vouloir supprimer ce chantier définitivement ?')) return;
-    
+    if (!confirm('Supprimer définitivement ?')) return;
     this.api.deleteChantier(this.existingChantier.id).subscribe({
-      next: () => {
-        this.presentToast('Chantier supprimé', 'success');
-        this.modalCtrl.dismiss(null, 'delete');
-      },
-      error: (err) => {
-        console.error(err);
-        this.presentToast('Erreur lors de la suppression', 'danger');
-      }
+      next: () => this.modalCtrl.dismiss(null, 'delete'),
+      error: () => this.presentToast('Erreur suppression', 'danger')
     });
   }
 
-  async processImageUpload(chantierId: number): Promise<void> {
+  async processImageUpload(id: number): Promise<void> {
     return new Promise((resolve) => {
       const file = new File([this.coverPhotoBlob!], "cover.jpg", { type: "image/jpeg" });
-      
-      this.api.uploadChantierCover(chantierId, file).subscribe({
-        next: (res) => { resolve(); },
-        error: (err) => { resolve(); } // On continue même si l'image échoue
-      });
+      this.api.uploadChantierCover(id, file).subscribe({ next: () => resolve(), error: () => resolve() });
     });
   }
 
-  async presentToast(message: string, color: string) {
-    const toast = await this.toastCtrl.create({
-      message, duration: 2000, color, position: 'bottom'
-    });
-    toast.present();
+  async presentToast(msg: string, color: string) {
+    const t = await this.toastCtrl.create({ message: msg, duration: 2000, color, position: 'bottom' });
+    t.present();
   }
 }

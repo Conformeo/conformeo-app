@@ -187,6 +187,8 @@ class ChantierCreate(ChantierBase):
     date_debut: Optional[str] = None
     date_fin: Optional[str] = None
     cover_url: Optional[str] = None
+    latitude: Optional[float] = None   # <--- INDISPENSABLE
+    longitude: Optional[float] = None  # <--- INDISPENSABLE
 
 class ChantierUpdate(BaseModel):
     nom: Optional[str] = None
