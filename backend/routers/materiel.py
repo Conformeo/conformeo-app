@@ -5,18 +5,19 @@ import csv
 import codecs
 from datetime import datetime, timedelta
 
+# Imports relatifs (assurez-vous que models.py et schemas.py sont dans le dossier parent backend/)
 from .. import models, schemas
 from ..database import get_db
 from ..dependencies import get_current_user
 
-# 👇 CORRECTION IMPORTANTE : "materiels" au pluriel pour correspondre à votre frontend
+# 👇 Le préfixe est "/materiels" (au pluriel, comme votre frontend)
 router = APIRouter(prefix="/materiels", tags=["Materiels"])
 
-# --- 1. LISTER LES MATÉRIELS (Avec calcul VGP) ---
+# --- 1. LISTER LES MATÉRIELS (Avec votre logique VGP) ---
 @router.get("/", response_model=List[schemas.MaterielOut])
-def read_materiels(skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+def read_materiels(skip: int = 0, limit: int = 1000, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     try:
-        # On filtre par entreprise
+        # On filtre par entreprise pour la sécurité
         query = db.query(models.Materiel).filter(models.Materiel.company_id == current_user.company_id)
         raw_rows = query.offset(skip).limit(limit).all()
         
@@ -25,37 +26,32 @@ def read_materiels(skip: int = 0, limit: int = 100, db: Session = Depends(get_db
 
         for row in raw_rows:
             try:
-                # Logique de calcul du statut VGP (Récupérée de votre code)
+                # --- VOTRE LOGIQUE DE CALCUL VGP ---
                 date_vgp = getattr(row, "date_derniere_vgp", None)
                 statut = "INCONNU" 
 
                 if date_vgp:
-                    # Conversion sécurisée si c'est une string (parfois le cas en SQLite/Legacy)
+                    # Conversion sécurisée si la date est une string
                     if isinstance(date_vgp, str):
-                        try: date_vgp = datetime.fromisoformat(str(date_vgp))
+                        try: date_vgp = datetime.fromisoformat(str(date_vgp)[:10])
                         except: date_vgp = None
                     
                     if date_vgp:
-                        # Si date_vgp est une date, on peut faire des maths
-                        if isinstance(date_vgp, datetime):
-                            prochaine = date_vgp + timedelta(days=365) 
-                            delta = (prochaine - today).days
-                        elif isinstance(date_vgp, (datetime.date)): # Si c'est un objet date simple
-                             # On convertit en datetime pour la soustraction
-                             dt_vgp = datetime(date_vgp.year, date_vgp.month, date_vgp.day)
-                             prochaine = dt_vgp + timedelta(days=365)
-                             delta = (prochaine - today).days
-                        else:
-                             delta = 999 # Fallback
-
+                        # Si c'est un objet date, on convertit en datetime pour les maths
+                        if not isinstance(date_vgp, datetime):
+                             date_vgp = datetime(date_vgp.year, date_vgp.month, date_vgp.day)
+                        
+                        prochaine = date_vgp + timedelta(days=365)
+                        delta = (prochaine - today).days
+                        
                         if delta < 0: statut = "NON CONFORME"
                         elif delta < 30: statut = "A PREVOIR"
                         else: statut = "CONFORME"
 
-                # Gestion référence (ref ou ref_interne)
+                # Gestion référence
                 ref_value = getattr(row, "reference", getattr(row, "ref_interne", None))
 
-                # Création manuelle de l'objet de sortie pour injecter le statut calculé
+                # Construction de l'objet de sortie
                 mat_out = schemas.MaterielOut(
                     id=row.id,
                     nom=row.nom or "Sans nom",
@@ -64,8 +60,7 @@ def read_materiels(skip: int = 0, limit: int = 100, db: Session = Depends(get_db
                     chantier_id=row.chantier_id,
                     date_derniere_vgp=date_vgp,
                     image_url=row.image_url,
-                    # 👇 On injecte le statut calculé ici
-                    statut_vgp=statut 
+                    statut_vgp=statut  # On injecte le statut calculé
                 )
                 valid_rows.append(mat_out)
 
@@ -82,7 +77,7 @@ def read_materiels(skip: int = 0, limit: int = 100, db: Session = Depends(get_db
 # --- 2. CRÉER UN MATÉRIEL ---
 @router.post("/", response_model=schemas.MaterielOut)
 def create_materiel(mat: schemas.MaterielCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    # Gestion de la date VGP
+    # Gestion Date VGP
     d_vgp = mat.date_derniere_vgp
     if isinstance(d_vgp, str) and d_vgp.strip():
         try: d_vgp = datetime.fromisoformat(d_vgp[:10])
@@ -96,7 +91,7 @@ def create_materiel(mat: schemas.MaterielCreate, db: Session = Depends(get_db), 
         etat=mat.etat, 
         image_url=mat.image_url,
         date_derniere_vgp=d_vgp,
-        company_id=current_user.company_id, # Lien entreprise
+        company_id=current_user.company_id,
         chantier_id=None
     )
     db.add(new_m)
@@ -104,24 +99,54 @@ def create_materiel(mat: schemas.MaterielCreate, db: Session = Depends(get_db), 
     db.refresh(new_m)
     return new_m
 
-# --- 3. METTRE À JOUR (Gère aussi le déplacement) ---
+# --- 3. TRANSFERT (C'est cette route qui bloquait) ---
+@router.put("/{mid}/transfert")
+def transfer_materiel(mid: int, chantier_id: Optional[int] = None, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    """
+    Route spécifique pour le Drag & Drop ou le transfert rapide.
+    Accepte chantier_id en paramètre d'URL (query param).
+    """
+    try:
+        m = db.query(models.Materiel).filter(models.Materiel.id == mid).first()
+        if not m: 
+            raise HTTPException(status_code=404, detail="Matériel introuvable")
+        
+        if m.company_id != current_user.company_id: 
+            raise HTTPException(status_code=403, detail="Non autorisé")
+        
+        # Gestion du retour en stock (0 ou null)
+        if chantier_id == 0:
+            m.chantier_id = None
+        else:
+            # Vérification si le chantier existe pour éviter l'erreur 500 IntegrityError
+            if chantier_id:
+                chantier = db.query(models.Chantier).filter(models.Chantier.id == chantier_id).first()
+                if not chantier:
+                    raise HTTPException(status_code=404, detail=f"Chantier {chantier_id} inconnu")
+            m.chantier_id = chantier_id
+
+        db.commit()
+        return {"status": "moved", "chantier_id": m.chantier_id}
+
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        db.rollback()
+        print(f"❌ Erreur Transfert: {e}")
+        raise HTTPException(status_code=500, detail="Erreur serveur lors du transfert")
+
+# --- 4. MISE À JOUR COMPLÈTE ---
 @router.put("/{mid}", response_model=schemas.MaterielOut)
 def update_materiel(mid: int, mat: schemas.MaterielUpdate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     db_mat = db.query(models.Materiel).filter(models.Materiel.id == mid).first()
     if not db_mat: raise HTTPException(404, detail="Matériel introuvable")
-    
-    # Sécurité
     if db_mat.company_id != current_user.company_id: raise HTTPException(403, detail="Non autorisé")
 
     update_data = mat.dict(exclude_unset=True)
 
     for key, value in update_data.items():
         if key == "chantier_id":
-            # Gestion intelligente du déplacement
-            if value == "" or value == 0:
-                db_mat.chantier_id = None
-            else:
-                db_mat.chantier_id = value
+            db_mat.chantier_id = None if (value == "" or value == 0) else value
         
         elif key == "date_derniere_vgp":
             if value and isinstance(value, str):
@@ -129,10 +154,9 @@ def update_materiel(mid: int, mat: schemas.MaterielUpdate, db: Session = Depends
                 except: pass
             else:
                 setattr(db_mat, key, value)
-
+        
         elif key == "statut_vgp":
-            pass # On ignore ce champ calculé
-            
+            pass # Champ calculé, on ignore
         else:
             if hasattr(db_mat, key):
                 setattr(db_mat, key, value)
@@ -141,24 +165,12 @@ def update_materiel(mid: int, mat: schemas.MaterielUpdate, db: Session = Depends
     db.refresh(db_mat)
     return db_mat
 
-# --- 4. TRANSFERT RAPIDE (Route spécifique legacy) ---
-@router.put("/{mid}/transfert")
-def transfer_materiel(mid: int, chantier_id: Optional[int] = None, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    m = db.query(models.Materiel).filter(models.Materiel.id == mid).first()
-    if not m: raise HTTPException(404)
-    if m.company_id != current_user.company_id: raise HTTPException(403)
-    
-    m.chantier_id = chantier_id if chantier_id != 0 else None
-    db.commit()
-    return {"status": "moved"}
-
 # --- 5. SUPPRIMER ---
 @router.delete("/{mid}")
 def delete_materiel(mid: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     m = db.query(models.Materiel).filter(models.Materiel.id == mid).first()
     if not m: raise HTTPException(404)
     if m.company_id != current_user.company_id: raise HTTPException(403)
-    
     db.delete(m)
     db.commit()
     return {"status": "success"}
@@ -167,42 +179,32 @@ def delete_materiel(mid: int, db: Session = Depends(get_db), current_user: model
 @router.post("/import")
 async def import_materiels_csv(file: UploadFile = File(...), db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     if not file.filename.lower().endswith('.csv'): raise HTTPException(400, "Fichier non CSV")
-    
     try:
         content = await file.read()
         try: text = content.decode('utf-8')
         except: text = content.decode('latin-1')
         
         lines = text.splitlines()
-        if not lines: return {"status": "error", "message": "Fichier vide"}
-
         delimiter = ';' if ';' in lines[0] else ','
         reader = csv.DictReader(lines, delimiter=delimiter)
         
         count = 0
         for row in reader:
-            # Nettoyage des clés/valeurs
             row = {k.strip(): v.strip() for k, v in row.items() if k}
-            
             nom = row.get('Nom') or row.get('nom')
             ref = row.get('Reference') or row.get('reference')
             
             if nom:
-                etat = row.get('Etat') or 'Bon'
-                # Création
                 db.add(models.Materiel(
                     nom=nom, 
                     reference=ref, 
-                    etat=etat, 
+                    etat=row.get('Etat', 'Bon'), 
                     company_id=current_user.company_id, 
                     chantier_id=None
                 ))
                 count += 1
-        
         db.commit()
-        return {"status": "success", "message": f"{count} équipements importés !"}
-        
+        return {"status": "success", "message": f"{count} équipements importés"}
     except Exception as e:
         db.rollback()
-        print(f"Erreur Import: {e}")
-        raise HTTPException(500, f"Erreur lors de l'import: {str(e)}")
+        raise HTTPException(500, str(e))
