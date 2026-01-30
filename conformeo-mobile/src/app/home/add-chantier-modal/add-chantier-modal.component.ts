@@ -15,7 +15,7 @@ import { addIcons } from 'ionicons';
 // 👇 AJOUT DE 'checkboxOutline' pour corriger l'erreur console
 import { 
   camera, cloudUpload, save, close, shieldCheckmarkOutline, image,
-  searchOutline, locationSharp, trashOutline, checkboxOutline 
+  searchOutline, locationSharp, trashOutline, checkboxOutline
 } from 'ionicons/icons';
 
 @Component({
