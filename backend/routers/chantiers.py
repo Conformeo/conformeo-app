@@ -1,193 +1,124 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, File, UploadFile
 from sqlalchemy.orm import Session
 from typing import List, Optional
-import io
-import requests 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
+import cloudinary
+import cloudinary.uploader
+from io import BytesIO
 
-# Attention aux imports relatifs selon votre structure de dossiers
 from .. import models, schemas
 from ..database import get_db
 from ..dependencies import get_current_user
-from ..services.email import send_email_via_brevo
+from ..utils import get_gps_from_address, send_email_via_brevo
 from ..services import pdf as pdf_generator 
 
 router = APIRouter(prefix="/chantiers", tags=["Chantiers"])
 
-# --- HELPER : GÉOCODAGE ---
-def get_gps_from_address(address: str):
-    if not address or len(address) < 3: return None, None
-    try:
-        clean = address.replace(",", " ").strip()
-        url = "https://nominatim.openstreetmap.org/search"
-        params = {'q': clean, 'format': 'json', 'limit': 1, 'countrycodes': 'fr'}
-        headers = {'User-Agent': 'ConformeoApp/1.0'}
-        res = requests.get(url, params=params, headers=headers, timeout=4)
-        if res.status_code == 200:
-            data = res.json()
-            if data: return float(data[0]['lat']), float(data[0]['lon'])
-    except Exception as e:
-        print(f"⚠️ Erreur GPS: {e}")
-    return None, None
-
-# --- ROUTES ---
+# --- CRUD ---
 
 @router.get("/", response_model=List[schemas.ChantierOut])
 def read_chantiers(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    return db.query(models.Chantier).filter(models.Chantier.company_id == current_user.company_id).all()
+    chantiers = db.query(models.Chantier).filter(models.Chantier.company_id == current_user.company_id).order_by(models.Chantier.date_creation.desc()).all()
+    # Nettoyage des dates pour Pydantic
+    for c in chantiers:
+        if isinstance(c.date_debut, datetime): c.date_debut = c.date_debut.date()
+        if isinstance(c.date_fin, datetime): c.date_fin = c.date_fin.date()
+    return chantiers
 
-@router.get("/{chantier_id}", response_model=schemas.ChantierOut)
-def read_one_chantier(chantier_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    c = db.query(models.Chantier).filter(models.Chantier.id == chantier_id).first()
-    if not c: raise HTTPException(404, "Chantier introuvable")
+@router.get("/{cid}", response_model=schemas.ChantierOut)
+def get_chantier(cid: int, db: Session = Depends(get_db)):
+    c = db.query(models.Chantier).filter(models.Chantier.id == cid).first()
+    if not c: raise HTTPException(404, "Introuvable")
+    if isinstance(c.date_debut, datetime): c.date_debut = c.date_debut.date()
+    if isinstance(c.date_fin, datetime): c.date_fin = c.date_fin.date()
     return c
 
 @router.post("/", response_model=schemas.ChantierOut)
 def create_chantier(chantier: schemas.ChantierCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    if not current_user.company_id: raise HTTPException(400, "Utilisateur sans entreprise")
+    if not current_user.company_id: raise HTTPException(400, "Entreprise requise")
     
-    # Récupération sécurisée depuis le schéma (qui a maintenant les champs !)
-    lat = chantier.latitude
-    lng = chantier.longitude
-
-    # Calcul serveur si manquant
-    if (lat is None or lat == 0) and chantier.adresse:
-        print(f"🌍 Calcul GPS serveur pour : {chantier.adresse}")
+    lat, lng = chantier.latitude, chantier.longitude
+    if (not lat or lat == 0) and chantier.adresse:
         lat, lng = get_gps_from_address(chantier.adresse)
 
-    chantier_data = chantier.dict()
-    chantier_data['latitude'] = lat
-    chantier_data['longitude'] = lng
+    d_debut = chantier.date_debut or datetime.now().date()
+    d_fin = chantier.date_fin or (datetime.now() + timedelta(days=30)).date()
 
-    # Nettoyage dates
-    if not chantier_data.get('date_debut'): chantier_data['date_debut'] = None
-    if not chantier_data.get('date_fin'): chantier_data['date_fin'] = None
+    new_c = models.Chantier(
+        nom=chantier.nom, adresse=chantier.adresse, client=chantier.client,
+        company_id=current_user.company_id, date_debut=d_debut, date_fin=d_fin,
+        latitude=lat, longitude=lng, soumis_sps=False
+    )
+    db.add(new_c); db.commit(); db.refresh(new_c)
+    return new_c
 
-    try:
-        db_chantier = models.Chantier(**chantier_data, company_id=current_user.company_id)
-        db.add(db_chantier)
-        db.commit()
-        db.refresh(db_chantier)
-        return db_chantier
-    except Exception as e:
-        db.rollback()
-        print(f"❌ Erreur DB: {e}")
-        raise HTTPException(status_code=500, detail="Erreur création chantier")
+@router.put("/{cid}", response_model=schemas.ChantierOut)
+def update_chantier(cid: int, chantier: schemas.ChantierUpdate, db: Session = Depends(get_db)):
+    db_c = db.query(models.Chantier).filter(models.Chantier.id == cid).first()
+    if not db_c: raise HTTPException(404, "Introuvable")
 
-@router.put("/{chantier_id}", response_model=schemas.ChantierOut)
-def update_chantier(chantier_id: int, chantier_update: schemas.ChantierUpdate, db: Session = Depends(get_db)):
-    db_chantier = db.query(models.Chantier).filter(models.Chantier.id == chantier_id).first()
-    if not db_chantier: raise HTTPException(404, "Chantier introuvable")
+    data = chantier.dict(exclude_unset=True)
+    for key, value in data.items():
+        if key == "adresse" and value != db_c.adresse and "latitude" not in data:
+            db_c.adresse = value
+            lat, lng = get_gps_from_address(value)
+            if lat: 
+                db_c.latitude = lat
+                db_c.longitude = lng
+        elif key in ["date_debut", "date_fin"] and isinstance(value, datetime):
+            setattr(db_c, key, value.date())
+        else:
+            setattr(db_c, key, value)
 
-    update_data = chantier_update.dict(exclude_unset=True)
+    db.commit(); db.refresh(db_c)
+    return db_c
 
-    if "adresse" in update_data and update_data["adresse"] != db_chantier.adresse:
-        if not update_data.get("latitude"):
-             lat, lng = get_gps_from_address(update_data["adresse"])
-             update_data['latitude'] = lat
-             update_data['longitude'] = lng
-
-    for key, value in update_data.items():
-        setattr(db_chantier, key, value)
-
-    db.commit()
-    db.refresh(db_chantier)
-    return db_chantier
-
-@router.delete("/{chantier_id}")
-def delete_chantier(chantier_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    c = db.query(models.Chantier).filter(models.Chantier.id == chantier_id).first()
-    if not c: 
-        raise HTTPException(status_code=404, detail="Chantier introuvable")
+@router.delete("/{cid}")
+def delete_chantier(cid: int, db: Session = Depends(get_db)):
+    c = db.query(models.Chantier).filter(models.Chantier.id == cid).first()
+    if not c: raise HTTPException(404)
     
-    if c.company_id != current_user.company_id:
-        raise HTTPException(status_code=403, detail="Non autorisé")
-
     try:
-        # 1. Détacher le matériel (Mise à jour à NULL au lieu de supprimer)
-        db.query(models.Materiel).filter(models.Materiel.chantier_id == chantier_id).update({"chantier_id": None}, synchronize_session=False)
+        # Nettoyage complet
+        db.query(models.Materiel).filter(models.Materiel.chantier_id == cid).update({"chantier_id": None}, synchronize_session=False)
+        for model in [models.Rapport, models.Task, models.Inspection, models.DocExterne, models.PPSPS, models.PIC, models.PlanPrevention, models.PermisFeu]:
+            db.query(model).filter(getattr(model, 'chantier_id') == cid).delete(synchronize_session=False)
         
-        # 2. Supprimer les dépendances (Images, Tâches, Rapports, etc.)
-        # On utilise synchronize_session=False pour la performance et éviter les erreurs de session
-        db.query(models.RapportImage).filter(models.RapportImage.rapport.has(chantier_id=chantier_id)).delete(synchronize_session=False)
-        db.query(models.Rapport).filter(models.Rapport.chantier_id == chantier_id).delete(synchronize_session=False)
-        db.query(models.Task).filter(models.Task.chantier_id == chantier_id).delete(synchronize_session=False)
-        db.query(models.Inspection).filter(models.Inspection.chantier_id == chantier_id).delete(synchronize_session=False)
-        db.query(models.DocExterne).filter(models.DocExterne.chantier_id == chantier_id).delete(synchronize_session=False)
-        db.query(models.PPSPS).filter(models.PPSPS.chantier_id == chantier_id).delete(synchronize_session=False)
-        db.query(models.PIC).filter(models.PIC.chantier_id == chantier_id).delete(synchronize_session=False)
-        db.query(models.PlanPrevention).filter(models.PlanPrevention.chantier_id == chantier_id).delete(synchronize_session=False)
-        db.query(models.PermisFeu).filter(models.PermisFeu.chantier_id == chantier_id).delete(synchronize_session=False)
-
-        # 3. Suppression finale du chantier
         db.delete(c)
         db.commit()
-        return {"status": "deleted", "message": f"Chantier {chantier_id} supprimé"}
-    
+        return {"status": "deleted"}
     except Exception as e:
         db.rollback()
-        print(f"❌ Erreur suppression chantier: {e}")
-        # On renvoie une 500 mais avec un message lisible
-        raise HTTPException(status_code=500, detail="Impossible de supprimer ce chantier (données liées bloquantes).")
+        raise HTTPException(500, f"Erreur suppression: {e}")
 
-# ... (Gardez les autres routes Details, Tasks, PDF, Email inchangées en bas du fichier)
-@router.get("/{chantier_id}/rapports", response_model=List[schemas.RapportOut])
-def get_chantier_rapports(chantier_id: int, db: Session = Depends(get_db)):
-    return db.query(models.Rapport).filter(models.Rapport.chantier_id == chantier_id).all()
+# --- FEATURES ---
 
-@router.get("/{chantier_id}/inspections", response_model=List[schemas.InspectionOut])
-def get_chantier_inspections(chantier_id: int, db: Session = Depends(get_db)):
-    return db.query(models.Inspection).filter(models.Inspection.chantier_id == chantier_id).all()
+@app.post("/chantiers/{cid}/cover")
+def upload_cover(cid: int, file: UploadFile = File(...), db: Session = Depends(get_db)):
+    c = db.query(models.Chantier).filter(models.Chantier.id == cid).first()
+    if not c: raise HTTPException(404)
+    try:
+        res = cloudinary.uploader.upload(file.file, folder="conformeo_covers", resource_type="image")
+        c.cover_url = res.get("secure_url")
+        db.commit()
+        return {"url": c.cover_url}
+    except Exception as e: raise HTTPException(500, str(e))
 
-@router.get("/{chantier_id}/docs", response_model=List[schemas.DocExterneOut])
-def get_chantier_docs(chantier_id: int, db: Session = Depends(get_db)):
-    return db.query(models.DocExterne).filter(models.DocExterne.chantier_id == chantier_id).all()
+@app.post("/chantiers/{cid}/send-email")
+def send_email(cid: int, email_dest: str, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    c = db.query(models.Chantier).filter(models.Chantier.id == cid).first()
+    if not c: raise HTTPException(404)
+    
+    # Récupération données pour le PDF
+    raps = db.query(models.Rapport).filter(models.Rapport.chantier_id == cid).all()
+    inss = db.query(models.Inspection).filter(models.Inspection.chantier_id == cid).all()
+    comp = db.query(models.Company).filter(models.Company.id == current_user.company_id).first()
 
-@router.get("/{chantier_id}/pic", response_model=Optional[schemas.PicOut])
-def get_chantier_pic(chantier_id: int, db: Session = Depends(get_db)):
-    return db.query(models.PIC).filter(models.PIC.chantier_id == chantier_id).first()
-
-@router.get("/{chantier_id}/permis-feu", response_model=List[schemas.PermisFeuOut])
-def get_chantier_permis_feu(chantier_id: int, db: Session = Depends(get_db)):
-    return db.query(models.PermisFeu).filter(models.PermisFeu.chantier_id == chantier_id).all()
-
-@router.get("/{chantier_id}/tasks", response_model=List[schemas.TaskOut])
-def read_tasks(chantier_id: int, db: Session = Depends(get_db)):
-    return db.query(models.Task).filter(models.Task.chantier_id == chantier_id).all()
-
-@router.post("/{chantier_id}/tasks", response_model=schemas.TaskOut)
-def create_task(chantier_id: int, task: schemas.TaskCreate, db: Session = Depends(get_db)):
-    db_task = models.Task(**task.dict()) 
-    db.add(db_task); db.commit(); db.refresh(db_task)
-    return db_task
-
-@router.put("/{chantier_id}/tasks/{task_id}", response_model=schemas.TaskOut)
-def update_task(task_id: int, task_update: schemas.TaskUpdate, db: Session = Depends(get_db)):
-    t = db.query(models.Task).filter(models.Task.id == task_id).first()
-    if not t: raise HTTPException(404, "Tâche introuvable")
-    if task_update.status: t.status = task_update.status
-    if task_update.description: t.description = task_update.description
-    db.commit(); db.refresh(t)
-    return t
-
-@router.get("/{chantier_id}/plans-prevention", response_model=List[schemas.PlanPreventionOut])
-def get_pdps(chantier_id: int, db: Session = Depends(get_db)):
-    return db.query(models.PlanPrevention).filter(models.PlanPrevention.chantier_id == chantier_id).all()
-
-@router.get("/{chantier_id}/ppsps", response_model=List[schemas.PPSPSOut])
-def get_ppsps(chantier_id: int, db: Session = Depends(get_db)):
-    return db.query(models.PPSPS).filter(models.PPSPS.chantier_id == chantier_id).all()
-
-@router.post("/{chantier_id}/send-email")
-def send_journal_email(chantier_id: int, email_dest: str, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    chantier = db.query(models.Chantier).filter(models.Chantier.id == chantier_id).first()
-    if not chantier: raise HTTPException(404, "Chantier inconnu")
-    rapports = db.query(models.Rapport).filter(models.Rapport.chantier_id == chantier_id).all()
-    inspections = db.query(models.Inspection).filter(models.Inspection.chantier_id == chantier_id).all()
-    company = db.query(models.Company).filter(models.Company.id == current_user.company_id).first()
-    pdf_buffer = io.BytesIO()
-    pdf_generator.generate_pdf(chantier, rapports, inspections, pdf_buffer, company=company)
-    html_content = f"<html><body><h2>Journal de Bord : {chantier.nom}</h2><p>Veuillez trouver ci-joint le PDF du journal de bord.</p></body></html>"
-    success = send_email_via_brevo(email_dest, f"Journal - {chantier.nom}", html_content, pdf_buffer, f"Journal_{chantier.nom}.pdf")
-    if success: return {"message": "Email envoyé ! 🚀"}
-    raise HTTPException(500, "Erreur envoi Brevo")
+    pdf_buffer = BytesIO()
+    pdf_generator.generate_pdf(c, raps, inss, pdf_buffer, company=comp)
+    
+    html = f"<html><body><h2>Suivi Chantier: {c.nom}</h2><p>Ci-joint le journal de bord.</p></body></html>"
+    
+    if send_email_via_brevo(email_dest, f"Suivi - {c.nom}", html, pdf_buffer, f"Journal_{c.nom}.pdf"):
+        return {"message": "Email envoyé !"}
+    raise HTTPException(500, "Erreur envoi email")
