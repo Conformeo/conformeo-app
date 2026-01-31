@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Query
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError # 👈 IMPORT INDISPENSABLE
 from typing import List, Optional
 import csv
-import codecs
 from datetime import datetime, timedelta
 
 from .. import models, schemas
@@ -13,7 +13,7 @@ router = APIRouter(prefix="/materiels", tags=["Materiels"])
 
 # --- 1. LISTER ---
 @router.get("/", response_model=List[schemas.MaterielOut])
-def read_materiels(skip: int = 0, limit: int = 1000, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+def read_materiels(skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     try:
         raw_rows = db.query(models.Materiel).filter(models.Materiel.company_id == current_user.company_id).offset(skip).limit(limit).all()
         valid_rows = []
@@ -55,7 +55,6 @@ def read_materiels(skip: int = 0, limit: int = 1000, db: Session = Depends(get_d
                 valid_rows.append(mat_out)
             except:
                 continue
-
         return valid_rows
     except Exception as e:
         print(f"❌ Erreur Lecture: {str(e)}")
@@ -82,38 +81,50 @@ def create_materiel(mat: schemas.MaterielCreate, db: Session = Depends(get_db), 
     db.add(new_m)
     db.commit()
     db.refresh(new_m)
-    
-    # On ajoute le champ calculé pour éviter l'erreur de validation Schema
     setattr(new_m, "statut_vgp", "INCONNU")
     return new_m
 
-# --- 3. TRANSFERT (CORRECTION ERREUR 500) ---
+# --- 3. TRANSFERT (La partie critique) ---
 @router.put("/{mid}/transfert")
 def transfer_materiel(mid: int, chantier_id: Optional[int] = Query(None), db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     try:
+        # 1. On récupère le matériel
         m = db.query(models.Materiel).filter(models.Materiel.id == mid).first()
         if not m: raise HTTPException(404, "Matériel introuvable")
         if m.company_id != current_user.company_id: raise HTTPException(403, "Non autorisé")
         
-        # Si retour stock
+        # 2. On traite la destination
         if not chantier_id or chantier_id == 0:
             m.chantier_id = None
         else:
-            # On vérifie que le chantier existe VRAIMENT avant de l'assigner
-            exists = db.query(models.Chantier).filter(models.Chantier.id == chantier_id).first()
-            if not exists:
-                # C'est ici que ça bloquait : on renvoie une 404 propre au lieu de planter
-                raise HTTPException(status_code=404, detail=f"Chantier {chantier_id} introuvable")
+            # Vérification explicite : le chantier existe-t-il ?
+            target_chantier = db.query(models.Chantier).filter(models.Chantier.id == chantier_id).first()
+            if not target_chantier:
+                # C'est ici qu'on bloque l'erreur avant qu'elle n'arrive à la base de données
+                print(f"🛑 BLOQUÉ : Tentative de transfert vers chantier {chantier_id} qui n'existe pas.")
+                raise HTTPException(status_code=404, detail="Ce chantier n'existe plus.")
+            
             m.chantier_id = chantier_id
 
+        # 3. Sauvegarde sécurisée
         db.commit()
         return {"status": "moved", "chantier_id": m.chantier_id}
 
     except HTTPException as he:
-        raise he  # 👈 IMPORTANT : On laisse passer les erreurs 404/403 normales
-    except Exception as e:
+        # On relance les erreurs HTTP contrôlées (404, 403)
+        raise he
+        
+    except IntegrityError as e:
+        # 🛡️ FILET DE SÉCURITÉ : Si la BDD refuse quand même (Clé étrangère)
         db.rollback()
-        print(f"❌ Erreur Serveur Transfert: {e}")
+        print(f"❌ Erreur Intégrité SQL : {e}")
+        # On renvoie une 404 propre au lieu d'une 500
+        raise HTTPException(status_code=404, detail="Impossible : le chantier cible semble avoir été supprimé.")
+        
+    except Exception as e:
+        # Autres erreurs imprévues
+        db.rollback()
+        print(f"❌ Erreur Serveur Inconnue: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 # --- 4. MISE À JOUR ---
@@ -136,10 +147,13 @@ def update_materiel(mid: int, mat: schemas.MaterielUpdate, db: Session = Depends
         elif key != "statut_vgp": 
             if hasattr(db_mat, key): setattr(db_mat, key, value)
 
-    db.commit()
-    db.refresh(db_mat)
-    
-    # Recalcul Statut VGP pour la réponse
+    try:
+        db.commit()
+        db.refresh(db_mat)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="Chantier invalide")
+
     statut = "INCONNU"
     if hasattr(db_mat, 'date_derniere_vgp') and db_mat.date_derniere_vgp:
         prochaine = db_mat.date_derniere_vgp + timedelta(days=365)
@@ -168,11 +182,9 @@ async def import_materiels_csv(file: UploadFile = File(...), db: Session = Depen
         content = await file.read()
         try: text = content.decode('utf-8')
         except: text = content.decode('latin-1')
-        
         lines = text.splitlines()
         delimiter = ';' if ';' in lines[0] else ','
         reader = csv.DictReader(lines, delimiter=delimiter)
-        
         count = 0
         for row in reader:
             row = {k.strip(): v.strip() for k, v in row.items() if k}
