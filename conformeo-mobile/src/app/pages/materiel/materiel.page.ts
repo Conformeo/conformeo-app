@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Platform } from '@ionic/angular/standalone'; 
+import { Platform, ViewWillEnter } from '@ionic/angular/standalone'; // 👈 Import ViewWillEnter
 import { 
   IonHeader, IonToolbar, IonContent,
   IonButtons, IonButton, IonIcon, IonFab, IonFabButton, 
@@ -12,7 +12,6 @@ import {
 import { Capacitor } from '@capacitor/core';
 import { addIcons } from 'ionicons';
 
-// 👇 AJOUT DE 'closeCircleOutline' qui manquait
 import { 
   add, hammer, construct, home, swapHorizontal, qrCodeOutline,
   searchOutline, cube, homeOutline, locationOutline, shieldCheckmark,
@@ -46,7 +45,8 @@ interface MaterielUI extends Materiel {
     IonCheckbox, IonList, IonItem, IonLabel
   ]
 })
-export class MaterielPage implements OnInit {
+// 👇 Ajout de l'implémentation ViewWillEnter
+export class MaterielPage implements OnInit, ViewWillEnter {
 
   materiels: MaterielUI[] = []; 
   filteredMateriels: MaterielUI[] = [];
@@ -81,6 +81,12 @@ export class MaterielPage implements OnInit {
   }
 
   ngOnInit() {
+    // On garde le chargement initial
+    this.loadData();
+  }
+
+  // 👇 CETTE FONCTION MAGIQUE RECHARGE LES CHANTIERS À CHAQUE FOIS QUE VOUS VOYEZ LA PAGE
+  ionViewWillEnter() {
     this.loadData();
   }
 
@@ -89,11 +95,15 @@ export class MaterielPage implements OnInit {
   }
 
   loadData(event?: any) {
-    // On recharge les chantiers en même temps pour éviter les fantômes
-    this.api.getChantiers().subscribe(chantiers => {
-      this.chantiers = chantiers;
+    // 1. On charge les chantiers (CRUCIAL pour avoir les nouveaux ID)
+    this.api.getChantiers().subscribe({
+      next: (chantiers) => {
+        this.chantiers = chantiers;
+      },
+      error: (err) => console.error("Erreur chantiers", err)
     });
 
+    // 2. On charge le matériel
     this.api.getMateriels().subscribe({
       next: (mats) => {
         this.materiels = mats as MaterielUI[];
@@ -182,12 +192,6 @@ export class MaterielPage implements OnInit {
     this.toggleSelectionMode(); 
   }
 
-  async presentToast(message: string, color: string) {
-    const toast = await this.toastCtrl.create({ message, duration: 2000, color, position: 'bottom' });
-    toast.present();
-  }
-
-  // --- IMPORT CSV ---
   async onCSVSelected(event: any) {
     const file = event.target.files[0];
     if (file) {
@@ -301,14 +305,12 @@ export class MaterielPage implements OnInit {
     if (role === 'confirm') this.loadData();
   }
 
-  // 👇 MISE À JOUR CRITIQUE : GESTION DE L'ERREUR 404 LORS DU TRANSFERT
   async openTransfer(mat: Materiel) {
     const inputs: any[] = [
-      // 👇 CORRECTION ICI : value est 0 (et non null) pour éviter l'erreur 422
       { type: 'radio', label: '🏠 Retour au Dépôt', value: 0, checked: !mat.chantier_id }
     ];
     
-    // Tri alphabétique des chantiers
+    // Tri pour que la liste soit propre
     this.chantiers.sort((a,b) => a.nom.localeCompare(b.nom)).forEach(c => {
       inputs.push({
         type: 'radio', 
@@ -326,21 +328,21 @@ export class MaterielPage implements OnInit {
         {
           text: 'Valider',
           handler: (chantierId) => {
-            // Si on ne change rien, on ne fait rien
-            if (mat.chantier_id === chantierId || (mat.chantier_id === null && chantierId === 0)) return;
+            // Si pas de changement, on ne fait rien
+            if (mat.chantier_id === chantierId || (!mat.chantier_id && chantierId === 0)) return;
             
-            // 👇 On s'assure d'envoyer 0 si c'est indéfini
             const targetId = chantierId ? chantierId : 0;
 
             this.api.transferMateriel(mat.id!, targetId).subscribe({
               next: () => {
                 this.presentToast('Transfert réussi', 'success');
-                this.loadData();
+                this.loadData(); // Rechargement immédiat
               },
               error: (err) => {
+                // Gestion 404 (Chantier supprimé)
                 if (err.status === 404) {
-                  this.presentAlert('Erreur', "Ce chantier n'existe plus. La liste va s'actualiser.");
-                  this.loadData(); // Rechargement automatique pour supprimer les fantômes
+                  this.presentAlert('Erreur', "Ce chantier n'existe plus. La liste va être actualisée.");
+                  this.loadData(); // On rafraîchit pour supprimer le chantier fantôme de la liste
                 } else {
                   console.error(err);
                   this.presentToast('Erreur lors du déplacement', 'danger');
@@ -379,6 +381,13 @@ export class MaterielPage implements OnInit {
       header, message, buttons: ['OK']
     });
     await alert.present();
+  }
+
+  async presentToast(message: string, color: string) {
+    const toast = await this.toastCtrl.create({
+      message, duration: 2000, color, position: 'bottom'
+    });
+    toast.present();
   }
 
   getImageUrl(mat: Materiel): string {
