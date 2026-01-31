@@ -97,22 +97,38 @@ def update_chantier(chantier_id: int, chantier_update: schemas.ChantierUpdate, d
 @router.delete("/{chantier_id}")
 def delete_chantier(chantier_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     c = db.query(models.Chantier).filter(models.Chantier.id == chantier_id).first()
-    if not c: raise HTTPException(404, "Introuvable")
-    if c.company_id != current_user.company_id: raise HTTPException(403, "Interdit")
+    if not c: 
+        raise HTTPException(status_code=404, detail="Chantier introuvable")
+    
+    if c.company_id != current_user.company_id:
+        raise HTTPException(status_code=403, detail="Non autorisé")
 
     try:
-        # Nettoyage manuel des dépendances
-        db.query(models.Rapport).filter(models.Rapport.chantier_id == chantier_id).delete()
-        db.query(models.Task).filter(models.Task.chantier_id == chantier_id).delete()
-        db.query(models.Inspection).filter(models.Inspection.chantier_id == chantier_id).delete()
-        db.query(models.Materiel).filter(models.Materiel.chantier_id == chantier_id).update({"chantier_id": None})
+        # 1. Détacher le matériel (Mise à jour à NULL au lieu de supprimer)
+        db.query(models.Materiel).filter(models.Materiel.chantier_id == chantier_id).update({"chantier_id": None}, synchronize_session=False)
         
+        # 2. Supprimer les dépendances (Images, Tâches, Rapports, etc.)
+        # On utilise synchronize_session=False pour la performance et éviter les erreurs de session
+        db.query(models.RapportImage).filter(models.RapportImage.rapport.has(chantier_id=chantier_id)).delete(synchronize_session=False)
+        db.query(models.Rapport).filter(models.Rapport.chantier_id == chantier_id).delete(synchronize_session=False)
+        db.query(models.Task).filter(models.Task.chantier_id == chantier_id).delete(synchronize_session=False)
+        db.query(models.Inspection).filter(models.Inspection.chantier_id == chantier_id).delete(synchronize_session=False)
+        db.query(models.DocExterne).filter(models.DocExterne.chantier_id == chantier_id).delete(synchronize_session=False)
+        db.query(models.PPSPS).filter(models.PPSPS.chantier_id == chantier_id).delete(synchronize_session=False)
+        db.query(models.PIC).filter(models.PIC.chantier_id == chantier_id).delete(synchronize_session=False)
+        db.query(models.PlanPrevention).filter(models.PlanPrevention.chantier_id == chantier_id).delete(synchronize_session=False)
+        db.query(models.PermisFeu).filter(models.PermisFeu.chantier_id == chantier_id).delete(synchronize_session=False)
+
+        # 3. Suppression finale du chantier
         db.delete(c)
         db.commit()
-        return {"status": "deleted"}
+        return {"status": "deleted", "message": f"Chantier {chantier_id} supprimé"}
+    
     except Exception as e:
         db.rollback()
-        raise HTTPException(500, detail=str(e))
+        print(f"❌ Erreur suppression chantier: {e}")
+        # On renvoie une 500 mais avec un message lisible
+        raise HTTPException(status_code=500, detail="Impossible de supprimer ce chantier (données liées bloquantes).")
 
 # ... (Gardez les autres routes Details, Tasks, PDF, Email inchangées en bas du fichier)
 @router.get("/{chantier_id}/rapports", response_model=List[schemas.RapportOut])

@@ -304,10 +304,11 @@ export class MaterielPage implements OnInit {
   // 👇 MISE À JOUR CRITIQUE : GESTION DE L'ERREUR 404 LORS DU TRANSFERT
   async openTransfer(mat: Materiel) {
     const inputs: any[] = [
-      { type: 'radio', label: '🏠 Retour au Dépôt', value: null, checked: !mat.chantier_id }
+      // 👇 CORRECTION ICI : value est 0 (et non null) pour éviter l'erreur 422
+      { type: 'radio', label: '🏠 Retour au Dépôt', value: 0, checked: !mat.chantier_id }
     ];
     
-    // On trie les chantiers
+    // Tri alphabétique des chantiers
     this.chantiers.sort((a,b) => a.nom.localeCompare(b.nom)).forEach(c => {
       inputs.push({
         type: 'radio', 
@@ -325,19 +326,21 @@ export class MaterielPage implements OnInit {
         {
           text: 'Valider',
           handler: (chantierId) => {
-            if (mat.chantier_id === chantierId) return;
+            // Si on ne change rien, on ne fait rien
+            if (mat.chantier_id === chantierId || (mat.chantier_id === null && chantierId === 0)) return;
             
-            // Appel API avec gestion d'erreur spécifique
-            this.api.transferMateriel(mat.id!, chantierId).subscribe({
+            // 👇 On s'assure d'envoyer 0 si c'est indéfini
+            const targetId = chantierId ? chantierId : 0;
+
+            this.api.transferMateriel(mat.id!, targetId).subscribe({
               next: () => {
                 this.presentToast('Transfert réussi', 'success');
                 this.loadData();
               },
               error: (err) => {
                 if (err.status === 404) {
-                  // Si le chantier n'existe plus, on alerte et on recharge pour nettoyer la liste
-                  this.presentAlert('Erreur', "Ce chantier n'existe plus. La liste va être actualisée.");
-                  this.loadData();
+                  this.presentAlert('Erreur', "Ce chantier n'existe plus. La liste va s'actualiser.");
+                  this.loadData(); // Rechargement automatique pour supprimer les fantômes
                 } else {
                   console.error(err);
                   this.presentToast('Erreur lors du déplacement', 'danger');
