@@ -9,6 +9,7 @@ from io import BytesIO
 from .. import models, schemas
 from ..database import get_db
 from ..dependencies import get_current_user
+# Assurez-vous que le fichier backend/utils.py existe bien (voir étape précédente)
 from ..utils import get_gps_from_address, send_email_via_brevo
 from ..services import pdf as pdf_generator 
 
@@ -19,7 +20,6 @@ router = APIRouter(prefix="/chantiers", tags=["Chantiers"])
 @router.get("/", response_model=List[schemas.ChantierOut])
 def read_chantiers(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     chantiers = db.query(models.Chantier).filter(models.Chantier.company_id == current_user.company_id).order_by(models.Chantier.date_creation.desc()).all()
-    # Nettoyage des dates pour Pydantic
     for c in chantiers:
         if isinstance(c.date_debut, datetime): c.date_debut = c.date_debut.date()
         if isinstance(c.date_fin, datetime): c.date_fin = c.date_fin.date()
@@ -93,7 +93,8 @@ def delete_chantier(cid: int, db: Session = Depends(get_db)):
 
 # --- FEATURES ---
 
-@app.post("/chantiers/{cid}/cover")
+# 👇 C'est ici que l'erreur se produisait. J'ai remplacé @app par @router
+@router.post("/{cid}/cover")
 def upload_cover(cid: int, file: UploadFile = File(...), db: Session = Depends(get_db)):
     c = db.query(models.Chantier).filter(models.Chantier.id == cid).first()
     if not c: raise HTTPException(404)
@@ -104,7 +105,8 @@ def upload_cover(cid: int, file: UploadFile = File(...), db: Session = Depends(g
         return {"url": c.cover_url}
     except Exception as e: raise HTTPException(500, str(e))
 
-@app.post("/chantiers/{cid}/send-email")
+# 👇 Ici aussi : @router au lieu de @app
+@router.post("/{cid}/send-email")
 def send_email(cid: int, email_dest: str, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     c = db.query(models.Chantier).filter(models.Chantier.id == cid).first()
     if not c: raise HTTPException(404)
