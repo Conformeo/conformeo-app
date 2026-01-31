@@ -12,12 +12,13 @@ import {
 import { Capacitor } from '@capacitor/core';
 import { addIcons } from 'ionicons';
 
+// 👇 AJOUT DE 'closeCircleOutline' qui manquait
 import { 
   add, hammer, construct, home, swapHorizontal, qrCodeOutline,
   searchOutline, cube, homeOutline, locationOutline, shieldCheckmark,
   trashOutline, hammerOutline, cloudUploadOutline, createOutline,
   printOutline, close, checkboxOutline, chevronForward, downloadOutline,
-  checkmarkDoneOutline
+  checkmarkDoneOutline, closeCircleOutline
 } from 'ionicons/icons';
 
 import { ApiService, Materiel, Chantier } from '../../services/api'; 
@@ -25,12 +26,11 @@ import { AddMaterielModalComponent } from './add-materiel-modal/add-materiel-mod
 import { QrCodeModalComponent } from './qr-code-modal/qr-code-modal.page';
 import { BarcodeScanner, BarcodeFormat } from '@capacitor-mlkit/barcode-scanning';
 
-// 👇 MISE À JOUR DE L'INTERFACE
 interface MaterielUI extends Materiel {
   selected?: boolean;
   marque?: string;
   modele?: string;
-  date_derniere_vgp?: string; // Ajout pour le CSV
+  date_derniere_vgp?: string;
 }
 
 @Component({
@@ -72,7 +72,8 @@ export class MaterielPage implements OnInit {
       'cloud-upload-outline': cloudUploadOutline,
       'print-outline': printOutline,
       'checkbox-outline': checkboxOutline,
-      close, checkboxOutline, chevronForward, downloadOutline, checkmarkDoneOutline
+      close, checkboxOutline, chevronForward, downloadOutline, 
+      checkmarkDoneOutline, closeCircleOutline 
     });
 
     this.checkScreen();
@@ -88,6 +89,7 @@ export class MaterielPage implements OnInit {
   }
 
   loadData(event?: any) {
+    // On recharge les chantiers en même temps pour éviter les fantômes
     this.api.getChantiers().subscribe(chantiers => {
       this.chantiers = chantiers;
     });
@@ -122,19 +124,15 @@ export class MaterielPage implements OnInit {
   
   toggleSelectionMode() {
     this.isSelectionMode = !this.isSelectionMode;
-    // Si on désactive (Annuler), on décoche tout
     if (!this.isSelectionMode) {
       this.unselectAll();
     }
   }
 
-  // 👇 NOUVELLE FONCTION : Tout sélectionner
   selectAll() {
-    // On sélectionne uniquement ceux qui sont affichés (filtrés)
     this.filteredMateriels.forEach(e => e.selected = true);
   }
 
-  // 👇 NOUVELLE FONCTION : Tout décocher (interne)
   unselectAll() {
     this.materiels.forEach(e => e.selected = false);
     this.filteredMateriels.forEach(e => e.selected = false);
@@ -144,7 +142,7 @@ export class MaterielPage implements OnInit {
     return this.materiels.filter(e => e.selected).length;
   }
 
-  // --- EXPORT CSV (MODIFIÉ) ---
+  // --- EXPORT CSV ---
 
   exportCsv() {
     const selection = this.materiels.filter(e => e.selected);
@@ -154,22 +152,16 @@ export class MaterielPage implements OnInit {
       return;
     }
 
-    // 1. Définition des colonnes (En-têtes)
-    // On retire Marque/Modèle et on ajoute Dernière VGP
     let csvContent = '\uFEFFNom;Référence;État;Lieu;Dernière VGP\n';
 
     selection.forEach(e => {
       const nom = (e.nom || '').replace(/;/g, ',');
-      // Suppression Marque/Modèle ici
       const reference = (e.reference || '').replace(/;/g, ',');
       const etat = (e.etat || 'Bon');
       const lieu = this.getChantierName(e.chantier_id).replace(/;/g, ',');
       
-      // Ajout VGP
-      // On formatte la date si elle existe, sinon vide
       let dateVgp = '';
       if (e.date_derniere_vgp) {
-        // Optionnel : formater la date si elle est brute (ex: YYYY-MM-DD)
         dateVgp = e.date_derniere_vgp.split('T')[0]; 
       }
 
@@ -217,7 +209,7 @@ export class MaterielPage implements OnInit {
     }
   }
 
-  // --- SCANNER INTELLIGENT ---
+  // --- SCANNER ---
   async startScan() {
     try {
       const { camera } = await BarcodeScanner.requestPermissions();
@@ -244,8 +236,6 @@ export class MaterielPage implements OnInit {
 
       if (barcodes.length > 0) {
         const scannedData = barcodes[0].rawValue;
-        console.log('Scanned:', scannedData);
-
         let foundMat = null;
 
         if (scannedData.startsWith('CONFORME-')) {
@@ -266,7 +256,7 @@ export class MaterielPage implements OnInit {
         if (foundMat) {
           this.openEdit(foundMat);
         } else {
-          this.presentAlert('Introuvable', `Aucun matériel trouvé pour le code : "${scannedData}"`);
+          this.presentAlert('Introuvable', `Aucun matériel trouvé pour : "${scannedData}"`);
         }
       }
 
@@ -311,11 +301,13 @@ export class MaterielPage implements OnInit {
     if (role === 'confirm') this.loadData();
   }
 
+  // 👇 MISE À JOUR CRITIQUE : GESTION DE L'ERREUR 404 LORS DU TRANSFERT
   async openTransfer(mat: Materiel) {
     const inputs: any[] = [
       { type: 'radio', label: '🏠 Retour au Dépôt', value: null, checked: !mat.chantier_id }
     ];
     
+    // On trie les chantiers
     this.chantiers.sort((a,b) => a.nom.localeCompare(b.nom)).forEach(c => {
       inputs.push({
         type: 'radio', 
@@ -334,8 +326,23 @@ export class MaterielPage implements OnInit {
           text: 'Valider',
           handler: (chantierId) => {
             if (mat.chantier_id === chantierId) return;
-            this.api.transferMateriel(mat.id!, chantierId).subscribe(() => {
-              this.loadData();
+            
+            // Appel API avec gestion d'erreur spécifique
+            this.api.transferMateriel(mat.id!, chantierId).subscribe({
+              next: () => {
+                this.presentToast('Transfert réussi', 'success');
+                this.loadData();
+              },
+              error: (err) => {
+                if (err.status === 404) {
+                  // Si le chantier n'existe plus, on alerte et on recharge pour nettoyer la liste
+                  this.presentAlert('Erreur', "Ce chantier n'existe plus. La liste va être actualisée.");
+                  this.loadData();
+                } else {
+                  console.error(err);
+                  this.presentToast('Erreur lors du déplacement', 'danger');
+                }
+              }
             });
           }
         }
@@ -366,9 +373,7 @@ export class MaterielPage implements OnInit {
 
   async presentAlert(header: string, message: string) {
     const alert = await this.alertCtrl.create({
-      header,
-      message,
-      buttons: ['OK']
+      header, message, buttons: ['OK']
     });
     await alert.present();
   }
