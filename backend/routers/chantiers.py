@@ -9,6 +9,7 @@ from io import BytesIO
 from .. import models, schemas
 from ..database import get_db
 from ..dependencies import get_current_user
+# Ensure utils.py exists or remove these imports if not used
 from ..utils import get_gps_from_address, send_email_via_brevo
 from ..services import pdf as pdf_generator 
 
@@ -76,16 +77,22 @@ def update_chantier(cid: int, chantier: schemas.ChantierUpdate, db: Session = De
 def delete_chantier(cid: int, db: Session = Depends(get_db)):
     c = db.query(models.Chantier).filter(models.Chantier.id == cid).first()
     if not c: raise HTTPException(404)
+    
     try:
+        # Nettoyage complet
         db.query(models.Materiel).filter(models.Materiel.chantier_id == cid).update({"chantier_id": None}, synchronize_session=False)
         for model in [models.Rapport, models.Task, models.Inspection, models.DocExterne, models.PPSPS, models.PIC, models.PlanPrevention, models.PermisFeu]:
             db.query(model).filter(getattr(model, 'chantier_id') == cid).delete(synchronize_session=False)
-        db.delete(c); db.commit()
+        
+        db.delete(c)
+        db.commit()
         return {"status": "deleted"}
     except Exception as e:
-        db.rollback(); raise HTTPException(500, f"Erreur suppression: {e}")
+        db.rollback()
+        raise HTTPException(500, f"Erreur suppression: {e}")
 
 # --- SUB-RESOURCES (GETTERS) ---
+# These were missing causing 404s
 
 @router.get("/{chantier_id}/tasks", response_model=List[schemas.TaskOut])
 def get_chantier_tasks(chantier_id: int, db: Session = Depends(get_db)):
