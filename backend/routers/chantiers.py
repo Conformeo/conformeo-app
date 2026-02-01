@@ -124,3 +124,60 @@ def send_email(cid: int, email_dest: str, db: Session = Depends(get_db), current
     if send_email_via_brevo(email_dest, f"Suivi - {c.nom}", html, pdf_buffer, f"Journal_{c.nom}.pdf"):
         return {"message": "Email envoyé !"}
     raise HTTPException(500, "Erreur envoi email")
+
+@router.get("/{chantier_id}/tasks", response_model=List[schemas.TaskOut])
+def get_chantier_tasks(chantier_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    # Security check
+    c = db.query(models.Chantier).filter(models.Chantier.id == chantier_id).first()
+    if not c or c.company_id != current_user.company_id:
+        raise HTTPException(status_code=404, detail="Chantier not found")
+        
+    return db.query(models.Task).filter(models.Task.chantier_id == chantier_id).all()
+
+@router.get("/{chantier_id}/docs", response_model=List[schemas.DocExterneOut])
+def get_chantier_docs(chantier_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    c = db.query(models.Chantier).filter(models.Chantier.id == chantier_id).first()
+    if not c or c.company_id != current_user.company_id:
+        raise HTTPException(status_code=404, detail="Chantier not found")
+
+    return db.query(models.DocExterne).filter(models.DocExterne.chantier_id == chantier_id).all()
+
+@router.get("/{chantier_id}/ppsps", response_model=List[schemas.PPSPSOut])
+def get_chantier_ppsps(chantier_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    c = db.query(models.Chantier).filter(models.Chantier.id == chantier_id).first()
+    if not c or c.company_id != current_user.company_id:
+        raise HTTPException(status_code=404, detail="Chantier not found")
+
+    return db.query(models.PPSPS).filter(models.PPSPS.chantier_id == chantier_id).all()
+
+@router.get("/{chantier_id}/plans-prevention", response_model=List[schemas.PlanPreventionOut])
+def get_chantier_plans_prevention(chantier_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    c = db.query(models.Chantier).filter(models.Chantier.id == chantier_id).first()
+    if not c or c.company_id != current_user.company_id:
+        raise HTTPException(status_code=404, detail="Chantier not found")
+
+    return db.query(models.PlanPrevention).filter(models.PlanPrevention.chantier_id == chantier_id).all()
+
+@router.get("/{chantier_id}/permis-feu", response_model=List[schemas.PermisFeuOut])
+def get_chantier_permis_feu(chantier_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    c = db.query(models.Chantier).filter(models.Chantier.id == chantier_id).first()
+    if not c or c.company_id != current_user.company_id:
+        raise HTTPException(status_code=404, detail="Chantier not found")
+
+    return db.query(models.PermisFeu).filter(models.PermisFeu.chantier_id == chantier_id).all()
+
+@router.get("/{chantier_id}/inspections", response_model=List[schemas.InspectionOut])
+def get_chantier_inspections(chantier_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    c = db.query(models.Chantier).filter(models.Chantier.id == chantier_id).first()
+    if not c or c.company_id != current_user.company_id:
+        raise HTTPException(status_code=404, detail="Chantier not found")
+
+    return db.query(models.Inspection).filter(models.Inspection.chantier_id == chantier_id).all()
+
+@router.get("/{chantier_id}/pic", response_model=Optional[schemas.PicOut])
+def get_chantier_pic(chantier_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    c = db.query(models.Chantier).filter(models.Chantier.id == chantier_id).first()
+    if not c or c.company_id != current_user.company_id:
+        raise HTTPException(status_code=404, detail="Chantier not found")
+
+    return db.query(models.PIC).filter(models.PIC.chantier_id == chantier_id).first()

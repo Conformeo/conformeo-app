@@ -6,7 +6,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .database import engine, Base
 # 👇 On importe UNIQUEMENT les routeurs
-from .routers import auth, companies, chantiers, users, materiel, duerp, dashboard
+from .routers import auth, companies, chantiers, users, materiel, duerp, dashboard, tasks
 
 load_dotenv()
 Base.metadata.create_all(bind=engine)
@@ -35,6 +35,7 @@ app.include_router(chantiers.router) # Utilise routers/chantiers.py
 app.include_router(materiel.router)  # Utilise routers/materiel.py
 app.include_router(duerp.router)
 app.include_router(dashboard.router)
+app.include_router(tasks.router)
 
 @app.get("/")
 def read_root():
