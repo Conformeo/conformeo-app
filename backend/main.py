@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from .database import engine, Base
+# Importation de TOUS les routeurs
 from .routers import auth, companies, chantiers, users, materiel, duerp, dashboard, tasks 
 
 load_dotenv()
@@ -38,9 +39,9 @@ app.include_router(tasks.router)
 
 @app.get("/")
 def read_root():
-    return {"status": "API Active 🚀", "version": "2.3 Final Fix"}
+    return {"status": "API Active 🚀", "version": "2.4 Final"}
 
-# 👇 ROUTE MANQUANTE POUR L'AUTOCOMPLÉTION ADRESSE
+# 👇 ROUTE ADRESSE (CORRECTION 404)
 @app.get("/tools/search-address")
 def search_address_autocomplete(q: str):
     if not q or len(q) < 3: return []
@@ -50,6 +51,7 @@ def search_address_autocomplete(q: str):
         response = requests.get(url, params=params, timeout=3)
         if response.status_code == 200:
             results = response.json().get('features', [])
+            # On retourne un format simple pour le frontend
             return [{
                 "label": item['properties'].get('label'),
                 "nom_rue": item['properties'].get('name'),

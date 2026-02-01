@@ -47,10 +47,10 @@ def create_materiel(mat: schemas.MaterielCreate, db: Session = Depends(get_db), 
     db.add(new_m); db.commit(); db.refresh(new_m)
     return inject_statut(new_m)
 
-# 👇 FIX CRITIQUE POUR LE 404 SUR NOUVEAU CHANTIER
+# 👇 FIX POUR "CHANTIER NON TROUVÉ"
 @router.put("/{mid}/transfert")
 def transfer_materiel(mid: int, chantier_id: Optional[int] = Query(None), db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    # 1. On force la session à se rafraîchir complètement
+    # 1. Rafraîchir la session pour voir les nouveaux chantiers
     db.expire_all()
     
     m = db.query(models.Materiel).filter(models.Materiel.id == mid).first()
@@ -60,22 +60,16 @@ def transfer_materiel(mid: int, chantier_id: Optional[int] = Query(None), db: Se
     if not chantier_id or chantier_id == 0:
         m.chantier_id = None
     else:
-        # 2. On cherche le chantier. S'il n'est pas trouvé, c'est que la transaction précédente n'est pas visible
         target = db.query(models.Chantier).filter(models.Chantier.id == chantier_id).first()
-        
         if not target:
-            # TENTATIVE ULTIME : Commit vide pour synchroniser la transaction si nécessaire
-            try:
-                db.commit() 
-            except:
-                db.rollback()
-            
-            # Re-tentative après synchro
+             # Si toujours pas trouvé, on tente un commit vide pour forcer la synchro
+            try: db.commit() 
+            except: db.rollback()
             target = db.query(models.Chantier).filter(models.Chantier.id == chantier_id).first()
             
             if not target:
-                print(f"🛑 CRITIQUE: Chantier {chantier_id} toujours invisible après refresh.")
-                raise HTTPException(status_code=404, detail="Ce chantier n'est pas encore accessible. Veuillez rafraîchir la page.")
+                print(f"🛑 Chantier {chantier_id} introuvable malgré refresh.")
+                raise HTTPException(status_code=404, detail="Ce chantier n'existe plus.")
         
         if target.company_id != current_user.company_id:
             raise HTTPException(403, "Chantier non autorisé")

@@ -7,16 +7,14 @@ from ..dependencies import get_current_user
 
 router = APIRouter(prefix="/tasks", tags=["Tasks"])
 
-# 👇 DOUBLE DÉFINITION POUR GARANTIR LA COMPATIBILITÉ (Avec et Sans slash)
+# 👇 DOUBLE DÉFINITION : Accepte "/tasks" ET "/tasks/" pour éviter le 401
 @router.post("", response_model=schemas.TaskOut)
 @router.post("/", response_model=schemas.TaskOut, include_in_schema=False)
 def create_task(task: schemas.TaskCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     if task.chantier_id:
         c = db.query(models.Chantier).filter(models.Chantier.id == task.chantier_id).first()
-        if not c:
-            raise HTTPException(status_code=404, detail="Chantier introuvable")
-        if c.company_id != current_user.company_id:
-            raise HTTPException(status_code=403, detail="Non autorisé")
+        if not c: raise HTTPException(404, "Chantier introuvable")
+        if c.company_id != current_user.company_id: raise HTTPException(403, "Non autorisé")
 
     new_task = models.Task(**task.dict())
     db.add(new_task)
