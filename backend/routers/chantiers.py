@@ -16,7 +16,7 @@ router = APIRouter(prefix="/chantiers", tags=["Chantiers"])
 
 # --- CRUD CHANTIER ---
 
-@router.get("", response_model=List[schemas.ChantierOut]) # Pas de slash
+@router.get("", response_model=List[schemas.ChantierOut])
 def read_chantiers(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     chantiers = db.query(models.Chantier).filter(models.Chantier.company_id == current_user.company_id).order_by(models.Chantier.date_creation.desc()).all()
     for c in chantiers:
@@ -32,7 +32,7 @@ def get_chantier(cid: int, db: Session = Depends(get_db)):
     if isinstance(c.date_fin, datetime): c.date_fin = c.date_fin.date()
     return c
 
-@router.post("", response_model=schemas.ChantierOut) # Pas de slash
+@router.post("", response_model=schemas.ChantierOut)
 def create_chantier(chantier: schemas.ChantierCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     if not current_user.company_id: raise HTTPException(400, "Entreprise requise")
     
@@ -89,38 +89,39 @@ def delete_chantier(cid: int, db: Session = Depends(get_db)):
         db.rollback()
         raise HTTPException(500, f"Erreur suppression: {e}")
 
-# --- SOUS-RESSOURCES (Celles qui faisaient 404/401) ---
+# --- SOUS-RESSOURCES (CORRECTION 404/401) ---
+# J'ai ajouté `get_current_user` pour sécuriser et uniformiser les appels
 
 @router.get("/{chantier_id}/tasks", response_model=List[schemas.TaskOut])
-def get_chantier_tasks(chantier_id: int, db: Session = Depends(get_db)):
+def get_chantier_tasks(chantier_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     return db.query(models.Task).filter(models.Task.chantier_id == chantier_id).all()
 
 @router.get("/{chantier_id}/rapports", response_model=List[schemas.RapportOut])
-def get_chantier_rapports(chantier_id: int, db: Session = Depends(get_db)):
+def get_chantier_rapports(chantier_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     return db.query(models.Rapport).filter(models.Rapport.chantier_id == chantier_id).all()
 
 @router.get("/{chantier_id}/inspections", response_model=List[schemas.InspectionOut])
-def get_chantier_inspections(chantier_id: int, db: Session = Depends(get_db)):
+def get_chantier_inspections(chantier_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     return db.query(models.Inspection).filter(models.Inspection.chantier_id == chantier_id).all()
 
 @router.get("/{chantier_id}/docs", response_model=List[schemas.DocExterneOut])
-def get_chantier_docs(chantier_id: int, db: Session = Depends(get_db)):
+def get_chantier_docs(chantier_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     return db.query(models.DocExterne).filter(models.DocExterne.chantier_id == chantier_id).all()
 
 @router.get("/{chantier_id}/pic", response_model=Optional[schemas.PicOut])
-def get_chantier_pic(chantier_id: int, db: Session = Depends(get_db)):
+def get_chantier_pic(chantier_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     return db.query(models.PIC).filter(models.PIC.chantier_id == chantier_id).first()
 
 @router.get("/{chantier_id}/permis-feu", response_model=List[schemas.PermisFeuOut])
-def get_chantier_permis_feu(chantier_id: int, db: Session = Depends(get_db)):
+def get_chantier_permis_feu(chantier_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     return db.query(models.PermisFeu).filter(models.PermisFeu.chantier_id == chantier_id).all()
 
 @router.get("/{chantier_id}/plans-prevention", response_model=List[schemas.PlanPreventionOut])
-def get_pdps(chantier_id: int, db: Session = Depends(get_db)):
+def get_pdps(chantier_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     return db.query(models.PlanPrevention).filter(models.PlanPrevention.chantier_id == chantier_id).all()
 
 @router.get("/{chantier_id}/ppsps", response_model=List[schemas.PPSPSOut])
-def get_ppsps(chantier_id: int, db: Session = Depends(get_db)):
+def get_ppsps(chantier_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     return db.query(models.PPSPS).filter(models.PPSPS.chantier_id == chantier_id).all()
 
 # --- FEATURES ---
