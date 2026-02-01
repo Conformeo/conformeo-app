@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Platform, ViewWillEnter } from '@ionic/angular/standalone'; // 👈 Import ViewWillEnter
+import { Platform, ViewWillEnter } from '@ionic/angular/standalone'; 
 import { 
   IonHeader, IonToolbar, IonContent,
   IonButtons, IonButton, IonIcon, IonFab, IonFabButton, 
@@ -12,12 +12,13 @@ import {
 import { Capacitor } from '@capacitor/core';
 import { addIcons } from 'ionicons';
 
+// 👇 IMPORT PROPRE DES ICÔNES
 import { 
   add, hammer, construct, home, swapHorizontal, qrCodeOutline,
   searchOutline, cube, homeOutline, locationOutline, shieldCheckmark,
   trashOutline, hammerOutline, cloudUploadOutline, createOutline,
   printOutline, close, checkboxOutline, chevronForward, downloadOutline,
-  checkmarkDoneOutline, closeCircleOutline
+  checkmarkDoneOutline, closeCircleOutline, create
 } from 'ionicons/icons';
 
 import { ApiService, Materiel, Chantier } from '../../services/api'; 
@@ -45,7 +46,6 @@ interface MaterielUI extends Materiel {
     IonCheckbox, IonList, IonItem, IonLabel
   ]
 })
-// 👇 Ajout de l'implémentation ViewWillEnter
 export class MaterielPage implements OnInit, ViewWillEnter {
 
   materiels: MaterielUI[] = []; 
@@ -53,7 +53,6 @@ export class MaterielPage implements OnInit, ViewWillEnter {
   chantiers: Chantier[] = [];
   searchTerm: string = '';
   isDesktop = false;
-
   isSelectionMode = false;
 
   constructor(
@@ -64,16 +63,34 @@ export class MaterielPage implements OnInit, ViewWillEnter {
     private loadingCtrl: LoadingController,
     private toastCtrl: ToastController 
   ) {
+    // 👇 ENREGISTREMENT EXPLICITE DES ICÔNES
+    // Cela empêche Ionic de chercher les SVG via HTTP et corrige l'erreur d'URL
     addIcons({
-      add, hammer, construct, home, swapHorizontal, qrCodeOutline,
-      searchOutline, cube, homeOutline, locationOutline, shieldCheckmark, createOutline,
+      'add': add,
+      'hammer': hammer,
+      'construct': construct,
+      'home': home,
+      'swap-horizontal': swapHorizontal,
+      'qr-code-outline': qrCodeOutline,
+      'search-outline': searchOutline,
+      'cube': cube,
+      'home-outline': homeOutline,
+      'location-outline': locationOutline,
+      'shield-checkmark': shieldCheckmark,
       'trash-outline': trashOutline,
       'hammer-outline': hammerOutline,
       'cloud-upload-outline': cloudUploadOutline,
+      'create-outline': createOutline,
       'print-outline': printOutline,
+      'close': close,
+      'close-circle-outline': closeCircleOutline,
+      'chevron-forward': chevronForward,
+      'download-outline': downloadOutline,
+      'checkmark-done-outline': checkmarkDoneOutline,
+      
+      // 👇 CELLE QUI POSAIT PROBLÈME
       'checkbox-outline': checkboxOutline,
-      close, checkboxOutline, chevronForward, downloadOutline, 
-      checkmarkDoneOutline, closeCircleOutline 
+      'create': create
     });
 
     this.checkScreen();
@@ -81,11 +98,9 @@ export class MaterielPage implements OnInit, ViewWillEnter {
   }
 
   ngOnInit() {
-    // On garde le chargement initial
     this.loadData();
   }
 
-  // 👇 CETTE FONCTION MAGIQUE RECHARGE LES CHANTIERS À CHAQUE FOIS QUE VOUS VOYEZ LA PAGE
   ionViewWillEnter() {
     this.loadData();
   }
@@ -95,15 +110,10 @@ export class MaterielPage implements OnInit, ViewWillEnter {
   }
 
   loadData(event?: any) {
-    // 1. On charge les chantiers (CRUCIAL pour avoir les nouveaux ID)
-    this.api.getChantiers().subscribe({
-      next: (chantiers) => {
-        this.chantiers = chantiers;
-      },
-      error: (err) => console.error("Erreur chantiers", err)
+    this.api.getChantiers().subscribe(chantiers => {
+      this.chantiers = chantiers;
     });
 
-    // 2. On charge le matériel
     this.api.getMateriels().subscribe({
       next: (mats) => {
         this.materiels = mats as MaterielUI[];
@@ -172,7 +182,7 @@ export class MaterielPage implements OnInit, ViewWillEnter {
       
       let dateVgp = '';
       if (e.date_derniere_vgp) {
-        dateVgp = e.date_derniere_vgp.split('T')[0]; 
+        dateVgp = String(e.date_derniere_vgp).split('T')[0]; 
       }
 
       csvContent += `${nom};${reference};${etat};${lieu};${dateVgp}\n`;
@@ -310,7 +320,6 @@ export class MaterielPage implements OnInit, ViewWillEnter {
       { type: 'radio', label: '🏠 Retour au Dépôt', value: 0, checked: !mat.chantier_id }
     ];
     
-    // Tri pour que la liste soit propre
     this.chantiers.sort((a,b) => a.nom.localeCompare(b.nom)).forEach(c => {
       inputs.push({
         type: 'radio', 
@@ -328,24 +337,24 @@ export class MaterielPage implements OnInit, ViewWillEnter {
         {
           text: 'Valider',
           handler: (chantierId) => {
-            // Si pas de changement, on ne fait rien
-            if (mat.chantier_id === chantierId || (!mat.chantier_id && chantierId === 0)) return;
-            
-            const targetId = chantierId ? chantierId : 0;
+            // Si pas de changement (null == null ou même ID)
+            if (mat.chantier_id === chantierId) return;
+            if (!mat.chantier_id && chantierId === 0) return;
 
-            this.api.transferMateriel(mat.id!, targetId).subscribe({
+            const target = chantierId ? chantierId : 0;
+            
+            this.api.transferMateriel(mat.id!, target).subscribe({
               next: () => {
                 this.presentToast('Transfert réussi', 'success');
-                this.loadData(); // Rechargement immédiat
+                this.loadData();
               },
               error: (err) => {
-                // Gestion 404 (Chantier supprimé)
                 if (err.status === 404) {
-                  this.presentAlert('Erreur', "Ce chantier n'existe plus. La liste va être actualisée.");
-                  this.loadData(); // On rafraîchit pour supprimer le chantier fantôme de la liste
+                  this.presentAlert('Info', "Ce chantier n'existe plus, la liste a été mise à jour.");
+                  this.loadData();
                 } else {
                   console.error(err);
-                  this.presentToast('Erreur lors du déplacement', 'danger');
+                  this.presentToast('Erreur transfert', 'danger');
                 }
               }
             });
