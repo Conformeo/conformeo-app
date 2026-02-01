@@ -9,7 +9,6 @@ from io import BytesIO
 from .. import models, schemas
 from ..database import get_db
 from ..dependencies import get_current_user
-# Ensure utils.py exists or remove these imports if not used
 from ..utils import get_gps_from_address, send_email_via_brevo
 from ..services import pdf as pdf_generator 
 
@@ -26,9 +25,11 @@ def read_chantiers(db: Session = Depends(get_db), current_user: models.User = De
     return chantiers
 
 @router.get("/{cid}", response_model=schemas.ChantierOut)
-def get_chantier(cid: int, db: Session = Depends(get_db)):
+def get_chantier(cid: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     c = db.query(models.Chantier).filter(models.Chantier.id == cid).first()
     if not c: raise HTTPException(404, "Introuvable")
+    if c.company_id != current_user.company_id: raise HTTPException(403, "Non autorisé")
+    
     if isinstance(c.date_debut, datetime): c.date_debut = c.date_debut.date()
     if isinstance(c.date_fin, datetime): c.date_fin = c.date_fin.date()
     return c
@@ -53,9 +54,10 @@ def create_chantier(chantier: schemas.ChantierCreate, db: Session = Depends(get_
     return new_c
 
 @router.put("/{cid}", response_model=schemas.ChantierOut)
-def update_chantier(cid: int, chantier: schemas.ChantierUpdate, db: Session = Depends(get_db)):
+def update_chantier(cid: int, chantier: schemas.ChantierUpdate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     db_c = db.query(models.Chantier).filter(models.Chantier.id == cid).first()
     if not db_c: raise HTTPException(404, "Introuvable")
+    if db_c.company_id != current_user.company_id: raise HTTPException(403, "Non autorisé")
 
     data = chantier.dict(exclude_unset=True)
     for key, value in data.items():
@@ -74,9 +76,10 @@ def update_chantier(cid: int, chantier: schemas.ChantierUpdate, db: Session = De
     return db_c
 
 @router.delete("/{cid}")
-def delete_chantier(cid: int, db: Session = Depends(get_db)):
+def delete_chantier(cid: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     c = db.query(models.Chantier).filter(models.Chantier.id == cid).first()
     if not c: raise HTTPException(404)
+    if c.company_id != current_user.company_id: raise HTTPException(403, "Non autorisé")
     
     try:
         # Nettoyage complet
@@ -91,39 +94,38 @@ def delete_chantier(cid: int, db: Session = Depends(get_db)):
         db.rollback()
         raise HTTPException(500, f"Erreur suppression: {e}")
 
-# --- SUB-RESOURCES (GETTERS) ---
-# These were missing causing 404s
+# --- SUB-RESSOURCES (CORRECTION 404) ---
 
 @router.get("/{chantier_id}/tasks", response_model=List[schemas.TaskOut])
-def get_chantier_tasks(chantier_id: int, db: Session = Depends(get_db)):
+def get_chantier_tasks(chantier_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     return db.query(models.Task).filter(models.Task.chantier_id == chantier_id).all()
 
 @router.get("/{chantier_id}/rapports", response_model=List[schemas.RapportOut])
-def get_chantier_rapports(chantier_id: int, db: Session = Depends(get_db)):
+def get_chantier_rapports(chantier_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     return db.query(models.Rapport).filter(models.Rapport.chantier_id == chantier_id).all()
 
 @router.get("/{chantier_id}/inspections", response_model=List[schemas.InspectionOut])
-def get_chantier_inspections(chantier_id: int, db: Session = Depends(get_db)):
+def get_chantier_inspections(chantier_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     return db.query(models.Inspection).filter(models.Inspection.chantier_id == chantier_id).all()
 
 @router.get("/{chantier_id}/docs", response_model=List[schemas.DocExterneOut])
-def get_chantier_docs(chantier_id: int, db: Session = Depends(get_db)):
+def get_chantier_docs(chantier_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     return db.query(models.DocExterne).filter(models.DocExterne.chantier_id == chantier_id).all()
 
 @router.get("/{chantier_id}/pic", response_model=Optional[schemas.PicOut])
-def get_chantier_pic(chantier_id: int, db: Session = Depends(get_db)):
+def get_chantier_pic(chantier_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     return db.query(models.PIC).filter(models.PIC.chantier_id == chantier_id).first()
 
 @router.get("/{chantier_id}/permis-feu", response_model=List[schemas.PermisFeuOut])
-def get_chantier_permis_feu(chantier_id: int, db: Session = Depends(get_db)):
+def get_chantier_permis_feu(chantier_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     return db.query(models.PermisFeu).filter(models.PermisFeu.chantier_id == chantier_id).all()
 
 @router.get("/{chantier_id}/plans-prevention", response_model=List[schemas.PlanPreventionOut])
-def get_pdps(chantier_id: int, db: Session = Depends(get_db)):
+def get_pdps(chantier_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     return db.query(models.PlanPrevention).filter(models.PlanPrevention.chantier_id == chantier_id).all()
 
 @router.get("/{chantier_id}/ppsps", response_model=List[schemas.PPSPSOut])
-def get_ppsps(chantier_id: int, db: Session = Depends(get_db)):
+def get_ppsps(chantier_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     return db.query(models.PPSPS).filter(models.PPSPS.chantier_id == chantier_id).all()
 
 # --- FEATURES ---
