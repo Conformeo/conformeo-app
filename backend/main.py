@@ -1,11 +1,11 @@
 import os
+import requests
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from .database import engine, Base
-# Import ALL routers here
 from .routers import auth, companies, chantiers, users, materiel, duerp, dashboard, tasks 
 
 load_dotenv()
@@ -34,8 +34,30 @@ app.include_router(chantiers.router)
 app.include_router(materiel.router)
 app.include_router(duerp.router)
 app.include_router(dashboard.router)
-app.include_router(tasks.router) 
+app.include_router(tasks.router)
 
 @app.get("/")
 def read_root():
-    return {"status": "API Active 🚀", "version": "2.2 Complete Fix"}
+    return {"status": "API Active 🚀", "version": "2.3 Final Fix"}
+
+# 👇 ROUTE MANQUANTE POUR L'AUTOCOMPLÉTION ADRESSE
+@app.get("/tools/search-address")
+def search_address_autocomplete(q: str):
+    if not q or len(q) < 3: return []
+    try:
+        url = "https://api-adresse.data.gouv.fr/search/"
+        params = {'q': q, 'limit': 5, 'autocomplete': 1}
+        response = requests.get(url, params=params, timeout=3)
+        if response.status_code == 200:
+            results = response.json().get('features', [])
+            return [{
+                "label": item['properties'].get('label'),
+                "nom_rue": item['properties'].get('name'),
+                "ville": item['properties'].get('city'),
+                "code_postal": item['properties'].get('postcode'),
+                "latitude": item['geometry']['coordinates'][1],
+                "longitude": item['geometry']['coordinates'][0]
+            } for item in results]
+    except Exception as e:
+        print(f"❌ Erreur API Adresse : {e}")
+    return []

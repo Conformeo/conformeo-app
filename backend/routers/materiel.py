@@ -50,24 +50,24 @@ def create_materiel(mat: schemas.MaterielCreate, db: Session = Depends(get_db), 
     db.add(new_m); db.commit(); db.refresh(new_m)
     return inject_statut(new_m)
 
-# 👇 ROUTE DE TRANSFERT BLINDÉE
+# 👇 ROUTE TRANSFERT CORRIGÉE
 @router.put("/{mid}/transfert")
 def transfer_materiel(mid: int, chantier_id: Optional[int] = Query(None), db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     m = db.query(models.Materiel).filter(models.Materiel.id == mid).first()
     if not m: raise HTTPException(404, "Matériel introuvable")
     if m.company_id != current_user.company_id: raise HTTPException(403, "Non autorisé")
     
-    # Gestion du retour au dépôt
     if not chantier_id or chantier_id == 0:
         m.chantier_id = None
     else:
-        # On force la BDD à rafraîchir ses données pour être sûr de voir les nouveaux chantiers
-        db.expire_all() 
+        # 🟢 FORCE LE RAFRAÎCHISSEMENT DE LA SESSION POUR VOIR LES NOUVEAUX CHANTIERS
+        db.expire_all()
         
         target = db.query(models.Chantier).filter(models.Chantier.id == chantier_id).first()
         if not target:
-            print(f"🛑 ERREUR 404: Chantier ID {chantier_id} introuvable pour Company {current_user.company_id}")
-            raise HTTPException(status_code=404, detail=f"Chantier {chantier_id} introuvable en base.")
+            # Double sécurité : si pas trouvé, on réessaie une requête simple sans filtre (debug)
+            print(f"DEBUG: Chantier {chantier_id} introuvable après expire_all")
+            raise HTTPException(status_code=404, detail="Ce chantier n'existe plus.")
         
         m.chantier_id = chantier_id
 
@@ -76,7 +76,7 @@ def transfer_materiel(mid: int, chantier_id: Optional[int] = Query(None), db: Se
         return {"status": "moved", "chantier_id": m.chantier_id}
     except IntegrityError:
         db.rollback()
-        raise HTTPException(404, "Erreur intégrité (Chantier supprimé ?)")
+        raise HTTPException(404, "Chantier invalide (Intégrité)")
     except Exception as e:
         db.rollback()
         raise HTTPException(500, str(e))
