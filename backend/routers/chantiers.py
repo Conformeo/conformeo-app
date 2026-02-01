@@ -9,13 +9,12 @@ from io import BytesIO
 from .. import models, schemas
 from ..database import get_db
 from ..dependencies import get_current_user
-# Assurez-vous que le fichier backend/utils.py existe bien (voir étape précédente)
 from ..utils import get_gps_from_address, send_email_via_brevo
 from ..services import pdf as pdf_generator 
 
 router = APIRouter(prefix="/chantiers", tags=["Chantiers"])
 
-# --- CRUD ---
+# --- CRUD CHANTIER ---
 
 @router.get("/", response_model=List[schemas.ChantierOut])
 def read_chantiers(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
@@ -77,23 +76,51 @@ def update_chantier(cid: int, chantier: schemas.ChantierUpdate, db: Session = De
 def delete_chantier(cid: int, db: Session = Depends(get_db)):
     c = db.query(models.Chantier).filter(models.Chantier.id == cid).first()
     if not c: raise HTTPException(404)
-    
     try:
-        # Nettoyage complet
         db.query(models.Materiel).filter(models.Materiel.chantier_id == cid).update({"chantier_id": None}, synchronize_session=False)
         for model in [models.Rapport, models.Task, models.Inspection, models.DocExterne, models.PPSPS, models.PIC, models.PlanPrevention, models.PermisFeu]:
             db.query(model).filter(getattr(model, 'chantier_id') == cid).delete(synchronize_session=False)
-        
-        db.delete(c)
-        db.commit()
+        db.delete(c); db.commit()
         return {"status": "deleted"}
     except Exception as e:
-        db.rollback()
-        raise HTTPException(500, f"Erreur suppression: {e}")
+        db.rollback(); raise HTTPException(500, f"Erreur suppression: {e}")
+
+# --- SUB-RESOURCES (GETTERS) ---
+
+@router.get("/{chantier_id}/tasks", response_model=List[schemas.TaskOut])
+def get_chantier_tasks(chantier_id: int, db: Session = Depends(get_db)):
+    return db.query(models.Task).filter(models.Task.chantier_id == chantier_id).all()
+
+@router.get("/{chantier_id}/rapports", response_model=List[schemas.RapportOut])
+def get_chantier_rapports(chantier_id: int, db: Session = Depends(get_db)):
+    return db.query(models.Rapport).filter(models.Rapport.chantier_id == chantier_id).all()
+
+@router.get("/{chantier_id}/inspections", response_model=List[schemas.InspectionOut])
+def get_chantier_inspections(chantier_id: int, db: Session = Depends(get_db)):
+    return db.query(models.Inspection).filter(models.Inspection.chantier_id == chantier_id).all()
+
+@router.get("/{chantier_id}/docs", response_model=List[schemas.DocExterneOut])
+def get_chantier_docs(chantier_id: int, db: Session = Depends(get_db)):
+    return db.query(models.DocExterne).filter(models.DocExterne.chantier_id == chantier_id).all()
+
+@router.get("/{chantier_id}/pic", response_model=Optional[schemas.PicOut])
+def get_chantier_pic(chantier_id: int, db: Session = Depends(get_db)):
+    return db.query(models.PIC).filter(models.PIC.chantier_id == chantier_id).first()
+
+@router.get("/{chantier_id}/permis-feu", response_model=List[schemas.PermisFeuOut])
+def get_chantier_permis_feu(chantier_id: int, db: Session = Depends(get_db)):
+    return db.query(models.PermisFeu).filter(models.PermisFeu.chantier_id == chantier_id).all()
+
+@router.get("/{chantier_id}/plans-prevention", response_model=List[schemas.PlanPreventionOut])
+def get_pdps(chantier_id: int, db: Session = Depends(get_db)):
+    return db.query(models.PlanPrevention).filter(models.PlanPrevention.chantier_id == chantier_id).all()
+
+@router.get("/{chantier_id}/ppsps", response_model=List[schemas.PPSPSOut])
+def get_ppsps(chantier_id: int, db: Session = Depends(get_db)):
+    return db.query(models.PPSPS).filter(models.PPSPS.chantier_id == chantier_id).all()
 
 # --- FEATURES ---
 
-# 👇 C'est ici que l'erreur se produisait. J'ai remplacé @app par @router
 @router.post("/{cid}/cover")
 def upload_cover(cid: int, file: UploadFile = File(...), db: Session = Depends(get_db)):
     c = db.query(models.Chantier).filter(models.Chantier.id == cid).first()
@@ -105,13 +132,11 @@ def upload_cover(cid: int, file: UploadFile = File(...), db: Session = Depends(g
         return {"url": c.cover_url}
     except Exception as e: raise HTTPException(500, str(e))
 
-# 👇 Ici aussi : @router au lieu de @app
 @router.post("/{cid}/send-email")
 def send_email(cid: int, email_dest: str, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     c = db.query(models.Chantier).filter(models.Chantier.id == cid).first()
     if not c: raise HTTPException(404)
     
-    # Récupération données pour le PDF
     raps = db.query(models.Rapport).filter(models.Rapport.chantier_id == cid).all()
     inss = db.query(models.Inspection).filter(models.Inspection.chantier_id == cid).all()
     comp = db.query(models.Company).filter(models.Company.id == current_user.company_id).first()
@@ -124,60 +149,3 @@ def send_email(cid: int, email_dest: str, db: Session = Depends(get_db), current
     if send_email_via_brevo(email_dest, f"Suivi - {c.nom}", html, pdf_buffer, f"Journal_{c.nom}.pdf"):
         return {"message": "Email envoyé !"}
     raise HTTPException(500, "Erreur envoi email")
-
-@router.get("/{chantier_id}/tasks", response_model=List[schemas.TaskOut])
-def get_chantier_tasks(chantier_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    # Security check
-    c = db.query(models.Chantier).filter(models.Chantier.id == chantier_id).first()
-    if not c or c.company_id != current_user.company_id:
-        raise HTTPException(status_code=404, detail="Chantier not found")
-        
-    return db.query(models.Task).filter(models.Task.chantier_id == chantier_id).all()
-
-@router.get("/{chantier_id}/docs", response_model=List[schemas.DocExterneOut])
-def get_chantier_docs(chantier_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    c = db.query(models.Chantier).filter(models.Chantier.id == chantier_id).first()
-    if not c or c.company_id != current_user.company_id:
-        raise HTTPException(status_code=404, detail="Chantier not found")
-
-    return db.query(models.DocExterne).filter(models.DocExterne.chantier_id == chantier_id).all()
-
-@router.get("/{chantier_id}/ppsps", response_model=List[schemas.PPSPSOut])
-def get_chantier_ppsps(chantier_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    c = db.query(models.Chantier).filter(models.Chantier.id == chantier_id).first()
-    if not c or c.company_id != current_user.company_id:
-        raise HTTPException(status_code=404, detail="Chantier not found")
-
-    return db.query(models.PPSPS).filter(models.PPSPS.chantier_id == chantier_id).all()
-
-@router.get("/{chantier_id}/plans-prevention", response_model=List[schemas.PlanPreventionOut])
-def get_chantier_plans_prevention(chantier_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    c = db.query(models.Chantier).filter(models.Chantier.id == chantier_id).first()
-    if not c or c.company_id != current_user.company_id:
-        raise HTTPException(status_code=404, detail="Chantier not found")
-
-    return db.query(models.PlanPrevention).filter(models.PlanPrevention.chantier_id == chantier_id).all()
-
-@router.get("/{chantier_id}/permis-feu", response_model=List[schemas.PermisFeuOut])
-def get_chantier_permis_feu(chantier_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    c = db.query(models.Chantier).filter(models.Chantier.id == chantier_id).first()
-    if not c or c.company_id != current_user.company_id:
-        raise HTTPException(status_code=404, detail="Chantier not found")
-
-    return db.query(models.PermisFeu).filter(models.PermisFeu.chantier_id == chantier_id).all()
-
-@router.get("/{chantier_id}/inspections", response_model=List[schemas.InspectionOut])
-def get_chantier_inspections(chantier_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    c = db.query(models.Chantier).filter(models.Chantier.id == chantier_id).first()
-    if not c or c.company_id != current_user.company_id:
-        raise HTTPException(status_code=404, detail="Chantier not found")
-
-    return db.query(models.Inspection).filter(models.Inspection.chantier_id == chantier_id).all()
-
-@router.get("/{chantier_id}/pic", response_model=Optional[schemas.PicOut])
-def get_chantier_pic(chantier_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    c = db.query(models.Chantier).filter(models.Chantier.id == chantier_id).first()
-    if not c or c.company_id != current_user.company_id:
-        raise HTTPException(status_code=404, detail="Chantier not found")
-
-    return db.query(models.PIC).filter(models.PIC.chantier_id == chantier_id).first()

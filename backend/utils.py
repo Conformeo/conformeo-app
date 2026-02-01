@@ -1,9 +1,7 @@
 import os
 import requests
 import base64
-from typing import Optional
 
-# --- GÉOCODAGE ---
 def get_gps_from_address(address: str):
     if not address or len(address) < 3: return None, None
     try:
@@ -19,7 +17,6 @@ def get_gps_from_address(address: str):
         print(f"⚠️ Erreur GPS: {e}")
     return None, None
 
-# --- EMAIL BREVO ---
 def send_email_via_brevo(to_email: str, subject: str, html_content: str, pdf_attachment=None, pdf_filename="document.pdf"):
     api_key = os.getenv("BREVO_API_KEY")
     sender_email = os.getenv("SENDER_EMAIL", "contact@conformeo-app.fr")
@@ -30,12 +27,7 @@ def send_email_via_brevo(to_email: str, subject: str, html_content: str, pdf_att
         return False
 
     url = "https://api.brevo.com/v3/smtp/email"
-    headers = {
-        "accept": "application/json",
-        "api-key": api_key,
-        "content-type": "application/json"
-    }
-
+    headers = {"accept": "application/json", "api-key": api_key, "content-type": "application/json"}
     payload = {
         "sender": {"name": sender_name, "email": sender_email},
         "to": [{"email": to_email}],
@@ -45,7 +37,6 @@ def send_email_via_brevo(to_email: str, subject: str, html_content: str, pdf_att
 
     if pdf_attachment:
         try:
-            # Gestion buffer ou bytes
             content = pdf_attachment.getvalue() if hasattr(pdf_attachment, "getvalue") else pdf_attachment
             encoded = base64.b64encode(content).decode("utf-8")
             payload["attachment"] = [{"content": encoded, "name": pdf_filename}]
@@ -53,8 +44,8 @@ def send_email_via_brevo(to_email: str, subject: str, html_content: str, pdf_att
             print(f"⚠️ Erreur PDF Email: {e}")
 
     try:
-        response = requests.post(url, json=payload, headers=headers)
-        return response.status_code in [200, 201, 202]
+        requests.post(url, json=payload, headers=headers)
+        return True
     except Exception as e:
         print(f"❌ Erreur Envoi Email: {e}")
         return False
