@@ -11,9 +11,8 @@ from ..dependencies import get_current_user
 
 router = APIRouter(prefix="/materiels", tags=["Materiels"])
 
-# --- HELPER INTERNE ---
+# --- HELPER ---
 def inject_statut(mat):
-    """Calcule le statut VGP à la volée pour l'affichage"""
     statut = "INCONNU"
     d = getattr(mat, "date_derniere_vgp", None)
     if d:
@@ -31,12 +30,12 @@ def inject_statut(mat):
 
 # --- ROUTES ---
 
-@router.get("/", response_model=List[schemas.MaterielOut])
+@router.get("", response_model=List[schemas.MaterielOut])
 def read_materiels(skip: int = 0, limit: int = 1000, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     rows = db.query(models.Materiel).filter(models.Materiel.company_id == current_user.company_id).offset(skip).limit(limit).all()
     return [inject_statut(r) for r in rows]
 
-@router.post("/", response_model=schemas.MaterielOut)
+@router.post("", response_model=schemas.MaterielOut)
 def create_materiel(mat: schemas.MaterielCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     d_vgp = None
     if mat.date_derniere_vgp:
@@ -51,18 +50,25 @@ def create_materiel(mat: schemas.MaterielCreate, db: Session = Depends(get_db), 
     db.add(new_m); db.commit(); db.refresh(new_m)
     return inject_statut(new_m)
 
+# 👇 ROUTE DE TRANSFERT BLINDÉE
 @router.put("/{mid}/transfert")
 def transfer_materiel(mid: int, chantier_id: Optional[int] = Query(None), db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     m = db.query(models.Materiel).filter(models.Materiel.id == mid).first()
     if not m: raise HTTPException(404, "Matériel introuvable")
     if m.company_id != current_user.company_id: raise HTTPException(403, "Non autorisé")
     
+    # Gestion du retour au dépôt
     if not chantier_id or chantier_id == 0:
         m.chantier_id = None
     else:
-        # VÉRIFICATION D'EXISTENCE
-        if not db.query(models.Chantier).filter(models.Chantier.id == chantier_id).first():
-            raise HTTPException(404, "Ce chantier n'existe plus.")
+        # On force la BDD à rafraîchir ses données pour être sûr de voir les nouveaux chantiers
+        db.expire_all() 
+        
+        target = db.query(models.Chantier).filter(models.Chantier.id == chantier_id).first()
+        if not target:
+            print(f"🛑 ERREUR 404: Chantier ID {chantier_id} introuvable pour Company {current_user.company_id}")
+            raise HTTPException(status_code=404, detail=f"Chantier {chantier_id} introuvable en base.")
+        
         m.chantier_id = chantier_id
 
     try:
@@ -70,7 +76,7 @@ def transfer_materiel(mid: int, chantier_id: Optional[int] = Query(None), db: Se
         return {"status": "moved", "chantier_id": m.chantier_id}
     except IntegrityError:
         db.rollback()
-        raise HTTPException(404, "Chantier introuvable (Integrity)")
+        raise HTTPException(404, "Erreur intégrité (Chantier supprimé ?)")
     except Exception as e:
         db.rollback()
         raise HTTPException(500, str(e))

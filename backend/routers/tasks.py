@@ -5,19 +5,18 @@ from .. import models, schemas
 from ..database import get_db
 from ..dependencies import get_current_user
 
-# 👇 C'est cette variable qui manquait et causait l'erreur de déploiement
 router = APIRouter(prefix="/tasks", tags=["Tasks"])
 
-# --- ROUTES ---
-
-# 👇 Utilisation de "" pour répondre à /tasks sans redirection
+# 👇 CORRECTION : Chaîne vide "" au lieu de "/"
+# Cela empêche la redirection 307 qui supprime le Token d'authentification
 @router.post("", response_model=schemas.TaskOut)
 def create_task(task: schemas.TaskCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    # Vérif Chantier
     if task.chantier_id:
         c = db.query(models.Chantier).filter(models.Chantier.id == task.chantier_id).first()
-        if not c: raise HTTPException(404, "Chantier introuvable")
-        if c.company_id != current_user.company_id: raise HTTPException(403, "Non autorisé")
+        if not c:
+            raise HTTPException(status_code=404, detail="Chantier introuvable")
+        if c.company_id != current_user.company_id:
+            raise HTTPException(status_code=403, detail="Non autorisé")
 
     new_task = models.Task(**task.dict())
     db.add(new_task)
@@ -30,7 +29,6 @@ def delete_task(task_id: int, db: Session = Depends(get_db), current_user: model
     task = db.query(models.Task).filter(models.Task.id == task_id).first()
     if not task: raise HTTPException(404, "Tâche introuvable")
     
-    # Sécurité
     if task.chantier and task.chantier.company_id != current_user.company_id:
         raise HTTPException(403, "Non autorisé")
             
