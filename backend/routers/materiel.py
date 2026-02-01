@@ -112,7 +112,26 @@ def delete_materiel(mid: int, db: Session = Depends(get_db)):
     db.delete(m); db.commit()
     return {"status": "deleted"}
 
+
 @router.post("/import")
 async def import_csv(file: UploadFile = File(...), db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    # ... (Code inchangé pour l'import)
-    return {"message": "Importé"}
+    if not file.filename.lower().endswith('.csv'): raise HTTPException(400, "Non CSV")
+    try:
+        content = await file.read()
+        try: text = content.decode('utf-8')
+        except: text = content.decode('latin-1')
+        reader = csv.DictReader(text.splitlines(), delimiter=';')
+        count = 0
+        for row in reader:
+            row = {k.strip(): v.strip() for k, v in row.items() if k}
+            if row.get('Nom'):
+                db.add(models.Materiel(
+                    nom=row.get('Nom'), reference=row.get('Reference'), etat=row.get('Etat', 'Bon'),
+                    company_id=current_user.company_id
+                ))
+                count += 1
+        db.commit()
+        return {"message": f"{count} importés"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(500, str(e))
