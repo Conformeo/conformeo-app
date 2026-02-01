@@ -34,7 +34,7 @@ app.include_router(chantiers.router)
 app.include_router(materiel.router)
 app.include_router(duerp.router)
 app.include_router(dashboard.router)
-app.include_router(tasks.router) # Make sure tasks is included!
+app.include_router(tasks.router) 
 
 @app.get("/")
 def read_root():
