@@ -2,17 +2,20 @@ import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { addIcons } from 'ionicons';
-import { Router, NavigationEnd, RouterLink,  } from '@angular/router';
+import { Router, NavigationEnd, RouterLink } from '@angular/router';
 import { 
   IonApp, IonSplitPane, IonMenu, IonContent, IonList, 
   IonItem, IonLabel, 
   IonRouterOutlet, IonIcon, ToastController, MenuController,
-  IonMenuToggle // 👈 IonButton ajouté pour le logout
+  IonMenuToggle 
 } from '@ionic/angular/standalone';
+
+// 👇 IMPORTATION DE TOUTES LES ICONES (Pour éviter les warnings Xcode)
 import { 
   gridOutline, hammerOutline, mapOutline, peopleOutline, business,
   settingsOutline, logOutOutline, sync, checkmarkCircle, warning, calendarOutline,
-  documentTextOutline, home, cubeOutline, shieldCheckmarkOutline
+  documentTextOutline, home, cubeOutline, shieldCheckmarkOutline,
+  checkboxOutline, imageOutline, squareOutline, createOutline, trashOutline, add, close
 } from 'ionicons/icons';
 
 import { OfflineService } from './services/offline';
@@ -33,13 +36,12 @@ import { ApiService } from './services/api';
 })
 export class AppComponent {
   
-  // 👇 MENU COMPLET
   public appPages = [
     { title: 'Tableau de Bord', url: '/dashboard', icon: 'grid-outline' },
     { title: 'Mes Chantiers', url: '/home', icon: 'map-outline' },
     { title: 'Parc Matériel', url: '/materiel', icon: 'hammer-outline' },
     { title: 'Équipes', url: '/team', icon: 'people-outline' },
-    { title: 'Mon Entreprise', url: '/company', icon: 'business' }, // ✅ Page Entreprise
+    { title: 'Mon Entreprise', url: '/company', icon: 'business' },
     { title: 'Planning', url: '/planning', icon: 'calendar-outline' },
     { title: 'Sécurité & DUERP', url: '/securite-doc', icon: 'shield-checkmark-outline' },
     { title: 'Mon Compte', url: '/settings', icon: 'settings-outline' },
@@ -55,15 +57,17 @@ export class AppComponent {
     private router: Router,
     private menuCtrl: MenuController
   ) {
+    // 👇 ENREGISTREMENT GLOBAL DES ICÔNES
+    // Cela corrige les erreurs "Could not load icon" sur iOS
     addIcons({ 
       gridOutline, hammerOutline, mapOutline, peopleOutline, business,
       settingsOutline, logOutOutline, sync, checkmarkCircle, warning, calendarOutline,
-      documentTextOutline, home, cubeOutline, shieldCheckmarkOutline
+      documentTextOutline, home, cubeOutline, shieldCheckmarkOutline,
+      checkboxOutline, imageOutline, squareOutline, createOutline, trashOutline, add, close
     });
     
     this.initializeApp();
 
-    // Suivi de l'URL active pour la surbrillance
     this.router.events.subscribe((event) => {
       if (event instanceof NavigationEnd) {
         this.currentUrl = event.url;
@@ -127,7 +131,7 @@ export class AppComponent {
         try {
           const rawPath = data.localPhotoPath;
           const fileName = rawPath.substring(rawPath.lastIndexOf('/') + 1);
-          // @ts-ignore - Ignore si la méthode n'existe pas encore dans votre version locale
+          // @ts-ignore
           const blob = await this.api.readLocalPhoto(fileName);
 
           this.api.uploadPhoto(blob).subscribe({
