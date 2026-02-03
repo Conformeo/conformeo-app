@@ -684,16 +684,15 @@ export class ApiService {
   // --- GESTION DES TÂCHES (FIXED) ---
   
   getTasks(chantierId: number | null = null): Observable<any[]> {
-    // If chantierId is provided, use the specific endpoint
     if (chantierId) {
+        // 👇 LE FIX EST ICI : this.getOptions() est OBLIGATOIRE
         return this.http.get<any[]>(`${this.apiUrl}/chantiers/${chantierId}/tasks`, this.getOptions());
     }
-    // Otherwise fetch all tasks (ensure backend supports this at /tasks)
     return this.http.get<any[]>(`${this.apiUrl}/tasks`, this.getOptions());
   }
 
   createTask(task: any) {
-    // IMPORTANT: added this.getOptions() to fix 401 error
+    // 👇 LE FIX EST ICI AUSSI
     return this.http.post<any>(`${this.apiUrl}/tasks`, task, this.getOptions());
   }
 
