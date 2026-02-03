@@ -1,17 +1,14 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
-import { Observable, from, of } from 'rxjs';
-import { map, switchMap, tap } from 'rxjs/operators';
+import { Observable, from, of, BehaviorSubject } from 'rxjs'; // Added BehaviorSubject
+import { map, switchMap, tap, catchError } from 'rxjs/operators';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Preferences } from '@capacitor/preferences';
 import { NavController } from '@ionic/angular';
 import { OfflineService } from './offline'; 
 
-import { catchError } from 'rxjs/operators';
-import { throwError } from 'rxjs';
-
 // --- INTERFACES ---
-
+// (Your interfaces remain unchanged)
 export interface Company {
   id: number;
   name: string;
@@ -154,7 +151,6 @@ export interface PermisFeu {
     date?: string;
 }
 
-
 export interface UserLogin { email?: string; username?: string; password: string; }
 export interface Token { access_token: string; token_type: string; }
 
@@ -167,6 +163,8 @@ export class ApiService {
   
   public needsRefresh = false;
   private token: string | null = null;
+  // Added authState for consistent auth checking across app
+  private authState = new BehaviorSubject<boolean>(false);
 
   constructor(
     public http: HttpClient,
@@ -175,6 +173,7 @@ export class ApiService {
   ) { 
     // 1. Chargement SYNCHRONE immédiat (Local Storage)
     this.token = localStorage.getItem('token') || localStorage.getItem('access_token');
+    if (this.token) this.authState.next(true);
     
     // 2. Chargement ASYNCHRONE (Capacitor Preferences)
     this.loadTokenAsync();
@@ -187,6 +186,7 @@ export class ApiService {
     localStorage.setItem('token', newToken);
     localStorage.setItem('access_token', newToken);
     Preferences.set({ key: 'auth_token', value: newToken });
+    this.authState.next(true);
   }
 
   async loadTokenAsync() {
@@ -195,6 +195,7 @@ export class ApiService {
       this.token = value;
       localStorage.setItem('token', value);
       localStorage.setItem('access_token', value);
+      this.authState.next(true);
     }
   }
 
@@ -218,6 +219,7 @@ export class ApiService {
           localStorage.setItem('access_token', t);
           localStorage.setItem('token', t);
           Preferences.set({ key: 'auth_token', value: t });
+          this.authState.next(true);
         }
       })
     );
@@ -243,6 +245,7 @@ export class ApiService {
     localStorage.clear();
     Preferences.clear();
     this.token = null;
+    this.authState.next(false);
     this.navCtrl.navigateRoot('/login');
   }
 
@@ -279,13 +282,18 @@ export class ApiService {
   }
 
   async readLocalPhoto(fileName: string): Promise<Blob> {
-    const readFile = await Filesystem.readFile({
-      path: fileName,
-      directory: Directory.Data 
-    });
-    const data = readFile.data;
-    const response = await fetch(`data:image/jpeg;base64,${data}`);
-    return await response.blob();
+    try {
+      const readFile = await Filesystem.readFile({
+        path: fileName,
+        directory: Directory.Data 
+      });
+      const data = readFile.data;
+      const response = await fetch(`data:image/jpeg;base64,${data}`);
+      return await response.blob();
+    } catch (e) {
+      console.error("Erreur lecture fichier local", e);
+      throw e;
+    }
   }
 
   // ==========================================
@@ -296,17 +304,17 @@ export class ApiService {
     return this.http.get<any>(`${this.apiUrl}/companies/me`, this.getOptions());
   }
 
-  // Mettre à jour les infos texte
   updateCompany(data: any): Observable<any> {
     return this.http.put(`${this.apiUrl}/companies/me`, data, this.getOptions());
   }
 
-  // Uploader le logo (Angular gère le Content-Type Multipart)
   uploadLogo(file: File): Observable<any> {
     const formData = new FormData();
     formData.append('file', file);
     
-    const token = localStorage.getItem('access_token');
+    // Manual header construction because Angular handles multipart boundary automatically 
+    // BUT we still need the token.
+    const token = localStorage.getItem('access_token') || this.token;
     const headers = new HttpHeaders({
       'Authorization': `Bearer ${token}`
     });
@@ -325,8 +333,7 @@ export class ApiService {
     formData.append('type_doc', type_doc);
     if (date_expiration) formData.append('date_expiration', date_expiration);
 
-    // IMPORTANT : On retire le Content-Type 'application/json' pour laisser le navigateur mettre le boundary
-    const token = localStorage.getItem('access_token');
+    const token = localStorage.getItem('access_token') || this.token;
     const headers = new HttpHeaders({
       'Authorization': `Bearer ${token}`
     });
@@ -355,8 +362,12 @@ export class ApiService {
   importChantiersCSV(file: File): Observable<any> {
     const formData = new FormData();
     formData.append('file', file);
-    const headers = this.getOptions().headers?.delete('Content-Type');
-    return this.http.post(`${this.apiUrl}/chantiers/import`, formData, { headers });
+    // Remove Content-Type to let browser set boundary
+    const options = this.getOptions();
+    if (options.headers) {
+        options.headers = options.headers.delete('Content-Type');
+    }
+    return this.http.post(`${this.apiUrl}/chantiers/import`, formData, options);
   }
 
   createChantier(chantier: Chantier): Observable<Chantier> {
@@ -391,7 +402,7 @@ export class ApiService {
     formData.append('categorie', categorie);
     formData.append('titre', titre);
 
-    const token = localStorage.getItem('token') || localStorage.getItem('access_token') || '';
+    const token = localStorage.getItem('token') || localStorage.getItem('access_token') || this.token || '';
     const headers = new HttpHeaders({
       'Authorization': `Bearer ${token}`
     });
@@ -408,7 +419,7 @@ export class ApiService {
     const formData = new FormData();
     formData.append('file', file);
     
-    const token = localStorage.getItem('access_token');
+    const token = localStorage.getItem('access_token') || this.token;
     const headers = new HttpHeaders({ 'Authorization': `Bearer ${token}` });
 
     return this.http.post<any>(`${this.apiUrl}/chantiers/${chantierId}/cover`, formData, { headers });
@@ -432,8 +443,12 @@ export class ApiService {
     if (!this.offline.isOnline.value) throw new Error('Offline');
     const formData = new FormData();
     formData.append('file', blob, 'photo.jpg');
-    const headers = this.getOptions().headers?.delete('Content-Type');
-    return this.http.post<{url: string}>(`${this.apiUrl}/upload`, formData, { headers });
+    
+    const options = this.getOptions();
+    if (options.headers) {
+        options.headers = options.headers.delete('Content-Type');
+    }
+    return this.http.post<{url: string}>(`${this.apiUrl}/upload`, formData, options);
   }
 
   createRapport(rapport: Rapport, photoUrl?: string): Observable<Rapport> {
@@ -508,8 +523,12 @@ export class ApiService {
   importMaterielsCSV(file: File): Observable<any> {
     const formData = new FormData();
     formData.append('file', file);
-    const headers = this.getOptions().headers?.delete('Content-Type');
-    return this.http.post(`${this.apiUrl}/materiels/import`, formData, { headers });
+    
+    const options = this.getOptions();
+    if (options.headers) {
+        options.headers = options.headers.delete('Content-Type');
+    }
+    return this.http.post(`${this.apiUrl}/materiels/import`, formData, options);
   }
 
   // ==========================================
@@ -570,17 +589,14 @@ export class ApiService {
 
   // --- GESTION DUERP ---
 
-  // 1. Récupérer les données (lignes) du DUERP pour une année donnée
   getDuerp(annee: string): Observable<any> {
     return this.http.get<any>(`${this.apiUrl}/companies/me/duerp/${annee}`, this.getOptions());
   }
 
-  // 2. Sauvegarder le formulaire (Écrase et remplace les lignes existantes)
   saveDuerp(data: any): Observable<any> {
     return this.http.post(`${this.apiUrl}/companies/me/duerp`, data, this.getOptions());
   }
 
-  // 3. Télécharger le PDF (Admin)
   downloadDuerpPdf(annee: string): Observable<Blob> {
     const url = `${this.apiUrl}/companies/me/duerp/${annee}/pdf`;
     return this.http.get(url, { 
@@ -589,7 +605,6 @@ export class ApiService {
     });
   }
 
-  // 4. 👇 NOUVELLE MÉTHODE : Télécharger le DUERP "Public" (Consultation Salariés)
   downloadPublicDuerp(): Observable<Blob> {
     return this.http.get(`${this.apiUrl}/duerp/consultation/pdf`, {
       responseType: 'blob',
@@ -615,7 +630,6 @@ export class ApiService {
   // 📧 ENVOI EMAILS
   // ==========================================
 
-  // Envoi du PdP par email
   sendPdpEmail(pdpId: number, emailDestinataire: string) {
     return this.http.post(`${this.apiUrl}/plans-prevention/${pdpId}/email`, { email: emailDestinataire }, this.getOptions());
   }
@@ -632,70 +646,72 @@ export class ApiService {
     return this.http.get<any>(`${this.apiUrl}/dashboard/stats`, this.getOptions());
   }
   
-  // Récupérer son propre profil
+  getDashboardStats(): Observable<any> { // Alias for compatibility
+    return this.getStats();
+  }
+  
   getMe(): Observable<User> {
     return this.http.get<User>(`${this.apiUrl}/users/me`, this.getOptions());
   }
 
-  // Mettre à jour son propre profil
   updateUser(data: any): Observable<User> {
     return this.http.put<User>(`${this.apiUrl}/users/me`, data, this.getOptions());
   }
 
-  // --- GESTION ÉQUIPE (MODIFIÉ : /team -> /users) ---
+  // --- GESTION ÉQUIPE ---
 
-  // Récupérer tous les membres de l'entreprise
   getTeam(): Observable<User[]> {
-    // ⚠️ CHANGEMENT DE ROUTE : /team -> /users
     return this.http.get<User[]>(`${this.apiUrl}/users`, this.getOptions());
   }
 
-  // Inviter un nouveau membre
   inviteMember(data: any): Observable<any> {
-    // ⚠️ CHANGEMENT DE ROUTE : /team/invite -> /users/invite
     return this.http.post(`${this.apiUrl}/users/invite`, data, this.getOptions());
   }
 
-  // Mettre à jour un membre spécifique (Admin)
   updateTeamMember(userId: number, data: any): Observable<any> {
-    // ⚠️ CHANGEMENT DE ROUTE : /team/{id} -> /users/{id}
     return this.http.put(`${this.apiUrl}/users/${userId}`, data, this.getOptions());
   }
 
-  // Alias pour garder la compatibilité avec votre code existant
   addTeamMember(user: any): Observable<User> {
     return this.inviteMember(user);
   }
 
-  // Supprimer un membre
   deleteMember(userId: number): Observable<any> {
-    // ⚠️ CHANGEMENT DE ROUTE : /team/{id} -> /users/{id}
     return this.http.delete(`${this.apiUrl}/users/${userId}`, this.getOptions());
   }
 
 
-  // --- GESTION DES TÂCHES ---
+  // --- GESTION DES TÂCHES (FIXED) ---
   
-  getTasks(chantierId: number) {
-    return this.http.get<any[]>(`${this.apiUrl}/chantiers/${chantierId}/tasks`);
+  getTasks(chantierId: number | null = null): Observable<any[]> {
+    // If chantierId is provided, use the specific endpoint
+    if (chantierId) {
+        return this.http.get<any[]>(`${this.apiUrl}/chantiers/${chantierId}/tasks`, this.getOptions());
+    }
+    // Otherwise fetch all tasks (ensure backend supports this at /tasks)
+    return this.http.get<any[]>(`${this.apiUrl}/tasks`, this.getOptions());
   }
 
   createTask(task: any) {
-    return this.http.post<any>(`${this.apiUrl}/tasks`, task);
+    // IMPORTANT: added this.getOptions() to fix 401 error
+    return this.http.post<any>(`${this.apiUrl}/tasks`, task, this.getOptions());
   }
 
   updateTask(taskId: number, data: any) {
-    return this.http.put<any>(`${this.apiUrl}/tasks/${taskId}`, data);
+    // IMPORTANT: added this.getOptions() to fix 401 error
+    return this.http.put<any>(`${this.apiUrl}/tasks/${taskId}`, data, this.getOptions());
   }
 
   deleteTask(taskId: number) {
-    return this.http.delete<any>(`${this.apiUrl}/tasks/${taskId}`);
+    // IMPORTANT: added this.getOptions() to fix 401 error
+    return this.http.delete<any>(`${this.apiUrl}/tasks/${taskId}`, this.getOptions());
   }
 
 
-  // --- PERMIS FEU ---
+  // --- PERMIS FEU (FIXED) ---
   savePermisFeu(data: any) {
-    return this.http.post<any>(`${this.apiUrl}/permis-feu`, data);
+    // IMPORTANT: added this.getOptions() to fix potential 401 error
+    return this.http.post<any>(`${this.apiUrl}/permis-feu`, data, this.getOptions());
   }
 
   getPermisFeuList(chantierId: number) {
