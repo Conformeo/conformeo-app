@@ -83,7 +83,7 @@ class Chantier(Base):
 # 3. MATERIEL
 # ==========================
 class Materiel(Base):
-    __tablename__ = "materiels_v2" # Si vous n'avez pas renommé celle-ci, on garde v2
+    __tablename__ = "materiels" 
 
     id = Column(Integer, primary_key=True, index=True)
     nom = Column(String, index=True)
@@ -269,7 +269,7 @@ class Task(Base):
     chantier = relationship("Chantier", back_populates="tasks")
 
 class PermisFeu(Base):
-    __tablename__ = "permis_feu_v2" # On garde v2 si pas renommé
+    __tablename__ = "permis_feu"
 
     id = Column(Integer, primary_key=True, index=True)
     
