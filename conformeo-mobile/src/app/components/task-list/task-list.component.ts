@@ -1,12 +1,10 @@
 import { Component, Input, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { IonicModule, AlertController, ToastController } from '@ionic/angular';
+import { IonicModule, AlertController, ToastController, NavController } from '@ionic/angular';
 import { ApiService } from '../../services/api';
-import { add, trashOutline, checkboxOutline, squareOutline, alertCircleOutline } from 'ionicons/icons';
+import { add, trashOutline, checkboxOutline, squareOutline, alertCircleOutline, flameOutline } from 'ionicons/icons';
 import { addIcons } from 'ionicons';
-import { ModalController } from '@ionic/angular';
-import { PermisFeuModalPage } from '../../pages/tasks/permis-feu-modal/permis-feu-modal.page';
 
 @Component({
   selector: 'app-task-list',
@@ -19,15 +17,22 @@ export class TaskListComponent implements OnInit {
   @Input() chantierId: number = 0;
   
   tasks: any[] = [];
-  newTaskDesc: string = '';
+  newTaskTitle: string = '';
+
+  // ⚠️ Liste des mots-clés déclencheurs
+  dangerousKeywords = [
+    'soudure', 'souder', 'feu', 'flamme', 'chalumeau', 
+    'meulage', 'disqueuse', 'étincelle', 'chaud', 'plomb',
+    'amiante', 'gaz', 'toiture', 'hauteur'
+  ];
 
   constructor(
     private api: ApiService,
     private alertCtrl: AlertController,
     private toastCtrl: ToastController,
-    private modalCtrl: ModalController
+    private navCtrl: NavController // Utilisation de NavController pour la redirection
   ) {
-    addIcons({ add, trashOutline, checkboxOutline, squareOutline, alertCircleOutline });
+    addIcons({ add, trashOutline, checkboxOutline, squareOutline, alertCircleOutline, flameOutline });
   }
 
   ngOnInit() {
@@ -42,113 +47,82 @@ export class TaskListComponent implements OnInit {
     });
   }
 
-  // ... (imports et constructor restent pareils)
-
   async addTask() {
-    if (!this.newTaskDesc.trim()) return;
+    // AJOUTEZ CETTE VÉRIFICATION 👇
+    if (!this.chantierId || this.chantierId <= 0) {
+      console.error("❌ Erreur : ID Chantier invalide (" + this.chantierId + ")");
+      this.presentToast("Impossible de créer la tâche : Chantier non identifié.", "danger");
+      return;
+    }
+    if (!this.newTaskTitle.trim() || !this.chantierId) return;
 
+    // Préparation de la donnée
     const taskData = {
-      description: this.newTaskDesc,
-      chantier_id: this.chantierId, // Assurez-vous que c'est bien this.chantierId (lié au @Input)
-      status: 'TODO',
-      date_prevue: new Date()
+      titre: this.newTaskTitle,
+      description: this.newTaskTitle, // On double le titre en description pour être sûr
+      chantier_id: this.chantierId,
+      fait: false,
+      date: new Date().toISOString().split('T')[0]
     };
 
+    // Copie du titre pour l'analyse AVANT que le champ ne soit vidé
+    const titleToCheck = this.newTaskTitle;
+
     // 1. Envoi au Backend
-    this.api.createTask(taskData).subscribe(async (newTask: any) => {
-      this.tasks.push(newTask);
-      this.newTaskDesc = '';
+    this.api.createTask(taskData).subscribe({
+      next: (newTask: any) => {
+        this.tasks.push(newTask);
+        this.newTaskTitle = ''; // Reset input
 
-      // 2. VÉRIFICATION DE LA RÉPONSE BACKEND
-      // Si le backend a détecté un risque, il a renvoyé 'alert_type' et 'alert_message'
-      if (newTask.alert_type) {
-        await this.handleRiskAlert(newTask);
+        // 2. INTELLIGENCE LOCALE (Plus rapide que le backend)
+        this.checkRiskAndPrompt(titleToCheck);
+      },
+      error: (err) => {
+        console.error(err);
+        this.presentToast("Erreur lors de la création de la tâche", "danger");
       }
     });
   }
 
-  async openPermisFeuModal() {
-    const modal = await this.modalCtrl.create({
-      component: PermisFeuModalPage,
-      componentProps: { 
-        chantierId: this.chantierId // 👈 ON PASSE L'ID ICI
-      }
-    });
-    await modal.present();
-
-    const { role } = await modal.onWillDismiss();
-    if (role === 'confirm') {
-      this.presentToast("✅ Permis de Feu généré et archivé !", "success");
-    }
+  // --- MOTEUR D'INTELLIGENCE & SÉCURITÉ ---
+  
+  // Fonction utilitaire pour le HTML (affiche icône feu)
+  isRisky(text: string): boolean {
+    if (!text) return false;
+    // On vérifie le texte en minuscule
+    return this.dangerousKeywords.some(k => text.toLowerCase().includes(k));
   }
 
-  // Nouvelle méthode pour gérer l'alerte reçue du serveur
-  async handleRiskAlert(task: any) {
-    
-    // CAS 1 : PERMIS DE FEU
-    if (task.alert_type === 'PERMIS_FEU') {
+  async checkRiskAndPrompt(titre: string) {
+    if (this.isRisky(titre)) {
       const alert = await this.alertCtrl.create({
-        header: '🔥 Risque Feu Détecté',
-        subHeader: 'Analyse Conforméo',
-        message: task.alert_message,
+        header: '🔥 Risque Détecté',
+        subHeader: `La tâche "${titre}" implique des points chauds ou des risques.`,
+        message: 'La réglementation impose un Permis de Feu ou une vérification DUERP.',
         buttons: [
           { text: 'Ignorer', role: 'cancel' },
           { 
-            text: '📄 Créer Permis de Feu', 
+            text: '📄 Créer Permis Feu', 
             handler: () => {
-              this.openPermisFeuModal(); // 👈 Appel de la fonction
+              // Redirection vers la page de création
+              this.navCtrl.navigateForward(['/permis-feu/create'], {
+                queryParams: { chantierId: this.chantierId }
+              });
+            }
+          },
+          {
+            text: '🛡️ Voir DUERP',
+            handler: () => {
+              this.navCtrl.navigateForward(['/securite-doc']);
             }
           }
         ]
       });
       await alert.present();
     }
-
-    // CAS 2 : DUERP / AUTRE
-    else {
-       const t = await this.toastCtrl.create({
-         message: `⚠️ ${task.alert_message}`,
-         duration: 4000,
-         color: 'warning',
-         position: 'top',
-         icon: 'alert-circle'
-       });
-       t.present();
-    }
   }
 
-  // ... (deleteTask, toggleTask restent pareils)
-
-  // --- MOTEUR D'INTELLIGENCE (Front-End Handler) ---
-  async checkTaskIntelligence(task: any) {
-    // Simulation temporaire avant branchement Backend IA
-    const desc = task.description.toLowerCase();
-    
-    // Cas 1 : Risque Feu détecté
-    if (desc.includes('soudure') || desc.includes('feu') || desc.includes('coupe')) {
-      const alert = await this.alertCtrl.create({
-        header: '🔥 Risque Feu Détecté',
-        message: 'Cette tâche nécessite un Permis de Feu. Voulez-vous le générer maintenant ?',
-        buttons: [
-          { text: 'Plus tard', role: 'cancel' },
-          { 
-            text: 'Générer Permis', 
-            handler: () => {
-              // TODO: Redirection vers page Permis de Feu ou génération auto
-              console.log("Génération Permis Feu..."); 
-            }
-          }
-        ]
-      });
-      await alert.present();
-    }
-
-    // Cas 2 : Risque Hauteur / DUERP
-    if (desc.includes('toiture') || desc.includes('echafaudage')) {
-       // TODO: Proposer mise à jour DUERP
-       this.presentToast("⚠️ Pensez à mettre à jour le DUERP (Risque Chute)", "warning");
-    }
-  }
+  // --- ACTIONS TÂCHES ---
 
   async deleteTask(task: any) {
     this.api.deleteTask(task.id).subscribe(() => {
@@ -157,9 +131,11 @@ export class TaskListComponent implements OnInit {
   }
 
   async toggleTask(task: any) {
-    const newStatus = task.status === 'TODO' ? 'DONE' : 'TODO';
-    task.status = newStatus; // Optimistic UI
-    this.api.updateTask(task.id, { status: newStatus }).subscribe();
+    // Gestion "Fait / Pas fait"
+    task.fait = !task.fait; 
+    // Note: Assurez-vous que votre API attend 'fait' (boolean) ou 'status' (string)
+    // Ici j'utilise 'fait' pour simplifier, adaptez selon votre API (ex: status: 'DONE')
+    this.api.updateTask(task.id, { fait: task.fait }).subscribe();
   }
 
   async presentToast(msg: string, color: string = 'success') {

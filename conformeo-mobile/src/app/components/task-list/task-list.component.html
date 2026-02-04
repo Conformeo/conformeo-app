@@ -6,32 +6,32 @@
 
   <div class="input-group">
     <ion-input 
-      placeholder="Nouvelle tâche (ex: Soudure support, Pose toiture...)" 
-      [(ngModel)]="newTaskDesc"
+      placeholder="Nouvelle tâche (ex: Soudure...)" 
+      [(ngModel)]="newTaskTitle"
       (keyup.enter)="addTask()">
     </ion-input>
-    <ion-button (click)="addTask()" size="small">
-      <ion-icon name="add"></ion-icon>
+    <ion-button (click)="addTask()" size="small" fill="clear">
+      <ion-icon name="add-circle" size="large"></ion-icon>
     </ion-button>
   </div>
 
   <ion-list lines="none">
     <ion-item-sliding *ngFor="let t of tasks">
       
-      <ion-item class="task-item" [class.done]="t.status === 'DONE'">
+      <ion-item class="task-item" [class.done]="t.fait">
         <ion-icon 
           slot="start" 
-          [name]="t.status === 'DONE' ? 'checkbox-outline' : 'square-outline'"
-          [color]="t.status === 'DONE' ? 'success' : 'medium'"
+          [name]="t.fait ? 'checkbox-outline' : 'square-outline'"
+          [color]="t.fait ? 'success' : 'medium'"
           (click)="toggleTask(t)">
         </ion-icon>
         
         <ion-label>
-          <h2>{{ t.description }}</h2>
-          <p>{{ t.date_prevue | date:'dd/MM/yyyy' }}</p>
+          <h2>{{ t.titre || t.description || 'Tâche sans nom' }}</h2>
+          <p>{{ t.date || t.date_prevue | date:'dd/MM/yyyy' }}</p>
         </ion-label>
 
-        <ion-icon *ngIf="t.alert_type" name="alert-circle-outline" color="warning" slot="end"></ion-icon>
+        <ion-icon *ngIf="isRisky(t.titre || t.description)" name="flame-outline" color="danger" slot="end"></ion-icon>
       </ion-item>
 
       <ion-item-options side="end">

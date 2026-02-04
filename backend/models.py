@@ -38,18 +38,17 @@ class User(Base):
     company = relationship("Company", back_populates="users")
 
 # ==========================
-# 2. CHANTIERS
+# 2. CHANTIERS (Table principale)
 # ==========================
 class Chantier(Base):
-    # 👇 On force la création d'une nouvelle table propre
-    __tablename__ = "chantiers_v2"
+    # ✅ CORRECTION : On pointe maintenant vers la table "chantiers" standard
+    __tablename__ = "chantiers"
 
     id = Column(Integer, primary_key=True, index=True)
     nom = Column(String, index=True)
     adresse = Column(String, nullable=True)
     client = Column(String, nullable=True)
     
-    # 👇 Utiliser 'Date' est plus simple que 'DateTime' pour un planning
     date_debut = Column(Date, nullable=True)
     date_fin = Column(Date, nullable=True)
     
@@ -78,13 +77,13 @@ class Chantier(Base):
     pic = relationship("PIC", uselist=False, back_populates="chantier")
     tasks = relationship("Task", back_populates="chantier")
     permis_feu = relationship("PermisFeu", back_populates="chantier")
-
+    # docs_externes est géré via backref dans DocExterne
 
 # ==========================
 # 3. MATERIEL
 # ==========================
 class Materiel(Base):
-    __tablename__ = "materiels_v2"
+    __tablename__ = "materiels_v2" # Si vous n'avez pas renommé celle-ci, on garde v2
 
     id = Column(Integer, primary_key=True, index=True)
     nom = Column(String, index=True)
@@ -100,7 +99,8 @@ class Materiel(Base):
     company_id = Column(Integer, ForeignKey("companies.id"), nullable=True)
     company = relationship("Company", back_populates="materiels")
     
-    chantier_id = Column(Integer, ForeignKey("chantiers_v2.id"), nullable=True) # 👈 Notez le lien vers chantiers_v2
+    # ✅ CORRECTION : Lien vers "chantiers.id"
+    chantier_id = Column(Integer, ForeignKey("chantiers.id"), nullable=True) 
     chantier = relationship("Chantier", back_populates="materiels")
 
 # ==========================
@@ -122,7 +122,10 @@ class Rapport(Base):
     titre = Column(String)
     description = Column(String)
     photo_url = Column(String, nullable=True) 
-    chantier_id = Column(Integer, ForeignKey("chantiers_v2.id")) # 👈 Lien mis à jour
+    
+    # ✅ CORRECTION : Lien vers "chantiers.id"
+    chantier_id = Column(Integer, ForeignKey("chantiers.id"))
+    
     date_creation = Column(DateTime, default=datetime.utcnow)
     niveau_urgence = Column(String, default="Faible")
     latitude = Column(Float, nullable=True)
@@ -138,7 +141,10 @@ class Inspection(Base):
     titre = Column(String)
     type = Column(String)
     data = Column(JSON) 
-    chantier_id = Column(Integer, ForeignKey("chantiers_v2.id")) # 👈 Lien mis à jour
+    
+    # ✅ CORRECTION : Lien vers "chantiers.id"
+    chantier_id = Column(Integer, ForeignKey("chantiers.id"))
+    
     date_creation = Column(DateTime, default=datetime.utcnow)
     createur = Column(String)
 
@@ -151,7 +157,10 @@ class PPSPS(Base):
     __tablename__ = "ppsps"
 
     id = Column(Integer, primary_key=True, index=True)
-    chantier_id = Column(Integer, ForeignKey("chantiers_v2.id")) # 👈 Lien mis à jour
+    
+    # ✅ CORRECTION
+    chantier_id = Column(Integer, ForeignKey("chantiers.id"))
+    
     maitre_ouvrage = Column(String)
     maitre_oeuvre = Column(String)
     coordonnateur_sps = Column(String)
@@ -170,7 +179,10 @@ class PlanPrevention(Base):
     __tablename__ = "plans_prevention"
 
     id = Column(Integer, primary_key=True, index=True)
-    chantier_id = Column(Integer, ForeignKey("chantiers_v2.id")) # 👈 Lien mis à jour
+    
+    # ✅ CORRECTION
+    chantier_id = Column(Integer, ForeignKey("chantiers.id"))
+    
     entreprise_utilisatrice = Column(String) 
     entreprise_exterieure = Column(String)   
     date_inspection_commune = Column(DateTime, default=datetime.utcnow)
@@ -186,7 +198,9 @@ class PIC(Base):
     __tablename__ = "pics"
 
     id = Column(Integer, primary_key=True, index=True)
-    chantier_id = Column(Integer, ForeignKey("chantiers_v2.id")) # 👈 Lien mis à jour
+    
+    # ✅ CORRECTION
+    chantier_id = Column(Integer, ForeignKey("chantiers.id"))
     
     acces = Column(String, nullable=True)          
     clotures = Column(String, nullable=True)       
@@ -226,7 +240,6 @@ class DUERPLigne(Base):
     id = Column(Integer, primary_key=True, index=True)
     duerp_id = Column(Integer, ForeignKey("duerps.id"))
     
-    # 👇 CES DEUX LIGNES SONT OBLIGATOIRES POUR QUE ÇA MARCHE
     unite_travail = Column(String, default="Général") 
     statut = Column(String, default="EN COURS")
     
@@ -246,17 +259,23 @@ class Task(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     description = Column(String, index=True)
+    # Ajout optionnel du titre pour compatibilité future si besoin
+    titre = Column(String, nullable=True) 
     status = Column(String, default="TODO") 
     date_prevue = Column(DateTime, default=datetime.utcnow)
     
-    chantier_id = Column(Integer, ForeignKey("chantiers_v2.id")) # 👈 Lien mis à jour
+    # ✅ CORRECTION : Lien vers "chantiers.id"
+    chantier_id = Column(Integer, ForeignKey("chantiers.id"))
     chantier = relationship("Chantier", back_populates="tasks")
 
 class PermisFeu(Base):
-    __tablename__ = "permis_feu_v2"
+    __tablename__ = "permis_feu_v2" # On garde v2 si pas renommé
 
     id = Column(Integer, primary_key=True, index=True)
-    chantier_id = Column(Integer, ForeignKey("chantiers_v2.id")) # 👈 Lien mis à jour
+    
+    # ✅ CORRECTION : Lien vers "chantiers.id"
+    chantier_id = Column(Integer, ForeignKey("chantiers.id"))
+    
     date = Column(DateTime, default=datetime.utcnow)
     
     lieu = Column(String)
@@ -272,24 +291,12 @@ class PermisFeu(Base):
     chantier = relationship("Chantier", back_populates="permis_feu")
 
 
-# 1. Définition temporaire de l'ancienne table pour lecture
+# ⚠️ Archivage de l'ancienne table si elle existe encore sous le nom 'chantiers_old'
 class OldChantier(Base):
-    __tablename__ = "chantiers" # 👈 On cible l'ancienne table
+    __tablename__ = "chantiers_old" # On pointe vers la table archivée
     id = Column(Integer, primary_key=True, index=True)
     nom = Column(String)
-    adresse = Column(String)
-    client = Column(String)
-    est_actif = Column(Boolean)
-    date_creation = Column(DateTime)
-    signature_url = Column(String)
-    cover_url = Column(String)
-    latitude = Column(Float)
-    longitude = Column(Float)
-    date_debut = Column(DateTime)
-    date_fin = Column(DateTime)
-    statut_planning = Column(String)
-    company_id = Column(Integer)
-    # Note : Pas de 'soumis_sps' ici car il n'existait pas
+    # ... autres champs ...
 
 # ==========================
 # 8. DOCUMENTS EXTERNES (DOE / GED)
@@ -298,11 +305,13 @@ class DocExterne(Base):
     __tablename__ = "docs_externes"
 
     id = Column(Integer, primary_key=True, index=True)
-    chantier_id = Column(Integer, ForeignKey("chantiers_v2.id"))
     
-    titre = Column(String)       # Ex: "Plan RDC", "Notice Chaudière"
-    url = Column(String)         # L'URL Cloudinary ou locale
-    categorie = Column(String)   # "PLANS", "NOTICES", "MAINTENANCE", "GARANTIES", "DECHETS"
+    # ✅ CORRECTION : Lien vers "chantiers.id"
+    chantier_id = Column(Integer, ForeignKey("chantiers.id"))
+    
+    titre = Column(String)
+    url = Column(String)
+    categorie = Column(String)
     date_ajout = Column(DateTime, default=datetime.utcnow)
     
     # Lien vers le chantier
@@ -315,7 +324,7 @@ class CompanyDocument(Base):
     titre = Column(String)
     url = Column(String)
     date_upload = Column(DateTime, default=datetime.utcnow)
-    date_expiration = Column(DateTime, nullable=True) # Utile pour les assurances
+    date_expiration = Column(DateTime, nullable=True)
 
     company_id = Column(Integer, ForeignKey("companies.id"))
     company = relationship("Company", back_populates="documents")

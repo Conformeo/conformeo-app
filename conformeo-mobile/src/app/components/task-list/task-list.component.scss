@@ -1,0 +1,58 @@
+.tasks-container {
+  padding: 10px;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  
+  h3 {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+  }
+}
+
+.input-group {
+  display: flex;
+  align-items: center;
+  background: white;
+  border-radius: 12px;
+  padding: 0 5px;
+  border: 1px solid #e0e0e0;
+  margin-bottom: 15px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+
+  ion-input {
+    --padding-start: 10px;
+  }
+}
+
+.task-item {
+  --background: transparent;
+  --padding-start: 0;
+  margin-bottom: 5px;
+  
+  &.done {
+    opacity: 0.6;
+    text-decoration: line-through;
+  }
+  
+  h2 {
+    font-size: 1rem;
+    font-weight: 500;
+  }
+  p {
+    font-size: 0.8rem;
+    color: #666;
+  }
+}
+
+.empty-state {
+  text-align: center;
+  padding: 20px;
+  color: #999;
+  font-style: italic;
+}

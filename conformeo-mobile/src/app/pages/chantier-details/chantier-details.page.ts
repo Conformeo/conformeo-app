@@ -59,6 +59,17 @@ export class ChantierDetailsPage implements OnInit {
   currentUploadCategory = ''; // Catégorie en cours d'upload
   
   @ViewChild('doeFileInput') fileInput!: ElementRef;
+
+  // --- GESTION DES TACHES (AJOUTÉ) ---
+  newTaskTitle: string = ''; // Champ de saisie pour nouvelle tâche
+  tasks: any[] = []; // Liste des tâches si gérées ici
+
+  // ⚠️ LISTE DES MOTS-CLÉS DANGEREUX (AJOUTÉ)
+  dangerousKeywords = [
+    'soudure', 'souder', 'feu', 'flamme', 'chalumeau', 
+    'meulage', 'disqueuse', 'étincelle', 'chaud', 'plomb',
+    'amiante', 'gaz', 'toiture', 'hauteur', 'electrique', 'tension'
+  ];
   
   constructor(
     private route: ActivatedRoute,
@@ -121,6 +132,9 @@ export class ChantierDetailsPage implements OnInit {
 
     // 4. DOE (Documents Externes)
     this.loadDoeDocs();
+
+    // 5. Tâches (AJOUTÉ si vous voulez les gérer ici)
+    this.loadTasks();
   }
 
   loadRapports() {
@@ -128,6 +142,93 @@ export class ChantierDetailsPage implements OnInit {
       this.rapports = data.sort((a, b) => 
         new Date(b.date_creation || 0).getTime() - new Date(a.date_creation || 0).getTime()
       );
+    });
+  }
+
+  loadTasks() {
+    this.api.getTasks(this.chantierId).subscribe(data => {
+      this.tasks = data;
+    });
+  }
+
+  // ==========================================
+  // ✅ GESTION DES TÂCHES & SÉCURITÉ (AJOUTÉ)
+  // ==========================================
+
+  addTask() {
+    if (!this.newTaskTitle.trim() || !this.chantierId) return;
+
+    // ✅ CORRECTION ERREUR 422 : On ajoute 'description'
+    const taskData = {
+      titre: this.newTaskTitle,
+      description: this.newTaskTitle, // Obligatoire pour le backend
+      chantier_id: this.chantierId,
+      fait: false,
+      date: new Date().toISOString().split('T')[0]
+    };
+
+    // On garde le titre pour l'analyse
+    const titleToCheck = this.newTaskTitle;
+
+    this.api.createTask(taskData).subscribe({
+      next: (newTask) => {
+        this.tasks.push(newTask);
+        this.newTaskTitle = ''; // On vide le champ
+        
+        // 🚨 Lance l'alerte si nécessaire
+        this.checkRiskAndPrompt(titleToCheck);
+      },
+      error: (err) => {
+        console.error(err);
+        // Affichage discret de l'erreur
+        this.toastCtrl.create({
+            message: 'Erreur ajout tâche. Vérifiez la connexion.',
+            duration: 2000, color: 'danger'
+        }).then(t => t.present());
+      }
+    });
+  }
+
+  async checkRiskAndPrompt(titre: string) {
+    const lowerTitre = titre.toLowerCase();
+    const isDangerous = this.dangerousKeywords.some(keyword => lowerTitre.includes(keyword));
+
+    if (isDangerous) {
+      const alert = await this.alertCtrl.create({
+        header: '⚠️ Activité à Risque',
+        subHeader: `La tâche "${titre}" implique des risques.`,
+        message: 'Souhaitez-vous créer un Permis de Feu ou consulter le DUERP ?',
+        buttons: [
+          { text: 'Ignorer', role: 'cancel' },
+          {
+            text: '🔥 Permis Feu',
+            handler: () => {
+              // Navigation vers la création de permis feu
+              this.navCtrl.navigateForward(['/permis-feu/create'], { // Vérifiez bien cette route
+                queryParams: { chantierId: this.chantierId }
+              });
+            }
+          },
+          {
+            text: '🛡️ Sécurité',
+            handler: () => {
+               this.navCtrl.navigateForward(['/securite-doc']); 
+            }
+          }
+        ]
+      });
+      await alert.present();
+    }
+  }
+
+  toggleTask(task: any) {
+    task.fait = !task.fait;
+    this.api.updateTask(task.id, { fait: task.fait }).subscribe();
+  }
+
+  deleteTask(task: any) {
+    this.api.deleteTask(task.id).subscribe(() => {
+      this.tasks = this.tasks.filter(t => t.id !== task.id);
     });
   }
 

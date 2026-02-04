@@ -685,15 +685,33 @@ export class ApiService {
   
   getTasks(chantierId: number | null = null): Observable<any[]> {
     if (chantierId) {
-        // 👇 LE FIX EST ICI : this.getOptions() est OBLIGATOIRE
         return this.http.get<any[]>(`${this.apiUrl}/chantiers/${chantierId}/tasks`, this.getOptions());
     }
     return this.http.get<any[]>(`${this.apiUrl}/tasks`, this.getOptions());
   }
 
-  createTask(task: any) {
-    // 👇 LE FIX EST ICI AUSSI
-    return this.http.post<any>(`${this.apiUrl}/tasks`, task, this.getOptions());
+  // --- GESTION DES TÂCHES ---
+
+  createTask(task: any): Observable<any> {
+    const token = localStorage.getItem('access_token') || this.token;
+    
+    // On force le Content-Type pour éviter l'erreur "Unknown Error"
+    const headers = new HttpHeaders({
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json' 
+    });
+
+    // Construction du payload exact attendu par FastAPI
+    const payload = {
+      titre: task.titre,
+      // ✅ FIX CRITIQUE : On s'assure que la description est envoyée
+      description: task.description || task.titre, 
+      chantier_id: task.chantier_id,
+      fait: task.fait || false,
+      date: task.date || new Date().toISOString().split('T')[0]
+    };
+
+    return this.http.post<any>(`${this.apiUrl}/tasks`, payload, { headers });
   }
 
   updateTask(taskId: number, data: any) {

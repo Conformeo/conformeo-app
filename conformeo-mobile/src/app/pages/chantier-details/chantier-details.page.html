@@ -1,6 +1,8 @@
 <ion-header class="ion-no-border">
   <ion-toolbar color="primary">
-    <ion-buttons slot="start"><ion-back-button defaultHref="/home"></ion-back-button></ion-buttons>
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/home"></ion-back-button>
+    </ion-buttons>
     <ion-title>Détails Chantier</ion-title>
     <ion-buttons slot="end">
       <ion-button (click)="editChantier()">
@@ -10,8 +12,12 @@
   </ion-toolbar>
 
   <ion-segment [(ngModel)]="segment" mode="md" class="header-segment">
-    <ion-segment-button value="suivi"><ion-label>Suivi & Terrain</ion-label></ion-segment-button>
-    <ion-segment-button value="doe"><ion-label>DOE & Fin</ion-label></ion-segment-button>
+    <ion-segment-button value="suivi">
+      <ion-label>Suivi & Terrain</ion-label>
+    </ion-segment-button>
+    <ion-segment-button value="doe">
+      <ion-label>DOE & Fin</ion-label>
+    </ion-segment-button>
   </ion-segment>
 </ion-header>
 
@@ -20,11 +26,12 @@
   <div class="header-image-container">
     <img [src]="api.getFullUrl(chantier?.cover_url) || 'assets/chantier-placeholder.jpg'" 
          class="cover-img" 
+         alt="Couverture"
          onerror="this.src='assets/chantier-placeholder.jpg'">
          
     <div class="header-overlay">
       <div class="header-text">
-        <h1 class="chantier-title">{{ chantier?.nom }}</h1>
+        <h1 class="chantier-title">{{ chantier?.nom || 'Chargement...' }}</h1>
         <p class="chantier-subtitle">{{ chantier?.client }}</p>
       </div>
     </div>
@@ -54,7 +61,11 @@
             
             <div class="status-wrapper">
               <span class="label">STATUT</span>
-              <ion-select interface="popover" [value]="chantier?.est_actif" (ionChange)="updateStatus($event)" class="status-select" [class.actif]="chantier?.est_actif">
+              <ion-select interface="popover" 
+                          [value]="chantier?.est_actif" 
+                          (ionChange)="updateStatus($event)" 
+                          class="status-select" 
+                          [class.actif]="chantier?.est_actif">
                 <ion-select-option [value]="true">En cours 🟢</ion-select-option>
                 <ion-select-option [value]="false">Terminé 🏁</ion-select-option>
               </ion-select>
@@ -65,11 +76,15 @@
 
       <div class="actions-grid">
         <div class="action-btn" (click)="downloadPdf()">
-          <div class="icon-circle bg-pdf"><ion-icon name="document-text"></ion-icon></div>
+          <div class="icon-circle bg-pdf">
+            <ion-icon name="document-text"></ion-icon>
+          </div>
           <span>PDF</span>
         </div>
         <div class="action-btn" (click)="sendJournal()">
-          <div class="icon-circle bg-mail"><ion-icon name="mail"></ion-icon></div>
+          <div class="icon-circle bg-mail">
+            <ion-icon name="mail"></ion-icon>
+          </div>
           <span>Envoyer</span>
         </div>
         
@@ -84,13 +99,17 @@
 
         <ng-template #pdpButton>
           <div class="action-btn" [routerLink]="['/pdp-form', chantierId]">
-            <div class="icon-circle bg-pdp"><ion-icon name="document-lock-outline"></ion-icon></div>
+            <div class="icon-circle bg-pdp">
+              <ion-icon name="document-lock-outline"></ion-icon>
+            </div>
             <span>PdP</span>
           </div>
         </ng-template>
         
         <div class="action-btn" (click)="openSignature()">
-          <div class="icon-circle bg-sign"><ion-icon name="create"></ion-icon></div>
+          <div class="icon-circle bg-sign">
+            <ion-icon name="create"></ion-icon>
+          </div>
           <span>Signer</span>
         </div>
       </div>
@@ -105,9 +124,12 @@
       <div class="section-header" *ngIf="materielsSurSite.length > 0">
         <h3>Matériel sur place ({{ materielsSurSite.length }})</h3>
       </div>
+      
       <div class="materiel-scroll" *ngIf="materielsSurSite.length > 0">
         <ion-card *ngFor="let mat of materielsSurSite" class="mat-card">
-          <div class="mat-img" [style.backgroundImage]="'url(' + (api.getFullUrl(mat.image_url) || 'assets/no-img.png') + ')'"></div>
+          <div class="mat-img" 
+               [style.backgroundImage]="'url(' + (api.getFullUrl(mat.image_url) || 'assets/no-img.png') + ')'">
+          </div>
           <ion-card-header>
             <ion-card-title>{{ mat.nom }}</ion-card-title>
             <div class="etat-badge" [ngClass]="mat.etat.toLowerCase()">{{ mat.etat }}</div>
@@ -116,6 +138,7 @@
       </div>
 
       <div class="section-header"><h3>Journal Photo</h3></div>
+      
       <div *ngIf="rapports.length === 0" class="empty-journal">
         <p>Aucune observation photo. 👇</p>
       </div>
@@ -124,10 +147,16 @@
         <div *ngIf="hasImage(rap)" class="rapport-img" [style.backgroundImage]="'url(' + getFirstImage(rap) + ')'">
           <div class="date-badge">{{ rap.date_creation | date:'dd MMM' }}</div>
         </div>
+        <div *ngIf="!hasImage(rap)" class="rapport-no-img">
+           <div class="date-badge-inline">{{ rap.date_creation | date:'dd/MM/yyyy' }}</div>
+        </div>
+
         <ion-card-content>
           <div class="top-line">
             <h2>{{ rap.titre || 'Rapport' }}</h2>
-            <ion-badge [color]="rap.niveau_urgence === 'Critique' ? 'danger' : 'success'">{{ rap.niveau_urgence }}</ion-badge>
+            <ion-badge [color]="rap.niveau_urgence === 'Critique' ? 'danger' : 'success'">
+              {{ rap.niveau_urgence }}
+            </ion-badge>
           </div>
         </ion-card-content>
       </ion-card>
@@ -162,7 +191,11 @@
       <ion-accordion-group expand="inset" class="doe-accordion">
         
         <ion-accordion value="PLANS">
-          <ion-item slot="header" color="light"><ion-icon name="map-outline" slot="start" color="primary"></ion-icon><ion-label>Plans Conformes</ion-label><ion-badge slot="end">{{ getCount('PLANS') }}</ion-badge></ion-item>
+          <ion-item slot="header" color="light">
+            <ion-icon name="map-outline" slot="start" color="primary"></ion-icon>
+            <ion-label>Plans Conformes</ion-label>
+            <ion-badge slot="end">{{ getCount('PLANS') }}</ion-badge>
+          </ion-item>
           <div class="ion-padding content-box" slot="content">
             <ion-button expand="block" fill="outline" size="small" (click)="uploadDoeDoc('PLANS')">
               <ion-icon name="cloud-upload" slot="start"></ion-icon> Ajouter un plan
@@ -177,41 +210,77 @@
         </ion-accordion>
 
         <ion-accordion value="NOTICES">
-          <ion-item slot="header" color="light"><ion-icon name="book" slot="start" color="secondary"></ion-icon><ion-label>Notices Techniques</ion-label><ion-badge slot="end" color="secondary">{{ getCount('NOTICES') }}</ion-badge></ion-item>
+          <ion-item slot="header" color="light">
+            <ion-icon name="book" slot="start" color="secondary"></ion-icon>
+            <ion-label>Notices Techniques</ion-label>
+            <ion-badge slot="end" color="secondary">{{ getCount('NOTICES') }}</ion-badge>
+          </ion-item>
           <div class="ion-padding content-box" slot="content">
-            <ion-button expand="block" fill="outline" size="small" (click)="uploadDoeDoc('NOTICES')">Ajouter une notice</ion-button>
+            <ion-button expand="block" fill="outline" size="small" (click)="uploadDoeDoc('NOTICES')">
+              Ajouter une notice
+            </ion-button>
             <ion-list>
-              <ion-item *ngFor="let d of getDocs('NOTICES')"><ion-label>{{ d.titre }}</ion-label><ion-icon name="trash" slot="end" color="danger" (click)="deleteDoc(d.id)"></ion-icon></ion-item>
+              <ion-item *ngFor="let d of getDocs('NOTICES')">
+                <ion-label>{{ d.titre }}</ion-label>
+                <ion-icon name="trash" slot="end" color="danger" (click)="deleteDoc(d.id)"></ion-icon>
+              </ion-item>
             </ion-list>
           </div>
         </ion-accordion>
 
         <ion-accordion value="MAINTENANCE">
-          <ion-item slot="header" color="light"><ion-icon name="hammer-outline" slot="start" color="warning"></ion-icon><ion-label>Maintenance</ion-label><ion-badge slot="end" color="warning">{{ getCount('MAINTENANCE') }}</ion-badge></ion-item>
+          <ion-item slot="header" color="light">
+            <ion-icon name="hammer-outline" slot="start" color="warning"></ion-icon>
+            <ion-label>Maintenance</ion-label>
+            <ion-badge slot="end" color="warning">{{ getCount('MAINTENANCE') }}</ion-badge>
+          </ion-item>
           <div class="ion-padding content-box" slot="content">
-            <ion-button expand="block" fill="outline" size="small" (click)="uploadDoeDoc('MAINTENANCE')">Ajouter un carnet</ion-button>
+            <ion-button expand="block" fill="outline" size="small" (click)="uploadDoeDoc('MAINTENANCE')">
+              Ajouter un carnet
+            </ion-button>
             <ion-list>
-              <ion-item *ngFor="let d of getDocs('MAINTENANCE')"><ion-label>{{ d.titre }}</ion-label><ion-icon name="trash" slot="end" color="danger" (click)="deleteDoc(d.id)"></ion-icon></ion-item>
+              <ion-item *ngFor="let d of getDocs('MAINTENANCE')">
+                <ion-label>{{ d.titre }}</ion-label>
+                <ion-icon name="trash" slot="end" color="danger" (click)="deleteDoc(d.id)"></ion-icon>
+              </ion-item>
             </ion-list>
           </div>
         </ion-accordion>
 
         <ion-accordion value="GARANTIES">
-          <ion-item slot="header" color="light"><ion-icon name="ribbon" slot="start" color="success"></ion-icon><ion-label>Garanties</ion-label><ion-badge slot="end" color="success">{{ getCount('GARANTIES') }}</ion-badge></ion-item>
+          <ion-item slot="header" color="light">
+            <ion-icon name="ribbon" slot="start" color="success"></ion-icon>
+            <ion-label>Garanties</ion-label>
+            <ion-badge slot="end" color="success">{{ getCount('GARANTIES') }}</ion-badge>
+          </ion-item>
           <div class="ion-padding content-box" slot="content">
-            <ion-button expand="block" fill="outline" size="small" (click)="uploadDoeDoc('GARANTIES')">Ajouter certificat</ion-button>
+            <ion-button expand="block" fill="outline" size="small" (click)="uploadDoeDoc('GARANTIES')">
+              Ajouter certificat
+            </ion-button>
             <ion-list>
-              <ion-item *ngFor="let d of getDocs('GARANTIES')"><ion-label>{{ d.titre }}</ion-label><ion-icon name="trash" slot="end" color="danger" (click)="deleteDoc(d.id)"></ion-icon></ion-item>
+              <ion-item *ngFor="let d of getDocs('GARANTIES')">
+                <ion-label>{{ d.titre }}</ion-label>
+                <ion-icon name="trash" slot="end" color="danger" (click)="deleteDoc(d.id)"></ion-icon>
+              </ion-item>
             </ion-list>
           </div>
         </ion-accordion>
 
         <ion-accordion value="DECHETS">
-          <ion-item slot="header" color="light"><ion-icon name="trash-outline" slot="start" color="medium"></ion-icon><ion-label>Déchets & DIUO</ion-label><ion-badge slot="end" color="medium">{{ getCount('DECHETS') }}</ion-badge></ion-item>
+          <ion-item slot="header" color="light">
+            <ion-icon name="trash-outline" slot="start" color="medium"></ion-icon>
+            <ion-label>Déchets & DIUO</ion-label>
+            <ion-badge slot="end" color="medium">{{ getCount('DECHETS') }}</ion-badge>
+          </ion-item>
           <div class="ion-padding content-box" slot="content">
-            <ion-button expand="block" fill="outline" size="small" (click)="uploadDoeDoc('DECHETS')">Ajouter BSD</ion-button>
+            <ion-button expand="block" fill="outline" size="small" (click)="uploadDoeDoc('DECHETS')">
+              Ajouter BSD
+            </ion-button>
             <ion-list>
-              <ion-item *ngFor="let d of getDocs('DECHETS')"><ion-label>{{ d.titre }}</ion-label><ion-icon name="trash" slot="end" color="danger" (click)="deleteDoc(d.id)"></ion-icon></ion-item>
+              <ion-item *ngFor="let d of getDocs('DECHETS')">
+                <ion-label>{{ d.titre }}</ion-label>
+                <ion-icon name="trash" slot="end" color="danger" (click)="deleteDoc(d.id)"></ion-icon>
+              </ion-item>
             </ion-list>
           </div>
         </ion-accordion>
@@ -220,7 +289,8 @@
 
       <div class="ion-padding ion-margin-top">
         <ion-button expand="block" size="large" color="dark" (click)="downloadFullDoe()">
-          <ion-icon name="download-outline" slot="start" class="ion-margin-end"></ion-icon> TÉLÉCHARGER LE DOE (.zip)
+          <ion-icon name="download-outline" slot="start" class="ion-margin-end"></ion-icon> 
+          TÉLÉCHARGER LE DOE (.zip)
         </ion-button>
       </div>
     </div>
