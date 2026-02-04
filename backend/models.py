@@ -260,7 +260,7 @@ class Task(Base):
     id = Column(Integer, primary_key=True, index=True)
     description = Column(String, index=True)
     # Ajout optionnel du titre pour compatibilité future si besoin
-    titre = Column(String, nullable=True) 
+    # titre = Column(String, nullable=True) 
     status = Column(String, default="TODO") 
     date_prevue = Column(DateTime, default=datetime.utcnow)
     
