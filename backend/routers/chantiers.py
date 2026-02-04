@@ -132,3 +132,38 @@ def send_email(cid: int, email_dest: str, db: Session = Depends(get_db), current
     if send_email_via_brevo(email_dest, f"Suivi - {c.nom}", html, pdf_buffer, f"Journal_{c.nom}.pdf"):
         return {"message": "Email envoyé !"}
     raise HTTPException(500, "Erreur envoi email")
+
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+from .. import models, schemas, database
+
+# ... (assurez-vous d'avoir les imports)
+
+router = APIRouter()
+
+@router.post("/chantiers/{chantier_id}/permis-feu")
+def create_permis_feu(chantier_id: int, permis: schemas.PermisFeuCreate, db: Session = Depends(database.get_db)):
+    # 1. Vérifier si le chantier existe
+    chantier = db.query(models.Chantier).filter(models.Chantier.id == chantier_id).first()
+    if not chantier:
+        raise HTTPException(status_code=404, detail="Chantier introuvable")
+
+    # 2. Créer l'objet PermisFeu
+    new_permis = models.PermisFeu(
+        chantier_id=chantier_id,
+        lieu=permis.lieu,
+        intervenant=permis.intervenant,
+        description=permis.description,
+        extincteur=permis.extincteur,
+        nettoyage=permis.nettoyage,
+        surveillance=permis.surveillance,
+        signature=permis.signature,
+        date=datetime.utcnow() 
+    )
+
+    # 3. Sauvegarder dans la DB
+    db.add(new_permis)
+    db.commit()
+    db.refresh(new_permis)
+
+    return new_permis

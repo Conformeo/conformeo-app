@@ -105,7 +105,7 @@ export class TaskListComponent implements OnInit {
             text: '📄 Créer Permis Feu', 
             handler: () => {
               // Redirection vers la page de création
-              this.navCtrl.navigateForward(['/permis-feu/create'], {
+              this.navCtrl.navigateForward(['/permis-feu-modal'], {
                 queryParams: { chantierId: this.chantierId }
               });
             }
