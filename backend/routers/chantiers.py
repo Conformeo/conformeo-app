@@ -12,7 +12,12 @@ from ..dependencies import get_current_user
 from ..utils import get_gps_from_address, send_email_via_brevo
 from ..services import pdf as pdf_generator 
 
+# Le préfixe est déjà défini ici, donc toutes les routes commencent par /chantiers
 router = APIRouter(prefix="/chantiers", tags=["Chantiers"])
+
+# ==========================
+# CRUD CHANTIERS
+# ==========================
 
 @router.get("", response_model=List[schemas.ChantierOut])
 def read_chantiers(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
@@ -69,7 +74,9 @@ def delete_chantier(cid: int, db: Session = Depends(get_db)):
     except Exception as e:
         db.rollback(); raise HTTPException(500, str(e))
 
-# --- SOUS-RESSOURCES (CORRECTION SLASH & AUTH) ---
+# ==========================
+# SOUS-RESSOURCES (TASKS, RAPPORTS, DOCS...)
+# ==========================
 
 @router.get("/{chantier_id}/tasks", response_model=List[schemas.TaskOut])
 def get_chantier_tasks(chantier_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
@@ -103,7 +110,40 @@ def get_pdps(chantier_id: int, db: Session = Depends(get_db), current_user: mode
 def get_ppsps(chantier_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     return db.query(models.PPSPS).filter(models.PPSPS.chantier_id == chantier_id).all()
 
-# --- FEATURES ---
+# ==========================
+# CREATION PERMIS FEU (NOUVEAU)
+# ==========================
+
+@router.post("/{chantier_id}/permis-feu", response_model=schemas.PermisFeuOut)
+def create_permis_feu(chantier_id: int, permis: schemas.PermisFeuCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    # 1. Vérifier si le chantier existe
+    chantier = db.query(models.Chantier).filter(models.Chantier.id == chantier_id).first()
+    if not chantier:
+        raise HTTPException(status_code=404, detail="Chantier introuvable")
+
+    # 2. Créer l'objet PermisFeu
+    new_permis = models.PermisFeu(
+        chantier_id=chantier_id,
+        lieu=permis.lieu,
+        intervenant=permis.intervenant,
+        description=permis.description,
+        extincteur=permis.extincteur,
+        nettoyage=permis.nettoyage,
+        surveillance=permis.surveillance,
+        signature=permis.signature,
+        date=datetime.utcnow() 
+    )
+
+    # 3. Sauvegarder dans la DB
+    db.add(new_permis)
+    db.commit()
+    db.refresh(new_permis)
+
+    return new_permis
+
+# ==========================
+# FEATURES (COVER, EMAIL...)
+# ==========================
 
 @router.post("/{cid}/cover")
 def upload_cover(cid: int, file: UploadFile = File(...), db: Session = Depends(get_db)):
@@ -132,38 +172,3 @@ def send_email(cid: int, email_dest: str, db: Session = Depends(get_db), current
     if send_email_via_brevo(email_dest, f"Suivi - {c.nom}", html, pdf_buffer, f"Journal_{c.nom}.pdf"):
         return {"message": "Email envoyé !"}
     raise HTTPException(500, "Erreur envoi email")
-
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
-from .. import models, schemas, database
-
-# ... (assurez-vous d'avoir les imports)
-
-router = APIRouter()
-
-@router.post("/chantiers/{chantier_id}/permis-feu")
-def create_permis_feu(chantier_id: int, permis: schemas.PermisFeuCreate, db: Session = Depends(database.get_db)):
-    # 1. Vérifier si le chantier existe
-    chantier = db.query(models.Chantier).filter(models.Chantier.id == chantier_id).first()
-    if not chantier:
-        raise HTTPException(status_code=404, detail="Chantier introuvable")
-
-    # 2. Créer l'objet PermisFeu
-    new_permis = models.PermisFeu(
-        chantier_id=chantier_id,
-        lieu=permis.lieu,
-        intervenant=permis.intervenant,
-        description=permis.description,
-        extincteur=permis.extincteur,
-        nettoyage=permis.nettoyage,
-        surveillance=permis.surveillance,
-        signature=permis.signature,
-        date=datetime.utcnow() 
-    )
-
-    # 3. Sauvegarder dans la DB
-    db.add(new_permis)
-    db.commit()
-    db.refresh(new_permis)
-
-    return new_permis
