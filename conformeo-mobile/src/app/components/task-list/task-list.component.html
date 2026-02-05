@@ -1,18 +1,38 @@
 <div class="tasks-container">
+  
   <div class="section-header">
     <h3>✅ Tâches & Planification</h3>
     <ion-badge color="light" mode="ios">IA Ready 🤖</ion-badge>
   </div>
 
-  <div class="input-group">
-    <ion-input 
-      placeholder="Nouvelle tâche (ex: Soudure...)" 
-      [(ngModel)]="newTaskTitle"
-      (keyup.enter)="addTask()">
-    </ion-input>
-    <ion-button (click)="addTask()" size="small" fill="clear">
-      <ion-icon name="add-circle" size="large"></ion-icon>
-    </ion-button>
+  <div class="smart-input-group" [class.recording-active]="isRecording">
+    
+    <div class="input-row">
+      <ion-input 
+        placeholder="Nouvelle tâche (ou dictez...)" 
+        [(ngModel)]="newTaskTitle"
+        (keyup.enter)="handleMainAction()">
+      </ion-input>
+
+      <ion-button 
+        (click)="handleMainAction()" 
+        fill="clear"
+        class="action-btn"
+        [color]="newTaskTitle.length > 0 ? 'primary' : (isRecording ? 'danger' : 'medium')">
+        
+        <ion-icon *ngIf="newTaskTitle.length > 0" name="add-circle" size="large"></ion-icon>
+        
+        <ion-icon *ngIf="newTaskTitle.length === 0 && isRecording" name="stop-circle" size="large" class="pulsing-icon"></ion-icon>
+        
+        <ion-icon *ngIf="newTaskTitle.length === 0 && !isRecording" name="mic" size="large"></ion-icon>
+      
+      </ion-button>
+    </div>
+
+    <div *ngIf="isRecording" class="recording-feedback">
+      <span>🎤 Je vous écoute...</span>
+    </div>
+
   </div>
 
   <ion-list lines="none">
@@ -31,7 +51,7 @@
           <p>{{ t.date || t.date_prevue | date:'dd/MM/yyyy' }}</p>
         </ion-label>
 
-        <ion-icon *ngIf="isRisky(t.titre || t.description)" name="flame-outline" color="danger" slot="end"></ion-icon>
+        <ion-icon *ngIf="isRisky(t.titre || t.description)" name="flame" color="danger" slot="end"></ion-icon>
       </ion-item>
 
       <ion-item-options side="end">

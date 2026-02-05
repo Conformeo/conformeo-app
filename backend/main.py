@@ -9,6 +9,7 @@ from .routers import chantiers
 from .routers import materiels 
 from .routers import tasks
 from .routers import dashboard
+from .routers import documents
 
 # ✅ Import des modèles (Via le nouveau dossier models/)
 # Le fichier models/__init__.py expose "Base" et charge toutes les tables
@@ -42,6 +43,7 @@ app.include_router(chantiers.router)
 app.include_router(materiels.router)
 app.include_router(tasks.router)
 app.include_router(dashboard.router)
+app.include_router(documents.router)
 
 # ==========================================
 # 🏠 ROUTES GLOBALES & OUTILS
