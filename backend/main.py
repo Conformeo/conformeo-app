@@ -5,12 +5,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from .routers import users
 from .routers import companies
 from .routers import chantiers
-from .routers import materiels  # C'est lui qui posait problème via __init__
+from .routers import materiels 
 from .routers import tasks
 from .routers import dashboard
 
 from . import models
 from .database import engine
+import requests
 
 # Création des tables (si pas fait via migration)
 models.Base.metadata.create_all(bind=engine)
@@ -43,7 +44,7 @@ app.add_middleware(
 app.include_router(users.router)
 app.include_router(companies.router)
 app.include_router(chantiers.router) # Vérifiez que le permis feu est bien dedans
-app.include_router(materiel.router)
+app.include_router(materiels.router)
 app.include_router(tasks.router)
 app.include_router(dashboard.router)
 
