@@ -725,10 +725,10 @@ export class ApiService {
   }
 
 
-  // --- PERMIS FEU (FIXED) ---
+// --- PERMIS FEU ---
   savePermisFeu(data: any) {
-    // Correcting the endpoint to match the nested resource structure
-    // Assumes backend route is: POST /chantiers/{chantier_id}/permis-feu
+    // ✅ CORRECTION : L'URL doit inclure /chantiers/{id}/permis-feu
+    // On récupère l'ID directement depuis l'objet data envoyé par la modale
     return this.http.post<any>(
       `${this.apiUrl}/chantiers/${data.chantier_id}/permis-feu`, 
       data, 

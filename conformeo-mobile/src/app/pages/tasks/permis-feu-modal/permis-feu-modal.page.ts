@@ -1,8 +1,8 @@
-import { Component, Input, OnInit } from '@angular/core'; // Ajoutez Input
+import { Component, Input, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { IonicModule, ModalController, ToastController } from '@ionic/angular';
-import { ApiService } from '../../../services/api'; // Importez l'API
+import { ApiService } from '../../../services/api';
 
 @Component({
   selector: 'app-permis-feu-modal',
@@ -13,7 +13,7 @@ import { ApiService } from '../../../services/api'; // Importez l'API
 })
 export class PermisFeuModalPage implements OnInit {
   
-  @Input() chantierId!: number; // On a besoin de l'ID du chantier !
+  @Input() chantierId!: number;
 
   formData = {
     lieu: '',
@@ -24,7 +24,7 @@ export class PermisFeuModalPage implements OnInit {
       nettoyage: false,
       surveillance: false
     },
-    signature: false
+    signature: true // ✅ Initialisé à true
   };
 
   constructor(
@@ -43,7 +43,7 @@ export class PermisFeuModalPage implements OnInit {
 
   savePermis() {
     if (!this.formData.lieu || !this.formData.intervenant) {
-      alert("Veuillez remplir le lieu et l'intervenant.");
+      this.presentToast("Veuillez remplir le lieu et l'intervenant.", "warning");
       return;
     }
 
@@ -52,30 +52,33 @@ export class PermisFeuModalPage implements OnInit {
       chantier_id: this.chantierId,
       lieu: this.formData.lieu,
       intervenant: this.formData.intervenant,
-      description: this.formData.description, 
+      description: this.formData.description,
       extincteur: this.formData.mesures.extincteur,
       nettoyage: this.formData.mesures.nettoyage,
       surveillance: this.formData.mesures.surveillance,
-      signature: true // Force signature to true or bind to formData.signature
+      signature: true // ✅ Envoi explicite
     };
 
     // Envoi API
     this.api.savePermisFeu(payload).subscribe({
       next: async (res) => {
-        const toast = await this.toastCtrl.create({
-          message: '✅ Permis de Feu validé et enregistré !',
-          duration: 3000,
-          color: 'success'
-        });
-        toast.present();
+        this.presentToast('✅ Permis de Feu validé et enregistré !', 'success');
         this.modalCtrl.dismiss({ saved: true }, 'confirm');
       },
       error: (err) => {
         console.error(err);
-        // Better error handling
-        const msg = err.error?.detail || "Erreur lors de l'enregistrement.";
-        alert(msg);
+        this.presentToast("Erreur lors de l'enregistrement. Vérifiez votre connexion.", "danger");
       }
     });
+  }
+
+  async presentToast(msg: string, color: string) {
+    const toast = await this.toastCtrl.create({
+      message: msg,
+      duration: 3000,
+      color: color,
+      position: 'bottom'
+    });
+    toast.present();
   }
 }

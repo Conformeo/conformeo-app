@@ -13,8 +13,8 @@ class TokenData(BaseModel):
 class UserCreate(BaseModel):
     email: EmailStr
     password: str
-    nom: str  # On utilise nom ici
-    company_name: Optional[str] = None
+    nom: str
+    company_name: Optional[str] = None # ✅ Ajouté comme demandé
 
 class UserLogin(BaseModel):
     email: EmailStr
@@ -24,11 +24,11 @@ class UserUpdate(BaseModel):
     email: Optional[EmailStr] = None
     password: Optional[str] = None
     role: Optional[str] = None
-    nom: Optional[str] = None        # Priorité à nom
-    full_name: Optional[str] = None  # On garde pour compatibilité
+    nom: Optional[str] = None       
+    full_name: Optional[str] = None
 
 class UserUpdateAdmin(BaseModel):
-    nom: Optional[str] = None       # Priorité à nom
+    nom: Optional[str] = None       
     full_name: Optional[str] = None 
     email: Optional[EmailStr] = None
     password: Optional[str] = None
@@ -39,11 +39,10 @@ class UserUpdateAdmin(BaseModel):
 class UserOut(BaseModel):
     id: int
     email: EmailStr
-    nom: Optional[str] = None # C'est ce champ que le front va lire
+    nom: Optional[str] = None
     role: str
     is_active: bool
     company_id: Optional[int] = None
-    
     class Config:
         from_attributes = True
 
@@ -106,7 +105,6 @@ class MaterielOut(BaseModel):
     date_derniere_vgp: Optional[Any] = None
     image_url: Optional[str] = None
     statut_vgp: Optional[str] = "INCONNU" 
-    
     class Config:
         from_attributes = True
 
@@ -116,6 +114,8 @@ class TaskCreate(BaseModel):
     chantier_id: int
     date_prevue: Optional[datetime] = None
     status: str = "TODO"
+    # Ajout optionnel pour tolérance frontend
+    titre: Optional[str] = None 
 
 class TaskUpdate(BaseModel):
     description: Optional[str] = None
@@ -125,6 +125,7 @@ class TaskUpdate(BaseModel):
 class TaskOut(BaseModel):
     id: int
     description: Optional[str] = "Tâche sans nom"
+    titre: Optional[str] = None # Ajouté pour éviter erreur si API le renvoie
     status: Optional[str] = "TODO"
     date_prevue: Optional[datetime] = None
     chantier_id: int
@@ -187,8 +188,8 @@ class ChantierCreate(ChantierBase):
     date_debut: Optional[str] = None
     date_fin: Optional[str] = None
     cover_url: Optional[str] = None
-    latitude: Optional[float] = None   # <--- INDISPENSABLE
-    longitude: Optional[float] = None  # <--- INDISPENSABLE
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
 
 class ChantierUpdate(BaseModel):
     nom: Optional[str] = None
@@ -201,9 +202,8 @@ class ChantierUpdate(BaseModel):
     est_actif: Optional[bool] = None
     soumis_sps: Optional[bool] = None
     cover_url: Optional[str] = None
-
     class Config:
-        from_attributes = True # ✅ CORRECTION WARNING
+        from_attributes = True
 
 class ChantierOut(BaseModel):
     id: int
@@ -217,7 +217,8 @@ class ChantierOut(BaseModel):
     cover_url: Optional[str] = None
     date_creation: Optional[datetime] = None
     company_id: Optional[int] = None
-    
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
     class Config:
         from_attributes = True
 
@@ -337,33 +338,19 @@ class PicOut(PicSchema):
     class Config:
         from_attributes = True
 
+# ✅ SCHÉMA PERMIS FEU CORRIGÉ
 class PermisFeuCreate(BaseModel):
     chantier_id: int
     lieu: str
     intervenant: str
-    description: str  # This is the correct field name expected by backend logic
+    description: str
     extincteur: bool
     nettoyage: bool
     surveillance: bool
-    signature: bool = True # Added default as per previous discussions
+    signature: bool = True # Ajout de la valeur par défaut
 
 class PermisFeuOut(PermisFeuCreate):
     id: int
     date: datetime
     class Config:
         from_attributes = True
-
-
-
-
-
-
-
-
-# Dans backend/schemas.py
-
-class UserCreate(BaseModel):
-    email: EmailStr
-    password: str
-    nom: str
-    company_name: Optional[str] = None # 👈 Ajoutez cette ligne si elle manque
