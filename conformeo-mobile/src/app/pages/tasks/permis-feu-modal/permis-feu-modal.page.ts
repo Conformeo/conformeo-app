@@ -52,10 +52,11 @@ export class PermisFeuModalPage implements OnInit {
       chantier_id: this.chantierId,
       lieu: this.formData.lieu,
       intervenant: this.formData.intervenant,
-      description: this.formData.description,
+      description: this.formData.description, 
       extincteur: this.formData.mesures.extincteur,
       nettoyage: this.formData.mesures.nettoyage,
-      surveillance: this.formData.mesures.surveillance
+      surveillance: this.formData.mesures.surveillance,
+      signature: true // Force signature to true or bind to formData.signature
     };
 
     // Envoi API
@@ -71,7 +72,9 @@ export class PermisFeuModalPage implements OnInit {
       },
       error: (err) => {
         console.error(err);
-        alert("Erreur lors de l'enregistrement.");
+        // Better error handling
+        const msg = err.error?.detail || "Erreur lors de l'enregistrement.";
+        alert(msg);
       }
     });
   }

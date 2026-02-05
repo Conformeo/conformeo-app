@@ -341,19 +341,17 @@ class PermisFeuCreate(BaseModel):
     chantier_id: int
     lieu: str
     intervenant: str
-    description: str
+    description: str  # This is the correct field name expected by backend logic
     extincteur: bool
     nettoyage: bool
     surveillance: bool
+    signature: bool = True # Added default as per previous discussions
 
 class PermisFeuOut(PermisFeuCreate):
     id: int
     date: datetime
     class Config:
         from_attributes = True
-
-
-
 
 
 

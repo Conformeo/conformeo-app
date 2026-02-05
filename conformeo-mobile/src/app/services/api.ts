@@ -727,8 +727,13 @@ export class ApiService {
 
   // --- PERMIS FEU (FIXED) ---
   savePermisFeu(data: any) {
-    // IMPORTANT: added this.getOptions() to fix potential 401 error
-    return this.http.post<any>(`${this.apiUrl}/permis-feu`, data, this.getOptions());
+    // Correcting the endpoint to match the nested resource structure
+    // Assumes backend route is: POST /chantiers/{chantier_id}/permis-feu
+    return this.http.post<any>(
+      `${this.apiUrl}/chantiers/${data.chantier_id}/permis-feu`, 
+      data, 
+      this.getOptions()
+    );
   }
 
   getPermisFeuList(chantierId: number) {

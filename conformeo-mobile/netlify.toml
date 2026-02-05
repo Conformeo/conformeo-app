@@ -1,0 +1,17 @@
+[build]
+  # Dossier où Angular génère les fichiers (vérifie ton angular.json)
+  publish = "dist/conformeo/browser"
+  command = "npm run build"
+
+[[redirects]]
+  # Redirige toutes les routes vers index.html (essentiel pour Angular Router)
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  # Redirige les appels API vers ton backend FastAPI
+  # Remplace l'URL par celle de ton serveur de prod
+  from = "/api/*"
+  to = "https://conformeo-api.onrender.com"
+  status = 200
