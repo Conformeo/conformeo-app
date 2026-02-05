@@ -43,7 +43,7 @@ app.add_middleware(
 app.include_router(users.router)
 app.include_router(companies.router)
 app.include_router(chantiers.router) # Vérifiez que le permis feu est bien dedans
-app.include_router(materiels.router)
+app.include_router(materiel.router)
 app.include_router(tasks.router)
 app.include_router(dashboard.router)
 
