@@ -134,10 +134,12 @@ def draw_cover_page(c, chantier, titre_principal, sous_titre, company=None):
     c.showPage()
 
 # ==========================================
-# 2. JOURNAL DE BORD
+# 2. JOURNAL DE BORD (Correction du nom et args)
 # ==========================================
-def generate_pdf(chantier, rapports, inspections, output_path, company=None):
-    c = canvas.Canvas(output_path, pagesize=A4)
+# ✅ CORRECTION ICI : Renommé 'generate_pdf' -> 'generate_journal_pdf'
+# ✅ CORRECTION ICI : 'buffer' en premier argument
+def generate_journal_pdf(buffer, chantier, rapports, inspections=None, company=None):
+    c = canvas.Canvas(buffer, pagesize=A4)
     margin = 2 * cm
     draw_cover_page(c, chantier, "JOURNAL DE BORD", "Suivi d'exécution & Rapports", company)
 
@@ -246,15 +248,14 @@ def generate_pdf(chantier, rapports, inspections, output_path, company=None):
     
     draw_footer(c, width, height, chantier, "Journal de Bord")
     c.save()
-    return output_path
 
 # ==========================================
 # 3. PPSPS
 # ==========================================
-def generate_ppsps_pdf(chantier, ppsps, output_path, company=None):
-    c = canvas.Canvas(output_path, pagesize=A4)
+def generate_ppsps_pdf(buffer, ppsps, chantier):
+    c = canvas.Canvas(buffer, pagesize=A4)
     margin = 2 * cm
-    draw_cover_page(c, chantier, "P.P.S.P.S", "Plan Particulier de Sécurité", company)
+    draw_cover_page(c, chantier, "P.P.S.P.S", "Plan Particulier de Sécurité")
     
     y = height - 3 * cm
     bottom_limit = 3 * cm
@@ -315,15 +316,14 @@ def generate_ppsps_pdf(chantier, ppsps, output_path, company=None):
 
     draw_footer(c, width, height, chantier, "PPSPS")
     c.save()
-    return output_path
 
 # ==========================================
 # 4. AUDIT UNIQUE
 # ==========================================
-def generate_audit_pdf(chantier, inspection, output_path, company=None):
-    c = canvas.Canvas(output_path, pagesize=A4)
+def generate_audit_pdf(buffer, inspection, chantier):
+    c = canvas.Canvas(buffer, pagesize=A4)
     margin = 2 * cm
-    draw_cover_page(c, chantier, "RAPPORT D'INSPECTION", f"{inspection.titre} ({inspection.type})", company)
+    draw_cover_page(c, chantier, "RAPPORT D'INSPECTION", f"{inspection.titre} ({inspection.type})")
     
     y = height - 3 * cm
     bottom_limit = 3 * cm
@@ -370,10 +370,10 @@ def generate_audit_pdf(chantier, inspection, output_path, company=None):
 # ==========================================
 # 5. PLAN DE PREVENTION (PdP)
 # ==========================================
-def generate_pdp_pdf(chantier, pdp, output_path, company=None):
-    c = canvas.Canvas(output_path, pagesize=A4)
+def generate_pdp_pdf(buffer, pdp, chantier):
+    c = canvas.Canvas(buffer, pagesize=A4)
     margin = 2 * cm
-    draw_cover_page(c, chantier, "PLAN DE PRÉVENTION", "Travaux en site occupé / Coactivité", company)
+    draw_cover_page(c, chantier, "PLAN DE PRÉVENTION", "Travaux en site occupé / Coactivité")
 
     y = height - 3 * cm
     bottom_limit = 3 * cm
@@ -406,7 +406,7 @@ def generate_pdp_pdf(chantier, pdp, output_path, company=None):
     y -= 0.5*cm
     c.setFont(FONT_TEXT, 10); c.setFillColorRGB(0.2, 0.2, 0.2)
     c.drawString(margin, y, pdp.entreprise_utilisatrice or "Non défini")
-    c.drawString(margin + col_w, y, pdp.entreprise_exterieure or (company.name if company else "Nous"))
+    c.drawString(margin + col_w, y, pdp.entreprise_exterieure or "Nous")
     y -= 1.5*cm
 
     draw_section_title("2. CONSIGNES DU SITE & SECOURS")
@@ -474,7 +474,6 @@ def generate_pdp_pdf(chantier, pdp, output_path, company=None):
     c.drawCentredString(width/2, y, "Document certifié conforme par Conforméo BTP.")
     draw_footer(c, width, height, chantier, "Plan de Prévention")
     c.save()
-    return output_path
 
 # ==========================================
 # 6. DUERP (Tableau Dynamique)
