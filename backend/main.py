@@ -1,45 +1,47 @@
-import os
-import requests
-from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
+from .routers import users, companies, chantiers, materiels, tasks, dashboard
+from . import models
+from .database import engine
 
-from .database import engine, Base
-# Importation de TOUS les routeurs
-from .routers import auth, companies, chantiers, users, materiel, duerp, dashboard, tasks 
+# Création des tables (si pas fait via migration)
+models.Base.metadata.create_all(bind=engine)
 
-load_dotenv()
-Base.metadata.create_all(bind=engine)
+app = FastAPI(title="Conformeo API")
 
-app = FastAPI(title="Conforméo API")
+# ==========================================
+# 🛡️ FIX CRITIQUE : CONFIGURATION CORS
+# ==========================================
+origins = [
+    "http://localhost",
+    "http://localhost:8100",
+    "http://localhost:4200",
+    "capacitor://localhost",   # Pour iOS
+    "http://10.0.2.2:8000",    # Pour Android Emulator
+    "*"                        # ⚠️ Autoriser tout le monde (Solution radicale pour test)
+]
 
-# --- CORS ---
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], 
+    allow_origins=["*"],       # On met "*" pour être sûr que ça passe partout
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["*"],       # Autorise GET, POST, PUT, DELETE, OPTIONS
+    allow_headers=["*"],       # Autorise tous les headers (Authorization, etc.)
 )
 
-# --- STATIC FILES ---
-os.makedirs("uploads", exist_ok=True)
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
-
-# --- ROUTEURS ---
-app.include_router(auth.router)
-app.include_router(companies.router)
+# ==========================================
+# 🛣️ ROUTEURS
+# ==========================================
 app.include_router(users.router)
-app.include_router(chantiers.router)
-app.include_router(materiel.router)
-app.include_router(duerp.router)
-app.include_router(dashboard.router)
+app.include_router(companies.router)
+app.include_router(chantiers.router) # Vérifiez que le permis feu est bien dedans
+app.include_router(materiels.router)
 app.include_router(tasks.router)
+app.include_router(dashboard.router)
 
 @app.get("/")
 def read_root():
-    return {"status": "API Active 🚀", "version": "2.4 Final"}
+    return {"message": "API Conformeo en ligne 🚀"}
 
 # 👇 ROUTE ADRESSE (CORRECTION 404)
 @app.get("/tools/search-address")

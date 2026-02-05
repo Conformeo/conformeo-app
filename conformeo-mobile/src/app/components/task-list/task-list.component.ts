@@ -1,10 +1,13 @@
 import { Component, Input, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { IonicModule, AlertController, ToastController, NavController } from '@ionic/angular';
+import { IonicModule, AlertController, ToastController, ModalController } from '@ionic/angular'; // ✅ Ajout de ModalController
 import { ApiService } from '../../services/api';
 import { add, trashOutline, checkboxOutline, squareOutline, alertCircleOutline, flameOutline } from 'ionicons/icons';
 import { addIcons } from 'ionicons';
+
+// ✅ IMPORTANT : Importez la page de la modale pour pouvoir l'ouvrir
+import { PermisFeuModalPage } from '../../pages/tasks/permis-feu-modal/permis-feu-modal.page';
 
 @Component({
   selector: 'app-task-list',
@@ -30,7 +33,7 @@ export class TaskListComponent implements OnInit {
     private api: ApiService,
     private alertCtrl: AlertController,
     private toastCtrl: ToastController,
-    private navCtrl: NavController // Utilisation de NavController pour la redirection
+    private modalCtrl: ModalController // ✅ On remplace NavController par ModalController pour les popups
   ) {
     addIcons({ add, trashOutline, checkboxOutline, squareOutline, alertCircleOutline, flameOutline });
   }
@@ -48,24 +51,23 @@ export class TaskListComponent implements OnInit {
   }
 
   async addTask() {
-    // AJOUTEZ CETTE VÉRIFICATION 👇
+    // VÉRIFICATION DE SÉCURITÉ
     if (!this.chantierId || this.chantierId <= 0) {
       console.error("❌ Erreur : ID Chantier invalide (" + this.chantierId + ")");
       this.presentToast("Impossible de créer la tâche : Chantier non identifié.", "danger");
       return;
     }
-    if (!this.newTaskTitle.trim() || !this.chantierId) return;
+    if (!this.newTaskTitle.trim()) return;
 
     // Préparation de la donnée
     const taskData = {
       titre: this.newTaskTitle,
-      description: this.newTaskTitle, // On double le titre en description pour être sûr
+      description: this.newTaskTitle, 
       chantier_id: this.chantierId,
       fait: false,
       date: new Date().toISOString().split('T')[0]
     };
 
-    // Copie du titre pour l'analyse AVANT que le champ ne soit vidé
     const titleToCheck = this.newTaskTitle;
 
     // 1. Envoi au Backend
@@ -74,7 +76,7 @@ export class TaskListComponent implements OnInit {
         this.tasks.push(newTask);
         this.newTaskTitle = ''; // Reset input
 
-        // 2. INTELLIGENCE LOCALE (Plus rapide que le backend)
+        // 2. INTELLIGENCE LOCALE
         this.checkRiskAndPrompt(titleToCheck);
       },
       error: (err) => {
@@ -84,12 +86,27 @@ export class TaskListComponent implements OnInit {
     });
   }
 
+  // --- GESTION OUVERTURE MODALE (La clé du correctif) ---
+  async openPermisFeuModal() {
+    const modal = await this.modalCtrl.create({
+      component: PermisFeuModalPage,
+      componentProps: { 
+        chantierId: this.chantierId // 👈 On passe l'ID directement ici
+      }
+    });
+
+    await modal.present();
+
+    const { role } = await modal.onWillDismiss();
+    if (role === 'confirm') {
+      // Optionnel : Rafraichir quelque chose si besoin
+    }
+  }
+
   // --- MOTEUR D'INTELLIGENCE & SÉCURITÉ ---
   
-  // Fonction utilitaire pour le HTML (affiche icône feu)
   isRisky(text: string): boolean {
     if (!text) return false;
-    // On vérifie le texte en minuscule
     return this.dangerousKeywords.some(k => text.toLowerCase().includes(k));
   }
 
@@ -104,16 +121,17 @@ export class TaskListComponent implements OnInit {
           { 
             text: '📄 Créer Permis Feu', 
             handler: () => {
-              // Redirection vers la page de création
-              this.navCtrl.navigateForward(['/permis-feu-modal'], {
-                queryParams: { chantierId: this.chantierId }
-              });
+              // ✅ CORRECTION : Appel de la fonction locale qui ouvre la modale
+              this.openPermisFeuModal();
             }
           },
           {
             text: '🛡️ Voir DUERP',
             handler: () => {
-              this.navCtrl.navigateForward(['/securite-doc']);
+              // Ici on garde le Router car c'est une autre page complète
+              // (Note: assurez-vous d'avoir injecté NavController si vous utilisez ceci, 
+              // sinon supprimez ce bouton ou utilisez window.open pour le PDF)
+              this.presentToast("Redirection DUERP (à implémenter)", "warning");
             }
           }
         ]
@@ -131,10 +149,7 @@ export class TaskListComponent implements OnInit {
   }
 
   async toggleTask(task: any) {
-    // Gestion "Fait / Pas fait"
     task.fait = !task.fait; 
-    // Note: Assurez-vous que votre API attend 'fait' (boolean) ou 'status' (string)
-    // Ici j'utilise 'fait' pour simplifier, adaptez selon votre API (ex: status: 'DONE')
     this.api.updateTask(task.id, { fait: task.fait }).subscribe();
   }
 

@@ -1,5 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse # 👈 INDISPENSABLE
+from ..services import pdf as pdf_service # Importez le fichier créé à l'étape 2
 from sqlalchemy.orm import Session
+from io import BytesIO
 from .. import models, schemas
 from ..database import get_db
 from ..dependencies import get_current_user
@@ -111,3 +114,30 @@ def add_company_document(
     db.commit()
     db.refresh(new_doc)
     return new_doc
+
+
+# ==========================
+# 📄 GÉNÉRATION PDF PERMIS FEU
+# ==========================
+@router.get("/permis-feu/{permis_id}/pdf")
+def download_permis_feu_pdf(permis_id: int, db: Session = Depends(get_db)):
+    # 1. Récupérer le permis
+    permis = db.query(models.PermisFeu).filter(models.PermisFeu.id == permis_id).first()
+    if not permis:
+        raise HTTPException(status_code=404, detail="Permis introuvable")
+    
+    # 2. Récupérer le chantier lié (pour le nom et l'adresse)
+    chantier = db.query(models.Chantier).filter(models.Chantier.id == permis.chantier_id).first()
+
+    # 3. Générer le PDF en mémoire
+    buffer = BytesIO()
+    pdf_service.generate_permis_feu_pdf(buffer, permis, chantier)
+    buffer.seek(0)
+
+    # 4. Renvoyer le fichier au navigateur
+    filename = f"Permis_Feu_{permis_id}.pdf"
+    return StreamingResponse(
+        buffer, 
+        media_type="application/pdf", 
+        headers={"Content-Disposition": f"inline; filename={filename}"}
+    )

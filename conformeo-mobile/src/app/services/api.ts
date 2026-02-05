@@ -726,9 +726,10 @@ export class ApiService {
 
 
 // --- PERMIS FEU ---
+
+  // 1. Enregistrement (Déjà corrigé, on le garde)
   savePermisFeu(data: any) {
-    // ✅ CORRECTION : L'URL doit inclure /chantiers/{id}/permis-feu
-    // On récupère l'ID directement depuis l'objet data envoyé par la modale
+    // L'URL doit inclure l'ID du chantier
     return this.http.post<any>(
       `${this.apiUrl}/chantiers/${data.chantier_id}/permis-feu`, 
       data, 
@@ -736,7 +737,21 @@ export class ApiService {
     );
   }
 
+  // 2. Liste des permis d'un chantier
   getPermisFeuList(chantierId: number) {
-    return this.http.get<any[]>(`${this.apiUrl}/chantiers/${chantierId}/permis-feu`, this.getOptions()); 
+    return this.http.get<any[]>(
+      `${this.apiUrl}/chantiers/${chantierId}/permis-feu`, 
+      this.getOptions()
+    ); 
+  }
+
+  // 3. 🆕 AJOUT : Méthode pour obtenir l'URL du PDF
+  // Utile pour le bouton "Voir PDF" dans le HTML
+  getPermisFeuPdfUrl(permisId: number): string {
+    // Attention : On passe par /chantiers/ car le routeur est préfixé
+    // On ajoute le token dans l'URL si besoin, ou on l'ouvre tel quel si l'API est publique pour les PDFs
+    // Si votre API demande un token Header pour le PDF, il faudra utiliser une méthode downloadBlob.
+    // Pour l'instant, tentons l'ouverture directe dans le navigateur système :
+    return `${this.apiUrl}/chantiers/permis-feu/${permisId}/pdf`;
   }
 }

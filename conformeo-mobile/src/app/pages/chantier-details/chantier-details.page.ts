@@ -27,7 +27,6 @@ import { NewRapportModalComponent } from './new-rapport-modal/new-rapport-modal.
 import { RapportDetailsModalComponent } from './rapport-details-modal/rapport-details-modal.component';
 import { SignatureModalComponent } from './signature-modal/signature-modal.component';
 
-// Interface locale pour l'affichage (match avec le backend)
 interface DocExterne {
   id: number;
   titre: string;
@@ -55,21 +54,10 @@ export class ChantierDetailsPage implements OnInit {
   segment = 'suivi'; 
   
   // --- GESTION DOE ---
-  docsExternes: DocExterne[] = []; // Liste typée
-  currentUploadCategory = ''; // Catégorie en cours d'upload
+  docsExternes: DocExterne[] = []; 
+  currentUploadCategory = ''; 
   
   @ViewChild('doeFileInput') fileInput!: ElementRef;
-
-  // --- GESTION DES TACHES (AJOUTÉ) ---
-  newTaskTitle: string = ''; // Champ de saisie pour nouvelle tâche
-  tasks: any[] = []; // Liste des tâches si gérées ici
-
-  // ⚠️ LISTE DES MOTS-CLÉS DANGEREUX (AJOUTÉ)
-  dangerousKeywords = [
-    'soudure', 'souder', 'feu', 'flamme', 'chalumeau', 
-    'meulage', 'disqueuse', 'étincelle', 'chaud', 'plomb',
-    'amiante', 'gaz', 'toiture', 'hauteur', 'electrique', 'tension'
-  ];
   
   constructor(
     private route: ActivatedRoute,
@@ -132,9 +120,8 @@ export class ChantierDetailsPage implements OnInit {
 
     // 4. DOE (Documents Externes)
     this.loadDoeDocs();
-
-    // 5. Tâches (AJOUTÉ si vous voulez les gérer ici)
-    this.loadTasks();
+    
+    // Note: Les Tâches sont gérées par <app-task-list> automatiquement
   }
 
   loadRapports() {
@@ -142,93 +129,6 @@ export class ChantierDetailsPage implements OnInit {
       this.rapports = data.sort((a, b) => 
         new Date(b.date_creation || 0).getTime() - new Date(a.date_creation || 0).getTime()
       );
-    });
-  }
-
-  loadTasks() {
-    this.api.getTasks(this.chantierId).subscribe(data => {
-      this.tasks = data;
-    });
-  }
-
-  // ==========================================
-  // ✅ GESTION DES TÂCHES & SÉCURITÉ (AJOUTÉ)
-  // ==========================================
-
-  addTask() {
-    if (!this.newTaskTitle.trim() || !this.chantierId) return;
-
-    // ✅ CORRECTION ERREUR 422 : On ajoute 'description'
-    const taskData = {
-      titre: this.newTaskTitle,
-      description: this.newTaskTitle, // Obligatoire pour le backend
-      chantier_id: this.chantierId,
-      fait: false,
-      date: new Date().toISOString().split('T')[0]
-    };
-
-    // On garde le titre pour l'analyse
-    const titleToCheck = this.newTaskTitle;
-
-    this.api.createTask(taskData).subscribe({
-      next: (newTask) => {
-        this.tasks.push(newTask);
-        this.newTaskTitle = ''; // On vide le champ
-        
-        // 🚨 Lance l'alerte si nécessaire
-        this.checkRiskAndPrompt(titleToCheck);
-      },
-      error: (err) => {
-        console.error(err);
-        // Affichage discret de l'erreur
-        this.toastCtrl.create({
-            message: 'Erreur ajout tâche. Vérifiez la connexion.',
-            duration: 2000, color: 'danger'
-        }).then(t => t.present());
-      }
-    });
-  }
-
-  async checkRiskAndPrompt(titre: string) {
-    const lowerTitre = titre.toLowerCase();
-    const isDangerous = this.dangerousKeywords.some(keyword => lowerTitre.includes(keyword));
-
-    if (isDangerous) {
-      const alert = await this.alertCtrl.create({
-        header: '⚠️ Activité à Risque',
-        subHeader: `La tâche "${titre}" implique des risques.`,
-        message: 'Souhaitez-vous créer un Permis de Feu ou consulter le DUERP ?',
-        buttons: [
-          { text: 'Ignorer', role: 'cancel' },
-          {
-            text: '🔥 Permis Feu',
-            handler: () => {
-              // Navigation vers la création de permis feu
-              this.navCtrl.navigateForward(['/permis-feu/create'], { // Vérifiez bien cette route
-                queryParams: { chantierId: this.chantierId }
-              });
-            }
-          },
-          {
-            text: '🛡️ Sécurité',
-            handler: () => {
-               this.navCtrl.navigateForward(['/securite-doc']); 
-            }
-          }
-        ]
-      });
-      await alert.present();
-    }
-  }
-
-  toggleTask(task: any) {
-    task.fait = !task.fait;
-    this.api.updateTask(task.id, { fait: task.fait }).subscribe();
-  }
-
-  deleteTask(task: any) {
-    this.api.deleteTask(task.id).subscribe(() => {
-      this.tasks = this.tasks.filter(t => t.id !== task.id);
     });
   }
 
@@ -242,7 +142,6 @@ export class ChantierDetailsPage implements OnInit {
     });
   }
 
-  // Helpers pour le HTML
   getDocs(cat: string) {
     return this.docsExternes.filter(d => d.categorie === cat);
   }
@@ -251,16 +150,13 @@ export class ChantierDetailsPage implements OnInit {
     return this.getDocs(cat).length;
   }
 
-  // 1. Déclenche l'ouverture de l'explorateur de fichiers
   uploadDoeDoc(category: string) {
     this.currentUploadCategory = category;
-    // On clique virtuellement sur l'input caché dans le HTML
     if (this.fileInput) {
         this.fileInput.nativeElement.click();
     }
   }
 
-  // 2. Une fois le fichier choisi, on demande le nom
   async onDoeFileSelected(event: any) {
     const file = event.target.files[0];
     if (!file) return;
@@ -279,7 +175,7 @@ export class ChantierDetailsPage implements OnInit {
         { 
           text: 'Annuler', 
           role: 'cancel',
-          handler: () => { event.target.value = ''; } // Reset input
+          handler: () => { event.target.value = ''; } 
         },
         { 
           text: 'Envoyer', 
@@ -293,18 +189,16 @@ export class ChantierDetailsPage implements OnInit {
     await alert.present();
   }
 
-  // 3. Envoi au serveur via ApiService
   async processUpload(file: File, titre: string, eventInput: any) {
     const loading = await this.loadingCtrl.create({ message: 'Envoi en cours...' });
     await loading.present();
 
     this.api.uploadChantierDoc(this.chantierId, file, this.currentUploadCategory, titre).subscribe({
       next: (newDoc) => {
-        // On ajoute directement à la liste locale pour éviter un rechargement complet
         this.docsExternes.push(newDoc);
         loading.dismiss();
         this.presentToast('Document ajouté au DOE ! 📂', 'success');
-        eventInput.target.value = ''; // Reset de l'input file
+        eventInput.target.value = ''; 
       },
       error: (err) => {
         console.error(err);
@@ -377,7 +271,6 @@ export class ChantierDetailsPage implements OnInit {
     });
 
     // 3. Plan de Prévention (PdP)
-    // On ajoute aussi les PdP s'ils existent
     this.api.getPdp(this.chantierId).subscribe(pdps => {
         pdps.forEach(pdp => {
             this.documentsList.push({
@@ -426,7 +319,7 @@ export class ChantierDetailsPage implements OnInit {
         });
     });
 
-    // 6. Permis Feu
+    // 6. Permis Feu (CORRECTION URL)
     this.api.getPermisFeuList(this.chantierId).subscribe(permisList => {
         permisList.forEach(p => {
             this.documentsList.push({
@@ -436,8 +329,15 @@ export class ChantierDetailsPage implements OnInit {
                 icon: 'flame',
                 color: 'danger',
                 action: () => {
-                    const url = `${this.api.apiUrl}/permis-feu/${p.id}/pdf`;
-                    window.open(url, '_system');
+                    // ✅ Utilise la méthode centralisée du service si disponible
+                    if (this.api.getPermisFeuPdfUrl) {
+                        const url = this.api.getPermisFeuPdfUrl(p.id);
+                        window.open(url, '_system');
+                    } else {
+                        // Fallback : construction manuelle avec le bon préfixe
+                        const url = `${this.api.apiUrl}/chantiers/permis-feu/${p.id}/pdf`;
+                        window.open(url, '_system');
+                    }
                 }
             });
         });
@@ -459,6 +359,14 @@ export class ChantierDetailsPage implements OnInit {
   // ==========================================
   // ⚙️ ACTIONS DIVERSES
   // ==========================================
+
+  // Fonction pour bouton direct "Voir PDF" dans le HTML si besoin
+  openPdf(permisId: number) {
+    if (this.api.getPermisFeuPdfUrl) {
+      const url = this.api.getPermisFeuPdfUrl(permisId);
+      window.open(url, '_system');
+    }
+  }
 
   async takePhoto() {
     try {
@@ -541,7 +449,6 @@ export class ChantierDetailsPage implements OnInit {
   }
   
   downloadPdf() {
-    // Note: Utilisation token URL pour accès mobile facile
     const token = localStorage.getItem('access_token');
     const url = `${this.api.apiUrl}/chantiers/${this.chantierId}/pdf?token=${token}`;
     window.open(url, '_system');
@@ -633,13 +540,11 @@ export class ChantierDetailsPage implements OnInit {
   getFullUrl(path: string | undefined) {
     if (!path) return '';
     if (path.startsWith('http')) {
-      // Optimisation Cloudinary si possible
       if (path.includes('cloudinary.com')) {
         return path.replace('/upload/', '/upload/w_500,f_auto,q_auto/');
       }
       return path;
     }
-    // Si chemin relatif
     return `${this.api.apiUrl}${path}`; 
   }
 
