@@ -1,6 +1,14 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from .routers import users, companies, chantiers, materiels, tasks, dashboard
+
+# 👇 MODIFIEZ CETTE PARTIE (On importe chaque fichier séparément)
+from .routers import users
+from .routers import companies
+from .routers import chantiers
+from .routers import materiels  # C'est lui qui posait problème via __init__
+from .routers import tasks
+from .routers import dashboard
+
 from . import models
 from .database import engine
 
