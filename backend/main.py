@@ -1,7 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+import requests
 
-# 👇 MODIFIEZ CETTE PARTIE (On importe chaque fichier séparément)
+# ✅ Imports directs des routeurs (Évite les erreurs d'import circulaire)
 from .routers import users
 from .routers import companies
 from .routers import chantiers
@@ -9,33 +10,27 @@ from .routers import materiels
 from .routers import tasks
 from .routers import dashboard
 
+# ✅ Import des modèles (Via le nouveau dossier models/)
+# Le fichier models/__init__.py expose "Base" et charge toutes les tables
 from . import models
 from .database import engine
-import requests
 
-# Création des tables (si pas fait via migration)
+# Création des tables dans la base de données
+# Cela fonctionne car models.Base est défini dans models/__init__.py
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Conformeo API")
 
 # ==========================================
-# 🛡️ FIX CRITIQUE : CONFIGURATION CORS
+# 🛡️ CONFIGURATION CORS
 # ==========================================
-origins = [
-    "http://localhost",
-    "http://localhost:8100",
-    "http://localhost:4200",
-    "capacitor://localhost",   # Pour iOS
-    "http://10.0.2.2:8000",    # Pour Android Emulator
-    "*"                        # ⚠️ Autoriser tout le monde (Solution radicale pour test)
-]
-
+# On autorise tout le monde pour éviter les blocages Mobile/Web
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],       # On met "*" pour être sûr que ça passe partout
+    allow_origins=["*"],       
     allow_credentials=True,
-    allow_methods=["*"],       # Autorise GET, POST, PUT, DELETE, OPTIONS
-    allow_headers=["*"],       # Autorise tous les headers (Authorization, etc.)
+    allow_methods=["*"],       
+    allow_headers=["*"],       
 )
 
 # ==========================================
@@ -43,16 +38,20 @@ app.add_middleware(
 # ==========================================
 app.include_router(users.router)
 app.include_router(companies.router)
-app.include_router(chantiers.router) # Vérifiez que le permis feu est bien dedans
+app.include_router(chantiers.router)
 app.include_router(materiels.router)
 app.include_router(tasks.router)
 app.include_router(dashboard.router)
+
+# ==========================================
+# 🏠 ROUTES GLOBALES & OUTILS
+# ==========================================
 
 @app.get("/")
 def read_root():
     return {"message": "API Conformeo en ligne 🚀"}
 
-# 👇 ROUTE ADRESSE (CORRECTION 404)
+# 👇 Route pour l'autocomplétion d'adresse (Data Gouv)
 @app.get("/tools/search-address")
 def search_address_autocomplete(q: str):
     if not q or len(q) < 3: return []
