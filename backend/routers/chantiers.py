@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, File, UploadFile
+from fastapi.responses import StreamingResponse # 👈 INDISPENSABLE POUR LE PDF
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime, timedelta, date
@@ -10,7 +11,7 @@ from .. import models, schemas
 from ..database import get_db
 from ..dependencies import get_current_user
 from ..utils import get_gps_from_address, send_email_via_brevo
-from ..services import pdf as pdf_generator 
+from ..services import pdf as pdf_service # 👈 IMPORT DU GÉNÉRATEUR
 
 # Le préfixe est déjà défini ici, donc toutes les routes commencent par /chantiers
 router = APIRouter(prefix="/chantiers", tags=["Chantiers"])
@@ -111,17 +112,15 @@ def get_ppsps(chantier_id: int, db: Session = Depends(get_db), current_user: mod
     return db.query(models.PPSPS).filter(models.PPSPS.chantier_id == chantier_id).all()
 
 # ==========================
-# CREATION PERMIS FEU (NOUVEAU)
+# CREATION PERMIS FEU
 # ==========================
 
 @router.post("/{chantier_id}/permis-feu", response_model=schemas.PermisFeuOut)
 def create_permis_feu(chantier_id: int, permis: schemas.PermisFeuCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    # 1. Vérifier si le chantier existe
     chantier = db.query(models.Chantier).filter(models.Chantier.id == chantier_id).first()
     if not chantier:
         raise HTTPException(status_code=404, detail="Chantier introuvable")
 
-    # 2. Créer l'objet PermisFeu
     new_permis = models.PermisFeu(
         chantier_id=chantier_id,
         lieu=permis.lieu,
@@ -134,12 +133,44 @@ def create_permis_feu(chantier_id: int, permis: schemas.PermisFeuCreate, db: Ses
         date=datetime.utcnow() 
     )
 
-    # 3. Sauvegarder dans la DB
     db.add(new_permis)
     db.commit()
     db.refresh(new_permis)
 
     return new_permis
+
+# ==========================
+# 📄 GÉNÉRATION PDF PERMIS FEU (C'est ce qu'il vous manquait !)
+# ==========================
+@router.get("/permis-feu/{permis_id}/pdf")
+def download_permis_feu_pdf(permis_id: int, db: Session = Depends(get_db)):
+    # 1. Récupérer le permis
+    permis = db.query(models.PermisFeu).filter(models.PermisFeu.id == permis_id).first()
+    if not permis:
+        # Si le permis n'existe pas en BDD, on renvoie une 404 explicite
+        raise HTTPException(status_code=404, detail="Permis introuvable dans la base de données")
+    
+    # 2. Récupérer le chantier lié
+    chantier = db.query(models.Chantier).filter(models.Chantier.id == permis.chantier_id).first()
+
+    # 3. Générer le PDF
+    buffer = BytesIO()
+    try:
+        # On appelle le service de dessin
+        pdf_service.generate_permis_feu_pdf(buffer, permis, chantier)
+    except Exception as e:
+        print(f"Erreur PDF Service: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur lors de la génération du PDF : {str(e)}")
+
+    buffer.seek(0)
+
+    # 4. Renvoyer le fichier
+    filename = f"Permis_Feu_{permis_id}.pdf"
+    return StreamingResponse(
+        buffer, 
+        media_type="application/pdf", 
+        headers={"Content-Disposition": f"inline; filename={filename}"}
+    )
 
 # ==========================
 # FEATURES (COVER, EMAIL...)
@@ -166,8 +197,11 @@ def send_email(cid: int, email_dest: str, db: Session = Depends(get_db), current
     comp = db.query(models.Company).filter(models.Company.id == current_user.company_id).first()
 
     pdf_buffer = BytesIO()
-    pdf_generator.generate_pdf(c, raps, inss, pdf_buffer, company=comp)
-    
+    try:
+        pdf_service.generate_pdf(c, raps, inss, pdf_buffer, company=comp)
+    except Exception as e:
+        raise HTTPException(500, f"Erreur PDF Journal: {str(e)}")
+        
     html = f"<html><body><h2>Suivi Chantier: {c.nom}</h2><p>Ci-joint le journal de bord.</p></body></html>"
     if send_email_via_brevo(email_dest, f"Suivi - {c.nom}", html, pdf_buffer, f"Journal_{c.nom}.pdf"):
         return {"message": "Email envoyé !"}
