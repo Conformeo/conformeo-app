@@ -18,6 +18,8 @@ COLOR_SECONDARY = (0.4, 0.4, 0.4) # Gris
 FONT_TITLE = "Helvetica-Bold"
 FONT_TEXT = "Helvetica"
 
+
+
 # ==========================================
 # 1. FONCTIONS UTILITAIRES
 # ==========================================
@@ -598,145 +600,200 @@ def generate_duerp_pdf(duerp, company, lignes):
 # ==========================================
 # 7. GENERATEUR PERMIS FEU (Canvas)
 # ==========================================
-# def generate_permis_pdf(permis, chantier):
-#     """
-#     Génère le fichier PDF du Permis de Feu et retourne un buffer.
-#     """
-#     chantier_nom = chantier.nom if chantier else "Chantier Inconnu"
-#     buffer = BytesIO()
-#     c = canvas.Canvas(buffer, pagesize=A4)
-#     width, height = A4
-    
-#     # En-tête Rouge
-#     c.setFillColor(colors.firebrick)
-#     c.rect(0, height - 3*cm, width, 3*cm, fill=1, stroke=0)
-#     c.setFillColor(colors.white)
-#     c.setFont("Helvetica-Bold", 24)
-#     c.drawCentredString(width / 2, height - 1.5*cm, "PERMIS DE FEU")
-#     c.setFont("Helvetica", 12)
-#     c.drawCentredString(width / 2, height - 2.2*cm, "Autorisation de travail par points chauds")
+# --- CONFIGURATION DES COULEURS ---
+BRAND_RED = colors.Color(0.75, 0.15, 0.15) # Un rouge professionnel "brique"
+DARK_GREY = colors.Color(0.2, 0.2, 0.2)
+LIGHT_RED_BG = colors.Color(0.95, 0.9, 0.9) # Pour les fonds de cases
 
-#     # Info
-#     c.setFillColor(colors.black)
-#     y = height - 4*cm
-#     c.rect(1*cm, y - 3*cm, width - 2*cm, 3*cm)
-#     c.setFont("Helvetica-Bold", 12)
-#     c.drawString(1.5*cm, y - 0.8*cm, f"CHANTIER : {chantier_nom}")
-#     c.drawString(1.5*cm, y - 1.5*cm, f"Date : {permis.date.strftime('%d/%m/%Y')}")
-#     c.drawString(1.5*cm, y - 2.2*cm, f"Lieu : {permis.lieu}")
-#     c.drawString(11*cm, y - 1.5*cm, f"Intervenant : {permis.intervenant}")
-    
-#     y -= 4*cm
-#     c.setFont("Helvetica-Bold", 14)
-#     c.drawString(1*cm, y, "NATURE DES TRAVAUX")
-#     y -= 1*cm
-#     c.setFont("Helvetica", 12)
-#     c.drawString(1.5*cm, y, f"Description : {permis.description}")
-    
-#     y -= 2*cm
-#     c.setFont("Helvetica-Bold", 14)
-#     c.drawString(1*cm, y, "SÉCURITÉ")
-#     y -= 1*cm
-    
-#     # Checkboxes
-#     def draw_check(txt, val, cur_y):
-#         c.rect(1.5*cm, cur_y, 0.5*cm, 0.5*cm)
-#         c.setFont("Helvetica", 12)
-#         c.drawString(2.5*cm, cur_y+0.15*cm, txt)
-#         if val: 
-#             c.setFont("Helvetica-Bold", 14)
-#             c.drawString(1.65*cm, cur_y+0.15*cm, "X")
-            
-#     draw_check("Extincteur à portée", permis.extincteur, y)
-#     y -= 1*cm
-#     draw_check("Zone nettoyée", permis.nettoyage, y)
-#     y -= 1*cm
-#     draw_check("Surveillance (2h)", permis.surveillance, y)
-    
-#     # Signature
-#     y -= 3*cm
-#     c.setFillColor(colors.lightgrey)
-#     c.rect(1*cm, y - 3*cm, width - 2*cm, 3*cm, fill=1, stroke=0)
-#     c.setFillColor(colors.black)
-#     if permis.signature:
-#         c.setFont("Courier", 10)
-#         c.drawString(2*cm, y - 1.5*cm, f"Signé numériquement par {permis.intervenant} le {permis.date.strftime('%d/%m/%Y')}")
+width, height = A4
 
-#     c.showPage()
-#     c.save()
-#     buffer.seek(0)
-#     return buffer
+# --- FONCTIONS UTILITAIRES DE DESSIN ---
+def draw_header(c, permis, chantier):
+    """Dessine l'en-tête rouge style 'réglementaire'"""
+    # Bannière rouge supérieure
+    c.setFillColor(BRAND_RED)
+    c.rect(0, height - 3*cm, width, 3*cm, fill=1, stroke=0)
+    
+    # Logo texte "Conforméo" (à gauche)
+    c.setFillColor(colors.white)
+    c.setFont("Helvetica-BoldOblique", 18)
+    c.drawString(1.5*cm, height - 1.8*cm, "Conforméo")
+    c.setFont("Helvetica", 10)
+    c.drawString(1.5*cm, height - 2.3*cm, "Solutions QHSE Digitales")
+
+    # Titre central
+    c.setFont("Helvetica-Bold", 28)
+    c.drawCentredString(width / 2.0, height - 1.9*cm, "PERMIS DE FEU")
+    c.setFont("Helvetica-Bold", 12)
+    c.drawCentredString(width / 2.0, height - 2.5*cm, "Travaux par Points Chauds")
+
+    # Cadre N° Permis (à droite, style tampon)
+    c.setStrokeColor(colors.white)
+    c.setLineWidth(2)
+    c.roundRect(width - 5.5*cm, height - 2.5*cm, 4*cm, 1.5*cm, 5, stroke=1, fill=0)
+    c.setFont("Helvetica-Bold", 10)
+    c.drawRightString(width - 1.8*cm, height - 1.5*cm, "N° PERMIS")
+    c.setFont("Helvetica-Bold", 16)
+    c.drawRightString(width - 1.8*cm, height - 2.2*cm, str(permis.id).zfill(6))
+    c.setStrokeColor(BRAND_RED) # Reset stroke color
+
+def draw_section_title(c, y_pos, title):
+    """Dessine une barre de titre de section rouge"""
+    c.setFillColor(BRAND_RED)
+    c.rect(1*cm, y_pos, width - 2*cm, 0.8*cm, fill=1, stroke=0)
+    c.setFillColor(colors.white)
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(1.5*cm, y_pos + 0.25*cm, title.upper())
+    c.setFillColor(DARK_GREY) # Reset text color
+
+def draw_field(c, x, y, label, value, field_width=8*cm):
+    """Dessine un champ label : valeur soulignée"""
+    c.setFont("Helvetica-Bold", 9)
+    c.drawString(x, y, label + " :")
+    c.setFont("Helvetica", 10)
+    c.drawString(x + 0.2*cm, y - 0.5*cm, value or "Non renseigné")
+    # Ligne de soulignement
+    c.setStrokeColor(colors.grey)
+    c.setLineWidth(0.5)
+    c.line(x, y - 0.7*cm, x + field_width, y - 0.7*cm)
+    c.setStrokeColor(BRAND_RED)
+
+def draw_checkbox_line(c, x, y, label, checked, is_mandatory=False):
+    """Dessine une ligne avec case à cocher style formulaire"""
+    # Carré
+    c.setStrokeColor(BRAND_RED)
+    c.setLineWidth(1)
+    c.rect(x, y, 0.5*cm, 0.5*cm)
+    
+    if checked:
+        # Grande croix rouge si coché
+        c.setLineWidth(2)
+        c.line(x, y, x + 0.5*cm, y + 0.5*cm)
+        c.line(x, y + 0.5*cm, x + 0.5*cm, y)
+        c.setLineWidth(1)
+
+    # Label
+    font = "Helvetica-Bold" if is_mandatory else "Helvetica"
+    c.setFont(font, 10)
+    prefix = "IMPÉRATIF : " if is_mandatory else ""
+    c.drawString(x + 0.8*cm, y + 0.1*cm, prefix + label)
+
+# --- FONCTION PRINCIPALE ---
 
 def generate_permis_feu_pdf(buffer, permis, chantier):
-    p = canvas.Canvas(buffer, pagesize=A4)
-    width, height = A4
+    c = canvas.Canvas(buffer, pagesize=A4)
+    c.setTitle(f"Permis Feu {permis.id}")
     
-    # --- EN-TÊTE ---
-    p.setFont("Helvetica-Bold", 16)
-    p.drawString(50, height - 50, "PERMIS DE FEU")
-    
-    p.setFont("Helvetica", 10)
-    p.drawString(50, height - 70, f"Chantier : {chantier.nom}")
-    p.drawString(50, height - 85, f"Adresse : {chantier.adresse}")
-    p.drawString(400, height - 50, f"N° Permis: {permis.id}")
-    p.drawString(400, height - 65, f"Date: {permis.date.strftime('%d/%m/%Y')}")
+    # Dessin de l'en-tête
+    draw_header(c, permis, chantier)
 
-    # --- LIGNE DE SÉPARATION ---
-    p.line(50, height - 100, 550, height - 100)
+    current_y = height - 4.5*cm
 
-    # --- DÉTAILS ---
-    y = height - 130
-    p.setFont("Helvetica-Bold", 12)
-    p.drawString(50, y, "Détails de l'intervention")
+    # --- SECTION 1 : INTERVENANTS & LIEU ---
+    draw_section_title(c, current_y, "Cadre de l'intervention")
+    current_y -= 1.5*cm
     
-    y -= 25
-    p.setFont("Helvetica", 11)
-    p.drawString(60, y, f"Lieu exact : {permis.lieu}")
-    y -= 20
-    p.drawString(60, y, f"Intervenant : {permis.intervenant}")
-    y -= 20
-    p.drawString(60, y, f"Description des travaux :")
-    y -= 15
-    p.drawString(70, y, f"{permis.description}")
+    # Colonne Gauche (Lieu)
+    draw_field(c, 1.5*cm, current_y, "Chantier / Client", chantier.nom)
+    current_y -= 1.2*cm
+    draw_field(c, 1.5*cm, current_y, "Lieu exact des travaux", permis.lieu)
+    
+    # Colonne Droite (Dates & Exécutant) - On remonte le Y
+    current_y += 1.2*cm
+    draw_field(c, 11*cm, current_y, "Date de validité", permis.date.strftime('%d/%m/%Y'))
+    current_y -= 1.2*cm
+    draw_field(c, 11*cm, current_y, "Responsable Exécutant", permis.intervenant)
 
-    # --- MESURES DE SÉCURITÉ ---
-    y -= 40
-    p.setFont("Helvetica-Bold", 12)
-    p.drawString(50, y, "Mesures de Prévention appliquées :")
-    
-    y -= 25
-    p.setFont("Helvetica", 11)
-    
-    def draw_checkbox(x, y, label, checked):
-        # Carré
-        p.rect(x, y, 10, 10)
-        p.drawString(x + 20, y + 2, label)
-        if checked:
-            # Croix si coché
-            p.line(x, y, x + 10, y + 10)
-            p.line(x, y + 10, x + 10, y)
+    current_y -= 1.5*cm
 
-    draw_checkbox(60, y, "Extincteur à proximité immédiate", permis.extincteur)
-    y -= 20
-    draw_checkbox(60, y, "Nettoyage de la zone (poussières, combustibles)", permis.nettoyage)
-    y -= 20
-    draw_checkbox(60, y, "Surveillance post-intervention (2h)", permis.surveillance)
-
-    # --- SIGNATURE ---
-    y -= 60
-    p.line(50, y, 550, y)
-    y -= 30
-    p.setFont("Helvetica-Oblique", 10)
-    p.drawString(50, y, "Le présent permis est valable pour la journée en cours uniquement.")
+    # --- SECTION 2 : DESCRIPTION DES TRAVAUX ---
+    draw_section_title(c, current_y, "Nature des travaux par points chauds")
+    current_y -= 1*cm
     
-    y -= 40
-    p.setFont("Helvetica-Bold", 10)
-    p.drawString(350, y, "Visa / Signature :")
+    # Boîte de description avec fond légèrement grisé
+    c.setFillColor(LIGHT_RED_BG)
+    c.setStrokeColor(BRAND_RED)
+    c.rect(1*cm, current_y - 2*cm, width - 2*cm, 2.5*cm, fill=1, stroke=1)
+    
+    c.setFillColor(DARK_GREY)
+    c.setFont("Helvetica", 10)
+    # On positionne le texte en haut de la boîte
+    text_y = current_y + 0.2*cm
+    c.drawString(1.5*cm, text_y, "Description détaillée :")
+    c.setFont("Helvetica-Oblique", 11)
+    # Petit hack pour gérer le texte long (on prend les 90 premiers caractères pour l'instant)
+    # Pour faire mieux, il faudrait utiliser l'objet Paragraph de ReportLab (plus complexe)
+    desc_text = permis.description[:180] + ("..." if len(permis.description) > 180 else "")
+    c.drawString(1.5*cm, text_y - 0.7*cm, desc_text)
+
+    current_y -= 3*cm
+
+    # --- SECTION 3 : MESURES DE SÉCURITÉ IMPÉRATIVES ---
+    draw_section_title(c, current_y, "Sécurité & Consignes (Check-list avant travaux)")
+    current_y -= 1.2*cm
+
+    # Liste des cases à cocher style formulaire
+    draw_checkbox_line(c, 1.5*cm, current_y, "Moyens d'extinction (extincteur adapté) à portée de main immédiate.", permis.extincteur, is_mandatory=True)
+    current_y -= 0.8*cm
+    draw_checkbox_line(c, 1.5*cm, current_y, "Zone nettoyée : absence de combustibles dans un rayon de 10m.", permis.nettoyage, is_mandatory=True)
+    current_y -= 0.8*cm
+    draw_checkbox_line(c, 1.5*cm, current_y, "Surveillance post-intervention maintenue pendant 2 heures.", permis.surveillance, is_mandatory=True)
+    
+    # Ajout de consignes fixes "réglementaires"
+    current_y -= 1.2*cm
+    c.setFont("Helvetica-Bold", 9)
+    c.drawString(1.5*cm, current_y, "Autres consignes permanentes :")
+    c.setFont("Helvetica", 9)
+    current_y -= 0.5*cm
+    c.drawString(2*cm, current_y, "• Alerte des secours : Composer le 18 ou le 112 en cas de départ de feu.")
+    current_y -= 0.5*cm
+    c.drawString(2*cm, current_y, "• Protection des matériaux inamovibles par bâches ignifugées.")
+
+    current_y -= 1.5*cm
+
+    # --- SECTION 4 : SIGNATURES ---
+    draw_section_title(c, current_y, "Validation & Signatures")
+    current_y -= 2.5*cm
+
+    # Création de 2 cadres de signature côte à côte
+    box_width = (width - 3*cm) / 2
+    box_height = 2.5*cm
+
+    # Cadre Demandeur / Sécurité
+    c.setStrokeColor(BRAND_RED)
+    c.rect(1*cm, current_y, box_width, box_height)
+    c.setFont("Helvetica-Bold", 9)
+    c.drawCentredString(1*cm + box_width/2, current_y + box_height - 0.5*cm, "Pour le Donneur d'Ordre / Sécurité")
+    c.setFont("Helvetica-Oblique", 8)
+    c.drawCentredString(1*cm + box_width/2, current_y + 0.3*cm, "(Nom, Date et Signature)")
+
+    # Cadre Exécutant
+    c.rect(1*cm + box_width + 1*cm, current_y, box_width, box_height)
+    c.setFont("Helvetica-Bold", 9)
+    c.drawCentredString(1*cm + box_width + 1*cm + box_width/2, current_y + box_height - 0.5*cm, "L'Exécutant (Intervenant)")
+    
+    # Gestion de la signature numérique de l'app
     if permis.signature:
-        p.setFillColor(colors.green)
-        p.drawString(350, y - 20, "✅ SIGNÉ NUMÉRIQUEMENT")
-        p.setFillColor(colors.black)
+        c.setFillColor(colors.green)
+        c.setFont("Helvetica-Bold", 12)
+        c.drawCentredString(1*cm + box_width + 1*cm + box_width/2, current_y + 1.2*cm, "✅ VALIDÉ NUMÉRIQUEMENT")
+        c.setFont("Helvetica", 8)
+        c.drawCentredString(1*cm + box_width + 1*cm + box_width/2, current_y + 0.8*cm, f"Date : {permis.date.strftime('%d/%m/%Y %H:%M')}")
+        c.setFillColor(DARK_GREY)
+    else:
+        c.setFont("Helvetica-Oblique", 8)
+        c.drawCentredString(1*cm + box_width + 1*cm + box_width/2, current_y + 0.3*cm, "(Lu et approuvé, Signature)")
 
-    # Fin du document
-    p.showPage()
-    p.save()
+    # --- PIED DE PAGE AVEC AVERTISSEMENT ---
+    c.setFillColor(BRAND_RED)
+    c.setFont("Helvetica-BoldOblique", 10)
+    warning_msg = "ATTENTION : Ce permis n'est valable que pour la journée, le lieu et les travaux définis ci-dessus. En cas de changement, un nouveau permis doit être établi."
+    c.drawCentredString(width / 2.0, 1.5*cm, warning_msg)
+    
+    # Numéro de page simple
+    c.setFillColor(DARK_GREY)
+    c.setFont("Helvetica", 8)
+    c.drawRightString(width - 1*cm, 0.5*cm, "Généré par Conforméo - Page 1/1")
+
+    c.showPage()
+    c.save()
